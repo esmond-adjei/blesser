@@ -1,5 +1,0 @@
-/* Local copies of the Google Fonts faces, for offline use. */
-@font-face { font-family: "Instrument Sans"; src: url("InstrumentSans[wdth,wght].ttf") format("truetype"); font-weight: 400 700; font-style: normal; }
-@font-face { font-family: "Instrument Sans"; src: url("InstrumentSans-Italic[wdth,wght].ttf") format("truetype"); font-weight: 400 700; font-style: italic; }
-@font-face { font-family: "Newsreader"; src: url("Newsreader[opsz,wght].ttf") format("truetype"); font-weight: 200 800; font-style: normal; }
-@font-face { font-family: "Newsreader"; src: url("Newsreader-Italic[opsz,wght].ttf") format("truetype"); font-weight: 200 800; font-style: italic; }

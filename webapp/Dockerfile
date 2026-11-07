@@ -1,8 +1,8 @@
 # Builder: bake VITE_API_URL at build time.
-#   - Same-origin (composed nginx proxy): leave empty (default).
-#   - Standalone webapp (Vercel/Netlify/own host): pass the api origin,
-#     e.g. --build-arg VITE_API_URL=https://graduator-api.example.com
-FROM node:22-alpine AS builder
+#   - Same-origin (the compose nginx proxy): leave empty (default).
+#   - Standalone host: pass the API origin,
+#     e.g. --build-arg VITE_API_URL=https://api.example.com
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 

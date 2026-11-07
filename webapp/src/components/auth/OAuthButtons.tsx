@@ -4,7 +4,7 @@ import * as api from "../../lib/api"
 import { toastError } from "../../lib/toast"
 import { Button } from "../ui/button"
 
-export const OAUTH_STATE_KEY = "graduator.oauth.state"
+export const OAUTH_STATE_KEY = "blesser.oauth.state"
 
 /** Google "G" mark (brand guidelines: always the four-colour glyph). */
 function GoogleMark() {

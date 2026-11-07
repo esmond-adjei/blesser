@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { ScanDialog } from "./Scans"
 
 const SORTS = [
   { value: "deadline", label: "Closing soonest" },
@@ -561,82 +562,6 @@ function TodoDialog({ opp, onClose }: { opp: Opportunity | null; onClose: () => 
             </Button>
             <Button type="submit" disabled={create.isPending || !title.trim()}>
               Add
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const navigate = useNavigate()
-  const [categories, setCategories] = React.useState<OpportunityCategory[]>([...CATEGORIES])
-  const [region, setRegion] = React.useState("Ghana")
-  const [focus, setFocus] = React.useState("")
-  const [busy, setBusy] = React.useState(false)
-  const toggle = (c: OpportunityCategory) =>
-    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" onClose={() => onOpenChange(false)}>
-        <form
-          className="flex min-h-0 flex-auto flex-col"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            if (!categories.length) return
-            setBusy(true)
-            try {
-              const started = await api.startOpportunityScan({ categories, region: region.trim(), focus: focus.trim() })
-              toastSuccess(`Agents are searching (${started.tasks} ${started.tasks === 1 ? "task" : "tasks"}).`)
-              onOpenChange(false)
-              navigate(`/runs/${started.run_id}`)
-            } catch (err) {
-              toastError(err, "Couldn't start the search")
-            } finally {
-              setBusy(false)
-            }
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Find more opportunities</DialogTitle>
-            <DialogDescription>
-              Agents search the web, read each opportunity's own page and add what they can verify to the public
-              catalogue. You can watch them work.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
-            <fieldset className="space-y-2">
-              <legend className="g-label mb-1">Look for</legend>
-              {CATEGORIES.map((c) => (
-                <label key={c} className="flex items-start gap-2 text-sm">
-                  <input type="checkbox" className="mt-0.5" checked={categories.includes(c)} onChange={() => toggle(c)} />
-                  <span>
-                    <span className="font-medium text-label">{CATEGORY_LABELS[c]}</span>
-                    <span className="block text-label-secondary">{CATEGORY_DESCRIPTIONS[c]}</span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-            <Field label="Region">
-              <Input value={region} onChange={(e) => setRegion(e.target.value)} maxLength={120} placeholder="Ghana" />
-            </Field>
-            <Field label="Focus (optional)">
-              <Textarea
-                value={focus}
-                onChange={(e) => setFocus(e.target.value)}
-                maxLength={2000}
-                rows={3}
-                placeholder="e.g. agritech and climate startups; PhD funding in public health"
-              />
-            </Field>
-          </DialogBody>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy || !categories.length}>
-              <Sparkles /> Start search
             </Button>
           </DialogFooter>
         </form>

@@ -12,7 +12,7 @@ from api.core.config import settings
 
 log = logging.getLogger(__name__)
 
-LOGO_CID = "graduator-logo"
+LOGO_CID = "blesser-logo"
 _LOGO = Path(__file__).with_name("mail_logo.png")
 
 

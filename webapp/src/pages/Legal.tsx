@@ -3,13 +3,10 @@ import { Link } from "react-router-dom"
 import { AppLogo } from "../components/layout/AppLogo"
 
 /** Bumped with api TERMS_VERSION when either notice changes. */
-export const TERMS_VERSION = "2026-10-15"
+export const TERMS_VERSION = "2026-11-07"
 
 /** Operator contact for privacy and removal requests (build-time). */
 const CONTACT = import.meta.env.VITE_CONTACT_EMAIL as string | undefined
-
-/** The marketing site (build-time). */
-const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim()
 
 function LegalShell({ title, children }: { title: string; children: React.ReactNode }) {
   React.useEffect(() => {
@@ -17,7 +14,7 @@ function LegalShell({ title, children }: { title: string; children: React.ReactN
   }, [title])
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <a href={SITE_URL ?? "/"} className="mb-8 flex items-center gap-2.5">
+      <a href="/" className="mb-8 flex items-center gap-2.5">
         <AppLogo className="size-8" />
         <span className="text-lg font-bold tracking-tight">Blesser</span>
       </a>
@@ -48,37 +45,23 @@ export function Privacy() {
       <section>
         <h2>What we store about you</h2>
         <ul>
-          <li>Your account: email, a hashed password, display name and profile picture.</li>
-          <li>Your research: runs, interest statements, programmes, professors, scores, drafts, applications and chats.</li>
-          <li>Uploaded CVs (the file, your base CV text and every tailored version) and any data-export archive you create (kept 7 days).</li>
-          <li>Agent traces (pages read, tool calls, checkpoints), deleted 90 days after a task finishes.</li>
-          <li>Model usage counts, and model keys you add (encrypted, never shown again).</li>
+          <li>Your account: email, a hashed password (or your Google sign-in) and display name.</li>
+          <li>What you track: applications, their checklists and notes, to-dos, and your notification settings.</li>
+          <li>Scans you start, with their agent traces (searches, pages read, tool calls), deleted 90 days after a scan finishes.</li>
+          <li>Opportunities you share, which become part of the public catalogue once published.</li>
         </ul>
         <p className="mt-2">
-          Deleting your account removes all of it, including CV files and export archives. You can export
-          everything first from Settings.
+          Deleting your account in Settings removes all of it except opportunities in the public catalogue.
         </p>
       </section>
       <section>
         <h2>Who else sees it</h2>
-        <p>To do the research, parts of your data are sent to:</p>
         <ul>
-          <li>The language model provider you choose (or the instance's default): your interest statement, CV text when you ask about it, chats, and the pages the agent reads.</li>
-          <li>The embedding provider used for alignment scores: your interest statement and paper abstracts.</li>
-          <li>Web search providers (Tavily, Brave, or DuckDuckGo where enabled): search queries, which can paraphrase your interest statement.</li>
-          <li>OpenAlex, for publication data: professor names and author ids.</li>
-          <li>University and lab websites, fetched directly, and the Internet Archive as a fallback copy.</li>
+          <li>The opportunity catalogue is public. Nothing else you store is.</li>
+          <li>Your calendar link is private: anyone who has it can see your deadlines and dated to-dos. Make a new one in To-dos if it leaks.</li>
+          <li>Scans send search queries, including any focus notes you give, to the web search provider and the language model provider this service uses, and fetch public web pages.</li>
         </ul>
-        <p className="mt-2">Nothing is sold, and no email is ever sent on your behalf.</p>
-      </section>
-      <section>
-        <h2>People we research</h2>
-        <p>
-          Blesser collects publicly available academic information about faculty (name, institution, publications,
-          public profile and lab links, photo and bio from faculty pages) into the accounts of students who research
-          them. If you are one of them and want your information removed from every account and excluded from future
-          research, contact <Contact />. We delete it and record an opt-out.
-        </p>
+        <p className="mt-2">Nothing is sold.</p>
       </section>
       <section>
         <h2>Contact</h2>
@@ -96,25 +79,17 @@ export function Terms() {
       <section>
         <h2>The service</h2>
         <p>
-          Blesser helps you discover opportunities such as grants, accelerators, fellowships and scholarships, track your applications, to-dos and deadlines, find graduate programmes and supervisors, and draft outreach emails for you to review.
-          Research results come from automated tools and public sources and can be wrong or out of date: check
-          anything important before you rely on it.
+          Blesser lists grants, accelerators, fellowships, scholarships and other opportunities, and helps you track
+          your applications, to-dos and deadlines. Listings are found by automated agents and by people, and can be
+          wrong or out of date: always check the official page before you apply or rely on a deadline.
         </p>
       </section>
       <section>
         <h2>Your responsibilities</h2>
         <ul>
-          <li>Keep your sign-in details safe and only upload content you have the right to use.</li>
-          <li>Review every draft before you send it. You are the sender, and you are responsible for what it says.</li>
-          <li>Don't use Blesser to send bulk or automated email, to harass anyone, or to collect data about people for any other purpose.</li>
-        </ul>
-      </section>
-      <section>
-        <h2>Contacting professors</h2>
-        <ul>
-          <li>Send individual, relevant messages from your own address, and stop if someone asks you to.</li>
-          <li>In the US (CAN-SPAM) and the EU/UK (GDPR, ePrivacy), unsolicited messages must identify you honestly and respect opt-outs; academic enquiries are usually fine, mass mailing is not.</li>
-          <li>Never claim qualifications you don't have. Fill in every [placeholder] in a draft yourself.</li>
+          <li>Keep your sign-in details safe.</li>
+          <li>Only share real opportunities, with a link to their official page.</li>
+          <li>Don't use Blesser to send spam, to harass anyone, or to overload the service.</li>
         </ul>
       </section>
       <section>

@@ -7,12 +7,12 @@ Blesser makes opportunities visible: grants, accelerators, incubators, fellowshi
 | Piece | Code | Notes |
 |---|---|---|
 | Catalogue | `api/api/opportunities/` (`models.py`, `service.py`, `routes.py`) | One shared, public table: `opportunities`. Deduplicated on normalized organization + title (`dedupe_key`). |
-| Discovery agent | `opportunities/tasks.py`, `prompts.py`, `tools.py` | Task type `discover_opportunities`, one per audience category, on the existing run queue. Its only write is `save_opportunity`. |
-| Scans | `opportunities/scans.py` | A scan is a run whose field starts with `Opportunities:`. The run page shows its agents and their traces live. |
+| Discovery agent | `opportunities/tasks.py`, `prompts.py`, `tools.py` | Task type `discover_opportunities`, one per audience category. Its tools are `search_web`, `fetch_page` and `save_opportunity`. |
+| Scans | `api/api/scans/` | A scan queues one discovery task per category on a Postgres-backed queue (leases, retries, a reaper). The scan page shows each agent's steps as it works. |
 | Tracking | `applications.opportunity_id` | Tracking copies the opportunity into the person's application tracker. Status, checklist, notes and the 14/7/1-day deadline reminders then work as for any application. |
 | To-dos | `api/api/todos/` | Private to-dos, optionally linked to an opportunity or an application. |
 | Calendar | `todos/ics.py`, `todos/service.py` | A per-opportunity `.ics` download, a Google Calendar link, and a private subscription feed of deadlines and dated to-dos. |
-| Web app | `webapp/src/pages/Opportunities.tsx`, `Todos.tsx`, `lib/opportunities.ts` | `/opportunities` is public (signed-out visitors get a light frame); `/todos` needs an account. |
+| Web app | `webapp/src/pages/` | `/opportunities` is public (signed-out visitors get a light frame); `/applications`, `/todos`, `/scans` and `/settings` need an account. |
 
 ## How an agent save is grounded
 
@@ -35,7 +35,7 @@ These checks catch a model that invents a page or a date. They do not prove a pa
 
 ## Keeping the catalogue fresh
 
-People start scans from the Opportunities page with **Find more**. A scan is a normal run, so it uses the person's own model settings and counts against their plan's monthly run quota.
+Signed-in people start scans from the Opportunities or Scans page. Scans use the operator's model and search keys, so each account may start 3 an hour and 10 a day.
 
 For an always-fresh public catalogue, set `OPPORTUNITY_SWEEP_EMAIL` to an existing account and `OPPORTUNITY_SWEEP_HOURS` to an interval, for example 24. Once an hour, the worker's housekeeping loop checks whether that account's newest scan is older than the interval and, if it is, starts a scan of every category in `OPPORTUNITY_DEFAULT_REGION`.
 
@@ -48,7 +48,8 @@ For an always-fresh public catalogue, set `OPPORTUNITY_SWEEP_EMAIL` to an existi
 | `GET /api/opportunities/{id}` | none | One published opportunity. |
 | `GET /api/opportunities/{id}/calendar.ics` | none | The deadline as an all-day event, with reminders 7 days and 1 day before. |
 | `POST /api/opportunities` | account | Share an opportunity (held for review). |
-| `POST /api/opportunities/scans` | account | Start a scan: `{categories, region, focus}`. Returns `{run_id, tasks}`. |
+| `POST /api/scans`, `GET /api/scans`, `GET /api/scans/{id}` | account | Start a scan (`{categories, region, focus}`), list yours, or read one with every task's trace. |
+| `POST /api/scans/{id}/cancel`, `DELETE /api/scans/{id}` | account | Stop a scan; delete one (its opportunities stay in the catalogue). |
 | `POST /api/opportunities/{id}/track` | account | Add the opportunity to the application tracker (idempotent). |
 | `GET /api/opportunities/tracked` | account | `{opportunity_id: application_id}`. |
 | `GET /api/opportunities/pending`, `PATCH /api/opportunities/{id}/status` | ops admin | Moderation. |

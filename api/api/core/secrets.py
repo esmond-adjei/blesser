@@ -27,7 +27,7 @@ def _fernet() -> Fernet | None:
         return Fernet(settings.secrets_key.encode())
     if settings.auth_secret:
         digest = hashlib.sha256(
-            b"graduator-secrets:" + settings.auth_secret.encode()
+            b"blesser-secrets:" + settings.auth_secret.encode()
         ).digest()
         return Fernet(base64.urlsafe_b64encode(digest))
     if not _warned:

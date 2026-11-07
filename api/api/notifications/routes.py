@@ -165,7 +165,7 @@ async def send_test(
         user_id=current.id,
         kind="test",
         title="Test notification",
-        body="Notifications from Graduator reach this device.",
+        body="Notifications from Blesser reach this device.",
         link="/new?settings=notifications",
         dedupe_key=f"test:{uuid.uuid4().hex}",
     )
@@ -214,10 +214,10 @@ async def send_test_email(
     sent = await mailer.send(
         compose(
             to=user.email,
-            subject="Test email from Graduator",
+            subject="Test email from Blesser",
             eyebrow="Test",
             heading="Email notifications work",
-            paragraphs=["This address receives Graduator notifications. Choose which events email you in your notification settings."],
+            paragraphs=["This address receives Blesser notifications. Choose which events email you in your notification settings."],
             action=("Open notification settings", delivery.settings_link()),
         )
     )

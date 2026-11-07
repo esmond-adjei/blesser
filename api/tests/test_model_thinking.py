@@ -118,5 +118,5 @@ def _compat(chunks, label="ollama", model="m"):
 def test_a_reply_that_merely_starts_with_markup_is_left_alone():
     assert split_thinking("<b>Bold</b> start") == ("", "<b>Bold</b> start")
     assert split_thinking("<thought>Plan.</thought>Answer") == ("Plan.", "Answer")
-    # Cut off mid-thought: nothing said yet, so Gradis asks again with room.
+    # Cut off mid-thought: nothing said yet, so the model is asked again with room.
     assert split_thinking("<think>Still going") == ("Still going", "")

@@ -54,7 +54,7 @@ def email_for(user: auth_models.User, notification: notification_models.Notifica
         eyebrow=kind.label if kind else None,
         heading=notification.title,
         paragraphs=[notification.body] if notification.body else [],
-        action=("Open in Graduator", app_url(notification.link)),
+        action=("Open in Blesser", app_url(notification.link)),
         footer=Footer(
             reason=f"You're getting this because email is on for {kind.label if kind else 'this event'} in your notification settings.",
             links=[("Stop emails like this one", unsubscribe_link(user.id, notification.kind)), ("Notification settings", settings_link())],

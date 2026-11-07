@@ -11,7 +11,6 @@ export default defineConfig({
       // In production, serve the built client from the backend or set
       // VITE_API_URL to the API origin.
       "/api": { target: "http://localhost:8000", changeOrigin: true },
-      "/health": { target: "http://localhost:8000", changeOrigin: true },
       "/ready": { target: "http://localhost:8000", changeOrigin: true },
     },
   },

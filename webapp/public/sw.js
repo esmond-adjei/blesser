@@ -1,4 +1,4 @@
-/* Graduator service worker: browser push notifications only (#196).
+/* Blesser service worker: browser push notifications only.
  *
  * No offline cache: the app is online-only, and a fetch handler would
  * only add a stale-asset failure mode. A push payload carries
@@ -14,15 +14,15 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {}
   } catch {
-    data = { title: "Graduator", body: event.data ? event.data.text() : "" }
+    data = { title: "Blesser", body: event.data ? event.data.text() : "" }
   }
-  const title = data.title || "Graduator"
+  const title = data.title || "Blesser"
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(title, {
         body: data.body || "",
-        icon: "/logo-light.svg",
-        badge: "/logo-light.svg",
+        icon: "/logo.svg",
+        badge: "/logo.svg",
         tag: data.id || undefined,
         data: { link: data.link || "/" },
       }),

@@ -4,7 +4,7 @@ import * as api from "./api"
 import { currentSubscription } from "./push"
 import type { AuthUser } from "./types"
 
-const REFRESH_KEY = "graduator.refresh_token"
+const REFRESH_KEY = "blesser.refresh_token"
 /** Refresh this early so staggered pollers don't race the token's TTL. */
 const REFRESH_MARGIN_MS = 60_000
 

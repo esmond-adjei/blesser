@@ -1,13 +1,13 @@
 {
-  "name": "Graduator",
-  "short_name": "Graduator",
-  "description": "Agentic research and outreach for graduate programs",
-  "start_url": "/new",
+  "name": "Blesser",
+  "short_name": "Blesser",
+  "description": "Grants, accelerators, fellowships and scholarships for startups, researchers and students in Ghana",
+  "start_url": "/opportunities",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
-    { "src": "/logo-light.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

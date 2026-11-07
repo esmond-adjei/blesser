@@ -26,7 +26,6 @@ export class ErrorBoundary extends React.Component<
     if (!this.state.error) return this.props.children
     return (
       <ErrorState
-        mascot="error-gear"
         title="This part of Blesser hit a snag"
         description="Your data is safe. Try again, or reload the page if it keeps happening."
         action={

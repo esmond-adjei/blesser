@@ -4,14 +4,14 @@
 # drop the scratch database. Never touches the live database.
 #
 #   ops/restore-verify.sh                     # newest dump in ./backups
-#   ops/restore-verify.sh backups/graduator-20261015T020000Z.dump
+#   ops/restore-verify.sh backups/blesser-20261015T020000Z.dump
 set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-DUMP="${1:-$(ls -1t "$BACKUP_DIR"/graduator-*.dump | head -1)}"
+DUMP="${1:-$(ls -1t "$BACKUP_DIR"/blesser-*.dump | head -1)}"
 DB_SERVICE="${DB_SERVICE:-db}"
-PGUSER="${POSTGRES_USER:-graduator}"
-SCRATCH="graduator_restore_check_$$"
+PGUSER="${POSTGRES_USER:-blesser}"
+SCRATCH="blesser_restore_check_$$"
 psql() { docker compose exec -T "$DB_SERVICE" psql -U "$PGUSER" -v ON_ERROR_STOP=1 "$@"; }
 
 echo "restore-verify: $DUMP -> $SCRATCH"
@@ -23,7 +23,7 @@ head=$(psql -d "$SCRATCH" -Atc "SELECT version_num FROM alembic_version")
 [ -n "$head" ] || { echo "restore-verify: FAIL: no alembic version in restore" >&2; exit 1; }
 echo "restore-verify: alembic head = $head"
 users=0
-for t in users runs applications cv_documents; do
+for t in users opportunities applications scans; do
   n=$(psql -d "$SCRATCH" -Atc "SELECT count(*) FROM $t")
   echo "restore-verify: $t = $n rows"
   [ "$t" != users ] || users="$n"

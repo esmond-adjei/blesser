@@ -1,306 +1,340 @@
 import * as React from "react"
-import { Plus } from "lucide-react"
-import { usePreviewParam, useUrlParam } from "../lib/urlParams"
+import { Link } from "react-router-dom"
+import { ArrowUpRight, Plus, Trash2 } from "lucide-react"
+import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useApplications } from "../lib/applications"
+import { formatDay } from "../lib/format"
+import { toastError, toastSuccess } from "../lib/toast"
+import { cn } from "../lib/utils"
+import type { Application, ApplicationStatus, RequirementItem } from "../lib/types"
+import { Badge } from "../components/ui/badge"
+import { Button, buttonVariants } from "../components/ui/button"
+import { Field, Input, Textarea } from "../components/ui/input"
+import { Select } from "../components/ui/select"
 import {
-  APPLICATION_STATUSES,
-  daysUntil,
-  useApplications,
-  type Application,
-  type ApplicationStatus,
-} from "../lib/applications"
-import { toastError } from "../lib/toast"
-import { Button } from "../components/ui/button"
-import { Alert, AlertDescription } from "../components/ui/feedback"
-import { useDetailPanel } from "../components/layout/DetailPanel"
-import { EmptyState } from "../components/feedback/EmptyState"
-import { ApplicationAgenda, ApplicationBoard } from "../components/applications/ApplicationViews"
-import {
-  ApplicationCard,
-  ApplicationDetail,
-  ApplicationRowMenu,
-  statusLabel,
-} from "../components/cards/ApplicationCards"
-import { ApplicationWizard } from "../components/dialogs/ApplicationWizard"
-import { ConfirmDialog } from "../components/dialogs/ConfirmDialog"
-import { ListingView, gridColumnsClass } from "../components/listing/ListingView"
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog"
+import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 
-/** Grad-application tracker: requirements, offers, deadlines, and professor candidates. */
-export function Applications() {
-  const { apps, isLoading, upsert, remove, resolveProfessors, toggleRequirement, setStatus } = useApplications()
-  // Filter state lives in the URL (?q=, ?status=) so it is shareable.
-  const [query, setQuery] = useUrlParam("q")
-  const [statusParam, setStatusParam] = useUrlParam("status", "all")
-  // Sort order lives in the URL too (?sort=).
-  const [sortParam, setSortParam] = useUrlParam("sort", "deadline")
-  const sort = sortParam === "school" || sortParam === "updated" ? sortParam : "deadline"
-  const status = statusParam === "all" || APPLICATION_STATUSES.includes(statusParam as (typeof APPLICATION_STATUSES)[number])
-    ? statusParam
-    : "all"
-  const [deadlineParam, setDeadlineParam] = useUrlParam("due", "all")
-  const deadline = DEADLINE_WINDOWS.some((w) => w.value === deadlineParam) ? deadlineParam : "all"
-  const [degreeParam, setDegreeParam] = useUrlParam("degree", "all")
-  const degree = ["PhD", "Masters", "Either"].includes(degreeParam) ? degreeParam : "all"
-  const [waiverParam, setWaiverParam] = useUrlParam("waiver", "all")
-  const waiver = waiverParam === "yes" ? "yes" : "all"
-  const [editorOpen, setEditorOpen] = React.useState(false)
-  const [editing, setEditing] = React.useState<Application | null>(null)
-  const [deleting, setDeleting] = React.useState<Application | null>(null)
+function todayIso(): string {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+}
 
-  const q = query.trim().toLowerCase()
-  const filtered = apps.filter((a) => {
-    if (status !== "all" && a.status !== status) return false
-    if (degree !== "all" && a.degreeType !== degree) return false
-    if (waiver === "yes" && !a.feeWaiver) return false
-    if (!inWindow(a.deadline, deadline)) return false
-    if (!q) return true
-    return `${a.school} ${a.program} ${a.location} ${a.professors.map((p) => p.name).join(" ")}`.toLowerCase().includes(q)
-  })
-  // Client-side ordering. Unknown deadlines sink below dated ones.
-  const sorted = [...filtered].sort((a, b) => {
-    if (sort === "school") return a.school.localeCompare(b.school) || a.program.localeCompare(b.program)
-    if (sort === "updated") return b.updatedAt.localeCompare(a.updatedAt)
-    const da = a.deadline ? Date.parse(a.deadline) : Number.POSITIVE_INFINITY
-    const db = b.deadline ? Date.parse(b.deadline) : Number.POSITIVE_INFINITY
-    return da - db || a.school.localeCompare(b.school)
-  })
+function daysUntil(day: string): number {
+  return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${todayIso()}T00:00:00Z`)) / 86_400_000)
+}
 
-  // Selection lives in ?preview= so the rail is deep-linkable and Back closes it.
-  const { previewId: selectedId, openPreview: openApp, closePreview: closeApp } = usePreviewParam()
-  const { setPanel, clearPanel } = useDetailPanel()
-
-  const move = (app: Application, next: ApplicationStatus) => {
-    setStatus(app.id, next).catch(() => toastError(`Couldn't move ${app.program || app.school}. Try again.`))
-  }
-  const menuFor = (a: Application) => (
-    <ApplicationRowMenu app={a} onEdit={() => openEdit(a)} onDelete={() => setDeleting(a)} onMove={(next) => move(a, next)} />
-  )
-  // Deadlines that need attention: open applications due within a week.
-  const dueSoon = apps.filter((a) => {
-    const d = daysUntil(a.deadline)
-    return (a.status === "wishlist" || a.status === "applying") && d !== null && d >= 0 && d < 7
-  }).length
-
-  function openCreate() {
-    setEditing(null)
-    setEditorOpen(true)
-  }
-  const openEdit = React.useCallback((app: Application) => {
-    setEditing(app)
-    setEditorOpen(true)
-  }, [])
-
-  // The rail appears only after the user picks a row.
-  const selected = selectedId ? (apps.find((a) => a.id === selectedId) ?? null) : null
-  React.useEffect(() => {
-    if (selected) {
-      setPanel(
-        <ApplicationDetail
-          key={selected.id}
-          app={selected}
-          onEdit={() => openEdit(selected)}
-          onDelete={() => setDeleting(selected)}
-          onToggleRequirement={(index) => void toggleRequirement(selected.id, index)}
-          onResolve={() => resolveProfessors(selected.id)}
-          size="panel"
-        />,
-        {
-          onClose: closeApp,
-          title: selected.program || selected.school || "Application",
-          ref: { kind: "application", id: selected.id },
-          actions: (
-            <ApplicationRowMenu
-              variant="header"
-              app={selected}
-              onEdit={() => openEdit(selected)}
-              onDelete={() => setDeleting(selected)}
-            />
-          ),
-        },
-      )
-    } else {
-      clearPanel()
-    }
-  }, [selected, setPanel, clearPanel, closeApp, openEdit, resolveProfessors, toggleRequirement])
-
-  // Unmount only: clearing in the effect above would reopen the rail after every save.
-  React.useEffect(() => () => clearPanel(), [clearPanel])
-
+function DeadlineBadge({ app }: { app: Application }) {
+  if (!app.deadline_date) return app.deadline ? <Badge variant="secondary">{app.deadline}</Badge> : null
+  const days = daysUntil(app.deadline_date)
+  const open = OPEN_STATUSES.includes(app.status)
+  const label = days < 0 ? "Deadline passed" : days === 0 ? "Due today" : days === 1 ? "Due tomorrow" : `${days} days left`
+  const variant = !open ? "outline" : days < 0 ? "outline" : days <= 7 ? "destructive" : days <= 21 ? "warning" : "success"
   return (
-    <>
-      <ListingView
-        title="Applications"
-        search={{ value: query, onChange: setQuery, placeholder: "Search school, program, professor..." }}
-        filters={[
-          {
-            id: "status",
-            label: "Status",
-            value: status,
-            options: [
-              { value: "all", label: "All statuses" },
-              ...APPLICATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
-            ],
-            onChange: setStatusParam,
-          },
-          {
-            id: "due",
-            label: "Deadline",
-            value: deadline,
-            options: DEADLINE_WINDOWS,
-            onChange: setDeadlineParam,
-          },
-          {
-            id: "degree",
-            label: "Degree",
-            value: degree,
-            options: [
-              { value: "all", label: "Any degree" },
-              { value: "PhD", label: "PhD" },
-              { value: "Masters", label: "Master's" },
-              { value: "Either", label: "PhD or Master's" },
-            ],
-            onChange: setDegreeParam,
-          },
-          {
-            id: "waiver",
-            label: "Fee waiver",
-            value: waiver,
-            options: [
-              { value: "all", label: "With or without" },
-              { value: "yes", label: "Fee waiver available" },
-            ],
-            onChange: setWaiverParam,
-          },
-        ]}
-        actions={
-          <Button aria-label="Track a new application" size="sm" onClick={openCreate}>
-            <Plus />
-          </Button>
-        }
-        viewStorageKey="applications:view"
-        availableViews={["board", "list", "grid"]}
-        defaultView="board"
-        gridColumns={3}
-        sort={{
-          value: sort,
-          options: [
-            { value: "deadline", label: "Deadline" },
-            { value: "school", label: "School A–Z" },
-            { value: "updated", label: "Recently updated" },
-          ],
-          onChange: setSortParam,
-        }}
-        items={sorted}
-        renderItems={(view, { columns }) => {
-          const isActive = (a: Application) => a.id === selectedId
-          const open = (a: Application) => openApp(a.id)
-          if (view === "board") {
-            return (
-              <ApplicationBoard
-                apps={sorted}
-                statuses={status === "all" ? APPLICATION_STATUSES : [status as ApplicationStatus]}
-                isActive={isActive}
-                onOpen={open}
-                menuFor={menuFor}
-                onMove={move}
-              />
-            )
-          }
-          if (view === "list") {
-            return <ApplicationAgenda apps={sorted} isActive={isActive} onOpen={open} menuFor={menuFor} />
-          }
-          return (
-            <ul className={`grid gap-4 ${gridColumnsClass(columns)}`}>
-              {sorted.map((a) => (
-                <li key={a.id} className="min-w-0">
-                  <ApplicationCard
-                    app={a}
-                    isActive={isActive(a)}
-                    onOpen={() => open(a)}
-                    onEdit={() => openEdit(a)}
-                    onDelete={() => setDeleting(a)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )
-        }}
-        status={isLoading ? "loading" : apps.length === 0 ? "empty" : "ready"}
-        empty={
-          <EmptyState
-            mascot="empty-box"
-            title="No applications tracked"
-            description="Add the programmes you will actually apply to, with deadlines, requirements, funding notes and the professors you want to work with. Research agents index admissions details here automatically."
-            action={<Button aria-label="Track a new application" size="sm" onClick={openCreate}><Plus /> Track your first application</Button>}
-          />
-        }
-        notice={
-          <>
-            {dueSoon > 0 && (
-              <p className="flex items-center gap-2 type-meta">
-                <span className="g-pill g-pill--caution">{dueSoon} due this week</span>
-                Open applications with a deadline in the next seven days.
-              </p>
-            )}
-            {selectedId && !isLoading && !selected ? (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  Application not found. It may have been deleted. Pick another one below.
-                </AlertDescription>
-              </Alert>
-            ) : undefined}
-          </>
-        }
-        noMatchText="Nothing matches these filters."
-      />
-
-      <ApplicationWizard
-        key={editing ? `edit-${editing.id}` : "new"}
-        open={editorOpen}
-        initial={editing}
-        onClose={() => setEditorOpen(false)}
-        onSave={(draft) => {
-          void upsert(draft).then((id) => {
-            setEditorOpen(false)
-            openApp(id)
-          })
-        }}
-      />
-      <ConfirmDialog
-        open={deleting !== null}
-        onOpenChange={(o) => { if (!o) setDeleting(null) }}
-        title="Delete application?"
-        description={`Removes ${deleting?.program || "this application"} at ${deleting?.school ?? ""} from your tracker. This can't be undone.`}
-        loading={false}
-        onConfirm={() => {
-          if (deleting) {
-            const id = deleting.id
-            setDeleting(null)
-            void remove(id).then(() => {
-              if (id === selectedId) closeApp()
-            })
-          }
-        }}
-      />
-    </>
+    <Badge variant={variant} data-tooltip={formatDay(app.deadline_date)}>
+      {open ? label : formatDay(app.deadline_date)}
+    </Badge>
   )
 }
 
-const DEADLINE_WINDOWS = [
-  { value: "all", label: "Any deadline" },
-  { value: "week", label: "Due in 7 days" },
-  { value: "month", label: "Due in 30 days" },
-  { value: "later", label: "Due later" },
-  { value: "closed", label: "Closed" },
-  { value: "none", label: "No deadline" },
+const FILTERS = [
+  { value: "active", label: "In progress" },
+  { value: "all", label: "All" },
+  ...STATUSES,
 ]
 
-function inWindow(deadline: string, window: string): boolean {
-  if (window === "all") return true
-  const d = daysUntil(deadline)
-  if (window === "none") return d === null
-  if (d === null) return false
-  if (window === "closed") return d < 0
-  if (window === "week") return d >= 0 && d < 7
-  if (window === "month") return d >= 0 && d <= 30
-  return d > 30
+export function Applications() {
+  const { data, isLoading, isError, refetch } = useApplications()
+  const { update } = useApplicationMutations()
+  const [filter, setFilter] = React.useState("active")
+  const [editing, setEditing] = React.useState<Application | null>(null)
+  const [adding, setAdding] = React.useState(false)
+
+  const apps = (data ?? []).filter((a) => {
+    if (filter === "all") return true
+    if (filter === "active") return a.status !== "accepted" && a.status !== "rejected"
+    return a.status === filter
+  })
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="type-page-title">Applications</h1>
+          <p className="type-meta max-w-2xl">
+            Everything you're applying for, from saved to accepted. Saved and preparing applications get deadline
+            reminders 14, 7 and 1 days before.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setAdding(true)}>
+          <Plus /> Add by hand
+        </Button>
+      </header>
+
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
+        {FILTERS.map((f) => {
+          const count =
+            f.value === "all"
+              ? data?.length
+              : f.value === "active"
+                ? data?.filter((a) => a.status !== "accepted" && a.status !== "rejected").length
+                : data?.filter((a) => a.status === f.value).length
+          return (
+            <button
+              key={f.value}
+              type="button"
+              aria-pressed={filter === f.value}
+              onClick={() => setFilter(f.value)}
+              className={cn(
+                "inline-flex h-8 items-center rounded-full border px-3 text-sm transition-colors",
+                filter === f.value ? "border-tint bg-tint-soft text-tint" : "border-border text-label-secondary hover:bg-fill-quiet",
+              )}
+            >
+              {f.label}
+              {count ? <span className="ml-1.5 text-xs opacity-70">{count}</span> : null}
+            </button>
+          )
+        })}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="h-16 animate-pulse rounded-lg bg-fill-quiet" />
+          ))}
+        </div>
+      ) : isError ? (
+        <ErrorState title="Couldn't load your applications" description="Try again in a moment." onRetry={() => void refetch()} />
+      ) : apps.length === 0 ? (
+        <EmptyState
+          title={data?.length ? "Nothing with this status" : "Nothing tracked yet"}
+          description="Track an opportunity from the catalogue, or add one by hand."
+          action={
+            <Link to="/opportunities" className={buttonVariants({ size: "sm" })}>
+              Browse opportunities
+            </Link>
+          }
+        />
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+          {apps.map((app) => {
+            const done = app.requirements.filter((r) => r.done).length
+            return (
+              <li key={app.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <button type="button" className="w-full min-w-0 text-left sm:w-auto sm:flex-1" onClick={() => setEditing(app)}>
+                  <span className="block truncate text-sm font-semibold text-label hover:underline">{app.title}</span>
+                  <span className="block truncate text-xs text-label-secondary">
+                    {[app.organization, app.kind].filter(Boolean).join(" · ")}
+                    {app.requirements.length ? ` · ${done}/${app.requirements.length} ready` : ""}
+                  </span>
+                </button>
+                <DeadlineBadge app={app} />
+                <Select
+                  aria-label={`Status of ${app.title}`}
+                  className="ml-auto w-auto min-w-[140px] sm:ml-0"
+                  value={app.status}
+                  onChange={(e) =>
+                    update.mutate(
+                      { id: app.id, body: { status: e.target.value as ApplicationStatus } },
+                      { onError: (err) => toastError(err, "Couldn't update the status") },
+                    )
+                  }
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </Select>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <ApplicationDialog app={editing} onClose={() => setEditing(null)} />
+      <AddDialog open={adding} onClose={() => setAdding(false)} />
+    </div>
+  )
+}
+
+function ApplicationDialog({ app, onClose }: { app: Application | null; onClose: () => void }) {
+  const { update, remove } = useApplicationMutations()
+  const [shown, setShown] = React.useState<Application | null>(app)
+  const [notes, setNotes] = React.useState("")
+  const [deadline, setDeadline] = React.useState("")
+  const [requirements, setRequirements] = React.useState<RequirementItem[]>([])
+  const [newItem, setNewItem] = React.useState("")
+  if (app && app !== shown) {
+    setShown(app)
+    setNotes(app.notes)
+    setDeadline(app.deadline_date ?? "")
+    setRequirements(app.requirements)
+    setNewItem("")
+  }
+  const save = (body: Parameters<typeof update.mutate>[0]["body"]) =>
+    shown && update.mutate({ id: shown.id, body }, { onError: (err) => toastError(err, "Couldn't save") })
+
+  return (
+    <Dialog open={!!app} onOpenChange={(open) => !open && onClose()}>
+      {shown ? (
+        <DialogContent className="max-w-xl" onClose={onClose}>
+          <DialogHeader>
+            <DialogTitle>{shown.title}</DialogTitle>
+            <DialogDescription>
+              {[shown.organization, shown.kind, STATUS_LABEL[shown.status]].filter(Boolean).join(" · ")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            {shown.benefits ? <p className="text-sm font-medium text-label">{shown.benefits}</p> : null}
+            <Field label="Deadline">
+              <Input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                onBlur={() => deadline !== (shown.deadline_date ?? "") && save({ deadline_date: deadline || null })}
+              />
+            </Field>
+            <div>
+              <p className="g-label mb-1.5">What to prepare</p>
+              <ul className="space-y-1.5">
+                {requirements.map((r, i) => (
+                  <li key={`${r.label}-${i}`} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={r.done}
+                      aria-label={r.label}
+                      onChange={() => {
+                        const next = requirements.map((x, j) => (j === i ? { ...x, done: !x.done } : x))
+                        setRequirements(next)
+                        save({ requirements: next })
+                      }}
+                    />
+                    <span className={cn(r.done && "text-label-tertiary line-through")}>{r.label}</span>
+                  </li>
+                ))}
+              </ul>
+              <form
+                className="mt-2 flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!newItem.trim()) return
+                  const next = [...requirements, { label: newItem.trim(), done: false }]
+                  setRequirements(next)
+                  setNewItem("")
+                  save({ requirements: next })
+                }}
+              >
+                <Input
+                  aria-label="Add an item"
+                  placeholder="Add an item, e.g. Two references"
+                  value={newItem}
+                  onChange={(e) => setNewItem(e.target.value)}
+                  className="flex-1"
+                />
+                <Button type="submit" size="sm" variant="outline" disabled={!newItem.trim()}>
+                  Add
+                </Button>
+              </form>
+            </div>
+            <Field label="Notes">
+              <Textarea
+                rows={4}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={() => notes !== shown.notes && save({ notes })}
+              />
+            </Field>
+          </DialogBody>
+          <DialogFooter className="flex-wrap">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mr-auto text-critical"
+              onClick={() =>
+                remove.mutate(shown.id, {
+                  onSuccess: () => {
+                    toastSuccess("Removed from your applications")
+                    onClose()
+                  },
+                  onError: (err) => toastError(err, "Couldn't remove it"),
+                })
+              }
+            >
+              <Trash2 /> Remove
+            </Button>
+            {shown.link ? (
+              <a href={shown.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "outline" })}>
+                Open <ArrowUpRight />
+              </a>
+            ) : null}
+            <Button size="sm" onClick={onClose}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : null}
+    </Dialog>
+  )
+}
+
+function AddDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { create } = useApplicationMutations()
+  const [form, setForm] = React.useState({ title: "", organization: "", link: "", deadline: "" })
+  const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md" onClose={onClose}>
+        <form
+          className="flex min-h-0 flex-auto flex-col"
+          onSubmit={(e) => {
+            e.preventDefault()
+            create.mutate(
+              { title: form.title.trim(), organization: form.organization.trim(), link: form.link.trim(), deadline: form.deadline },
+              {
+                onSuccess: () => {
+                  setForm({ title: "", organization: "", link: "", deadline: "" })
+                  onClose()
+                },
+                onError: (err) => toastError(err, "Couldn't add it"),
+              },
+            )
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Add an application</DialogTitle>
+            <DialogDescription>For something that isn't in the catalogue.</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            <Field label="Name">
+              <Input value={form.title} onChange={(e) => set("title", e.target.value)} required maxLength={300} />
+            </Field>
+            <Field label="Organization">
+              <Input value={form.organization} onChange={(e) => set("organization", e.target.value)} maxLength={200} />
+            </Field>
+            <Field label="Link">
+              <Input type="url" value={form.link} onChange={(e) => set("link", e.target.value)} placeholder="https://" />
+            </Field>
+            <Field label="Deadline">
+              <Input type="date" value={form.deadline} onChange={(e) => set("deadline", e.target.value)} />
+            </Field>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={create.isPending || !form.title.trim()}>
+              Add
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
 }

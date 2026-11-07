@@ -1,48 +1,28 @@
-# Graduator compose — every app deploys on its own.
+# Blesser compose.
 #
 # Full local stack:   docker compose up -d --build db api worker webapp
 # Backend only:        docker compose up -d --build db api worker
-# Webapp only:         docker compose up -d --build webapp
-#                   (needs VITE_API_URL pointed at a reachable api)
 # Scale workers:       docker compose up -d --scale worker=3
-# DB tools:            docker compose --profile tools up -d pgadmin
 #
-# Service -> source:
-#   api / worker  api/Dockerfile   (one image, command decides the role)
-#   webapp        webapp/Dockerfile (VITE_API_URL baked via build arg)
+#   api / worker  api/Dockerfile    (one image; the command decides the role)
+#   webapp        webapp/Dockerfile (VITE_API_URL baked in via build arg)
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-graduator}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-graduator}
-      POSTGRES_DB: ${POSTGRES_DB:-graduator}
+      POSTGRES_USER: ${POSTGRES_USER:-blesser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blesser}
+      POSTGRES_DB: ${POSTGRES_DB:-blesser}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-graduator} -d ${POSTGRES_DB:-graduator}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-blesser} -d ${POSTGRES_DB:-blesser}"]
       interval: 5s
       timeout: 5s
       retries: 10
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    profiles: ["tools"]
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@graduator.dev}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    depends_on:
-      db:
-        condition: service_healthy
 
   api:
     build:
@@ -53,20 +33,12 @@ services:
       - path: ./api/.env
         required: false
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-graduator}:${POSTGRES_PASSWORD:-graduator}@db:5432/${POSTGRES_DB:-graduator}}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-blesser}:${POSTGRES_PASSWORD:-blesser}@db:5432/${POSTGRES_DB:-blesser}}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
-      # Pinned to the mounted volume so a relative CV_STORAGE_DIR in
-      # api/.env can't put files back inside the container layer.
-      CV_STORAGE_DIR: /app/cv_storage
     ports:
-      # Loopback only by default: browsers reach the api through the
-      # webapp's nginx (/api). Set API_BIND=0.0.0.0 only for split-origin
-      # deploys that put their own TLS proxy in front.
+      # Loopback only by default: browsers reach the api through the webapp's
+      # nginx (/api). Set API_BIND=0.0.0.0 for split-origin deploys behind TLS.
       - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
-    volumes:
-      # CV files, versions, previews and export archives. Without this,
-      # every rebuild deletes them while their DB rows survive.
-      - cv-storage:/app/cv_storage
     depends_on:
       db:
         condition: service_healthy
@@ -87,18 +59,11 @@ services:
       - path: ./api/.env
         required: false
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-graduator}:${POSTGRES_PASSWORD:-graduator}@db:5432/${POSTGRES_DB:-graduator}}
-      CV_STORAGE_DIR: /app/cv_storage
-    volumes:
-      # Same files as the api: agent tools read CVs from the worker too.
-      - cv-storage:/app/cv_storage
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-blesser}:${POSTGRES_PASSWORD:-blesser}@db:5432/${POSTGRES_DB:-blesser}}
     depends_on:
       db:
         condition: service_healthy
-    # Concurrency is the throughput knob: the pipeline fans out one narrow
-    # task per professor. The poll interval is only a backstop now - idle
-    # loops wake on an enqueue notification over LISTEN/NOTIFY.
-    command: ["python", "-m", "api.worker", "--concurrency", "${WORKER_CONCURRENCY:-8}", "--poll-interval", "${WORKER_POLL_INTERVAL:-5.0}"]
+    command: ["python", "-m", "api.worker", "--concurrency", "${WORKER_CONCURRENCY:-4}"]
 
   webapp:
     build:
@@ -109,17 +74,7 @@ services:
     restart: unless-stopped
     ports:
       - "${WEBAPP_PORT:-8080}:80"
-    # No depends_on on purpose: the webapp must stay deployable alone.
-    # In full-stack compose, nginx proxies /api to the api service when it
-    # is up; with VITE_API_URL set the browser calls the api directly.
 
 volumes:
-  # Pinned names: survive directory / project renames. Without `name:`,
-  # compose prefixes the directory name, so a rename orphans the data
-  # in the old volume (exactly what happened grad-app-agent -> graduator).
   pgdata:
-    name: graduator_pgdata
-  pgadmin-data:
-    name: graduator_pgadmin-data
-  cv-storage:
-    name: graduator_cv_storage
+    name: blesser_pgdata

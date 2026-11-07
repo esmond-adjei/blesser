@@ -2,18 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/logo-light.svg" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Web app manifest: lets the app be added to the Home Screen, which
-         iOS requires before it allows web push (#196). -->
+         iOS requires before it allows web push. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Blesser" />
     <title>Blesser | Opportunities in Ghana</title>
     <script>
+      // Follow the system's light or dark setting.
       try {
-        var t = localStorage.getItem("graduator.theme")
-        if (t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark")
+        var dark = window.matchMedia("(prefers-color-scheme: dark)")
+        var apply = function () { document.documentElement.classList.toggle("dark", dark.matches) }
+        apply()
+        dark.addEventListener("change", apply)
       } catch (e) {}
     </script>
   </head>

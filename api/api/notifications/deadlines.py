@@ -137,7 +137,7 @@ async def send_digests(session, now: datetime | None = None) -> int:
         await mailer.send(
             compose(
                 to=user.email,
-                subject=f"Graduator: {count}",
+                subject=f"Blesser: {count}",
                 eyebrow="Daily digest",
                 heading=f"You have {count}",
                 paragraphs=["Here is what happened in the last day."],

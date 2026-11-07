@@ -10,7 +10,7 @@ from pathlib import Path
 from api.core import mailer
 from api.core.mail_layout import Footer, Item, compose
 
-LINK = "https://graduator.app/runs/example"
+LINK = "https://blesser.example/scans/example"
 FOOTER = Footer(
     reason="You're getting this because email is on for Run finished in your notification settings.",
     links=[("Stop emails like this one", LINK), ("Notification settings", LINK)],
@@ -18,22 +18,22 @@ FOOTER = Footer(
 
 SAMPLES = {
     "verify": compose(
-        to="you@example.com", subject="Confirm your email for Graduator", heading="Confirm your email",
+        to="you@example.com", subject="Confirm your email for Blesser", heading="Confirm your email",
         paragraphs=["Confirm this address to unlock account features like data export and email notifications."],
-        action=("Confirm email", LINK), note="The link expires in 48 hours. If you didn't create a Graduator account, ignore this email.",
+        action=("Confirm email", LINK), note="The link expires in 48 hours. If you didn't create a Blesser account, ignore this email.",
     ),
     "reset": compose(
-        to="you@example.com", subject="Reset your Graduator password", heading="Reset your password",
-        paragraphs=["Someone (hopefully you) asked to reset the password for this Graduator account."],
+        to="you@example.com", subject="Reset your Blesser password", heading="Reset your password",
+        paragraphs=["Someone (hopefully you) asked to reset the password for this Blesser account."],
         action=("Choose a new password", LINK), note="The link works once and expires in 30 minutes.",
     ),
     "notification": compose(
         to="you@example.com", subject="Your run finished", eyebrow="Run finished", heading="Your run finished",
         paragraphs=["Your run Machine Learning in Canada finished: 12 candidates."],
-        action=("Open in Graduator", LINK), footer=FOOTER,
+        action=("Open in Blesser", LINK), footer=FOOTER,
     ),
     "digest": compose(
-        to="you@example.com", subject="Graduator: 3 unread notifications", eyebrow="Daily digest",
+        to="you@example.com", subject="Blesser: 3 unread notifications", eyebrow="Daily digest",
         heading="You have 3 unread notifications", paragraphs=["Here is what happened in the last day."],
         items=[
             Item("Your run finished", "Machine Learning in Canada finished: 12 candidates.", LINK),

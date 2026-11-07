@@ -4,7 +4,7 @@ import { BellRing, Smartphone } from "lucide-react"
 import * as api from "../../lib/api"
 import { browserTimezone, currentSubscription, disablePush, enablePush, permission, pushSupport } from "../../lib/push"
 import { toastError, toastInfo, toastSuccess } from "../../lib/toast"
-import { formatRelativeDate } from "../../lib/format"
+import { formatAgo } from "../../lib/format"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Skeleton, SkeletonStack } from "../ui/feedback"
@@ -298,7 +298,7 @@ function ThisBrowser() {
                 <li key={d.id} className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Smartphone className="size-3.5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{deviceName(d.user_agent)}</span>
-                  <span>added {formatRelativeDate(d.created_at)}</span>
+                  <span>added {formatAgo(d.created_at)}</span>
                   <Button size="sm" variant="ghost" className="h-7" onClick={() => remove(d)}>
                     Remove
                   </Button>

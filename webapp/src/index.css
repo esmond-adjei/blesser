@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* The design system (docs/design-system), copied in by make design-system. */
+/* The design system: tokens, components and fonts. */
 @import "./styles/design-system/fonts.css";
 @import "./styles/design-system/tokens.css" layer(base);
 @import "./styles/design-system/components.css" layer(components);
@@ -134,7 +134,7 @@
   --shadow-2xl: var(--elevation-3);
 }
 
-/* Plain-CSS consumers (tooltips, the editor, third-party widgets) read these. */
+/* Plain-CSS consumers (tooltips, toasts) read these. */
 :root, .dark {
   --radius: 10px;
   --background: var(--canvas);
@@ -149,27 +149,6 @@
   --border: var(--separator);
   --ring: var(--focus);
   --sidebar-accent-foreground: var(--label);
-}
-
-/* Chart marks: the dark steps sit inside the dark lightness band, where
-   --tint and --critical are too light to read as marks. Series 2-5 are
-   categorical slots in fixed order, validated against each surface. */
-:root {
-  --chart-1: var(--tint);
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #eda100;
-  --chart-5: #e87ba4;
-  --chart-critical: var(--critical);
-  --chart-rest: var(--control-border);
-}
-.dark {
-  --chart-1: #5a90ec;
-  --chart-2: #d95926;
-  --chart-3: #199e70;
-  --chart-4: #c98500;
-  --chart-5: #d55181;
-  --chart-critical: #f0574e;
 }
 
 @layer base {
@@ -417,163 +396,6 @@
   }
 }
 
-.recessed-panel::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    border-radius: inherit;
-    pointer-events: none;
-    box-shadow: inset 0 -16px 40px -26px rgb(0 0 0 / 0.25);
-}
-
-/* A CV as its PDF prints it (api/cv/pdf_export.py, at 96dpi: A4 is
-   794x1123px, 1pt is 4/3px): margins 18mm/16mm, Helvetica 10pt on 14pt,
-   name 20pt, section headings 11.5pt with a rule. The CV list's page
-   thumbnails use it, so a card shows the CV as it downloads. */
-@layer components {
-  .doc-sheet {
-    width: 794px;
-    height: 1123px;
-    padding: 60px 68px;
-    overflow: hidden;
-    font-family: Helvetica, Arial, sans-serif;
-    font-size: 13.33px;
-    line-height: 18.67px;
-    color: #14233a;
-    background: #fff;
-  }
-
-  .dark .doc-sheet {
-    color: var(--color-card-foreground);
-    background: var(--color-card);
-  }
-
-  .doc-sheet .rich-text {
-    line-height: inherit;
-  }
-
-  .doc-sheet :where(p, ul, ol) {
-    margin-block: 0 5.33px;
-  }
-
-  .doc-sheet :where(h1, h2, h3, h4, h5, h6) {
-    color: inherit;
-    font-weight: 700;
-    letter-spacing: 0;
-  }
-
-  .doc-sheet h1 {
-    font-size: 26.67px;
-    line-height: 32px;
-    margin-block: 0 8px;
-  }
-
-  .doc-sheet h2 {
-    font-size: 15.33px;
-    line-height: 20px;
-    margin-block: 13.33px 6.67px;
-    padding-bottom: 1.33px;
-    border-bottom: 0.8px solid color-mix(in oklab, currentColor 25%, transparent);
-  }
-
-  .doc-sheet :where(h3, h4, h5, h6) {
-    font-size: 14px;
-    line-height: 18.67px;
-    margin-block: 5.33px 0;
-  }
-
-  .doc-sheet :where(ul, ol) {
-    padding-left: 16px;
-  }
-
-  .doc-sheet li + li {
-    margin-top: 2.67px;
-  }
-
-  .doc-sheet li::marker {
-    color: inherit;
-  }
-
-  /* Tables as the PDF draws them: 9.5pt cells, thin rules, a shaded header. */
-  .doc-sheet table {
-    width: 100%;
-    margin: 4px 0 8px;
-    border-collapse: collapse;
-    font-size: 12.67px;
-    line-height: 16.67px;
-  }
-
-  .doc-sheet :is(th, td) {
-    padding: 4px 6.67px 5.33px;
-    border: 0.67px solid #c9d1dc;
-    vertical-align: top;
-    text-align: left;
-  }
-
-  .doc-sheet th {
-    font-weight: 700;
-    background: #f1f4f8;
-  }
-
-  .dark .doc-sheet :is(th, td) {
-    border-color: color-mix(in oklab, currentColor 22%, transparent);
-  }
-
-  .dark .doc-sheet th {
-    background: color-mix(in oklab, currentColor 6%, transparent);
-  }
-
-  /* The sheet's own color throughout, in either theme. */
-  .doc-sheet a,
-  .doc-sheet :is(strong, em, blockquote, code, del) {
-    color: inherit;
-  }
-}
-
-/* The CV editor's fold arrows fade in on hover. */
-.doc-editor .cm-doc-fold {
-  transition: opacity 150ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .doc-editor .cm-doc-fold {
-    transition: none;
-  }
-}
-
-/* The CV editor's selection bar comes in, and text a suggestion is on
-   its way for breathes until it lands. */
-.doc-editor .cm-doc-askbar {
-  animation: doc-ask-in 160ms ease-out;
-}
-.doc-editor .cm-doc-loading {
-  animation: doc-loading 1.6s ease-in-out infinite;
-}
-@keyframes doc-ask-in {
-  from { opacity: 0; transform: translateY(4px); }
-}
-@keyframes doc-loading {
-  50% { background-color: var(--tint-soft); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .doc-editor .cm-doc-askbar,
-  .doc-editor .cm-doc-loading {
-    animation: none;
-  }
-}
-
-/* Scroll container with a depth fade. */
-.depth-fade {
-  overflow: auto;
-  mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 calc(100% - var(--fade-height)),
-    transparent 100%
-  );
-}
-
 .nice-scroll::-webkit-scrollbar {
   width: 6px;
   height: 8px;
@@ -586,28 +408,6 @@
   background: transparent;
 }
 
-.scrollbar-hide {
-  &::-webkit-scrollbar {
-    display: none;
-  }
-
-  scrollbar-width: none;
-}
-
-.shimmer-text-only {
-  background: linear-gradient(
-    -45deg,
-    #8a8f98 0%,
-    #8a8f98 25%,
-    var(--sidebar-accent-foreground) 50%,
-    #8a8f98 75%,
-    #8a8f98 100%
-  );
-  background-size: 100% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-}
 .shimmer-text {
   background: linear-gradient(
     90deg,
@@ -627,28 +427,6 @@
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
-}
-
-/* Three dots that hop in turn: the model is still writing. */
-.typing-dot {
-  animation: typing-dot 1.2s ease-in-out infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.15s; }
-.typing-dot:nth-child(3) { animation-delay: 0.3s; }
-@keyframes typing-dot {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-3px); opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .typing-dot { animation: none; }
-}
-
-/* Sidebar row titles fade at the edge instead of showing an ellipsis. The row
-   menu overlays the row on a chip, so the fade never shifts to make room. */
-.text-fade {
-  overflow: hidden;
-  white-space: nowrap;
-  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
 }
 
 /* Shared hints sit above dialogs and menus without changing control layout. */
@@ -708,42 +486,6 @@
 [data-sonner-toast].toast-error [data-icon] { color: var(--critical); }
 [data-sonner-toast].toast-warning [data-icon] { color: var(--caution); }
 
-/* Scroll container whose edges fade out where there is more to scroll to.
- * useScrollFade sets the two lengths; 0 means that edge is reached. */
-@property --fade-start {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-@property --fade-end {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-.scroll-fade-y,
-.scroll-fade-x {
-  --scroll-fade-dir: to bottom;
-  mask-image: linear-gradient(
-    var(--scroll-fade-dir),
-    transparent,
-    #000 var(--fade-start),
-    #000 calc(100% - var(--fade-end)),
-    transparent
-  );
-  transition:
-    --fade-start 150ms ease,
-    --fade-end 150ms ease;
-}
-.scroll-fade-x {
-  --scroll-fade-dir: to right;
-}
-@media (prefers-reduced-motion: reduce) {
-  .scroll-fade-y,
-  .scroll-fade-x {
-    transition: none;
-  }
-}
-
 /* Shell surfaces. Light: the reading area is white and the panes beside
  * it (sidebar, detail panel) sit on the canvas grey. Dark keeps the
  * canvas for the page and lifts the detail panel to a surface. */
@@ -757,10 +499,4 @@
   --app-main: var(--canvas);
   --app-main-material: var(--material);
   --app-detail: var(--surface);
-}
-
-/* Recharts makes charts focusable; a click shouldn't outline them (keyboard focus still does). */
-.recharts-wrapper:focus:not(:focus-visible),
-.recharts-wrapper :focus:not(:focus-visible) {
-  outline: none;
 }

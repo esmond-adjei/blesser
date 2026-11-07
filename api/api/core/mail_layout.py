@@ -121,7 +121,7 @@ def _html(subject, heading, paragraphs, action, items, eyebrow, note, footer) ->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px">
 <tr><td style="padding:0 4px 16px;font-family:{FONT}">
 <img src="cid:{LOGO_CID}" width="32" height="32" alt="" style="vertical-align:middle;border:0">
-<span style="vertical-align:middle;margin-left:8px;font-size:17px;font-weight:600;letter-spacing:-0.01em;color:{LABEL}">Graduator</span>
+<span style="vertical-align:middle;margin-left:8px;font-size:17px;font-weight:600;letter-spacing:-0.01em;color:{LABEL}">Blesser</span>
 </td></tr>
 <tr><td bgcolor="{SURFACE}" style="background:{SURFACE};border:1px solid {SEPARATOR};border-radius:12px;padding:32px;font-family:{FONT}">
 {body}

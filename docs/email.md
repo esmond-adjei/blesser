@@ -32,7 +32,7 @@ Before enabling in production:
 
 ```
 MAIL_BACKEND=smtp            # "console" prints mail to the API's stderr (dev default)
-MAIL_FROM="Graduator <no-reply@yourdomain>"
+MAIL_FROM="Blesser <no-reply@yourdomain>"
 SMTP_HOST=smtp.postmarkapp.com
 SMTP_PORT=587
 SMTP_USERNAME=<server token>

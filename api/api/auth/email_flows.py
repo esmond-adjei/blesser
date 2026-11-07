@@ -77,9 +77,9 @@ async def request_password_reset(session, email: str) -> mailer.Mail | None:
     link = _link("/reset-password", raw)
     return compose(
         to=user.email,
-        subject="Reset your Graduator password",
+        subject="Reset your Blesser password",
         heading="Reset your password",
-        paragraphs=["Someone (hopefully you) asked to reset the password for this Graduator account."],
+        paragraphs=["Someone (hopefully you) asked to reset the password for this Blesser account."],
         action=("Choose a new password", link),
         note=(
             f"The link works once and expires in {settings.password_reset_minutes} minutes. "
@@ -123,11 +123,11 @@ async def verification_mail(session, user: auth_models.User) -> mailer.Mail:
     )
     return compose(
         to=user.email,
-        subject="Confirm your email for Graduator",
+        subject="Confirm your email for Blesser",
         heading="Confirm your email",
         paragraphs=["Confirm this address to unlock account features like data export and email notifications."],
         action=("Confirm email", _link("/verify-email", raw)),
-        note=f"The link expires in {settings.email_verify_hours} hours. If you didn't create a Graduator account, ignore this email.",
+        note=f"The link expires in {settings.email_verify_hours} hours. If you didn't create a Blesser account, ignore this email.",
     )
 
 
