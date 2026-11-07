@@ -176,6 +176,23 @@ class Settings(BaseSettings):
     max_professors_per_task: int = 10
     max_drafts_per_task: int = 3
 
+    # --- Opportunities (api/opportunities) ---
+    # What one discover_opportunities task, and one scan run, may save.
+    max_opportunities_per_task: int = 15
+    max_opportunities_per_run: int = 40
+    # Region a scan targets when none is given.
+    opportunity_default_region: str = "Ghana"
+    # Agent saves are grounded in a page the agent read, so they publish straight away;
+    # set false to hold them for an ops admin (OPS_ADMIN_EMAILS) to publish.
+    opportunity_auto_publish: bool = True
+    # Scheduled catalogue refresh: the worker starts a scan for every category every
+    # N hours as this account (an existing user). 0 or no email turns it off.
+    opportunity_sweep_email: str = ""
+    opportunity_sweep_hours: int = 0
+    # Public origin of the API, for links that outlive a page (calendar feeds).
+    # Empty: APP_BASE_URL, which works when the web app proxies /api.
+    public_api_url: str = ""
+
     # --- Scaling + reliability ---
     # Total candidates per run, checked via live COUNT in dispatch().
     max_candidates_per_run: int = 30

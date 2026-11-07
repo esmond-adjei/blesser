@@ -28,6 +28,8 @@ def test_api_routes_are_tagged_by_feature():
             assert operation.get("tags", []) and len(operation["tags"]) == 1, path
             groups.setdefault(operation["tags"][0], []).append(path)
     assert set(groups) == {
+        "opportunities",
+        "todos",
         "account",
         "usage",
         "agents",

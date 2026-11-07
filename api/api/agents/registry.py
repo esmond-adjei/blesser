@@ -21,6 +21,7 @@ TASK_TYPES = (
     "research_professor",
     "research_one_professor",
     "draft_email",
+    "discover_opportunities",
 )
 
 #: Least-privilege allowlists, also used for rows without their own, so empty never means "every tool".
@@ -44,6 +45,7 @@ DEFAULT_TASK_TOOLS: dict[str, tuple[str, ...]] = {
         "confirm_no_match",
     ),
     "draft_email": ("save_email_draft",),
+    "discover_opportunities": ("search_web", "fetch_page", "save_opportunity"),
 }
 
 

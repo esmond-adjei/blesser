@@ -15,6 +15,7 @@ from api.applications import tools as application_tools
 from api.billing import service as billing
 from api.candidates import tools as candidate_tools
 from api.core.config import settings
+from api.opportunities import tools as opportunity_tools
 from api.outreach import tools as outreach_tools
 from api.prospects import grounding, openalex, sources, web
 from api.prospects import tools as prospect_tools
@@ -42,6 +43,7 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
         max_chars=settings.fetch_max_chars,
         offset=tool_input.get("offset") or 0,
     )
+    opportunity_tools.record_fetch(ctx, tool_input["url"], text)
     return {"text": text}
 
 
@@ -197,6 +199,7 @@ HANDLERS = {
     "save_application": application_tools.handle_save_application,
     "confirm_no_match": _confirm_no_match,
     "spawn_professor_research": prospect_tools.handle_spawn_professor_research,
+    "save_opportunity": opportunity_tools.handle_save_opportunity,
 }
 
 

@@ -16,8 +16,10 @@ from api.flows import models as _flow_models  # noqa: F401
 from api.index import models as _index_models  # noqa: F401
 from api.metering import models as _metering_models  # noqa: F401
 from api.notifications import models as _notification_models  # noqa: F401
+from api.opportunities import models as _opportunity_models  # noqa: F401
 from api.outreach import models as _outreach_models  # noqa: F401
 from api.prospects import models as _prospect_models  # noqa: F401
 from api.providers import models as _providers_models  # noqa: F401
 from api.runs import models as _run_models  # noqa: F401
+from api.todos import models as _todo_models  # noqa: F401
 from api.workspace import models as _workspace_models  # noqa: F401

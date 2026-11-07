@@ -40,6 +40,11 @@ TOOL_GROUPS: dict[str, dict] = {
             "get_professor", "create_professor", "update_professor", "save_professor_papers", "delete_professor",
         ),
     },
+    "opportunities": {
+        "label": "Opportunities",
+        "description": "Find, save and look up opportunities in the public catalogue.",
+        "tools": ("save_opportunity",),
+    },
     "matches": {
         "label": "Matches",
         "description": "Look up, review, edit and remove the professors matched to your interests.",

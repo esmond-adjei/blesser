@@ -62,6 +62,10 @@ class Application(Base):
     match_id: Mapped[str | None] = mapped_column(
         ForeignKey("matches.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # The catalogue opportunity this application tracks (api/opportunities).
+    opportunity_id: Mapped[str | None] = mapped_column(
+        ForeignKey("opportunities.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

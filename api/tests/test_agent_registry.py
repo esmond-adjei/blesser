@@ -70,6 +70,7 @@ def test_registry_seeds_from_code():
         "research_professor",
         "research_one_professor",
         "draft_email",
+        "discover_opportunities",
     }
     # Least privilege by default: every task has an explicit list.
     from api.agents.registry import DEFAULT_TASK_TOOLS

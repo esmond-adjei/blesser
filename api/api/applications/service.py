@@ -39,6 +39,7 @@ def to_out(app: application_models.Application) -> dict:
         "fee_waiver_notes": app.fee_waiver_notes,
         "source": app.source,
         "run_id": app.run_id,
+        "opportunity_id": app.opportunity_id,
         "created_at": app.created_at,
         "updated_at": app.updated_at,
     }

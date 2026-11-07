@@ -36,6 +36,9 @@ class ToolContext:
         self.professors_saved = 0
         self.drafts_saved = 0
         self.applications_saved = 0
+        self.opportunities_saved = 0
+        # {url_key: text} of pages fetch_page returned; save_opportunity cites one.
+        self.fetched_pages: dict[str, str] = {}
         # Dispatch refuses tools not shown to the model.
         self.offered_tools: set[str] | None = None
         # The student's own addition: its own allowance, never cut by the run's cap.

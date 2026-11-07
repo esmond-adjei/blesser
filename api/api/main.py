@@ -24,6 +24,7 @@ from api.exports.routes import router as exports_router
 from api.flows.routes import router as flows_router
 from api.metering.routes import router as metering_router
 from api.notifications.routes import router as notifications_router
+from api.opportunities.routes import router as opportunities_router
 from api.outreach.routes import router as outreach_router
 from api.prospects.routes_professors import router as professors_router
 from api.prospects.routes_programs import router as programs_router
@@ -32,6 +33,7 @@ from api.providers.routes import router as providers_router
 from api.runs.routes_runs import router as runs_router
 from api.runs.routes_tasks import router as tasks_router
 from api.runs.routes_tasks import workers_router
+from api.todos.routes import router as todos_router
 
 
 @asynccontextmanager
@@ -141,6 +143,8 @@ app.include_router(billing_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 app.include_router(flows_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
+app.include_router(opportunities_router, prefix="/api")
+app.include_router(todos_router, prefix="/api")
 
 
 def main() -> None:

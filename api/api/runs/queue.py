@@ -26,6 +26,7 @@ from api.core.config import settings
 from api.core.db import SessionLocal, listener_dsn
 from api.core.egress import public_error
 from api.core.time import utcnow_naive
+from api.opportunities.tasks import run_discover_opportunities
 from api.outreach.tasks import run_draft_email
 from api.prospects.openalex import OpenAlexWait
 from api.prospects.tasks import (
@@ -333,6 +334,7 @@ TASK_HANDLERS = {
     "research_professor": run_research_professor,
     "research_one_professor": run_research_one_professor,
     "draft_email": run_draft_email,
+    "discover_opportunities": run_discover_opportunities,
 }
 
 
@@ -790,6 +792,11 @@ async def main_loop(concurrency: int = 1, poll_interval_seconds: float = 2.0):
                         if reminders:
                             print(f"[worker] {reminders} deadline reminder(s)", flush=True)
                         await send_digests(session)
+                        from api.opportunities.scans import maybe_sweep
+
+                        sweep = await maybe_sweep(session)
+                        if sweep:
+                            print(f"[worker] started opportunity sweep {sweep[:8]}", flush=True)
             except Exception as exc:  # noqa: BLE001 - housekeeping must not kill the loops
                 print(f"[worker] reaper error: {exc!r}", flush=True)
                 traceback.print_exc()

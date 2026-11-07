@@ -36,6 +36,8 @@ class ApplicationOut(BaseModel):
     fee_waiver_notes: str
     source: str
     run_id: str | None
+    # Set when this application tracks a catalogue opportunity.
+    opportunity_id: str | None = None
     created_at: datetime
     updated_at: datetime
     # The matching school's picture, when one of the account's schools has this name.
