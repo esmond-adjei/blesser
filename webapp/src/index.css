@@ -1,0 +1,766 @@
+@import "tailwindcss";
+/* The design system (docs/design-system), copied in by make design-system. */
+@import "./styles/design-system/fonts.css";
+@import "./styles/design-system/tokens.css" layer(base);
+@import "./styles/design-system/components.css" layer(components);
+
+/* Class-based dark mode: `dark:` responds to `.dark` on <html>, not the
+   media query, so the app can toggle it. tokens.css switches on the same
+   class. */
+@custom-variant dark (&:is(.dark *));
+
+/* Tailwind's scales, re-pointed at the design system's roles, so the
+   utilities components already use land on the system's values. */
+@theme {
+  --font-sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* caption 12, footnote 13, callout 14, body 15, reading 17, title-3 20,
+     title-2 28. 12px is the floor. */
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-compact: 13px;
+  --text-compact--line-height: 18px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 15px;
+  --text-base--line-height: 22px;
+  --text-md: 15px;
+  --text-md--line-height: 22px;
+  --text-lg: 17px;
+  --text-lg--line-height: 28px;
+  --text-xl: 20px;
+  --text-xl--line-height: 26px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 30px;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 34px;
+
+  /* 600 is the only bold. */
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
+  --font-weight-black: 600;
+
+  /* Seven named radii; inner corners are the outer minus the inset. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Token colours as utilities (bg-surface, text-label-secondary,
+   bg-positive-soft...), and the three elevations behind Tailwind's shadow
+   names: depth means floating. Inline, so dark mode follows the tokens. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-fill-quiet: var(--fill-quiet);
+  --color-fill: var(--fill);
+  --color-separator: var(--separator);
+  --color-control-border: var(--control-border);
+  --color-label: var(--label);
+  --color-label-secondary: var(--label-secondary);
+  --color-label-tertiary: var(--label-tertiary);
+  --color-tint: var(--tint);
+  --color-tint-hover: var(--tint-hover);
+  --color-tint-soft: var(--tint-soft);
+  --color-on-tint: var(--on-tint);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-on-brand-secondary: var(--on-brand-secondary);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+  --color-on-critical: var(--on-critical);
+  --color-fit-strong: var(--fit-strong);
+  --color-fit-moderate: var(--fit-moderate);
+  --color-fit-weak: var(--fit-weak);
+  --color-scrim: var(--scrim);
+  --color-material: var(--material);
+
+  /* The shadcn names the components were written against, kept as aliases. */
+  --color-background: var(--canvas);
+  --color-foreground: var(--label);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--label);
+  --color-popover: var(--surface-raised);
+  --color-popover-foreground: var(--label);
+  --color-primary: var(--tint);
+  --color-primary-foreground: var(--on-tint);
+  --color-secondary: var(--tint-soft);
+  --color-secondary-foreground: var(--tint);
+  --color-muted: var(--fill-quiet);
+  --color-muted-foreground: var(--label-secondary);
+  --color-accent: var(--fill-quiet);
+  --color-accent-foreground: var(--label);
+  --color-destructive: var(--critical);
+  --color-destructive-foreground: var(--on-critical);
+  --color-warning: var(--caution-soft);
+  --color-warning-foreground: var(--caution);
+  --color-border: var(--separator);
+  --color-input: var(--control-border);
+  --color-ring: var(--focus);
+  --color-sidebar: var(--canvas);
+  --color-sidebar-foreground: var(--label);
+  --color-sidebar-primary: var(--tint);
+  --color-sidebar-primary-foreground: var(--on-tint);
+  --color-sidebar-accent: var(--fill-quiet);
+  --color-sidebar-accent-foreground: var(--label);
+  --color-sidebar-border: var(--separator);
+  --color-sidebar-ring: var(--focus);
+  --color-chart-1: var(--tint);
+  --color-chart-2: var(--fit-moderate);
+  --color-chart-3: var(--positive);
+  --color-chart-4: var(--caution);
+  --color-chart-5: var(--label-tertiary);
+
+  --shadow-xs: var(--elevation-1);
+  --shadow-sm: var(--elevation-1);
+  --shadow: var(--elevation-1);
+  --shadow-md: var(--elevation-2);
+  --shadow-lg: var(--elevation-2);
+  --shadow-xl: var(--elevation-3);
+  --shadow-2xl: var(--elevation-3);
+}
+
+/* Plain-CSS consumers (tooltips, the editor, third-party widgets) read these. */
+:root, .dark {
+  --radius: 10px;
+  --background: var(--canvas);
+  --foreground: var(--label);
+  --card: var(--surface);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--label);
+  --primary: var(--tint);
+  --muted-foreground: var(--label-secondary);
+  --accent: var(--fill-quiet);
+  --destructive: var(--critical);
+  --border: var(--separator);
+  --ring: var(--focus);
+  --sidebar-accent-foreground: var(--label);
+}
+
+/* Chart marks: the dark steps sit inside the dark lightness band, where
+   --tint and --critical are too light to read as marks. Series 2-5 are
+   categorical slots in fixed order, validated against each surface. */
+:root {
+  --chart-1: var(--tint);
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-critical: var(--critical);
+  --chart-rest: var(--control-border);
+}
+.dark {
+  --chart-1: #5a90ec;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-critical: #f0574e;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* The app's reading size is body (15/22). Compact surfaces (the rail,
+     cards, the chat dock) set text-sm once at their root. */
+  body {
+    @apply bg-canvas text-label;
+    font: 400 15px/22px var(--font-sans);
+    letter-spacing: -0.005em;
+  }
+
+  ::selection {
+    background: var(--tint-soft);
+    color: var(--label);
+  }
+
+  /* Focus is always visible: a solid 2px ring outside a 2px gap. */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* Numbers use the sans's tabular figures; mono is for keys and ids. */
+  :where(table, time) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One paragraph style app-wide. Size follows the surrounding surface;
+     leading and wrapping are central. Utilities override either. */
+  p {
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+}
+
+/* Type roles: components say what text IS; size, leading and colour live
+   here. Plain paragraphs need nothing; they follow their surface. */
+@layer components {
+  /* An inset grouped list: rows on one surface, separators inset past
+     the leading icon. */
+  .g-list > li { position: relative; }
+  .g-list > li + li::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 3rem;
+    height: 1px;
+    background: var(--separator);
+    width: 100%;
+    transform: translateX(-48px); 
+  }
+
+  /* title-2: one per page. */
+  .type-page-title {
+    font-size: 28px;
+    line-height: 34px;
+    font-weight: 600;
+    letter-spacing: -0.022em;
+  }
+
+  /* title-3: dialogs, panels, sheets. */
+  .type-panel-title {
+    font-size: 20px;
+    line-height: 26px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  /* A group's title above its list or section. */
+  .type-section-title {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
+    color: var(--label-secondary);
+  }
+
+  /* A label over a group of rows (search results, an outline, a menu
+     section). The gold eyebrow is the landing page's, never the app's. */
+  .type-group-label {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--label-secondary);
+  }
+
+  /* callout: row subtitles, hints, secondary facts. */
+  .type-meta {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--label-secondary);
+  }
+
+  /* caption: timestamps, counts, the smallest facts. */
+  .type-caption {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--label-secondary);
+  }
+
+  .type-numeral {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Long-form content (Markdown, legal): always the size of the text around
+   it, with one rhythm for headings, lists, code and tables. */
+@layer components {
+  .rich-text {
+    font-size: inherit;
+    line-height: 1.65;
+    overflow-wrap: break-word;
+  }
+
+  .rich-text :where(p, ul, ol, blockquote, pre, table) {
+    margin-block: 0.75em;
+  }
+
+  .rich-text :first-child {
+    margin-top: 0;
+  }
+
+  .rich-text :last-child {
+    margin-bottom: 0;
+  }
+
+  .rich-text :where(h1, h2, h3, h4) {
+    margin-block: 1.25em 0.4em;
+    color: var(--color-foreground);
+  }
+
+  .rich-text h1 {
+    font-size: 1.5em;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+
+  .rich-text h2 {
+    font-size: 1.25em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+
+  .rich-text h3 {
+    font-size: 1.1em;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .rich-text h4 {
+    font-size: 1em;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .rich-text ul {
+    list-style: disc;
+    padding-left: 1.35em;
+  }
+
+  .rich-text ol {
+    list-style: decimal;
+    padding-left: 1.35em;
+  }
+
+  .rich-text li + li {
+    margin-top: 0.25em;
+  }
+
+  .rich-text li::marker {
+    color: var(--color-muted-foreground);
+  }
+
+  .rich-text a {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .rich-text strong {
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+
+  .rich-text code {
+    background: var(--color-muted);
+    border-radius: 0.25rem;
+    padding: 0.1em 0.3em;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+  }
+
+  .rich-text pre {
+    background: var(--color-muted);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 0.875rem;
+    overflow-x: auto;
+  }
+
+  .rich-text pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  .rich-text blockquote {
+    border-left: 2px solid var(--color-border);
+    padding-left: 0.75em;
+    color: var(--color-muted-foreground);
+  }
+
+  .rich-text hr {
+    border-color: var(--color-border);
+  }
+
+  .rich-text table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .rich-text :is(th, td) {
+    border: 1px solid var(--color-border);
+    padding: 0.3em 0.6em;
+    text-align: left;
+  }
+
+  .rich-text th {
+    background: var(--color-muted);
+    font-weight: 600;
+  }
+}
+
+.recessed-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 -16px 40px -26px rgb(0 0 0 / 0.25);
+}
+
+/* A CV as its PDF prints it (api/cv/pdf_export.py, at 96dpi: A4 is
+   794x1123px, 1pt is 4/3px): margins 18mm/16mm, Helvetica 10pt on 14pt,
+   name 20pt, section headings 11.5pt with a rule. The CV list's page
+   thumbnails use it, so a card shows the CV as it downloads. */
+@layer components {
+  .doc-sheet {
+    width: 794px;
+    height: 1123px;
+    padding: 60px 68px;
+    overflow: hidden;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 13.33px;
+    line-height: 18.67px;
+    color: #14233a;
+    background: #fff;
+  }
+
+  .dark .doc-sheet {
+    color: var(--color-card-foreground);
+    background: var(--color-card);
+  }
+
+  .doc-sheet .rich-text {
+    line-height: inherit;
+  }
+
+  .doc-sheet :where(p, ul, ol) {
+    margin-block: 0 5.33px;
+  }
+
+  .doc-sheet :where(h1, h2, h3, h4, h5, h6) {
+    color: inherit;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .doc-sheet h1 {
+    font-size: 26.67px;
+    line-height: 32px;
+    margin-block: 0 8px;
+  }
+
+  .doc-sheet h2 {
+    font-size: 15.33px;
+    line-height: 20px;
+    margin-block: 13.33px 6.67px;
+    padding-bottom: 1.33px;
+    border-bottom: 0.8px solid color-mix(in oklab, currentColor 25%, transparent);
+  }
+
+  .doc-sheet :where(h3, h4, h5, h6) {
+    font-size: 14px;
+    line-height: 18.67px;
+    margin-block: 5.33px 0;
+  }
+
+  .doc-sheet :where(ul, ol) {
+    padding-left: 16px;
+  }
+
+  .doc-sheet li + li {
+    margin-top: 2.67px;
+  }
+
+  .doc-sheet li::marker {
+    color: inherit;
+  }
+
+  /* Tables as the PDF draws them: 9.5pt cells, thin rules, a shaded header. */
+  .doc-sheet table {
+    width: 100%;
+    margin: 4px 0 8px;
+    border-collapse: collapse;
+    font-size: 12.67px;
+    line-height: 16.67px;
+  }
+
+  .doc-sheet :is(th, td) {
+    padding: 4px 6.67px 5.33px;
+    border: 0.67px solid #c9d1dc;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  .doc-sheet th {
+    font-weight: 700;
+    background: #f1f4f8;
+  }
+
+  .dark .doc-sheet :is(th, td) {
+    border-color: color-mix(in oklab, currentColor 22%, transparent);
+  }
+
+  .dark .doc-sheet th {
+    background: color-mix(in oklab, currentColor 6%, transparent);
+  }
+
+  /* The sheet's own color throughout, in either theme. */
+  .doc-sheet a,
+  .doc-sheet :is(strong, em, blockquote, code, del) {
+    color: inherit;
+  }
+}
+
+/* The CV editor's fold arrows fade in on hover. */
+.doc-editor .cm-doc-fold {
+  transition: opacity 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-editor .cm-doc-fold {
+    transition: none;
+  }
+}
+
+/* The CV editor's selection bar comes in, and text a suggestion is on
+   its way for breathes until it lands. */
+.doc-editor .cm-doc-askbar {
+  animation: doc-ask-in 160ms ease-out;
+}
+.doc-editor .cm-doc-loading {
+  animation: doc-loading 1.6s ease-in-out infinite;
+}
+@keyframes doc-ask-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@keyframes doc-loading {
+  50% { background-color: var(--tint-soft); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-editor .cm-doc-askbar,
+  .doc-editor .cm-doc-loading {
+    animation: none;
+  }
+}
+
+/* Scroll container with a depth fade. */
+.depth-fade {
+  overflow: auto;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--fade-height)),
+    transparent 100%
+  );
+}
+
+.nice-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 8px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-hide {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  scrollbar-width: none;
+}
+
+.shimmer-text-only {
+  background: linear-gradient(
+    -45deg,
+    #8a8f98 0%,
+    #8a8f98 25%,
+    var(--sidebar-accent-foreground) 50%,
+    #8a8f98 75%,
+    #8a8f98 100%
+  );
+  background-size: 100% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #8a8f98 0%,
+    #8a8f98 42%,
+    #ffffff 50%,
+    #8a8f98 58%,
+    #8a8f98 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer 5s linear infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Three dots that hop in turn: the model is still writing. */
+.typing-dot {
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot { animation: none; }
+}
+
+/* Sidebar row titles fade at the edge instead of showing an ellipsis. The row
+   menu overlays the row on a chip, so the fade never shifts to make room. */
+.text-fade {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+}
+
+/* Shared hints sit above dialogs and menus without changing control layout. */
+.app-tooltip {
+  position: fixed;
+  z-index: 200;
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 1rem));
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--label);
+  font: 500 12px/16px var(--font-sans);
+  letter-spacing: 0;
+  text-align: center;
+  box-shadow: var(--elevation-2);
+  animation: tooltip-appear var(--duration-quick) var(--ease-out);
+}
+
+.app-tooltip-content {
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border-radius: inherit;
+  background: inherit;
+  padding: 6px 10px;
+}
+
+.app-tooltip-arrow {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--surface-raised);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.app-tooltip[data-side="top"] .app-tooltip-arrow {
+  bottom: -4px;
+}
+
+.app-tooltip[data-side="bottom"] .app-tooltip-arrow {
+  top: -4px;
+}
+
+@keyframes tooltip-appear {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-tooltip { animation: none; }
+}
+
+[data-sonner-toast].toast-success [data-icon] { color: var(--positive); }
+[data-sonner-toast].toast-error [data-icon] { color: var(--critical); }
+[data-sonner-toast].toast-warning [data-icon] { color: var(--caution); }
+
+/* Scroll container whose edges fade out where there is more to scroll to.
+ * useScrollFade sets the two lengths; 0 means that edge is reached. */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.scroll-fade-y,
+.scroll-fade-x {
+  --scroll-fade-dir: to bottom;
+  mask-image: linear-gradient(
+    var(--scroll-fade-dir),
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  transition:
+    --fade-start 150ms ease,
+    --fade-end 150ms ease;
+}
+.scroll-fade-x {
+  --scroll-fade-dir: to right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-fade-y,
+  .scroll-fade-x {
+    transition: none;
+  }
+}
+
+/* Shell surfaces. Light: the reading area is white and the panes beside
+ * it (sidebar, detail panel) sit on the canvas grey. Dark keeps the
+ * canvas for the page and lifts the detail panel to a surface. */
+:root {
+  --app-main: var(--surface);
+  --app-main-material: rgba(255, 255, 255, 0.72);
+  --app-detail: var(--canvas);
+}
+[data-theme="dark"],
+.dark {
+  --app-main: var(--canvas);
+  --app-main-material: var(--material);
+  --app-detail: var(--surface);
+}
+
+/* Recharts makes charts focusable; a click shouldn't outline them (keyboard focus still does). */
+.recharts-wrapper:focus:not(:focus-visible),
+.recharts-wrapper :focus:not(:focus-visible) {
+  outline: none;
+}

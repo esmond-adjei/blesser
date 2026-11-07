@@ -1,0 +1,52 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>Graduator</title>
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:var(--canvas); color:var(--label); font-family:var(--font-sans); overflow:hidden; }
+  .cover { position:relative; width:960px; height:288px; overflow:hidden; }
+  .art { position:absolute; top:0; left:480px; width:480px; height:288px; overflow:hidden; }
+  .art svg { display:block; width:480px; height:288px; }
+  .brand { fill:var(--brand); }
+  .ground { fill:var(--canvas); }
+  .needle { fill:var(--gold); }
+  .tint { fill:var(--tint); }
+  .tint-soft { fill:var(--tint-soft); }
+  .quiet { fill:var(--fill); }
+  .words { position:absolute; left:var(--space-6); bottom:var(--space-6); max-width:440px; }
+  .name { margin:0; font-size:80px; line-height:.92; font-weight:600; letter-spacing:-.035em; color:var(--label); }
+  .tag { margin:var(--space-3) 0 0 3px; font-size:14px; line-height:20px; color:var(--label-secondary); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 288" width="480" height="288">
+<!--
+  blocks      brand 208×268 slab bled off the top (identity, largest), tint 264×160 bled off the right (the one action hue), fill 176×56 pill (relief), gold only as the needle; about 40% of 960×288
+  arrangement one tall navy slab with two satellites to its right, top edges on space-6, bottoms on one line space-12 above the edge
+  pattern     literal motif, from the logo's lens and the "concentric radii" rule: a lens disc cut from the slab holding the gold needle, and concentric quarter-discs at radius-2xl multiples (28, 56, 84, 112) in tint and tint-soft in the tint block's corner
+  scales      gutters space-4; pill and slab corners radius-2xl (28); quarter-disc radii 1–4 × radius-2xl; lens r = 64 (space-16)
+-->
+<rect class="brand" x="0" y="-28" width="208" height="268" rx="28"/>
+<circle class="ground" cx="104" cy="120" r="64"/>
+<path class="needle" d="M140 80 L117 129 L68 160 L91 111 Z"/>
+<circle class="ground" cx="104" cy="120" r="7"/>
+<rect class="quiet" x="224" y="24" width="272" height="56" rx="28"/>
+<rect class="tint" x="224" y="96" width="272" height="144" rx="28"/>
+<path class="tint-soft" d="M480 240 L480 128 A112 112 0 0 0 368 240 Z"/>
+<path class="tint" d="M480 240 L480 156 A84 84 0 0 0 396 240 Z"/>
+<path class="tint-soft" d="M480 240 L480 184 A56 56 0 0 0 424 240 Z"/>
+<path class="tint" d="M480 240 L480 212 A28 28 0 0 0 452 240 Z"/>
+</svg>
+</div>
+<div class="words">
+  <h1 class="name">Graduator</h1>
+  <p class="tag">Find the professor, not just the programme.</p>
+</div>
+</div>
+</body>
+</html>

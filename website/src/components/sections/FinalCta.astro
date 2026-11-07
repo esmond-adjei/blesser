@@ -1,0 +1,24 @@
+---
+import { REGISTER_URL, WAITLIST_MODE } from "../../lib/site"
+import WaitlistForm from "../WaitlistForm.astro"
+---
+<section class="bg-[var(--brand)] text-[var(--on-brand)]">
+  <div class="mx-auto max-w-site px-4 py-24 text-center sm:px-6 sm:py-32">
+    <h2 class="type-display mx-auto max-w-4xl max-sm:text-[40px] max-sm:leading-[1.1]">Your shortlist is one search away.</h2>
+    {
+      WAITLIST_MODE ? (
+        <>
+          <p class="type-lead mx-auto mt-5 max-w-xl text-[var(--on-brand-secondary)]">Graduator is opening to new applicants soon. Join the waitlist and be first in.</p>
+          <div id="waitlist" class="mx-auto mt-10 max-w-2xl">
+            <WaitlistForm id="waitlist-home" tone="brand" />
+          </div>
+        </>
+      ) : (
+        <>
+          <p class="type-lead mx-auto mt-5 max-w-xl text-[var(--on-brand-secondary)]">Describe your research in a few sentences. Start free, with no card.</p>
+          <a href={REGISTER_URL} class="g-btn g-btn--on-brand g-btn--xl mt-8">Start free</a>
+        </>
+      )
+    }
+  </div>
+</section>

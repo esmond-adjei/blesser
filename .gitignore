@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.db-journal
+cv_storage/
+.env
+.pytest_cache/
+.ruff_cache/
+node_modules/
+webapp/dist/
+/image*.png
+
+# ephemeral review pages (deleted after review)
+progress.html
+.claude/worktrees/*

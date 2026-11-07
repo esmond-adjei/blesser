@@ -1,0 +1,8 @@
+{
+    "postman.settings.dotenv-detection-notification-visibility": false,
+    // Use the project's own TypeScript, so the editor resolves modules and
+    // infers types exactly as `npm run build` does. The editor's bundled
+    // compiler is older and reports imports the build resolves fine.
+    "typescript.tsdk": "webapp/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true
+}

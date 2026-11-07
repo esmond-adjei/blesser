@@ -1,0 +1,132 @@
+---
+import { ArrowRight, Check } from "@lucide/astro"
+import { REGISTER_URL } from "../../lib/site"
+const { compare = false } = Astro.props
+---
+
+<pricing-catalog>
+  <section class="mx-auto max-w-[110rem] px-4 pt-12" aria-label="Plans">
+    <div data-pricing-status role="status" class="py-8 text-center text-muted-foreground">
+      <p data-pricing-message>Loading current prices…</p>
+      <button data-pricing-retry class="g-btn g-btn--outline mt-4" hidden>Try again</button>
+      <noscript><p>Enable JavaScript to load current prices, or <a href={REGISTER_URL}>view plans in the app</a>.</p></noscript>
+    </div>
+    <div data-pricing-cards class="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4"></div>
+  </section>
+  <template data-pricing-card>
+    <article class="g-price flex min-w-0 flex-col">
+      <h2 data-name class="text-lg font-semibold"></h2>
+      <p data-summary class="mt-1 min-h-10 text-sm leading-relaxed text-muted-foreground"></p>
+      <p class="mt-6 flex flex-wrap items-baseline gap-x-1.5">
+        <span data-price class="text-4xl font-semibold tracking-tight tabular-nums"></span>
+        <span data-period class="text-sm text-muted-foreground"></span>
+      </p>
+      <p data-note class="mt-2 min-h-5 type-caption"></p>
+      <ul data-features class="mt-6 flex-1 content-start text-sm"></ul>
+      <a data-cta href={REGISTER_URL} class="g-btn mt-7"><span></span><ArrowRight class="size-4" aria-hidden="true" /></a>
+    </article>
+  </template>
+  <template data-pricing-feature><li class="flex gap-2.5"><Check class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span></span></li></template>
+  <slot />
+  {compare && (
+    <section data-pricing-comparison hidden class="mx-auto max-w-site px-4 py-20 sm:px-6">
+      <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">Compare the plans</h2>
+      <div class="nice-scroll mt-6 overflow-x-auto rounded-2xl border border-border bg-card">
+        <table class="w-full min-w-[700px] text-left text-sm">
+          <thead class="border-b border-border"><tr data-pricing-head><th scope="col" class="px-4 py-4 font-medium text-muted-foreground">Included</th></tr></thead>
+          <tbody data-pricing-rows class="divide-y divide-border"></tbody>
+        </table>
+      </div>
+      <p data-pricing-welcome class="mt-3 type-caption"></p>
+    </section>
+  )}
+</pricing-catalog>
+
+<script>
+  import { fetchCatalog } from "../../lib/plans"
+
+  class PricingCatalog extends HTMLElement {
+    connectedCallback() {
+      this.querySelector("[data-pricing-retry]")?.addEventListener("click", () => void this.load())
+      void this.load()
+    }
+
+    async load() {
+      const status = this.querySelector<HTMLElement>("[data-pricing-status]")
+      const message = this.querySelector("[data-pricing-message]")
+      const retry = this.querySelector<HTMLButtonElement>("[data-pricing-retry]")
+      if (message) message.textContent = "Loading current prices…"
+      if (retry) retry.hidden = true
+      try {
+        const catalog = await fetchCatalog()
+        const template = this.querySelector<HTMLTemplateElement>("[data-pricing-card]")
+        const featureTemplate = this.querySelector<HTMLTemplateElement>("[data-pricing-feature]")
+        const cards = this.querySelector("[data-pricing-cards]")
+        if (!template || !featureTemplate || !cards) throw new Error("Missing pricing layout")
+        cards.replaceChildren()
+        for (const plan of catalog.plans) {
+          const card = template.content.cloneNode(true)
+          if (!(card instanceof DocumentFragment)) continue
+          for (const field of ["name", "price", "period", "note", "summary"] as const) {
+            const el = card.querySelector(`[data-${field}]`)
+            if (el) el.textContent = plan[field]
+          }
+          card.querySelector("article")?.classList.toggle("g-price--featured", plan.featured)
+          const cta = card.querySelector("[data-cta]")
+          cta?.classList.add(plan.featured ? "g-btn--primary" : "g-btn--outline")
+          const ctaText = cta?.querySelector("span")
+          if (ctaText) ctaText.textContent = plan.price === "$0" ? "Start free" : `Get ${plan.name}`
+          for (const text of plan.features) {
+            const feature = featureTemplate.content.cloneNode(true)
+            if (!(feature instanceof DocumentFragment)) continue
+            const label = feature.querySelector("span")
+            if (label) label.textContent = text
+            card.querySelector("[data-features]")?.append(feature)
+          }
+          cards.append(card)
+        }
+        const head = this.querySelector("[data-pricing-head]")
+        head?.querySelectorAll("[data-plan-heading]").forEach((el) => el.remove())
+        for (const plan of catalog.plans) {
+          const th = document.createElement("th")
+          th.scope = "col"
+          th.dataset.planHeading = ""
+          th.className = "px-4 py-4 font-semibold"
+          th.textContent = plan.name
+          head?.append(th)
+        }
+        const rows = this.querySelector("[data-pricing-rows]")
+        rows?.replaceChildren()
+        for (const row of catalog.comparison) {
+          const tr = document.createElement("tr")
+          const th = document.createElement("th")
+          th.scope = "row"
+          th.className = "px-4 py-3.5 font-medium"
+          th.textContent = row.label
+          tr.append(th)
+          for (const value of row.values) {
+            const td = document.createElement("td")
+            td.className = "px-4 py-3.5 tabular-nums"
+            td.textContent = typeof value === "boolean" ? (value ? "Included" : "Not included") : value
+            tr.append(td)
+          }
+          rows?.append(tr)
+        }
+        for (const [selector, text] of [
+          ["[data-pricing-top-up]", catalog.top_up],
+          ["[data-pricing-season]", catalog.season_pass],
+          ["[data-pricing-welcome]", catalog.welcome],
+        ]) {
+          document.querySelectorAll(selector).forEach((el) => { el.textContent = text })
+        }
+        const comparison = this.querySelector<HTMLElement>("[data-pricing-comparison]")
+        if (comparison) comparison.hidden = false
+        if (status) status.hidden = true
+      } catch {
+        if (message) message.textContent = "We couldn't load current prices. Please try again or view plans in the app."
+        if (retry) retry.hidden = false
+      }
+    }
+  }
+  customElements.define("pricing-catalog", PricingCatalog)
+</script>

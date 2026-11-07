@@ -1,0 +1,24 @@
+<!-- @dsCard group="Content" height=330 subtitle="Rows in a bordered group: the app's list view" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><link rel="stylesheet" href="../components/app-patterns.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>ListRow preview</title>
+
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+body{background:var(--surface)}.w{max-width:720px}.g-list{list-style:none;margin:0;padding:0}.g-list li{position:relative}
+.g-list li + li::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:var(--separator)}
+.d{font:400 12px/16px var(--font-sans);color:var(--label-secondary);white-space:nowrap}
+</style>
+</head>
+<body class="g-root">
+<div class="w"><ul class="g-list">
+  <li><div class="g-row"><span class="g-avatar">GS</span><span class="g-row__main"><span class="g-row__title" style="display:flex;gap:8px;align-items:center">Guanya Shi <span class="g-best">Best fit</span></span><span class="g-row__sub">Robotics Institute PhD, Carnegie Mellon University</span></span><span class="g-row__trail"><span class="g-fit" data-band="strong"><span class="g-fit__track"><span class="g-fit__bar" style="width:91%"></span></span><span class="g-fit__value">91%</span></span></span></div></li>
+  <li><div class="g-row" style="background:var(--tint-soft)"><span class="g-avatar">PA</span><span class="g-row__main"><span class="g-row__title">Pulkit Agrawal</span><span class="g-row__sub">PhD position in robot learning</span></span><span class="g-row__trail"><span class="g-pill g-pill--positive">Approved</span><span class="d">Oct 28</span></span></div></li>
+  <li><div class="g-row"><span class="g-avatar">SL</span><span class="g-row__main"><span class="g-row__title">Sergey Levine</span><span class="g-row__sub">EECS PhD, UC Berkeley</span></span><span class="g-row__trail"><span class="g-fit" data-band="strong"><span class="g-fit__track"><span class="g-fit__bar" style="width:48%"></span></span><span class="g-fit__value">48%</span></span></span></div></li>
+  <li><div class="g-row"><span class="g-avatar">ZE</span><span class="g-row__main"><span class="g-row__title">Zackory Erickson</span><span class="g-row__sub">Robotics Institute PhD, Carnegie Mellon University</span></span><span class="g-row__trail"><span class="g-fit" data-band="moderate"><span class="g-fit__track"><span class="g-fit__bar" style="width:41%"></span></span><span class="g-fit__value">41%</span></span></span></div></li>
+</ul></div>
+</body>
+</html>

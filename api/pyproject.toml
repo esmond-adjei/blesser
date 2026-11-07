@@ -1,0 +1,87 @@
+[project]
+name = "graduator"
+version = "1.0.0"
+description = "Agentic backend that automates grad school application research (BYO model)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.143,<0.144",
+    "starlette>=1.3.1",
+    "uvicorn[standard]>=0.30.6",
+    "sqlalchemy[asyncio]>=2.0.35",
+    "asyncpg>=0.29.0",
+    "anthropic>=0.34.2",
+    "openai>=1.40",
+    "httpx>=0.27.2",
+    "lxml>=5",
+    "trafilatura>=1.12.2",
+    "voyageai>=0.2.3",
+    "numpy>=1.26.4",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.5.2",
+    "python-multipart>=0.0.18",
+    "python-dotenv>=1.0.1",
+    "typesafe-sdk>=0.7.0",
+    "alembic>=1.20.0",
+    "pypdf>=6.20.1",
+    "bcrypt>=5.0.0",
+    "pyjwt>=2.15.1",
+    "email-validator>=2.3.0",
+    "pillow>=10",
+    "cryptography>=42",
+    "reportlab>=4.2",
+    # Web Push (VAPID) for notifications; imported lazily by the worker.
+    "pywebpush>=2.0",
+    # The CV's Word (.docx) export (#220). Uploads are still read by hand
+    # (api/cv/engine.py), in the sandbox.
+    "python-docx>=1.1",
+]
+
+[project.scripts]
+api = "api.main:main"
+worker = "api.worker:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "real_auth: exercise the real auth dependency instead of the suite's test-user override",
+    "robots: keep robots.txt checks on (the suite turns them off by default)",
+    "institutions: keep OpenAlex institution lookups on (off by default)",
+    "pipeline: keep the deterministic first pass for narrow tasks on (off by default)",
+    "rate_limits: enable per-account throttles (off for the rest of the suite)",
+    "openalex_store: keep the Postgres OpenAlex cache and school author lists on (off by default)",
+    "rosters: keep the code-first faculty list on (off by default)",
+    "professor_index: keep the per-account professor index on (off by default)",
+    "verification_sources: keep the DBLP / NIH / NSF / faculty-page sources on (off by default)",
+]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+# B008 (function call in default arg) is the canonical FastAPI pattern:
+# Depends(get_session) must be called in the endpoint signature.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B009"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api"]

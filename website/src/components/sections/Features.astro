@@ -1,0 +1,22 @@
+---
+import { Check, User } from "@lucide/astro"
+---
+<section id="features" class="mx-auto max-w-site scroll-mt-20 px-4 py-24 sm:px-6 sm:py-32">
+  <h2 class="type-display max-sm:text-[40px] max-sm:leading-[1.1]">Every claim, on the record.</h2>
+  <p class="type-lead mt-4 max-w-2xl text-[var(--label-secondary)]">Your matches, emails and deadlines in one place, each with the evidence behind it.</p>
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <article data-reveal class="g-ecard min-h-64 lg:col-span-2">
+      <p class="g-ecard__kind">Matches</p><h3 class="g-ecard__title">A shortlist with reasons</h3>
+      <p class="g-ecard__body">Professors ranked by how closely their papers match your interests, measured with embeddings rather than guessed. Open any score to see the papers behind it.</p>
+      <div class="g-ecard__signal"><span class="g-best">Best fit</span><span class="g-fit" data-band="strong"><span class="g-fit__track"><span class="g-fit__bar" style="width: 82%"></span></span><span class="g-fit__value">82%</span></span></div>
+    </article>
+    <article data-reveal class="flex min-h-64 flex-col gap-4 rounded-[var(--radius-lg)] bg-[var(--brand)] p-6 text-[var(--on-brand)]">
+      <p class="text-sm text-[var(--on-brand-secondary)]">Outbox</p><h3 class="type-title-3">Nothing is ever sent for you.</h3>
+      <p class="text-[var(--on-brand-secondary)]">Each draft cites the professor's own work. You edit it, approve it and send it from your own address.</p>
+      <span class="mt-auto inline-flex items-center gap-2 text-sm"><Check class="size-4" /> You stay in control</span>
+    </article>
+    <article data-reveal class="g-ecard min-h-64"><p class="g-ecard__kind">Applications</p><h3 class="g-ecard__title">Every deadline in view</h3><p class="g-ecard__body">Requirements, deadlines and status for each programme, with the professors you matched there.</p><div class="g-ecard__signal"><span class="g-date"><span class="g-date__m">Dec</span><span class="g-date__d">15</span></span><span class="type-meta">4 of 7 requirements done</span></div></article>
+    <article data-reveal class="g-ecard min-h-64"><p class="g-ecard__kind">Gradis</p><h3 class="g-ecard__title">Ask about your search</h3><p class="g-ecard__body">Why is someone your best fit? Which deadlines are close? Gradis answers from your own records.</p><div class="g-ecard__signal"><span class="g-record w-full"><span class="g-icon-tile"><User class="size-4" /></span><span class="min-w-0"><span class="g-record__kind block">Best fit</span><span class="g-record__name block truncate">Amara Reyes</span></span></span></div></article>
+    <article data-reveal class="g-ecard min-h-64"><p class="g-ecard__kind">CV studio</p><h3 class="g-ecard__title">A CV for each professor</h3><p class="g-ecard__body">Suggestions that bring the right projects forward for each lab. You accept or reject each one.</p><div class="g-ecard__signal"><span class="g-btn g-btn--primary g-btn--sm">Accept</span><span class="g-btn g-btn--gray g-btn--sm">Reject</span></div></article>
+  </div>
+</section>

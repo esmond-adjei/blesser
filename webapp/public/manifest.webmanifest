@@ -1,0 +1,13 @@
+{
+  "name": "Graduator",
+  "short_name": "Graduator",
+  "description": "Agentic research and outreach for graduate programs",
+  "start_url": "/new",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/logo-light.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

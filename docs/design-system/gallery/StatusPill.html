@@ -1,0 +1,24 @@
+<!-- @dsCard group="Status" height=120 subtitle="A dot and a word, in five tones" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>StatusPill preview</title>
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+.r{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+</style>
+</head>
+<body class="g-root">
+<div class="r">
+  <span class="g-pill">Wishlist</span>
+  <span class="g-pill g-pill--info g-pill--live">Running</span>
+  <span class="g-pill g-pill--info">Drafted</span>
+  <span class="g-pill g-pill--positive">Approved</span>
+  <span class="g-pill g-pill--caution">Paused</span>
+  <span class="g-pill g-pill--critical">Rejected</span>
+</div>
+<div class="r"><span class="g-best">Best fit</span><span class="g-count">3</span><span class="g-secondary" style="font-size:13px">count badge on Filters</span></div>
+</body>
+</html>

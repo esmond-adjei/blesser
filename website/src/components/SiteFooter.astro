@@ -1,0 +1,82 @@
+---
+import { CONTACT_EMAIL, LOGIN_URL, REGISTER_URL, WAITLIST_MODE, path } from "../lib/site"
+import Logo from "./Logo.astro"
+
+const year = new Date().getFullYear()
+
+const columns = [
+  {
+    title: "Product",
+    links: [
+      { href: "/#how", label: "How it works" },
+      { href: "/#features", label: "Features" },
+      { href: "/pricing", label: "Pricing" },
+      { href: "/faq", label: "FAQ" },
+    ].filter((link) => !(WAITLIST_MODE && link.href === "/pricing")),
+  },
+  {
+    title: "Account",
+    links: [
+      { href: REGISTER_URL, label: WAITLIST_MODE ? "Join the waitlist" : "Create account" },
+      { href: LOGIN_URL, label: "Sign in" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { href: "/privacy", label: "Privacy notice" },
+      { href: "/terms", label: "Terms of service" },
+    ],
+  },
+]
+---
+
+<footer>
+  <div class="mx-auto max-w-site px-4 py-14 sm:px-6">
+    <div class="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div>
+        <a href={path("/")} class="flex items-center gap-2" aria-label="Graduator home">
+          <Logo class="size-8" />
+          <span class="text-lg font-bold tracking-tight">Graduator</span>
+        </a>
+        <p class="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
+          Finds the professors who fit your research, shows the papers behind every match, and leaves the email
+          to you.
+        </p>
+      </div>
+
+      {
+        columns.map((column) => (
+          <div>
+            <h2 class="text-sm font-semibold">{column.title}</h2>
+            <ul class="mt-4 space-y-2 text-sm">
+              {column.links.map((link) => (
+                <li>
+                  <a href={path(link.href)} class="text-muted-foreground transition-colors hover:text-foreground">
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <div
+      class="mt-12 flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center"
+    >
+      <span>© {year} Graduator</span>
+      {
+        CONTACT_EMAIL && (
+          <a href={`mailto:${CONTACT_EMAIL}`} class="hover:text-foreground">
+            {CONTACT_EMAIL}
+          </a>
+        )
+      }
+      <span class="sm:ml-auto">
+        An independent research agent. Not affiliated with any university.
+      </span>
+    </div>
+  </div>
+</footer>

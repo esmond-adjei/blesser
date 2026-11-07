@@ -1,0 +1,32 @@
+<!-- @dsCard group="Chat" height=330 subtitle="The work behind an answer: thoughts and tool calls, folded" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><link rel="stylesheet" href="../components/app-patterns.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>AgentActivity preview</title>
+
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+.w{max-width:620px;display:grid;gap:20px}
+</style>
+</head>
+<body class="g-root">
+<div class="w">
+  <div class="g-activity">
+    <button class="g-activity__head" aria-expanded="true"><svg class="g-icon g-spinner" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span class="g-shimmer">Reading 12 papers by Guanya Shi</span><svg class="g-icon g-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+    <div class="g-activity__body">
+      <p>I'll check her recent work first.</p>
+      <div class="g-tools">
+        <button class="g-tool"><svg class="g-icon g-tool__ok" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Searched OpenAlex for Guanya Shi</span><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button class="g-tool"><svg class="g-icon g-tool__ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg><span>Read 6 papers</span><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button class="g-tool"><svg class="g-icon g-spinner" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span class="g-shimmer">Reading the lab page</span><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+    </div>
+  </div>
+  <div class="g-activity">
+    <button class="g-activity__head" aria-expanded="false"><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg><span>Thought, 3 actions</span><span class="g-activity__failed">1 failed</span><svg class="g-icon g-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+  </div>
+</div>
+</body>
+</html>

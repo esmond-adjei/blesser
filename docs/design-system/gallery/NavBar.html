@@ -1,0 +1,20 @@
+<!-- @dsCard group="Landing page" height=120 subtitle="Translucent bar over the page" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>NavBar preview</title>
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+body{padding:0;background:var(--canvas)}
+</style>
+</head>
+<body class="g-root">
+<header class="g-navbar">
+  <a class="g-brand" style="padding:0;text-decoration:none" href="#"><img class="g-logo-l" src="../assets/logos/logo-dark.svg" alt="Graduator"><img class="g-logo-d" src="../assets/logos/logo-light.svg" alt="Graduator">Graduator</a>
+  <nav class="g-navbar__links" aria-label="Main"><a href="#">How it works</a><a href="#">Pricing</a><a href="#">FAQ</a><a href="#">Sign in</a></nav>
+  <a class="g-btn g-btn--primary g-btn--sm g-btn--capsule" href="#">Get started</a>
+</header>
+</body>
+</html>

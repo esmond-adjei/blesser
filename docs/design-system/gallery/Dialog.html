@@ -1,0 +1,21 @@
+<!-- @dsCard group="Overlays" height=330 subtitle="Confirm, decide or collect a few fields" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><link rel="stylesheet" href="../components/app-patterns.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>Dialog preview</title>
+
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+body{padding:0}.s{display:flex;align-items:flex-start;justify-content:center;min-height:330px;padding:40px 24px 24px}
+</style>
+</head>
+<body class="g-root">
+<div class="s g-scrim"><div class="g-dialog" role="dialog" aria-labelledby="dt">
+  <button class="g-dialog__close" aria-label="Close"><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+  <div class="g-dialog__head"><h3 class="g-dialog__title" id="dt">Delete this chat?</h3><p class="g-dialog__desc">The conversation and its messages are removed for good.</p></div>
+  <div class="g-dialog__foot"><button class="g-btn g-btn--outline">Cancel</button><button class="g-btn g-btn--destructive">Delete chat</button></div>
+</div></div>
+</body>
+</html>

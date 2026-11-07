@@ -1,0 +1,92 @@
+---
+import "../styles/global.css"
+import SiteHeader from "../components/SiteHeader.astro"
+import SiteFooter from "../components/SiteFooter.astro"
+import { BASE, SITE_URL, path } from "../lib/site"
+
+interface Props {
+  /** Page title. The site name is added automatically, except on the home page. */
+  title: string
+  description: string
+  /** This page's route, e.g. "/pricing". Used for the canonical link. */
+  route?: string
+  /** JSON-LD blocks for this page. */
+  schema?: Record<string, unknown> | Record<string, unknown>[]
+  /** Keep the page out of search results (the 404). */
+  noIndex?: boolean
+}
+
+const { title, description, route = "/", schema, noIndex = false } = Astro.props
+const canonical = `${SITE_URL}${BASE}${route === "/" ? "/" : route}`
+const ogImage = `${SITE_URL}${BASE}/og.png`
+const fullTitle = route === "/" ? title : `${title}, Graduator`
+const blocks = schema ? (Array.isArray(schema) ? schema : [schema]) : []
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noIndex && <meta name="robots" content="noindex" />}
+    <link rel="icon" type="image/svg+xml" href={path("/favicon.svg")} />
+    <link rel="sitemap" href={`${BASE}/sitemap-index.xml`} />
+    <meta name="theme-color" content="#f5f6f8" />
+    <script is:inline>
+      // Scroll effects need JavaScript; the root says so, and the styles
+      // that hide the elements only apply when it does.
+      document.documentElement.classList.add("js")
+    </script>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Graduator" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    {
+      blocks.map((block) => (
+        <script type="application/ld+json" set:html={JSON.stringify(block)} />
+      ))
+    }
+  </head>
+  <body>
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground"
+    >
+      Skip to content
+    </a>
+    <SiteHeader />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+  </body>
+</html>
+
+<script>
+  // Reveal: each element arrives once, when it reaches the viewport.
+  const targets = document.querySelectorAll<HTMLElement>("[data-reveal]")
+  if (targets.length > 0) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          entry.target.classList.add("is-revealed")
+          observer.unobserve(entry.target)
+        }
+      },
+      { rootMargin: "0px 0px -12% 0px", threshold: 0.12 },
+    )
+    for (const target of targets) observer.observe(target)
+  }
+</script>

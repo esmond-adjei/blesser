@@ -1,0 +1,58 @@
+---
+import Base from "../layouts/Base.astro"
+import Hero from "../components/sections/Hero.astro"
+import Sources from "../components/sections/Sources.astro"
+import Problem from "../components/sections/Problem.astro"
+import HowItWorks from "../components/sections/HowItWorks.astro"
+import Features from "../components/sections/Features.astro"
+import Faq from "../components/sections/Faq.astro"
+import FinalCta from "../components/sections/FinalCta.astro"
+import { SITE_URL, path } from "../lib/site"
+
+const description =
+  "Graduator finds the professors who fit your research: it reads their papers, ranks every match with the evidence, tracks your applications and drafts a first email for you to approve. Start free."
+
+const schema = [
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Graduator",
+    applicationCategory: "EducationalApplication",
+    operatingSystem: "Web",
+    url: SITE_URL,
+    description,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    featureList: [
+      "Research runs across programmes and faculty",
+      "Professors ranked by fit, with the papers behind every score",
+      "Outreach drafts you review and send yourself",
+      "Application deadlines, requirements and status",
+      "Gradis, an assistant that answers from your records",
+      "CV suggestions per professor",
+      "Bring your own AI model",
+      "Export everything, delete in a click",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Graduator",
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo-light.svg`,
+  },
+]
+---
+
+<Base title="Graduator: Find the professors you actually want to work with" description={description} schema={schema}>
+  <Hero />
+  <Problem />
+  <HowItWorks />
+  <Features />
+  <Sources />
+  <section class="mx-auto max-w-site px-4 py-24 sm:px-6 sm:py-32">
+    <h2 class="type-title-1">Questions</h2>
+    <div class="g-list mt-8 px-6"><Faq limit={5} /></div>
+    <p class="mt-6"><a href={path("/faq")} class="g-btn g-btn--plain">Read every question</a></p>
+  </section>
+  <FinalCta />
+</Base>

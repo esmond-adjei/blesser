@@ -1,0 +1,35 @@
+---
+import { path } from "../../lib/site"
+
+const sources = [
+  { name: "OpenAlex", href: "https://openalex.org/", image: "/sources/openalex.png", wordmark: true },
+  { name: "ORCID", href: "https://orcid.org/", image: "/sources/orcid.png", wordmark: true },
+  { name: "dblp", href: "https://dblp.org/", image: "/sources/dblp.svg", wordmark: false },
+  { name: "Semantic Scholar", href: "https://www.semanticscholar.org/", image: "/sources/semantic-scholar.svg", wordmark: false },
+]
+---
+<section class="bg-[var(--surface)]">
+  <div class="mx-auto max-w-site px-4 py-24 text-center sm:px-6 sm:py-32">
+  <h2 class="type-title-1">Grounded in the record.</h2>
+  <p class="mt-4 text-[var(--label-secondary)]">Check the publications and profiles behind each match.</p>
+  <ul class="source-logos mt-10" aria-label="Research sources">
+    {sources.map((source) => (
+      <li>
+        <a href={source.href} target="_blank" rel="noopener noreferrer" aria-label={source.name}>
+          <img src={path(source.image)} alt="" class:list={["source-logos__image", { "source-logos__image--wordmark": source.wordmark }]} loading="lazy" />
+          {!source.wordmark && <span>{source.name}</span>}
+        </a>
+      </li>
+    ))}
+  </ul>
+  </div>
+</section>
+
+<style>
+  .source-logos { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:2rem 3.5rem; }
+  .source-logos a { display:flex; align-items:center; gap:.55rem; min-height:3rem; color:var(--label); font-size:1.25rem; font-weight:600; }
+  .source-logos a:hover { color:var(--tint); }
+  .source-logos__image { display:block; width:2.5rem; height:2.5rem; object-fit:contain; }
+  .source-logos__image--wordmark { width:auto; max-width:11rem; height:2.5rem; }
+  @media (max-width:600px) { .source-logos { gap:1.5rem 2rem; } }
+</style>

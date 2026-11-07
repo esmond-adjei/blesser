@@ -1,0 +1,31 @@
+<!-- @dsCard group="Inputs" height=300 subtitle="Label, input, hint, error, textarea" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>TextField preview</title>
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;max-width:720px}
+</style>
+</head>
+<body class="g-root">
+<div class="g">
+  <div class="g-field">
+    <label class="g-label" for="f1">Research interests</label>
+    <input class="g-input" id="f1" value="Robot learning, legged locomotion">
+    <span class="g-hint">Pulled from your CV. Edit freely.</span>
+  </div>
+  <div class="g-field g-field--error">
+    <label class="g-label" for="f2">Email</label>
+    <input class="g-input" id="f2" value="ama@" aria-invalid="true">
+    <span class="g-hint">Enter a full email address, like ama@example.com.</span>
+  </div>
+  <div class="g-field" style="grid-column:1/-1">
+    <label class="g-label" for="f3">Note for Gradis</label>
+    <textarea class="g-textarea" id="f3" placeholder="Anything the agents should know, such as funding needs or start date"></textarea>
+  </div>
+</div>
+</body>
+</html>

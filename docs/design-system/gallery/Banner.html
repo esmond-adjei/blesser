@@ -1,0 +1,20 @@
+<!-- @dsCard group="Content" height=200 subtitle="Inline notice inside a page or panel" -->
+<!doctype html>
+<html lang="en">
+<head><link rel="stylesheet" href="../fonts/fonts.css"><link rel="stylesheet" href="../tokens/tokens.css"><link rel="stylesheet" href="../components/bundle.css"><script>document.documentElement.dataset.theme=new URLSearchParams(location.search).get("theme")||"light"</script>
+<meta charset="utf-8">
+<title>Banner preview</title>
+<style>
+body{margin:0;padding:24px;}
+.g-logo-d{display:none}[data-theme='dark'] .g-logo-l{display:none}[data-theme='dark'] .g-logo-d{display:inline-block}
+.g{display:grid;gap:10px;max-width:640px}
+</style>
+</head>
+<body class="g-root">
+<div class="g">
+  <div class="g-banner g-banner--info"><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div><strong>Verify your email.</strong> We sent a link to ama@example.com.</div><button class="g-btn g-btn--plain g-btn--sm g-banner__action">Resend</button></div>
+  <div class="g-banner g-banner--caution"><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div><strong>This run is near its budget.</strong> It will pause after 3 more professors.</div></div>
+  <div class="g-banner g-banner--critical"><svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div><strong>Your model key was rejected.</strong> Check it in Settings → Models.</div><button class="g-btn g-btn--plain g-btn--sm g-banner__action">Open settings</button></div>
+</div>
+</body>
+</html>

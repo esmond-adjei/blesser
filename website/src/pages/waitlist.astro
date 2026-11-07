@@ -1,0 +1,60 @@
+---
+import Base from "../layouts/Base.astro"
+import WaitlistForm from "../components/WaitlistForm.astro"
+import { BookOpenText, ListChecks, Mail } from "@lucide/astro"
+
+const description =
+  "Join the Graduator waitlist. Be first in when the research agent for grad school applications opens: matched professors, the papers behind every match, and outreach drafts you review yourself."
+
+const perks = [
+  {
+    icon: ListChecks,
+    title: "Professors who fit",
+    body: "Tell it your field and target countries. It finds faculty whose research matches yours and ranks them.",
+  },
+  {
+    icon: BookOpenText,
+    title: "The papers behind every match",
+    body: "Each score comes with the publications it was based on, so you can check the reasoning yourself.",
+  },
+  {
+    icon: Mail,
+    title: "Drafts, never sent for you",
+    body: "Personalised outreach drafts you review, edit and send. Nothing leaves without you.",
+  },
+]
+---
+
+<Base title="Join the waitlist" description={description} route="/waitlist">
+  <section class="mx-auto max-w-3xl px-4 pt-14 text-center sm:px-6 sm:pt-20">
+    <p class="type-eyebrow text-primary">Opening soon</p>
+    <h1 class="mx-auto mt-3 max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
+      Be first in when Graduator opens.
+    </h1>
+    <p class="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
+      We're opening to new applicants in small groups. Leave your email and we'll let you know when it's your turn.
+    </p>
+  </section>
+
+  <section class="mx-auto max-w-2xl px-4 pt-10 sm:px-6">
+    <div class="g-card sm:p-8">
+      <WaitlistForm id="waitlist-page" />
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+    <ul class="grid gap-6 sm:grid-cols-3">
+      {
+        perks.map((perk) => (
+          <li>
+            <span class="g-icon-tile">
+              <perk.icon class="size-4" />
+            </span>
+            <h2 class="mt-3 text-base font-semibold">{perk.title}</h2>
+            <p class="mt-1 text-sm leading-relaxed text-muted-foreground">{perk.body}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</Base>

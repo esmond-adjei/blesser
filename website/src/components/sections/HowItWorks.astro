@@ -1,0 +1,15 @@
+---
+const steps = [
+  { title: "Describe your research", body: "A few sentences on what you want to study, where, and at which degree level." },
+  { title: "Gradis does the reading", body: "It finds the programmes, lists their faculty and reads each professor's recent papers." },
+  { title: "Review your matches", body: "Every professor is ranked by fit, with the papers and the reasons behind the score." },
+  { title: "Write to the right people", body: "Edit the draft for each professor, approve it, and send it from your own email." },
+]
+---
+<section id="how" class="mx-auto max-w-site scroll-mt-20 px-4 py-24 sm:px-6 sm:py-32">
+  <h2 class="type-display max-sm:text-[40px] max-sm:leading-[1.1]">From interests to inbox.</h2>
+  <p class="type-lead mt-4 max-w-2xl text-[var(--label-secondary)]">One run does in minutes what usually takes weeks of evenings.</p>
+  <ol class="g-steps mt-12">
+    {steps.map(({ title, body }) => <li data-reveal><h3>{title}</h3><p>{body}</p></li>)}
+  </ol>
+</section>

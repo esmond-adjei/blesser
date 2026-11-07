@@ -1,0 +1,48 @@
+---
+import Base from "../layouts/Base.astro"
+import Faq from "../components/sections/Faq.astro"
+import { FAQ } from "../lib/faq"
+import { BASE, SITE_URL } from "../lib/site"
+
+const description =
+  "Answers to the questions applicants ask before letting Graduator read their CV: what is sent, what is scored, who sees the data, and how to leave."
+
+const schema = [
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  },
+]
+---
+
+<Base title="Questions" description={description} route="/faq" schema={schema}>
+  <section class="mx-auto max-w-3xl px-4 pt-16 sm:px-6">
+    <p class="type-eyebrow text-primary">FAQ</p>
+    <h1 class="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Questions, answered plainly</h1>
+    <p class="mt-4 text-lg leading-relaxed text-muted-foreground">
+      If something here is still unclear, mail us and we will answer it, and probably put it on this page.
+    </p>
+  </section>
+
+  <section class="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+    <div class="g-list px-6"><Faq /></div>
+  </section>
+
+  <section>
+    <div class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
+      <h2 class="text-2xl font-semibold tracking-tight">Ready to try it?</h2>
+      <p class="mt-3 text-muted-foreground">Free to start, and you can export or delete everything you put in.</p>
+      <a
+        href={`${SITE_URL}${BASE}/`}
+        class="g-btn g-btn--primary g-btn--capsule mt-6"
+      >
+        Back to the start
+      </a>
+    </div>
+  </section>
+</Base>

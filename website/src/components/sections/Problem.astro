@@ -1,0 +1,40 @@
+---
+import { Check, X } from "@lucide/astro"
+
+const byHand = [
+  "Open every department's faculty page, one school at a time",
+  "Skim abstracts to guess who works on what you care about",
+  "Keep deadlines and requirements in a spreadsheet",
+  "Send a template that could be to anyone",
+]
+const withGraduator = [
+  "Describe your research once, and the programmes are searched for you",
+  "Every professor scored against your interests, with the papers behind it",
+  "Deadlines, requirements and status for every programme on one board",
+  "A first draft for each professor that cites their own work",
+]
+---
+
+<section class="mx-auto max-w-site px-4 py-24 sm:px-6 sm:py-32">
+  <p class="type-statement mx-auto max-w-5xl text-center max-sm:text-[34px] max-sm:leading-[1.14]">
+    The hard part of a PhD application isn't the form. <span class="text-[var(--label-tertiary)]">It's finding the people you want to work with.</span>
+  </p>
+  <div class="mx-auto mt-16 grid max-w-5xl gap-4 md:grid-cols-2">
+    <div data-reveal class="rounded-[var(--radius-lg)] border border-[var(--separator)] p-6 sm:p-8">
+      <h2 class="type-title-3 text-[var(--label-secondary)]">By hand: weeks of tabs</h2>
+      <ul class="mt-6 space-y-4">
+        {byHand.map((item) => (
+          <li class="flex gap-3 text-[var(--label-secondary)]"><X class="mt-0.5 size-5 shrink-0 text-[var(--label-tertiary)]" aria-hidden="true" />{item}</li>
+        ))}
+      </ul>
+    </div>
+    <div data-reveal class="rounded-[var(--radius-lg)] bg-[var(--surface)] p-6 shadow-[var(--elevation-1)] sm:p-8">
+      <h2 class="type-title-3">With Graduator: one search</h2>
+      <ul class="mt-6 space-y-4">
+        {withGraduator.map((item) => (
+          <li class="flex gap-3"><Check class="mt-0.5 size-5 shrink-0 text-[var(--tint)]" aria-hidden="true" />{item}</li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</section>

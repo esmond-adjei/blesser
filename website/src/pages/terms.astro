@@ -1,0 +1,38 @@
+---
+import Base from "../layouts/Base.astro"
+import { CONTACT_EMAIL, CONTACT_HREF, path } from "../lib/site"
+// The app renders the same file, so both stay word-for-word identical.
+import { Content, frontmatter } from "../../../webapp/src/legal/terms.md"
+
+const description = "The terms for using Graduator: plans and payment, refunds, your content, contacting professors, and your rights."
+---
+
+<Base title="Terms of service" description={description} route="/terms">
+  <section class="mx-auto max-w-2xl px-4 pt-16 sm:px-6">
+    <p class="type-eyebrow text-primary">Legal</p>
+    <h1 class="mt-3 text-4xl font-semibold tracking-tight">Terms of service</h1>
+    <p class="mt-2 type-caption">Version {frontmatter.version}</p>
+
+    <div class="rich-text mt-8">
+      <Content />
+
+      <h2>Contact</h2>
+      <p>
+        Questions, requests about your data, refunds, or removal of a researcher's information:
+        {
+          CONTACT_EMAIL ? (
+            <a href={CONTACT_HREF}>{CONTACT_EMAIL}</a>
+          ) : (
+            <span>the operator of this Graduator instance</span>
+          )
+        }
+        .
+      </p>
+    </div>
+
+    <p class="mt-12 flex gap-4 type-caption">
+      <a href={path("/privacy")} class="hover:text-foreground">Privacy</a>
+      <a href={path("/terms")} class="hover:text-foreground">Terms</a>
+    </p>
+  </section>
+</Base>
