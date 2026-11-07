@@ -28,7 +28,7 @@ it("shows the professor name and a link to the professor list on a professor det
     expect(breadcrumb?.textContent).toContain("Professors")
     expect(breadcrumb?.textContent).toContain("Ada Lovelace")
     expect(breadcrumb?.querySelector('a[href="/professors"]')?.textContent).toBe("Professors")
-    expect(document.title).toBe("Ada Lovelace | Graduator")
+    expect(document.title).toBe("Ada Lovelace | Blesser")
   } finally {
     await act(async () => root.unmount())
     client.clear()

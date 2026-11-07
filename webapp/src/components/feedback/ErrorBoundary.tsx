@@ -27,7 +27,7 @@ export class ErrorBoundary extends React.Component<
     return (
       <ErrorState
         mascot="error-gear"
-        title="This part of Graduator hit a snag"
+        title="This part of Blesser hit a snag"
         description="Your data is safe. Try again, or reload the page if it keeps happening."
         action={
           <span className="flex flex-wrap justify-center gap-2">

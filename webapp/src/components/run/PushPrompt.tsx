@@ -71,7 +71,7 @@ export function PushPrompt({ running }: { running: boolean }) {
         <p className="font-medium">Notify me when it's done?</p>
         <p className="text-xs text-muted-foreground">
           {support === "ios-needs-home-screen"
-            ? "On iPhone and iPad, add Graduator to your Home Screen first (Share, then Add to Home Screen), open it from there, and turn notifications on in Settings."
+            ? "On iPhone and iPad, add Blesser to your Home Screen first (Share, then Add to Home Screen), open it from there, and turn notifications on in Settings."
             : "Runs take a while. Get a browser notification when this one finishes, so you can close the tab."}
         </p>
       </div>

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   Ban,
   Copy,
@@ -57,12 +57,18 @@ import { Markdown } from "../components/ui/MarkdownLazy"
 import { StatsRefreshButton } from "../components/run/StatsRefreshButton"
 import { artifactPreview } from "../components/gradis/GradisArtifactPreview"
 
-const TASK_TABS: TaskTypeFilter[] = [
+const RESEARCH_TABS: TaskTypeFilter[] = [
   "discover_programs",
   "research_professor",
   "research_one_professor",
   "draft_email",
 ]
+/** Opportunity scans (api/opportunities/scans.py) run one agent type only. */
+const SCAN_TABS: TaskTypeFilter[] = ["discover_opportunities"]
+
+function isScanRun(run: { field: string } | undefined): boolean {
+  return !!run?.field.startsWith("Opportunities:")
+}
 
 // Charts load with the Stats panel, not the run page.
 const UsageTab = React.lazy(() => import("../components/run/UsageTab").then((m) => ({ default: m.UsageTab })))
@@ -89,6 +95,8 @@ export function RunDetail() {
   const { data: run, isLoading: runLoading, isError: runError } = useRun(runId ?? "")
   // Preselected-list runs skip discovery; open on the faculty agents instead
   // of an empty "School Agents (0)" tab.
+  const scan = isScanRun(run)
+  const TASK_TABS = scan ? SCAN_TABS : RESEARCH_TABS
   const defaultTab = run?.region === "(preselected list)" ? "research_professor" : TASK_TABS[0]
   const tab = (TASK_TABS as string[]).includes(tabParam) ? tabParam : defaultTab
   const rid = runId ?? ""
@@ -357,14 +365,16 @@ export function RunDetail() {
             <div className="flex items-center gap-x-3 gap-y-2 type-caption">
               <RunStatusBadge status={run.status} live={liveActive} />
               <div className="flex shrink-0 items-center gap-1.5 ml-auto px-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  aria-pressed={rail === "resources" && !previewId && railVisible}
-                  onClick={() => toggleRail("resources")}
-                >
-                  <RunAllowance runId={rid} live={run.status === "running"} />
-                </Button>
+                {scan ? null : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-pressed={rail === "resources" && !previewId && railVisible}
+                    onClick={() => toggleRail("resources")}
+                  >
+                    <RunAllowance runId={rid} live={run.status === "running"} />
+                  </Button>
+                )}
                 <Button data-tooltip="Open the task board for this research run" size="sm" variant="outline" onClick={() => setBoardOpen(true)}>
                   <SquareKanban /> Tasks
                 </Button>
@@ -409,12 +419,16 @@ export function RunDetail() {
 
                   {(run.status === "running" || run.status === "paused" || run.status === "cancelled" || failedCount > 0) && <MenuSeparator />}
 
-                  <MenuItem onSelect={() => setEditOpen(true)}>
-                    <Pencil /> Edit run
-                  </MenuItem>
-                  <MenuItem onSelect={() => navigate(`/new?from=${rid}`)}>
-                    <Copy /> Run again with changes
-                  </MenuItem>
+                  {scan ? null : (
+                    <>
+                      <MenuItem onSelect={() => setEditOpen(true)}>
+                        <Pencil /> Edit run
+                      </MenuItem>
+                      <MenuItem onSelect={() => navigate(`/new?from=${rid}`)}>
+                        <Copy /> Run again with changes
+                      </MenuItem>
+                    </>
+                  )}
 
                   <MenuItem destructive onSelect={() => setConfirmDelete(true)}>
                     <Trash2 /> Delete
@@ -422,8 +436,10 @@ export function RunDetail() {
                 </Menu>
               </div>
             </div>
-            <h1 className="type-page-title truncate">{gradType} in {title}</h1>
-            <button
+            <h1 className="type-page-title truncate">
+              {scan ? `Opportunity scan: ${run.field.slice("Opportunities:".length).trim()} in ${run.region}` : `${gradType} in ${title}`}
+            </h1>
+            {scan && run.interest_statement.trim() === "-" ? null : <button
               type="button"
               aria-expanded={interestExpanded}
               onClick={() => setInterestExpanded((expanded) => !expanded)}
@@ -433,7 +449,13 @@ export function RunDetail() {
               )}
             >
               <Markdown text={run.interest_statement} />
-            </button>
+            </button>}
+            {scan ? (
+              <p className="type-meta">
+                Agents save only what they verify on each opportunity's own page.{" "}
+                <Link to="/opportunities?sort=new" className="text-tint hover:underline">See the newest opportunities</Link>
+              </p>
+            ) : null}
 
             <div className="flex items-center gap-x-3 gap-y-2 type-caption">
               <span data-tooltip={formatDate(run.created_at)}>Started {formatRelativeDate(run.created_at, now)}</span>

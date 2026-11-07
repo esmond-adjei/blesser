@@ -2,15 +2,15 @@
 version: "2026-11-02"
 ---
 
-This notice explains what personal data Graduator collects, why, who it is shared with, how long it is kept, and the rights you have. It covers people who use Graduator, visitors to our website, and the professors and researchers whose public academic information Graduator processes.
+This notice explains what personal data Blesser collects, why, who it is shared with, how long it is kept, and the rights you have. It covers people who use Blesser, visitors to our website, and the professors and researchers whose public academic information Blesser processes.
 
 ## 1. Who we are
 
-Graduator ("we", "us") operates the Graduator website and web app and is the data controller for the personal data described here. You can reach us at the contact address at the end of this notice.
+Blesser ("we", "us") operates the Blesser website and web app and is the data controller for the personal data described here. You can reach us at the contact address at the end of this notice.
 
 We process personal data in line with Ghana's Data Protection Act, 2012 (Act 843). Where the EU or UK General Data Protection Regulation applies to you, you also have the rights it gives you.
 
-## 2. Data you give us or that we create when you use Graduator
+## 2. Data you give us or that we create when you use Blesser
 
 **Account**
 - Your email address, display name and, if you add one, a profile picture. Pictures are re-encoded when uploaded, which removes location and other hidden metadata.
@@ -19,12 +19,12 @@ We process personal data in line with Ghana's Data Protection Act, 2012 (Act 843
 - When you accepted these terms and this notice, and which version.
 
 **Your research and applications**
-- What you tell Graduator about your interests: interest statements, fields, regions, degree level and run settings.
-- What Graduator finds and keeps for you: schools, programmes, professors, papers, fit scores and their reasons, email drafts, application records, requirements and deadlines.
+- What you tell Blesser about your interests: interest statements, fields, regions, degree level and run settings.
+- What Blesser finds and keeps for you: schools, programmes, professors, papers, fit scores and their reasons, email drafts, application records, requirements and deadlines.
 - Your conversations with Gradis, the assistant, and the results of the tools it uses.
 
 **Documents**
-- CVs, research statements and other documents you upload or write in Graduator: the original file, its text, tailored versions and suggestions.
+- CVs, research statements and other documents you upload or write in Blesser: the original file, its text, tailored versions and suggestions.
 
 **Payments**
 - Your plan, when it was paid for and until when, and your credit balance.
@@ -47,36 +47,36 @@ We process personal data in line with Ghana's Data Protection Act, 2012 (Act 843
 
 ## 3. Information about professors and researchers
 
-Graduator helps students find supervisors whose research fits theirs. To do that it processes publicly available academic information about faculty members: name, institution, department, title, publications and their abstracts, citation counts, public profile and lab pages, and sometimes a photo, biography or work email published on a university website.
+Blesser helps students find supervisors whose research fits theirs. To do that it processes publicly available academic information about faculty members: name, institution, department, title, publications and their abstracts, citation counts, public profile and lab pages, and sometimes a photo, biography or work email published on a university website.
 
-This information comes from university and lab websites, OpenAlex, ORCID, dblp, Semantic Scholar, public research grant databases (such as those of the US NIH and NSF) and the Internet Archive. Our crawler identifies itself as GraduatorBot and respects robots.txt.
+This information comes from university and lab websites, OpenAlex, ORCID, dblp, Semantic Scholar, public research grant databases (such as those of the US NIH and NSF) and the Internet Archive. Our crawler identifies itself as BlesserBot and respects robots.txt.
 
-We process this information because a student asked Graduator to research a programme. It is kept only in that student's account and is not published, sold or shared with other users. We rely on legitimate interests: helping prospective students find relevant supervisors, using information researchers have made public for academic purposes.
+We process this information because a student asked Blesser to research a programme. It is kept only in that student's account and is not published, sold or shared with other users. We rely on legitimate interests: helping prospective students find relevant supervisors, using information researchers have made public for academic purposes.
 
-Graduator never emails professors. Students review their own drafts and decide whether to send them, from their own email.
+Blesser never emails professors. Students review their own drafts and decide whether to send them, from their own email.
 
-If you are a researcher and would like your information removed, contact us. We will delete it from every account that holds it and keep a minimal record (your name and institution, or your OpenAlex identifier) so Graduator does not collect it again.
+If you are a researcher and would like your information removed, contact us. We will delete it from every account that holds it and keep a minimal record (your name and institution, or your OpenAlex identifier) so Blesser does not collect it again.
 
 ## 4. Why we use your data, and on what basis
 
 | Purpose | Legal basis |
 |---|---|
-| Creating your account and providing Graduator: research runs, matches, drafts, documents, applications and Gradis | Performing our contract with you |
+| Creating your account and providing Blesser: research runs, matches, drafts, documents, applications and Gradis | Performing our contract with you |
 | Taking payments, applying your plan, issuing credits and handling refunds | Performing our contract with you |
 | Keeping payment records for tax and accounting | Legal obligation |
 | Sending service emails: account verification, password resets and security notices | Performing our contract with you |
 | Sending notifications and deadline reminders you have turned on, and browser push notifications | Your consent, which you can withdraw in Settings at any time |
 | Applying plan limits, preventing abuse and keeping the service secure | Legitimate interests |
-| Understanding costs and improving Graduator, using usage totals rather than the content of your research | Legitimate interests |
+| Understanding costs and improving Blesser, using usage totals rather than the content of your research | Legitimate interests |
 | Researching professors at your request | Legitimate interests (see section 3) |
 
-We do not sell personal data, and we do not use it for advertising. Graduator has no advertising or analytics trackers.
+We do not sell personal data, and we do not use it for advertising. Blesser has no advertising or analytics trackers.
 
 Fit scores and match reasons are suggestions to help you decide. They do not produce decisions with legal or similarly significant effects on you.
 
 ## 5. Who we share data with
 
-We share personal data only with service providers that help us run Graduator, and only what each one needs for the feature you are using. They may process it only on our instructions or under their own terms for that service.
+We share personal data only with service providers that help us run Blesser, and only what each one needs for the feature you are using. They may process it only on our instructions or under their own terms for that service.
 
 | Provider | What they receive | Why |
 |---|---|---|
@@ -89,9 +89,9 @@ We share personal data only with service providers that help us run Graduator, a
 | Paystack | Your email, the amount, a payment reference, your account ID and, for mobile money, your phone number | To take payments |
 | Google | Your email address and the content of emails we send you; if you sign in with Google, the sign-in exchange | Email delivery and Google sign-in |
 | Your browser's push service (Google, Mozilla or Apple) | A short notification text, such as "Your run finished: 12 candidates", never CV text, drafts or professor details | Browser notifications you turned on |
-| Hosting and backup providers | All stored data, encrypted in transit | To run Graduator and keep backups |
+| Hosting and backup providers | All stored data, encrypted in transit | To run Blesser and keep backups |
 
-We may also disclose data if the law requires it, to protect people's safety or our rights, or as part of a merger or sale of Graduator, in which case this notice continues to apply.
+We may also disclose data if the law requires it, to protect people's safety or our rights, or as part of a merger or sale of Blesser, in which case this notice continues to apply.
 
 ## 6. International transfers
 
@@ -109,13 +109,13 @@ Several of these providers process data outside Ghana, including in the United S
 | A one-way hash of your email address, if you used the Free plan's welcome credits | Kept after your account is deleted, so a new account on the same address doesn't get the welcome credits again. It holds nothing else about you |
 | Database backups | 14 days, after which deleted data is gone from backups too |
 | Server logs | Only as long as needed for security and troubleshooting |
-| Researcher opt-out records | For as long as Graduator runs, so the opt-out keeps working |
+| Researcher opt-out records | For as long as Blesser runs, so the opt-out keeps working |
 
 When you delete your account, all of your data is deleted immediately, including uploaded files and export archives, except for the payment records and welcome-credit hash above.
 
 ## 8. Security
 
-Passwords are hashed, model keys are encrypted, and connections to Graduator use encryption in transit. Access to production systems is limited to the people who run Graduator. No system is perfectly secure. If a breach affects your personal data, we will notify you and the relevant authorities as the law requires.
+Passwords are hashed, model keys are encrypted, and connections to Blesser use encryption in transit. Access to production systems is limited to the people who run Blesser. No system is perfectly secure. If a breach affects your personal data, we will notify you and the relevant authorities as the law requires.
 
 ## 9. Your rights
 
@@ -131,11 +131,11 @@ For anything you cannot do in the app, contact us. We will reply within 30 days,
 
 ## 10. Children
 
-Graduator is for people aged 16 and over. If you are under 18, you need a parent or guardian's permission, and a parent or guardian must make any payment. We do not knowingly collect data from children under 16. If you believe a child has given us data, contact us and we will delete it.
+Blesser is for people aged 16 and over. If you are under 18, you need a parent or guardian's permission, and a parent or guardian must make any payment. We do not knowingly collect data from children under 16. If you believe a child has given us data, contact us and we will delete it.
 
 ## 11. Cookies and browser storage
 
-Graduator does not use advertising or tracking cookies. The app keeps a few items in your browser's local storage so it works: your sign-in session, unsaved drafts and edits, and display preferences such as panel widths. Signing out removes your session but not every unsynced draft. You can clear them in your browser settings.
+Blesser does not use advertising or tracking cookies. The app keeps a few items in your browser's local storage so it works: your sign-in session, unsaved drafts and edits, and display preferences such as panel widths. Signing out removes your session but not every unsynced draft. You can clear them in your browser settings.
 
 ## 12. Changes to this notice
 

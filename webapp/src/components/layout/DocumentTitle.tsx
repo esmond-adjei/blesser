@@ -11,7 +11,7 @@ import {
 import { useApplications } from "../../lib/applications"
 import { runTitle } from "../../lib/format"
 
-const APP_NAME = "Graduator"
+const APP_NAME = "Blesser"
 
 function ApplyTitle({ label }: { label: string }) {
   React.useEffect(() => {
@@ -79,6 +79,8 @@ export function DocumentTitle() {
   if (pathname === "/dossier") return <ApplyTitle label="Matches" />
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return <ApplyTitle label="Gradis" />
   if (pathname === "/outbox") return <ApplyTitle label="Outbox" />
+  if (pathname === "/opportunities") return <ApplyTitle label="Opportunities" />
+  if (pathname === "/todos") return <ApplyTitle label="To-dos" />
   if (pathname === "/applications") return <ApplyTitle label="Applications" />
   if (pathname === "/schools") return <ApplyTitle label="Schools" />
   if (pathname === "/professors") return <ApplyTitle label="Professors" />

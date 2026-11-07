@@ -67,6 +67,7 @@ const TASK_TYPE_LABELS: Record<string, string> = {
   research_professor: "Research faculty",
   research_one_professor: "Research professor",
   draft_email: "Draft email",
+  discover_opportunities: "Find opportunities",
 }
 
 export function TaskTypeLabel({ type }: { type: string }) {

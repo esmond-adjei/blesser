@@ -248,7 +248,7 @@ function ThisBrowser() {
   let status: string
   if (config.data && !config.data.enabled) status = "Push isn't set up on this server (the inbox and email still work)."
   else if (support === "ios-needs-home-screen")
-    status = "On iPhone and iPad, push works only once Graduator is on your Home Screen: tap Share, then Add to Home Screen, and open it from there (iOS 16.4 or later)."
+    status = "On iPhone and iPad, push works only once Blesser is on your Home Screen: tap Share, then Add to Home Screen, and open it from there (iOS 16.4 or later)."
   else if (support === "unsupported") status = "This browser can't receive push notifications."
   else if (permission() === "denied") status = "Notifications are blocked for this site. Allow them in the browser's site settings, then turn push on."
   else if (subscribed) status = "This browser gets push notifications."

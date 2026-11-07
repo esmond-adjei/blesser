@@ -33,6 +33,7 @@ const TASKS: Record<string, { label: string; description: string }> = {
   research_professor: { label: "Discover faculty", description: "Find potential supervisors at each school." },
   research_one_professor: { label: "Research a professor", description: "Review publications and assess a supervisor's research fit." },
   draft_email: { label: "Draft outreach emails", description: "Prepare a personal introduction for a potential supervisor." },
+  discover_opportunities: { label: "Find opportunities", description: "Search the web for open grants, programmes and scholarships, and add the verified ones to the catalogue." },
 }
 
 const GROUP_ICONS: Record<string, LucideIcon> = {

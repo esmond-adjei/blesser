@@ -24,7 +24,7 @@ function AuthShell({
       <div className="flex items-center gap-2.5">
         <AppLogo className="size-9" />
         <div>
-          <p className="text-lg font-bold tracking-tight">Graduator</p>
+          <p className="text-lg font-bold tracking-tight">Blesser</p>
           <p className="type-caption">{title}</p>
         </div>
       </div>
@@ -45,7 +45,7 @@ export function Login() {
   const [password, setPassword] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState<string | null>(null)
-  const next = searchParams.get("next") || "/dossier"
+  const next = searchParams.get("next") || "/opportunities"
   const oauthError = searchParams.get("oauth_error")
 
   React.useEffect(() => {
@@ -129,7 +129,7 @@ export function Register() {
   const [agreed, setAgreed] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState<string | null>(null)
-  const next = searchParams.get("next") || "/dossier"
+  const next = searchParams.get("next") || "/opportunities"
 
   React.useEffect(() => {
     if (ready && user) navigate(next, { replace: true })
@@ -358,7 +358,7 @@ export function VerifyEmail() {
   return (
     <AuthShell
       title="Confirm your email"
-      subtitle={<Link to={user ? "/new" : "/login"} className="text-primary hover:underline">{user ? "Back to Graduator" : "Sign in"}</Link>}
+      subtitle={<Link to={user ? "/new" : "/login"} className="text-primary hover:underline">{user ? "Back to Blesser" : "Sign in"}</Link>}
     >
       {state === "working" ? (
         <p className="text-center type-meta">Confirming…</p>
@@ -505,7 +505,7 @@ export function OAuthCallback() {
     >
       <form onSubmit={onLink} className="space-y-3">
         <p className="type-meta">
-          <span className="font-medium text-foreground">{link.data.email}</span> already has a Graduator account.
+          <span className="font-medium text-foreground">{link.data.email}</span> already has a Blesser account.
           Enter its password once to link {link.data.provider}; after that you can use either to sign in.
         </p>
         <Field label="Password">

@@ -42,6 +42,12 @@ export function taskLabel(type: string, name: string | null): string {
       return recipient ? `Draft email to ${recipient}` : "Draft email";
     }
 
+    case "discover_opportunities": {
+      const category = name?.replace(/^category:/, "");
+      const audience: Record<string, string> = { startup: "startups", research: "researchers", student: "students" };
+      return category ? `Find opportunities for ${audience[category] ?? category}` : "Find opportunities";
+    }
+
     default:
       return name ? `${type}: ${name}` : type;
   }

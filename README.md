@@ -1,46 +1,37 @@
 <p align="center">
-  <img src="webapp/public/mascot-states/happy.png" alt="Gradis, the Graduator mascot" width="140">
+  <img src="webapp/public/mascot-states/happy.png" alt="Gradis, the mascot Blesser inherits from Graduator" width="140">
 </p>
 
-<h1 align="center">Graduator</h1>
+<h1 align="center">Blesser</h1>
 
 <p align="center">
-  Find the right graduate programmes and supervisors, then reach out with confidence.
+  Making opportunities visible: grants, accelerators, fellowships, scholarships and more for startups, researchers and students in Ghana.
 </p>
 
-Graduator is a research assistant for graduate school applications. You describe what you want to study. Its agents then:
+Blesser gathers opportunities into one public catalogue and helps people act on them. Agents search the web, read each opportunity's own page and add what they can verify. Anyone can browse the catalogue without an account. With an account, people can:
 
-1. find programmes that match,
-2. identify their faculty,
-3. read each professor's actual publication record,
-4. score how well each professor fits your interests, and
-5. draft a personal outreach email for you to review.
+1. **Track** an opportunity. It joins their application tracker with its status, requirements checklist and deadline reminders.
+2. **Plan** the work in to-dos linked to the opportunity or application.
+3. **Sync** deadlines and dated to-dos to Google Calendar, Apple Calendar or Outlook, through a private subscription link, an `.ics` download or a Google Calendar link.
+4. **Find more** by starting a scan and watching the agents work, or share an opportunity they know about.
 
-**Nothing is ever sent for you.** Every draft waits in your Outbox until you approve it, copy it, and send it yourself.
-
-![Dossier: professors ranked by how well they fit your interests](docs/images/dossier.png)
+Blesser is a fork of [Graduator](https://github.com/esmond-adjei/graduator) (at `b6747b4`) and keeps all of its features: the agent orchestrator and run queue, application tracking, notifications, the Gradis assistant, and graduate programme and supervisor research for students and researchers.
 
 ## Features
 
-- **Discovery runs.** Start from a region and field, or from your own list of programmes. You can pull interests from your uploaded CV.
-- **Dossier.** A ranked shortlist with each professor's papers, the reasons for the match, and an alignment score. Scores come from embeddings, not from an LLM's guess.
-- **Outbox.** Draft, edit, approve or reject outreach emails.
-- **Applications.** Track deadlines, requirements and status, from wishlist to offer.
-- **CV curator.** Upload your CV once; tailor it for each professor with Gradis, accepting or rejecting each suggested change, then copy it as text or download a PDF.
-- **Gradis.** A built-in assistant that can look up your runs, professors, applications and drafts.
-- **Flows.** Copy the research pipeline, then switch steps off, narrow each step's tools, or add your own instructions.
-- **Bring your own model.** Works with Anthropic, OpenAI, Gemini, Ollama, or any OpenAI-compatible server. Each account can set its own model and key.
-- **Your account, your data.** Sign in with email or Google, export everything as one ZIP, and track your model usage.
-
-| Outbox | Applications |
-|---|---|
-| ![Outbox draft](docs/images/outbox-draft.png) | ![Applications](docs/images/applications.png) |
+- **Opportunity catalogue.** Public and filterable by audience (startups, researchers, students), kind, country, closing date and keyword. See [docs/opportunities.md](docs/opportunities.md).
+- **Grounded discovery agents.** A save must cite a page the agent fetched in the same task, the page must name the opportunity, and a stated deadline must appear on it. Duplicates merge into one row.
+- **Scheduled sweeps.** Optionally, the worker refreshes the catalogue every N hours.
+- **Tracking and reminders.** Tracked opportunities live in Applications, with reminders 14, 7 and 1 days before each deadline (inbox, push or email).
+- **To-dos and calendar sync.** A to-do list grouped by due date, and one private iCalendar feed that covers both deadlines and to-dos.
+- **Community submissions.** Signed-in people can share opportunities; ops admins publish them.
+- **Everything from Graduator.** Discovery runs, Dossier, Outbox, CV curator, Gradis, Flows, bring-your-own-model, data export.
 
 ## How it works
 
 <img src="webapp/public/mascot-states/reading.png" alt="" width="110" align="right">
 
-Graduator has two processes that share one Postgres database:
+Blesser has two processes that share one Postgres database:
 
 - **API** (FastAPI): serves the web app and adds agent work to a queue.
 - **Worker**: picks up queued tasks and runs the agent loop.
@@ -128,6 +119,7 @@ make encrypt-secrets  # one-off: encrypt provider keys stored by older versions
 | [Email](docs/email.md) · [Sign-in providers](docs/sign-in-providers.md) | SMTP setup; Google OAuth client setup |
 | [Notifications](docs/notifications.md) | Inbox, browser push (VAPID keys) and email notifications; deadline reminders |
 | [Plans](docs/plans.md) · [Flows](docs/flows.md) · [Fallbacks](docs/fallbacks.md) · [Verification sources](docs/verification-sources.md) | Paywalls, custom pipelines, external-service fallbacks, sources beyond OpenAlex |
+| [Opportunities](docs/opportunities.md) | The catalogue, grounded discovery agents, moderation, sweeps, to-dos and calendar feeds |
 | [CV sandbox](docs/cv-sandbox.md) | How uploaded documents are isolated |
 | [Data handling](docs/data-handling.md) | What is sent to LLM providers, and what is stored |
 

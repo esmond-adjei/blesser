@@ -588,6 +588,8 @@ export interface ApplicationOut {
   fee_waiver_notes: string
   source: string
   run_id: string | null
+  /** The catalogue opportunity this application tracks, if any. */
+  opportunity_id?: string | null
   created_at: string
   updated_at: string
   school_image_url?: string | null
@@ -798,4 +800,136 @@ export interface RunBudget {
   programs: { used: number; limit: number }
   professors: { used: number; limit: number }
   user_programs: { used: number; limit: number }
+}
+
+// --- Opportunities, to-dos and calendar ------------------------------------
+
+export type OpportunityCategory = "startup" | "research" | "student"
+export type OpportunityKind =
+  | "grant"
+  | "fellowship"
+  | "scholarship"
+  | "accelerator"
+  | "incubator"
+  | "competition"
+  | "internship"
+  | "call_for_proposals"
+  | "training"
+  | "conference"
+  | "job"
+  | "other"
+
+export interface Opportunity {
+  id: string
+  title: string
+  organization: string
+  category: OpportunityCategory
+  kind: OpportunityKind
+  summary: string
+  eligibility: string
+  benefits: string
+  location: string
+  countries: string[]
+  requirements: string[]
+  tags: string[]
+  deadline: string
+  /** yyyy-mm-dd when the deadline is a known date. */
+  deadline_date: string | null
+  rolling: boolean
+  link: string
+  source_url: string
+  status: "published" | "pending" | "hidden"
+  source: "agent" | "community"
+  verified_at: string | null
+  created_at: string
+  updated_at: string
+  is_open: boolean
+  days_left: number | null
+}
+
+export interface OpportunityQuery {
+  q?: string
+  category?: OpportunityCategory
+  kind?: OpportunityKind
+  country?: string
+  include_closed?: boolean
+  closing_within?: number
+  sort?: "deadline" | "new"
+  limit?: number
+  offset?: number
+}
+
+export interface OpportunityFacets {
+  categories: { key: OpportunityCategory; count: number }[]
+  kinds: { key: OpportunityKind; count: number }[]
+  total: number
+  closing_soon: number
+}
+
+export interface OpportunitySubmit {
+  title: string
+  organization?: string
+  category: OpportunityCategory
+  kind?: OpportunityKind
+  summary?: string
+  eligibility?: string
+  benefits?: string
+  location?: string
+  deadline?: string
+  rolling?: boolean
+  link: string
+}
+
+export interface ScanRequest {
+  categories?: OpportunityCategory[]
+  region?: string
+  focus?: string
+}
+
+export interface ScanStarted {
+  run_id: string
+  tasks: number
+}
+
+export type TodoPriority = "low" | "normal" | "high"
+
+export interface Todo {
+  id: string
+  title: string
+  notes: string
+  due_date: string | null
+  priority: TodoPriority
+  done: boolean
+  done_at: string | null
+  position: number
+  opportunity_id: string | null
+  application_id: string | null
+  opportunity_title: string | null
+  application_label: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoCreate {
+  title: string
+  notes?: string
+  due_date?: string | null
+  priority?: TodoPriority
+  opportunity_id?: string | null
+  application_id?: string | null
+}
+
+export interface TodoUpdate {
+  title?: string
+  notes?: string
+  due_date?: string | null
+  priority?: TodoPriority
+  done?: boolean
+  position?: number
+}
+
+export interface CalendarFeed {
+  url: string
+  webcal_url: string
+  created_at: string
 }

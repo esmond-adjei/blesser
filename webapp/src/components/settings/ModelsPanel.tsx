@@ -189,7 +189,7 @@ function ModelForm({
         <Button data-tooltip="Save this model and its connection settings" size="sm" disabled={!canSave} onClick={() => void onSave()}>
           {busy === "save" ? "Saving…" : activateOnSave ? "Add model" : "Save"}
         </Button>
-        <Button data-tooltip="Check that Graduator can connect to this model" size="sm" variant="outline" disabled={busy !== null} onClick={() => void onTest()}>
+        <Button data-tooltip="Check that Blesser can connect to this model" size="sm" variant="outline" disabled={busy !== null} onClick={() => void onTest()}>
           {busy === "test" ? "Testing…" : "Test connection"}
         </Button>
         <Button size="sm" variant="ghost" disabled={busy !== null} onClick={onDone}>
@@ -296,7 +296,7 @@ export function ModelsPanel() {
           })}
         </SettingSection>
 
-        {system && <SettingSection title="Included model" description="Auto is managed by Graduator and stays available alongside your own connections.">
+        {system && <SettingSection title="Included model" description="Auto is managed by Blesser and stays available alongside your own connections.">
           <div className="py-4">
             <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">Auto</p><Badge variant="outline">Included</Badge></div>
             <p className="mt-2 break-words text-xs text-muted-foreground">{providerLabel(system.provider)}{system.model ? `, ${system.model}` : ""}{system.context_window ? `, ${system.context_window.toLocaleString()} token context` : ""}</p>

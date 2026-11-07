@@ -475,3 +475,87 @@ def test_scheduled_sweep_runs_once_per_interval(monkeypatch):
     first = asyncio.run(sweep())
     assert first is not None
     assert asyncio.run(sweep()) is None
+
+
+# --- the agent loop, end to end with a scripted model --------------------------------
+
+
+class ScriptedScout:
+    """Reads one page, saves what it says, then summarizes."""
+
+    URL = "https://fund.example.org/call"
+
+    def __init__(self):
+        self.turn = 0
+
+    async def chat(self, messages, system, tools, max_tokens=4096):
+        from api.agent.llm.base import LLMResponse, ToolCall
+
+        self.turn += 1
+        names = {t["name"] for t in tools}
+        assert {"fetch_page", "save_opportunity"} <= names
+        if self.turn == 1:
+            return LLMResponse(
+                text="", tool_calls=[ToolCall(id="f1", name="fetch_page", arguments={"url": self.URL})]
+            )
+        if self.turn == 2:
+            return LLMResponse(
+                text="",
+                tool_calls=[
+                    ToolCall(
+                        id="s1",
+                        name="save_opportunity",
+                        arguments={
+                            "title": "Kumasi Innovation Fund",
+                            "organization": "Example Fund",
+                            "category": "startup",
+                            "kind": "grant",
+                            "summary": "Grants for Ghanaian hardware startups.",
+                            "deadline": "2027-04-30",
+                            "requirements": ["Pitch deck"],
+                            "source_url": self.URL,
+                        },
+                    )
+                ],
+            )
+        return LLMResponse(text="Saved 1 opportunity: Kumasi Innovation Fund.", tool_calls=[])
+
+
+def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
+    from api.agent import orchestrator as orch
+    from api.prospects import web
+    from api.runs import queue
+    from api.runs.models import TaskStatus
+
+    async def fake_fetch(url, max_chars=None, offset=0):
+        return "Example Fund presents the Kumasi Innovation Fund. Deadline: 30 April 2027."
+
+    monkeypatch.setattr(web, "fetch_page", fake_fetch)
+    model = ScriptedScout()
+    monkeypatch.setattr(orch, "get_provider", lambda **_: model)
+
+    run_id = _client().post("/api/opportunities/scans", json={"categories": ["startup"]}).json()["run_id"]
+
+    async def process():
+        async with SessionLocal() as session:
+            task = (
+                await session.execute(select(ResearchTask).where(ResearchTask.run_id == run_id))
+            ).scalar_one()
+            task.status = TaskStatus.running
+            await session.commit()
+            await queue._process_claimed(session, task)
+        async with SessionLocal() as session:
+            task = (
+                await session.execute(select(ResearchTask).where(ResearchTask.run_id == run_id))
+            ).scalar_one()
+            saved = (
+                await session.execute(select(Opportunity).where(Opportunity.run_id == run_id))
+            ).scalars().all()
+            return task, saved
+
+    task, saved = asyncio.run(process())
+    assert task.status == TaskStatus.done, task.error
+    assert "Kumasi Innovation Fund" in (task.final_text or "")
+    assert [(o.title, o.deadline_date, o.status) for o in saved] == [
+        ("Kumasi Innovation Fund", date(2027, 4, 30), "published")
+    ]

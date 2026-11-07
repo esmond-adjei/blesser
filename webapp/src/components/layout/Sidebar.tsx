@@ -10,6 +10,8 @@ import {
   Plus,
   MessageCircle,
   ArrowUpRight,
+  ListTodo,
+  Sparkles,
 } from "lucide-react"
 import { useOpenTransition } from "../../lib/transition"
 import { usePaneWidth } from "../../lib/paneWidth"
@@ -23,11 +25,13 @@ import { SidebarToggle, useSidebar } from "./SidebarContext"
 import { useGradis } from "../gradis/GradisProvider"
 
 const NAV = [
+  { to: "/opportunities", label: "Opportunities", description: "Grants, accelerators, fellowships and scholarships open to you", icon: Sparkles, end: false, workspace: false },
   { to: "/chat", label: "Gradis", description: "Chat with Gradis about your graduate school search", icon: MessageCircle, end: false, workspace: false },
   { to: "/schools", label: "Schools", description: "Browse saved schools and their programmes", icon: Landmark, end: false, workspace: false },
   { to: "/professors", label: "Professors", description: "Browse every professor your runs have found, matched or not", icon: Users, end: false, workspace: false },
 
   { to: "/applications", label: "Applications", description: "Track application deadlines, requirements and progress", icon: GraduationCap, end: false, workspace: true },
+  { to: "/todos", label: "To-dos", description: "Your to-do list and calendar sync", icon: ListTodo, end: false, workspace: true },
   { to: "/outbox", label: "Outbox", description: "Review and copy your outreach email drafts", icon: Mail, end: false, workspace: true },
   { to: "/dossier", label: "Matches", description: "Review professors ranked by research fit", icon: ContactRound, end: false, workspace: true },
   { to: "/documents", label: "Documents", description: "Write and tailor your CVs, statements and other documents", icon: FileText, end: false, workspace: true },
@@ -129,9 +133,9 @@ export function Sidebar() {
       <div style={{ width }} className="h-full shrink-0 bg-sidebar">
         <div className="flex h-full min-w-0 flex-col">
           <div className="flex items-center gap-2.5 px-4 py-2">
-            <Link to="/new" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md">
+            <Link to="/opportunities" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md">
               <AppLogo className="size-7"/>
-              <span className="block text-[17px] leading-[22px] font-semibold tracking-[-0.02em] text-label">Graduator</span>
+              <span className="block text-[17px] leading-[22px] font-semibold tracking-[-0.02em] text-label">Blesser</span>
             </Link>
             <SidebarToggle />
           </div>

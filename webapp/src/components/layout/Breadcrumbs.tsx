@@ -6,6 +6,8 @@ import {
   FileText,
   FlaskConical,
   Landmark,
+  ListTodo,
+  Sparkles,
   Users,
   Mail,
   MessageSquare,
@@ -190,6 +192,8 @@ export function Breadcrumbs() {
   if (pathname === "/dossier") return <Trail items={[{ label: "Matches", icon: ContactRound }]} />
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return <ChatCrumbs />
   if (pathname === "/outbox") return <Trail items={[{ label: "Outbox", icon: Mail }]} />
+  if (pathname === "/opportunities") return <Trail items={[{ label: "Opportunities", icon: Sparkles }]} />
+  if (pathname === "/todos") return <Trail items={[{ label: "To-dos", icon: ListTodo }]} />
   if (pathname === "/applications")
     return <Trail items={[{ label: "Applications", icon: FileText }]} />
   if (pathname === "/schools")

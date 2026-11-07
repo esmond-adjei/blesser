@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Link, NavLink, Outlet, useLocation, useMatch, useNavigate, useParams } from "react-router-dom"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
-import { Activity, ContactRound, FileText, GraduationCap, Landmark, Menu, Plus, Send, SquareKanban, X } from "lucide-react"
+import { Activity, FileText, GraduationCap, ListTodo, Menu, Plus, Sparkles, SquareKanban, X } from "lucide-react"
 import { useHealth, useReady, useRuns, useWorkers } from "../../lib/queries"
 import { formatDuration, runTitle } from "../../lib/format"
 import { useNow } from "../../lib/useNow"
@@ -236,21 +236,18 @@ function MobileBar() {
   return (
     <header className="flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-3 py-2 md:hidden">
       <MobileDrawer />
-      <Link to="/new" className="flex items-center gap-2">
+      <Link to="/opportunities" className="flex items-center gap-2">
         <AppLogo className="size-8" />
-        <span className="text-sm font-bold tracking-tight">Graduator</span>
+        <span className="text-sm font-bold tracking-tight">Blesser</span>
       </Link>
       <nav className="ml-auto flex items-center gap-1">
-        <NavLink to="/dossier" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
-          <ContactRound className="size-4" />
+        <NavLink to="/opportunities" aria-label="Opportunities" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
+          <Sparkles className="size-4" />
         </NavLink>
-        <NavLink to="/schools" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
-          <Landmark className="size-4" />
+        <NavLink to="/todos" aria-label="To-dos" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
+          <ListTodo className="size-4" />
         </NavLink>
-        <NavLink to="/outbox" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
-          <Send className="size-4" />
-        </NavLink>
-        <NavLink to="/applications" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
+        <NavLink to="/applications" aria-label="Applications" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
           <GraduationCap className="size-4" />
         </NavLink>
         <NavLink to="/documents" aria-label="Documents" className={({ isActive }) => cn("rounded-md p-2", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-muted-foreground")}>
@@ -319,7 +316,7 @@ function MobileDrawer() {
           >
             <div className="flex items-center gap-2 px-4 py-2">
               <AppLogo className="size-8" />
-              <span className="text-lg font-bold tracking-tight">Graduator</span>
+              <span className="text-lg font-bold tracking-tight">Blesser</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

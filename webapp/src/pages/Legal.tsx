@@ -13,13 +13,13 @@ const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim()
 
 function LegalShell({ title, children }: { title: string; children: React.ReactNode }) {
   React.useEffect(() => {
-    document.title = `${title}, Graduator`
+    document.title = `${title}, Blesser`
   }, [title])
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <a href={SITE_URL ?? "/"} className="mb-8 flex items-center gap-2.5">
         <AppLogo className="size-8" />
-        <span className="text-lg font-bold tracking-tight">Graduator</span>
+        <span className="text-lg font-bold tracking-tight">Blesser</span>
       </a>
       <h1 className="type-page-title">{title}</h1>
       <p className="mt-1 type-caption">Version {TERMS_VERSION}</p>
@@ -38,7 +38,7 @@ function Contact() {
   return CONTACT ? (
     <a className="text-primary hover:underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>
   ) : (
-    <>the operator of this Graduator instance</>
+    <>the operator of this Blesser instance</>
   )
 }
 
@@ -74,7 +74,7 @@ export function Privacy() {
       <section>
         <h2>People we research</h2>
         <p>
-          Graduator collects publicly available academic information about faculty (name, institution, publications,
+          Blesser collects publicly available academic information about faculty (name, institution, publications,
           public profile and lab links, photo and bio from faculty pages) into the accounts of students who research
           them. If you are one of them and want your information removed from every account and excluded from future
           research, contact <Contact />. We delete it and record an opt-out.
@@ -96,7 +96,7 @@ export function Terms() {
       <section>
         <h2>The service</h2>
         <p>
-          Graduator helps you find graduate programmes and supervisors and drafts outreach emails for you to review.
+          Blesser helps you discover opportunities such as grants, accelerators, fellowships and scholarships, track your applications, to-dos and deadlines, find graduate programmes and supervisors, and draft outreach emails for you to review.
           Research results come from automated tools and public sources and can be wrong or out of date: check
           anything important before you rely on it.
         </p>
@@ -106,7 +106,7 @@ export function Terms() {
         <ul>
           <li>Keep your sign-in details safe and only upload content you have the right to use.</li>
           <li>Review every draft before you send it. You are the sender, and you are responsible for what it says.</li>
-          <li>Don't use Graduator to send bulk or automated email, to harass anyone, or to collect data about people for any other purpose.</li>
+          <li>Don't use Blesser to send bulk or automated email, to harass anyone, or to collect data about people for any other purpose.</li>
         </ul>
       </section>
       <section>

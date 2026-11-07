@@ -13,7 +13,7 @@ import { AppLogo } from "../components/layout/AppLogo"
 
 /** Only same-app paths: ?next= must never send the user off-site. */
 function safeNext(raw: string | null): string {
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dossier"
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/opportunities"
 }
 
 const fmtLimit = (n: number) =>
@@ -263,7 +263,7 @@ export function Checkout() {
             )}
             <div className="flex items-baseline justify-between rounded-xl border border-border bg-card p-4">
               <div>
-                <p className="text-sm font-semibold">Graduator {page.plan.label}</p>
+                <p className="text-sm font-semibold">Blesser {page.plan.label}</p>
                 <p className="type-caption">Billed monthly</p>
               </div>
               <p className="text-lg font-semibold tabular-nums">${page.monthly_price_usd}<span className="text-xs font-normal text-muted-foreground"> / month</span></p>

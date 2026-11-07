@@ -51,6 +51,16 @@ import type {
   Refusals,
   Usage,
   Worker,
+  CalendarFeed,
+  Opportunity,
+  OpportunityFacets,
+  OpportunityQuery,
+  OpportunitySubmit,
+  ScanRequest,
+  ScanStarted,
+  Todo,
+  TodoCreate,
+  TodoUpdate,
 } from "./types"
 
 export const API_BASE: string =
@@ -657,3 +667,38 @@ export const unsubscribeNotificationEmail = (token: string) =>
 
 export interface SearchHit { kind: string; id: string; title: string; subtitle?: string | null; href: string | null; snippet?: string | null; image_url?: string | null }
 export const globalSearch = (q: string) => get<{ items: SearchHit[] }>(`/api/search${toQuery({ q })}`)
+
+// --- Opportunities (public reads), to-dos and the calendar feed -------------
+
+function opportunityParams(query: OpportunityQuery): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue
+    params.set(key, String(value))
+  }
+  const text = params.toString()
+  return text ? `?${text}` : ""
+}
+
+export const listOpportunities = (query: OpportunityQuery = {}) =>
+  get<Paged<Opportunity>>(`/api/opportunities${opportunityParams(query)}`)
+export const getOpportunity = (id: string) => get<Opportunity>(`/api/opportunities/${id}`)
+export const opportunityFacets = () => get<OpportunityFacets>("/api/opportunities/facets")
+export const trackedOpportunities = () => get<Record<string, string>>("/api/opportunities/tracked")
+export const trackOpportunity = (id: string) =>
+  post<ApplicationOut>(`/api/opportunities/${id}/track`)
+export const submitOpportunity = (body: OpportunitySubmit) =>
+  post<Opportunity>("/api/opportunities", body)
+export const startOpportunityScan = (body: ScanRequest) =>
+  post<ScanStarted>("/api/opportunities/scans", body)
+/** Absolute URL of one opportunity's .ics file (no auth needed). */
+export const opportunityIcsUrl = (id: string) => `${API_BASE}/api/opportunities/${id}/calendar.ics`
+
+export const listTodos = (status: "open" | "done" | "all" = "open") =>
+  get<Todo[]>(`/api/todos?status=${status}`)
+export const createTodo = (body: TodoCreate) => post<Todo>("/api/todos", body)
+export const updateTodo = (id: string, body: TodoUpdate) => patch<Todo>(`/api/todos/${id}`, body)
+export const deleteTodo = (id: string) => del<{ status: string }>(`/api/todos/${id}`)
+
+export const getCalendarFeed = () => get<CalendarFeed>("/api/calendar/feed")
+export const rotateCalendarFeed = () => post<CalendarFeed>("/api/calendar/feed/rotate")

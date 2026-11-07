@@ -1,6 +1,6 @@
 import { ProfessorDetailPage } from "./pages/ProfessorDetailPage"
 import * as React from "react"
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom"
+import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom"
 import { ErrorState } from "./components/feedback/EmptyState"
 import { buttonVariants } from "./components/ui/button"
 import { LoadingScreen } from "./components/feedback/LoadingScreen"
@@ -15,6 +15,10 @@ const Layout = React.lazy(() => import("./components/layout/AppShell").then((m) 
 const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim()
 
 // Route-level code-splitting keeps the entry chunk small.
+const Opportunities = React.lazy(() =>
+  import("./pages/Opportunities").then((m) => ({ default: m.Opportunities })),
+)
+const Todos = React.lazy(() => import("./pages/Todos").then((m) => ({ default: m.Todos })))
 const Applications = React.lazy(() =>
   import("./pages/Applications").then((m) => ({ default: m.Applications })),
 )
@@ -113,6 +117,8 @@ export default function App() {
             <Route path="outbox" element={<Outbox />} />
             <Route path="outbox/:draftId" element={<OutboxDraftPage />} />
 
+            <Route path="todos" element={<Todos />} />
+
             <Route path="applications" element={<Applications />} />
             <Route path="applications/:appId" element={<ApplicationDetailPage />} />
 
@@ -129,6 +135,11 @@ export default function App() {
             <Route path="settings/models" element={<Navigate to="/?settings=models" replace />} />
 
             <Route path="*" element={<NotFound />} />
+          </Route>
+
+          {/* Public catalogue: inside the app shell when signed in, a light frame otherwise. */}
+          <Route element={<MaybeShell />}>
+            <Route path="opportunities" element={<Opportunities />} />
           </Route>
 
           {/* Public "/": the app for signed-in users, the site for visitors. */}
@@ -159,36 +170,50 @@ export default function App() {
   )
 }
 
-/** "/": signed-in users go to the new-run flow; everyone else goes to the site. */
+/** "/": signed-in users land on the opportunities; visitors go to the site, or to the public catalogue. */
 function Home() {
   const { user, ready } = useAuth()
   if (!ready) return <LoadingScreen />
-  if (user) return <Navigate to="/new" replace />
+  if (user) return <Navigate to="/opportunities" replace />
   return <SiteRedirect />
+}
+
+/** Signed-in: the full app shell. Visitors: a header with sign-in, around the same page. */
+function MaybeShell() {
+  const { user, ready } = useAuth()
+  if (!ready) return <LoadingScreen />
+  if (user) return <Layout />
+  return (
+    <div className="min-h-dvh bg-background">
+      <header className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1080px] items-center gap-3 px-4 py-3 sm:px-6">
+          <Link to="/opportunities" className="flex items-center gap-2">
+            <AppLogo className="size-7" />
+            <span className="text-[17px] font-semibold tracking-[-0.02em] text-label">Blesser</span>
+          </Link>
+          <nav className="ml-auto flex gap-2">
+            <Link to="/login" className={buttonVariants({ size: "sm", variant: "ghost" })}>Sign in</Link>
+            <Link to="/register" className={buttonVariants({ size: "sm" })}>Create account</Link>
+          </nav>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-[1080px] px-4 py-6 sm:px-6">
+        <Outlet />
+      </main>
+    </div>
+  )
 }
 
 /**
  * Sends anonymous visitors to the marketing site. Without a configured site
- * (local dev) it offers the app itself instead of a blank page.
+ * it shows the public opportunity catalogue.
  */
 function SiteRedirect() {
   React.useEffect(() => {
     if (SITE_URL) window.location.replace(SITE_URL)
   }, [])
   if (SITE_URL) return <LoadingScreen />
-  return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 px-4 text-center">
-      <AppLogo className="size-10" />
-      <h1 className="type-page-title">Graduator</h1>
-      <p className="type-meta">
-        A research assistant for graduate school applications. Sign in, or create an account to start a run.
-      </p>
-      <div className="flex gap-3">
-        <Link to="/register" className={buttonVariants()}>Create account</Link>
-        <Link to="/login" className={buttonVariants({ variant: "outline" })}>Sign in</Link>
-      </div>
-    </div>
-  )
+  return <Navigate to="/opportunities" replace />
 }
 
 function CandidateRedirect() {

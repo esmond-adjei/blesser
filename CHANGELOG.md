@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Blesser: opportunities (forked from Graduator at b6747b4)
+- A public opportunity catalogue for startups, researchers and students in Ghana: grants, accelerators, incubators, fellowships, scholarships, internships, competitions and calls for proposals. Browse without an account; filter by audience, kind, country, closing date and keyword.
+- Discovery agents (`discover_opportunities`) add opportunities with `save_opportunity`. A save must cite a page fetched in the same task, the page must name the opportunity, and a stated deadline must appear on it. Duplicates merge into one row.
+- Start a scan from the Opportunities page and watch its agents on the run page; optionally, the worker refreshes the catalogue every N hours (`OPPORTUNITY_SWEEP_EMAIL`, `OPPORTUNITY_SWEEP_HOURS`).
+- Track an opportunity to add it to Applications, with its requirements as a checklist and deadline reminders.
+- To-dos, linked to opportunities or applications, grouped by due date.
+- Calendar sync: a Google Calendar link and an `.ics` file per opportunity, and a private, rotatable subscription feed of deadlines and dated to-dos.
+- Share an opportunity; ops admins publish submissions.
+- The app is renamed Blesser, and signed-in people now land on Opportunities.
+
 ## 1.0.0 (2026-10-25)
 
 ### Documents editor

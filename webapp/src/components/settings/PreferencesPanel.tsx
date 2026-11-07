@@ -7,7 +7,7 @@ export function PreferencesPanel() {
   const { mode, setTheme } = useTheme()
   const [autoContext, setAutoContext] = useAutoPageContext()
   return (
-    <SettingsPanel title="Preferences" description="Make Graduator feel at home on this device.">
+    <SettingsPanel title="Preferences" description="Make Blesser feel at home on this device.">
       <SettingSection title="Gradis context">
         <SettingRow title="Include the current page automatically" description="Give Gradis the page and record you're viewing. Selected text is attached only when you choose Add to Gradis context." control={<Switch checked={autoContext} onChange={setAutoContext} label="Include current page context" />} />
       </SettingSection>
