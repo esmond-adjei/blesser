@@ -38,16 +38,6 @@ class AuthError(DomainError):
     status_code = 401
 
 
-class UpgradeRequiredError(DomainError):
-    """402: the account's plan doesn't include this; `details` feeds the upgrade prompt."""
-
-    status_code = 402
-
-    def __init__(self, message: str, details: dict | None = None):
-        super().__init__(message)
-        self.details = dict(details or {})
-
-
 class ForbiddenError(DomainError):
     """403: signed in, but this action needs more (e.g. a verified email)."""
 

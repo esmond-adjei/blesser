@@ -1,9 +1,6 @@
 import asyncio
 from types import SimpleNamespace as NS
 
-import anthropic
-import httpx
-
 from api.agent.llm.anthropic_provider import AnthropicProvider, _thinking_config
 from api.agent.llm.base import ANTHROPIC_THINKING, foreign_extras
 from api.agent.llm.openai_compat_provider import OpenAICompatProvider, split_thinking
@@ -71,18 +68,6 @@ _TURN = [
 ]
 
 
-def test_claude_thoughts_stream_and_their_blocks_stay_with_the_tool_call():
-    provider, requests = _claude([_TURN])
-    events = _collect(provider.chat_stream([{"role": "user", "content": "hi"}], "sys", []))
-    assert requests[0]["thinking"] == {"type": "adaptive", "display": "summarized"}
-    assert [e["text"] for e in events if e["type"] == "reasoning"] == ["Read it first."]
-    response = events[-1]["response"]
-    assert response.reasoning == "Read it first."
-    assert response.tool_calls[0].extra_content[ANTHROPIC_THINKING] == [
-        {"type": "thinking", "thinking": "Read it first.", "signature": "sig"}
-    ]
-
-
 def _call(id_, thought):
     return {"id": id_, "name": "read_document", "arguments": {},
             "extra_content": {ANTHROPIC_THINKING: [{"type": "thinking", "thinking": thought, "signature": "s"}]}}
@@ -105,20 +90,6 @@ def test_only_the_tool_loop_under_way_sends_its_thinking_back():
     types = [[b["type"] for b in c] if isinstance(c, list) else c for c in assistant]
     assert types == [["tool_use"], ["text"], ["thinking", "text", "tool_use"]]
     assert assistant[2][0]["thinking"] == "new"
-
-
-def test_refused_thinking_is_dropped_and_the_request_sent_again():
-    refused = anthropic.BadRequestError(
-        "messages.5.content.0: Invalid `signature` in `thinking` block.",
-        response=httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com")),
-        body=None,
-    )
-    provider, requests = _claude([refused, _TURN, _TURN])
-    events = _collect(provider.chat_stream(HISTORY, "sys", []))
-    assert events[-1]["type"] == "done"
-    assert "thinking" not in str(requests[1]["messages"])
-    _collect(provider.chat_stream(HISTORY, "sys", []))
-    assert len(requests) == 3 and "'thinking'" not in str(requests[2]["messages"])
 
 
 def test_claude_thinking_is_never_sent_to_another_provider():
@@ -144,27 +115,8 @@ def _compat(chunks, label="ollama", model="m"):
     return provider, requests
 
 
-def test_reasoning_written_in_think_tags_streams_as_thoughts():
-    provider, _ = _compat(["<th", "ink>Check the", " dates.</thi", "nk>\n\nAll", " good."])
-    events = _collect(provider.chat_stream([{"role": "user", "content": "hi"}], "sys", []))
-    assert "".join(e["text"] for e in events if e["type"] == "reasoning") == "Check the dates."
-    assert "".join(e["text"] for e in events if e["type"] == "token") == "All good."
-    assert events[-1]["response"].text == "All good."
-
-
 def test_a_reply_that_merely_starts_with_markup_is_left_alone():
     assert split_thinking("<b>Bold</b> start") == ("", "<b>Bold</b> start")
     assert split_thinking("<thought>Plan.</thought>Answer") == ("Plan.", "Answer")
     # Cut off mid-thought: nothing said yet, so Gradis asks again with room.
     assert split_thinking("<think>Still going") == ("Still going", "")
-
-
-def test_gemini_is_asked_for_its_thoughts_when_it_has_them():
-    google = {"extra_body": {"google": {"thinking_config": {"include_thoughts": True}}}}
-    for model, asked in [("gemini-2.5-flash", True), ("gemini-3-pro", True), ("gemini-2.0-flash", False)]:
-        provider, requests = _compat(["Hi"], label="gemini", model=model)
-        _collect(provider.chat_stream([{"role": "user", "content": "hi"}], "sys", []))
-        assert (requests[0].get("extra_body") == google) is asked, model
-    provider, requests = _compat(["Hi"], label="openai", model="gpt-5")
-    _collect(provider.chat_stream([{"role": "user", "content": "hi"}], "sys", []))
-    assert "extra_body" not in requests[0]

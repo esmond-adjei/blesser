@@ -98,22 +98,3 @@ class AgentOpportunityIn(BaseModel):
 
 class OpportunityModerate(BaseModel):
     status: OpportunityStatus
-
-
-class ScanCreate(BaseModel):
-    """Start an agent scan: one discovery task per category."""
-
-    categories: list[OpportunityCategory] = Field(
-        default_factory=lambda: list(OpportunityCategory)
-    )
-    region: str = Field(default="", max_length=120)
-    focus: str = Field(
-        default="",
-        max_length=2000,
-        description="Optional: sectors, fields or kinds to look for first.",
-    )
-
-
-class ScanOut(BaseModel):
-    run_id: str
-    tasks: int

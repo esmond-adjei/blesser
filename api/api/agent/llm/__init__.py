@@ -1,9 +1,5 @@
 from api.agent.llm.base import BaseLLMProvider, LLMResponse, ToolCall
-from api.agent.llm.factory import (
-    SUPPORTED_PROVIDERS,
-    get_provider,
-    get_provider_info,
-)
+from api.agent.llm.factory import SUPPORTED_PROVIDERS, get_provider
 
 __all__ = [
     "SUPPORTED_PROVIDERS",
@@ -11,5 +7,4 @@ __all__ = [
     "LLMResponse",
     "ToolCall",
     "get_provider",
-    "get_provider_info",
 ]

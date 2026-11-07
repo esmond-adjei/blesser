@@ -22,12 +22,12 @@ from api.notifications.models import (
     NotificationPreference,
     PushSubscription,
 )
-from api.runs import queue as run_queue
-from api.runs.lifecycle import note_tasks_drained
-from api.runs.models import ResearchTask, Run, TaskStatus
+from api.scans import queue as scan_queue
+from api.scans.models import Scan, ScanTask, TaskStatus
+from api.scans.service import note_tasks_drained
 from tests.conftest import TEST_USER_ID
 
-SECRET_RATIONALE = "Professor Hidden Name works on exactly your CV topic"
+SECRET_FOCUS = "my private focus notes"
 
 
 def _run(coro):
@@ -64,11 +64,11 @@ def _new_user(verified: bool = True, **prefs) -> str:
 def _new_run(user_id: str, status: str = "running") -> str:
     async def setup():
         async with SessionLocal() as session:
-            run = Run(
+            run = Scan(
                 user_id=user_id,
-                region="Canada",
-                field="Machine Learning",
-                interest_statement="my private research statement",
+                region="Ghana",
+                categories=["startup"],
+                focus=SECRET_FOCUS,
                 status=status,
             )
             session.add(run)
@@ -134,14 +134,14 @@ def _deliver(now: datetime | None = None) -> int:
     return _run(go())
 
 
-def _notify(user_id: str, key: str, kind: str = "run_finished", **kw) -> bool:
+def _notify(user_id: str, key: str, kind: str = "scan_finished", **kw) -> bool:
     async def go():
         async with SessionLocal() as session:
             created = await service.notify(
                 session,
                 user_id=user_id,
                 kind=kind,
-                title=kw.get("title", "Run finished"),
+                title=kw.get("title", "Scan finished"),
                 body=kw.get("body", "Your run finished."),
                 link=kw.get("link", "/runs/x"),
                 dedupe_key=key,
@@ -167,7 +167,7 @@ def test_rolled_back_cause_leaves_no_notification():
     async def go():
         async with SessionLocal() as session:
             await service.notify(
-                session, user_id=user, kind="run_finished", title="t", dedupe_key="rollback"
+                session, user_id=user, kind="scan_finished", title="t", dedupe_key="rollback"
             )
             await session.rollback()
 
@@ -185,35 +185,35 @@ def test_preferences_turn_channels_off(pushes):
             await service.update_prefs(
                 session,
                 user,
-                {"channels": {"run_finished": {"push": False}, "first_candidate": {"inbox": False}}},
+                {"channels": {"scan_finished": {"push": False}, "scan_attention": {"inbox": False}}},
             )
 
     _run(set_prefs())
-    _notify(user, "a", kind="run_finished")
-    _notify(user, "b", kind="first_candidate", title="First candidate saved")
+    _notify(user, "a", kind="scan_finished")
+    _notify(user, "b", kind="scan_attention", title="Scan needs attention")
     _deliver()
     assert _to(sent, mine) == []
     rows = {r.kind: r for r in _rows(user)}
-    assert rows["run_finished"].delivery == "none"
-    assert rows["first_candidate"].in_inbox is False
+    assert rows["scan_finished"].delivery == "none"
+    assert rows["scan_attention"].in_inbox is False
 
     async def inbox():
         async with SessionLocal() as session:
             return await service.list_inbox(session, user)
 
     listed = _run(inbox())
-    assert [i["kind"] for i in listed["items"]] == ["run_finished"]
+    assert [i["kind"] for i in listed["items"]] == ["scan_finished"]
     assert listed["unread"] == 1
 
 
-def test_defaults_push_for_run_finished_but_not_first_candidate(pushes):
+def test_defaults_push_for_scan_finished_but_not_scan_attention(pushes):
     sent, _ = pushes
     user = _new_user()
     mine = _subscribe(user)
-    _notify(user, "a", kind="run_finished")
-    _notify(user, "b", kind="first_candidate")
+    _notify(user, "a", kind="scan_finished")
+    _notify(user, "b", kind="scan_attention")
     _deliver()
-    assert [s["payload"]["kind"] for s in _to(sent, mine)] == ["run_finished"]
+    assert [s["payload"]["kind"] for s in _to(sent, mine)] == ["scan_finished"]
 
 
 def test_preferences_api_round_trip_and_validation():
@@ -222,7 +222,7 @@ def test_preferences_api_round_trip_and_validation():
     assert got.status_code == 200, got.text
     kinds = {k["kind"]: k for k in got.json()["kinds"]}
     assert kinds["deadline"]["channels"] == {"inbox": True, "push": True, "email": True}
-    assert kinds["first_candidate"]["channels"]["push"] is False
+    assert kinds["scan_attention"]["channels"]["push"] is False
     assert "test" not in kinds
 
     patched = client.patch(
@@ -328,7 +328,7 @@ def test_hourly_cap_keeps_the_rest_in_the_inbox(pushes, monkeypatch):
 
 
 def test_push_payload_says_what_happened_and_links_only(pushes):
-    """The payload carries no interest statement, professor or rationale text."""
+    """The payload carries no focus text."""
     sent, _ = pushes
     user = _new_user()
     mine = _subscribe(user)
@@ -336,27 +336,23 @@ def test_push_payload_says_what_happened_and_links_only(pushes):
 
     async def fire():
         async with SessionLocal() as session:
-            run = await session.get(Run, run_id)
-            await events.run_finished(session, run)
-            await events.first_candidate(session, run)
-            await events.run_paused(session, run, "task-1", 1)
-            await events.run_attention(session, run)
+            run = await session.get(Scan, run_id)
+            await events.scan_finished(session, run)
+            await events.scan_attention(session, run)
             await session.commit()
 
     _run(fire())
-    with_push = {"run_finished", "run_paused"}
+    with_push = {"scan_finished"}
     _deliver()
     sent = _to(sent, mine)
     assert {s["payload"]["kind"] for s in sent} == with_push
     for item in sent:
         payload = item["payload"]
         assert set(payload) == {"id", "kind", "title", "body", "link"}
-        assert payload["link"] == f"/runs/{run_id}"
-        text = str(payload)
-        assert "private research statement" not in text
-        assert "Hidden Name" not in text
-    finished = next(s["payload"] for s in sent if s["payload"]["kind"] == "run_finished")
-    assert finished["body"] == "Your run Machine Learning in Canada finished: 0 candidates."
+        assert payload["link"] == f"/scans/{run_id}"
+        assert SECRET_FOCUS not in str(payload)
+    finished = next(s["payload"] for s in sent if s["payload"]["kind"] == "scan_finished")
+    assert finished["body"] == "Your opportunity scan in Ghana added 0 new opportunities."
 
 
 def test_test_endpoint_without_keys_reports_push_disabled(monkeypatch):
@@ -414,18 +410,18 @@ def test_subscription_routes_and_inbox_read(pushes):
 
 
 def _fake_claim_for(run_id):
-    async def fake_claim(session):
+    async def fake_claim(session, scan_id=None):
         task = (
             (
                 await session.execute(
-                    select(ResearchTask)
-                    .join(Run, ResearchTask.run_id == Run.id)
+                    select(ScanTask)
+                    .join(Scan, ScanTask.scan_id == Scan.id)
                     .where(
-                        ResearchTask.run_id == run_id,
-                        ResearchTask.status == TaskStatus.pending,
-                        Run.status == "running",
+                        ScanTask.scan_id == run_id,
+                        ScanTask.status == TaskStatus.pending,
+                        Scan.status == "running",
                     )
-                    .order_by(ResearchTask.created_at)
+                    .order_by(ScanTask.created_at)
                     .limit(1)
                 )
             )
@@ -451,8 +447,8 @@ def _add_tasks(run_id: str, user_id: str, task_type: str, n: int = 1) -> None:
         async with SessionLocal() as session:
             for _ in range(n):
                 session.add(
-                    ResearchTask(
-                        user_id=user_id, run_id=run_id, task_type=task_type, status=TaskStatus.pending
+                    ScanTask(
+                        user_id=user_id, scan_id=run_id, task_type=task_type, status=TaskStatus.pending
                     )
                 )
             await session.commit()
@@ -460,129 +456,49 @@ def _add_tasks(run_id: str, user_id: str, task_type: str, n: int = 1) -> None:
     _run(setup())
 
 
-def test_finishing_a_run_notifies_once_with_a_link(monkeypatch, pushes):
+def test_finishing_a_scan_notifies_once_with_a_link(monkeypatch, pushes):
     sent, _ = pushes
     user = _new_user()
     mine = _subscribe(user, 2)
     run_id = _new_run(user)
-    _add_tasks(run_id, user, "research_professor", 2)
-    monkeypatch.setitem(run_queue.TASK_HANDLERS, "research_professor", _ok_handler)
-    monkeypatch.setattr(run_queue, "_claim_next_task", _fake_claim_for(run_id))
-    assert _run(run_queue.process_one()) is True
-    assert _rows(user, "run_finished") == []
-    assert _run(run_queue.process_one()) is True
-    finished = _rows(user, "run_finished")
+    _add_tasks(run_id, user, "discover_opportunities", 2)
+    monkeypatch.setitem(scan_queue.TASK_HANDLERS, "discover_opportunities", _ok_handler)
+    monkeypatch.setattr(scan_queue, "claim_next_task", _fake_claim_for(run_id))
+    assert _run(scan_queue.process_one()) is True
+    assert _rows(user, "scan_finished") == []
+    assert _run(scan_queue.process_one()) is True
+    finished = _rows(user, "scan_finished")
     assert len(finished) == 1
-    assert finished[0].link == f"/runs/{run_id}"
+    assert finished[0].link == f"/scans/{run_id}"
 
     async def drain_again():
         async with SessionLocal() as session:
-            run = await session.get(Run, run_id)
+            run = await session.get(Scan, run_id)
             run.status = "running"
             await note_tasks_drained(session, run_id)
             await session.commit()
 
     _run(drain_again())
-    assert len(_rows(user, "run_finished")) == 1
+    assert len(_rows(user, "scan_finished")) == 1
     _deliver()
     assert {s["endpoint"] for s in _to(sent, mine)} == set(mine)
-    assert all(s["payload"]["link"] == f"/runs/{run_id}" for s in _to(sent, mine))
-
-
-def test_drafts_ready_only_when_the_last_draft_task_finishes(monkeypatch):
-    user = _new_user()
-    run_id = _new_run(user)
-    _add_tasks(run_id, user, "draft_email", 2)
-    monkeypatch.setitem(run_queue.TASK_HANDLERS, "draft_email", _ok_handler)
-    monkeypatch.setattr(run_queue, "_claim_next_task", _fake_claim_for(run_id))
-    _run(run_queue.process_one())
-    assert _rows(user, "drafts_ready") == []
-    _run(run_queue.process_one())
-    ready = _rows(user, "drafts_ready")
-    assert len(ready) == 1
-    assert ready[0].link == "/outbox"
+    assert all(s["payload"]["link"] == f"/scans/{run_id}" for s in _to(sent, mine))
 
 
 def test_task_failing_for_good_asks_for_attention_once_a_day(monkeypatch):
     user = _new_user()
     run_id = _new_run(user)
-    _add_tasks(run_id, user, "research_professor", 3)
+    _add_tasks(run_id, user, "discover_opportunities", 3)
 
     async def boom(session, task, run, on_event=None, resume_messages=None, on_checkpoint=None):
         raise RuntimeError("broken page")
 
-    monkeypatch.setitem(run_queue.TASK_HANDLERS, "research_professor", boom)
-    monkeypatch.setattr(run_queue, "_claim_next_task", _fake_claim_for(run_id))
+    monkeypatch.setitem(scan_queue.TASK_HANDLERS, "discover_opportunities", boom)
+    monkeypatch.setattr(scan_queue, "claim_next_task", _fake_claim_for(run_id))
     for _ in range(3):
-        _run(run_queue.process_one())
-    assert len(_rows(user, "run_attention")) == 1
-    assert _rows(user, "run_attention")[0].link == f"/runs/{run_id}?tab=research_professor&status=error"
-
-
-def test_first_candidate_opens_that_candidate():
-    user = _new_user()
-    run_id = _new_run(user)
-
-    async def fire():
-        async with SessionLocal() as session:
-            run = await session.get(Run, run_id)
-            await events.first_candidate(session, run, "cand-1")
-            await session.commit()
-
-    _run(fire())
-    assert _rows(user, "first_candidate")[0].link == f"/runs/{run_id}?preview=cand-1"
-
-
-def test_allowance_pause_notifies_once_for_concurrent_refusals():
-    user = _new_user()
-    run_id = _new_run(user)
-
-    async def setup():
-        async with SessionLocal() as session:
-            ids = []
-            for _ in range(3):
-                task = ResearchTask(
-                    user_id=user,
-                    run_id=run_id,
-                    task_type="research_one_professor",
-                    status=TaskStatus.running,
-                    attempt=1,
-                )
-                session.add(task)
-                await session.flush()
-                ids.append(task.id)
-            await session.commit()
-            return ids
-
-    task_ids = _run(setup())
-
-    async def park(task_id):
-        async with SessionLocal() as session:
-            task = await session.get(ResearchTask, task_id)
-            await run_queue._park_for_allowance(session, task, run_id, "out of allowance")
-
-    async def all_at_once():
-        await asyncio.gather(*(park(t) for t in task_ids))
-
-    _run(all_at_once())
-    paused = _rows(user, "run_paused")
-    assert len(paused) == 1
-    assert paused[0].link == f"/runs/{run_id}"
-
-
-def test_first_candidate_notification_is_created_once():
-    user = _new_user()
-    run_id = _new_run(user)
-
-    async def fire_twice():
-        async with SessionLocal() as session:
-            run = await session.get(Run, run_id)
-            first = await events.first_candidate(session, run)
-            second = await events.first_candidate(session, run)
-            await session.commit()
-            return first, second
-
-    assert _run(fire_twice()) == (True, False)
+        _run(scan_queue.process_one())
+    assert len(_rows(user, "scan_attention")) == 1
+    assert _rows(user, "scan_attention")[0].link == f"/scans/{run_id}"
 
 
 def test_parse_deadline_only_accepts_unambiguous_dates():
@@ -603,7 +519,7 @@ def test_tracker_form_sets_deadline_date():
     client = TestClient(app)
     created = client.post(
         "/api/applications",
-        json={"school": f"Deadline U {uuid.uuid4().hex[:6]}", "deadline": "2026-12-01"},
+        json={"title": f"Deadline Grant {uuid.uuid4().hex[:6]}", "deadline": "2026-12-01"},
     ).json()
     assert created["deadline_date"] == "2026-12-01"
     patched = client.patch(
@@ -617,13 +533,13 @@ def test_tracker_form_sets_deadline_date():
     client.delete(f"/api/applications/{created['id']}")
 
 
-def _application(user_id: str, deadline: date, status: str = "applying") -> str:
+def _application(user_id: str, deadline: date, status: str = "preparing") -> str:
     async def setup():
         async with SessionLocal() as session:
             row = Application(
                 user_id=user_id,
-                school="Reminder University",
-                program="PhD in Tests",
+                title="Reminder Fellowship",
+                organization="Test Foundation",
                 deadline=deadline.isoformat(),
                 deadline_date=deadline,
                 status=status,
@@ -715,7 +631,7 @@ def test_deadline_email_to_verified_address_with_unsubscribe(monkeypatch):
 def test_daily_digest_lists_unread_once_a_day():
     mailer.outbox.clear()
     user = _new_user(timezone="UTC", email_digest=True)
-    _notify(user, "digest-1", kind="first_candidate", title="First candidate saved")
+    _notify(user, "digest-1", kind="scan_attention", title="Scan needs attention")
     now = utcnow_naive().replace(hour=9)
 
     async def go(at):
@@ -726,13 +642,13 @@ def test_daily_digest_lists_unread_once_a_day():
     _run(go(now + timedelta(minutes=5)))
     mails = [m for m in mailer.outbox if m.to == f"{user}@example.com"]
     assert len(mails) == 1
-    assert "First candidate saved" in mails[0].text
+    assert "Scan needs attention" in mails[0].text
     assert "notifications/unsubscribe?token=" in mails[0].text
 
 
 def test_inbox_counts_for_the_shared_test_user():
     client = TestClient(app)
-    _notify(TEST_USER_ID, f"shared-{uuid.uuid4().hex}", kind="first_candidate")
+    _notify(TEST_USER_ID, f"shared-{uuid.uuid4().hex}", kind="scan_attention")
     inbox = client.get("/api/notifications")
     assert inbox.status_code == 200, inbox.text
     assert inbox.json()["unread"] >= 1
@@ -791,43 +707,6 @@ def test_logout_removes_this_devices_subscription():
     assert _run(endpoints()) == {other}
 
 
-def test_migration_parses_unambiguous_existing_deadlines():
-    from alembic import command
-    from tests.test_migrations import _cfg, _fetch, _scratch_db
-
-    with _scratch_db() as url:
-        cfg = _cfg(url)
-        command.upgrade(cfg, "040_cv_markdown")
-        _run(
-            _fetch(
-                url,
-                "INSERT INTO users (id, email, password_hash, plan, prefer_own_model) "
-                "VALUES ('u1', 'u1@example.com', 'x', 'free', false)",
-            )
-        )
-        _run(
-            _fetch(
-                url,
-                "INSERT INTO applications (id, school, program, degree_type, location, link, "
-                "requirements, offer, deadline, status, professors, notes, fee_waiver, "
-                "fee_waiver_notes, source, user_id) VALUES "
-                "('a1', 'S', '', 'phd', '', '', '[]', '', '15 December 2026', 'wishlist', "
-                "'[]', '', false, '', 'manual', 'u1'), "
-                "('a2', 'S', 'P', 'phd', '', '', '[]', '', 'rolling', 'wishlist', "
-                "'[]', '', false, '', 'manual', 'u1'), "
-                "('a3', 'S', 'Q', 'phd', '', '', '[]', '', '03/04/2026', 'wishlist', "
-                "'[]', '', false, '', 'manual', 'u1')",
-            )
-        )
-        command.upgrade(cfg, "041_notifications")
-        rows = _run(_fetch(url, "SELECT id, deadline_date FROM applications ORDER BY id"))
-        assert {r["id"]: r["deadline_date"] for r in rows} == {
-            "a1": date(2026, 12, 15),
-            "a2": None,
-            "a3": None,
-        }
-
-
 def test_delete_notification_is_scoped_idempotent_and_preserves_delivery(monkeypatch):
     from api.auth import schemas as auth_schemas
     from api.auth.routes import get_current_user
@@ -866,7 +745,7 @@ def test_clear_notifications_includes_older_read_and_unread_entries(monkeypatch)
 
     alice, bob = _new_user(), _new_user()
     for index in range(32):
-        _notify(alice, f"bulk:{index}", kind="first_candidate")
+        _notify(alice, f"bulk:{index}", kind="scan_attention")
     _notify(bob, "keep")
     first = _rows(alice)[0]
     monkeypatch.setitem(
@@ -891,4 +770,4 @@ def test_clear_notifications_includes_older_read_and_unread_entries(monkeypatch)
     assert len(_rows(alice)) == 32
     assert all(not row.in_inbox for row in _rows(alice))
     assert _rows(bob)[0].in_inbox is True
-    assert _notify(alice, "bulk:0", kind="first_candidate") is False
+    assert _notify(alice, "bulk:0", kind="scan_attention") is False

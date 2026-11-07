@@ -72,10 +72,10 @@ def deadline_on_page(page: str, deadline_date) -> bool:
     return bool(re.search(rf"(?<!\d)0?{deadline_date.day}(?!\d)", text))
 
 
-async def _run_created(session, run_id: str) -> int:
+async def _scan_created(session, scan_id: str) -> int:
     return (
         await session.execute(
-            select(func.count()).select_from(m.Opportunity).where(m.Opportunity.run_id == run_id)
+            select(func.count()).select_from(m.Opportunity).where(m.Opportunity.scan_id == scan_id)
         )
     ).scalar_one()
 
@@ -120,17 +120,16 @@ async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
             }
         if deadline_date < opp_service.today() and not data.rolling:
             return {"error": "This opportunity's deadline has passed: skip it."}
-    run = getattr(ctx, "run", None)
-    run_id = getattr(run, "id", None)
-    if run_id and await _run_created(ctx.session, run_id) >= settings.max_opportunities_per_run:
+    scan_id = getattr(getattr(ctx, "run", None), "id", None)
+    if scan_id and await _scan_created(ctx.session, scan_id) >= settings.max_opportunities_per_run:
         return {
             "error": (
-                f"Run budget reached: {settings.max_opportunities_per_run} new opportunities "
+                f"Scan budget reached: {settings.max_opportunities_per_run} new opportunities "
                 "per scan. Stop saving and write your final summary."
             )
         }
     opp, created, updated = await opp_service.upsert_from_agent(
-        ctx.session, user_id=getattr(ctx, "user_id", None), run_id=run_id, data=data
+        ctx.session, user_id=getattr(ctx, "user_id", None), scan_id=scan_id, data=data
     )
     await ctx.session.commit()
     ctx.opportunities_saved = saved + 1

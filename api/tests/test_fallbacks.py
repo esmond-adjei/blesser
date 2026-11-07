@@ -2,12 +2,10 @@ import asyncio
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
+from api import web
 from api.core import egress
 from api.core.config import settings
-from api.main import app
-from api.prospects import openalex, web
 
 DDG_HTML = """<html><body>
 <div class="result results_links"><h2><a class="result__a"
@@ -22,10 +20,8 @@ def _mock(monkeypatch, handler, target="search"):
     )
     if target == "search":
         monkeypatch.setattr(web, "search_client", lambda: client)
-    elif target == "fetch":
-        monkeypatch.setattr(web, "fetch_client", lambda: client)
     else:
-        monkeypatch.setattr(openalex, "client", lambda: client)
+        monkeypatch.setattr(web, "fetch_client", lambda: client)
 
 
 @pytest.fixture(autouse=True)
@@ -117,35 +113,3 @@ def test_fetch_falls_back_to_the_archive_with_a_note(monkeypatch):
     assert asyncio.run(web.fetch_page("https://uni.example/faculty")).startswith(
         "[Could not fetch"
     )
-
-
-def test_openalex_retries_then_degrades_honestly(monkeypatch):
-    monkeypatch.setattr(openalex, "_RETRY_DELAYS", (0, 0))
-    seen = {"n": 0}
-
-    def flaky(req):
-        seen["n"] += 1
-        return (
-            httpx.Response(503)
-            if seen["n"] < 3
-            else httpx.Response(200, json={"results": []})
-        )
-
-    _mock(monkeypatch, flaky, "openalex")
-    assert asyncio.run(openalex.find_author("Ada Lovelace")) == [] and seen["n"] == 3
-    _mock(monkeypatch, lambda req: httpx.Response(503), "openalex")
-    with pytest.raises(openalex.OpenAlexUnavailable, match="Don't invent papers"):
-        asyncio.run(openalex.get_recent_works("A1"))
-
-
-def test_fallback_order_is_visible():
-    with TestClient(app) as client:
-        caps = {c["capability"]: c for c in client.get("/api/agent/fallbacks").json()}
-    assert [s["name"] for s in caps["search"]["chain"]] == [
-        "tavily",
-        "brave",
-        "duckduckgo",
-        "recent results cache",
-    ]
-    assert [s["name"] for s in caps["fetch"]["chain"]] == ["direct", "archive"]
-    assert set(caps) == {"search", "fetch", "scholarly", "embeddings", "llm"}

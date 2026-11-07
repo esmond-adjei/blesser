@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Any
@@ -194,11 +193,6 @@ class AnthropicProvider(BaseLLMProvider):
                     )
                 native.append({"role": "assistant", "content": content_blocks or "..."})
             else:  # user
-                if m.get("attachments"):
-                    from api.assistant.attachments import user_blocks
-                    flush_tool_results()
-                    native.append({"role": "user", "content": user_blocks(m, "anthropic")})
-                    continue
                 text = str(m.get("content", ""))
                 if pending_tool_results:
                     extra_user_text.append(text)
@@ -228,115 +222,6 @@ class AnthropicProvider(BaseLLMProvider):
             **({"thinking": thinking} if thinking else {}),
             "messages": self._to_native_messages(messages, replay_thinking=replay),
             **self._prompt(system, tools),
-        }
-
-    async def chat_stream(
-        self,
-        messages: list[dict],
-        system: str,
-        tools: list[dict],
-        max_tokens: int = 4096,
-    ):
-        """Native streaming; tool_use blocks are reassembled from input_json fragments."""
-        import anthropic
-
-        yielded = False
-        try:
-            async for event in self._stream_once(self._request(messages, system, tools, max_tokens, self.replay_thinking)):
-                yielded = True
-                yield event
-        except anthropic.BadRequestError as exc:
-            if yielded or not self.replay_thinking or not _thinking_refused(exc, messages):
-                raise
-            self.replay_thinking = False
-            # Thinking refused (its prefix changed): once more without it.
-            logger.warning("Anthropic refused replayed thinking; asking without it: %s", exc)
-            async for event in self._stream_once(self._request(messages, system, tools, max_tokens, False)):
-                yield event
-
-    async def _stream_once(self, request: dict):
-        client = self._client_or_raise()
-        text_parts: list[str] = []
-        thought_parts: list[str] = []
-        calls: dict[int, dict] = {}
-        thinking: dict[int, dict] = {}
-        usage_out = 0
-        stop = None
-        usage_start: dict = {"input_tokens": 0}
-        async with client.messages.stream(**request) as stream:
-            async for event in stream:
-                kind = getattr(event, "type", "")
-                if kind == "content_block_start":
-                    block = getattr(event, "content_block", None)
-                    block_type = getattr(block, "type", "")
-                    index = getattr(event, "index", 0)
-                    if block_type == "tool_use":
-                        calls[index] = {
-                            "id": getattr(block, "id", ""),
-                            "name": getattr(block, "name", ""),
-                            "arguments": "",
-                        }
-                    elif block_type == "thinking":
-                        thinking[index] = {"type": "thinking", "thinking": "", "signature": ""}
-                    elif block_type == "redacted_thinking":
-                        thinking[index] = {"type": "redacted_thinking", "data": getattr(block, "data", "")}
-                elif kind == "content_block_delta":
-                    delta = getattr(event, "delta", None)
-                    delta_kind = getattr(delta, "type", "")
-                    index = getattr(event, "index", 0)
-                    if delta_kind == "text_delta":
-                        text = getattr(delta, "text", "")
-                        if text:
-                            text_parts.append(text)
-                            yield {"type": "token", "text": text}
-                    elif delta_kind == "thinking_delta":
-                        thought = getattr(delta, "thinking", "")
-                        if index in thinking:
-                            thinking[index]["thinking"] += thought
-                        if thought:
-                            thought_parts.append(thought)
-                            yield {"type": "reasoning", "text": thought}
-                    elif delta_kind == "signature_delta":
-                        if index in thinking:
-                            thinking[index]["signature"] += getattr(delta, "signature", "")
-                    elif delta_kind == "input_json_delta":
-                        slot = calls.get(index)
-                        if slot is not None:
-                            slot["arguments"] += getattr(delta, "partial_json", "")
-                elif kind == "message_delta":
-                    delta_usage = getattr(
-                        getattr(event, "usage", None), "output_tokens", 0
-                    )
-                    usage_out = delta_usage or usage_out
-                    stop = getattr(getattr(event, "delta", None), "stop_reason", None) or stop
-                elif kind == "message_start":
-                    start_usage = getattr(
-                        getattr(event, "message", None), "usage", None
-                    )
-                    if start_usage is not None:
-                        usage_start = _usage(start_usage)
-        tool_calls: list[ToolCall] = []
-        for index in sorted(calls):
-            slot = calls[index]
-            if not slot["name"]:
-                continue
-            try:
-                args = json.loads(slot["arguments"] or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            tool_calls.append(
-                ToolCall(id=slot["id"], name=slot["name"], arguments=args)
-            )
-        _keep_thinking(tool_calls, [thinking[i] for i in sorted(thinking)])
-        yield {
-            "type": "done",
-            "response": LLMResponse(
-                text="".join(text_parts),
-                tool_calls=tool_calls,
-                usage={**usage_start, "output_tokens": usage_out},
-                truncated=stop == "max_tokens",
-                reasoning="".join(thought_parts),
-            ),
         }
 
     async def chat(

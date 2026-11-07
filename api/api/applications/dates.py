@@ -2,7 +2,6 @@
 
 Parses ISO dates and forms naming one calendar date without guessing ("15
 December 2026", "Dec 15, 2026", d/m/y with day > 12). Anything else stays NULL.
-alembic/versions/041_notifications.py keeps a frozen copy for its backfill.
 """
 
 import re

@@ -37,7 +37,7 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSe
 
 
 def listener_dsn() -> str:
-    """Plain asyncpg DSN for a LISTEN connection, which the SSE feed holds outside the pool."""
+    """Plain asyncpg DSN for the worker's LISTEN connection, held outside the pool."""
     parts = urlsplit(settings.database_url)
     return urlunsplit(("postgresql", parts.netloc, parts.path, "", ""))
 
@@ -64,11 +64,7 @@ async def init_db() -> None:
     try:
         await asyncio.to_thread(_upgrade_head)
     except Exception as exc:
-        raise RuntimeError(
-            "Postgres migration failed. Databases created before Alembic "
-            "need their baseline stamped first: alembic stamp 001 "
-            "(see README migrations section)."
-        ) from exc
+        raise RuntimeError(f"Postgres migration failed: {exc}") from exc
 
 
 async def get_session():

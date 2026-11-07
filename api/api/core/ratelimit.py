@@ -18,17 +18,10 @@ from api.core.exceptions import RateLimitError
 
 # bucket -> [(max_calls, window_seconds), ...]; every window must allow.
 LIMITS: dict[str, list[tuple[int, int]]] = {
-    # File uploads: CVs and profile pictures.
-    "upload": [(10, 60), (60, 3600)],
-    # One chat turn (send or confirm) = one model loop.
-    "chat": [(15, 60), (300, 3600)],
-    # CV proposals stored for review (assistant or editor).
-    "proposal": [(20, 60), (200, 3600)],
-    # Anything that queues agent work: new runs, draft requests,
-    # manually added schools/professors (each queues research).
-    "agent_work": [(10, 60), (100, 3600)],
-    # PDF exports: each fetches photos and renders a document.
-    "export": [(6, 60), (60, 3600)],
+    # Agent scans spend model tokens and search calls.
+    "scan": [(3, 3600), (10, 86400)],
+    # Community submissions to the catalogue.
+    "submit": [(10, 3600), (30, 86400)],
     # Password-reset requests, keyed by the email asked about and by IP
     # (anonymous endpoint, so not per account).
     "reset_email": [(3, 900), (10, 86400)],
@@ -38,11 +31,8 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
 }
 
 _LABEL = {
-    "upload": "uploads",
-    "chat": "chat messages",
-    "proposal": "CV proposals",
-    "agent_work": "research requests",
-    "export": "PDF exports",
+    "scan": "scans",
+    "submit": "submissions",
     "reset_email": "reset requests",
     "reset_ip": "reset requests",
     "test_notification": "test notifications",

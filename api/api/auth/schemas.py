@@ -40,19 +40,9 @@ class UserOut(BaseModel):
     email: str
     created_at: datetime
     display_name: str | None = None
-    # Public, unguessable, immutable URL; null when no picture is set.
-    avatar_url: str | None = None
     email_verified: bool = False
     # False for accounts created through a sign-in provider only.
     has_password: bool = True
-    # The plan in effect (Beta while plans don't apply), and whether the
-    # account still has to pick one (onboarding's plan step).
-    plan: str = "beta"
-    needs_plan: bool = False
-    # Unset model choices use the account's default own model, not Auto.
-    prefer_own_model: bool = False
-    # Gradis makes changes without asking first.
-    agent_full_access: bool = False
 
 
 class OAuthStartIn(BaseModel):
@@ -87,8 +77,6 @@ class ProfileUpdate(BaseModel):
 
     display_name: str | None = Field(default=None, max_length=200)
     # Omitted leaves the model preference as it is.
-    prefer_own_model: bool | None = None
-    agent_full_access: bool | None = None
 
 
 class TokenPair(BaseModel):

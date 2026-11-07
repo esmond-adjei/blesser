@@ -9,7 +9,6 @@ Message history:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -50,18 +49,6 @@ class LLMResponse:
 ROOMY_MAX_TOKENS = 16_384
 
 
-def roomier(max_tokens: int) -> int:
-    return max(ROOMY_MAX_TOKENS, max_tokens * 4)
-
-
-async def chat_with_room(provider, messages: list[dict], system: str, tools: list[dict], max_tokens: int) -> LLMResponse:
-    """provider.chat, retried once with more room when `empty_at_limit`."""
-    response = await provider.chat(messages=messages, system=system, tools=tools, max_tokens=max_tokens)
-    if response.empty_at_limit:
-        response = await provider.chat(messages=messages, system=system, tools=tools, max_tokens=roomier(max_tokens))
-    return response
-
-
 class BaseLLMProvider:
     name: str = "base"
     # The backend 400s on tool calls without replayed extras (Gemini thought signatures).
@@ -75,22 +62,6 @@ class BaseLLMProvider:
         max_tokens: int = 4096,
     ) -> LLMResponse:
         raise NotImplementedError
-
-    async def chat_stream(
-        self,
-        messages: list[dict],
-        system: str,
-        tools: list[dict],
-        max_tokens: int = 4096,
-    ) -> AsyncIterator[dict]:
-        """Yields {"type": "token" | "reasoning", "text"} deltas, then {"type": "done", "response"}.
-
-        The default emits one chat() call as a single token event.
-        """
-        response = await self.chat(messages, system, tools, max_tokens)
-        if response.text:
-            yield {"type": "token", "text": response.text}
-        yield {"type": "done", "response": response}
 
 
 def to_anthropic_tools(tools: list[dict]) -> list[Any]:

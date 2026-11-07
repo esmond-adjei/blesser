@@ -11,11 +11,11 @@ from datetime import timedelta
 from sqlalchemy import func, select
 
 from api.applications import models as application_models
+from api.applications.models import OPEN_STATUSES
 from api.auth.security import hash_token
 from api.core.config import settings
 from api.core.exceptions import BadRequestError, NotFoundError
 from api.core.time import utcnow_naive
-from api.notifications.deadlines import OPEN_STATUSES
 from api.opportunities import models as opportunity_models
 from api.todos import ics, schemas
 from api.todos import models as m
@@ -25,7 +25,7 @@ FEED_PAST_DAYS = 30
 
 
 def _application_label(app: application_models.Application) -> str:
-    return app.school + (f", {app.program}" if app.program else "")
+    return app.title + (f" ({app.organization})" if app.organization else "")
 
 
 async def _labels(session, rows: list[m.Todo]) -> tuple[dict[str, str], dict[str, str]]:

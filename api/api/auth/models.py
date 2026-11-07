@@ -3,13 +3,10 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
     DateTime,
     ForeignKey,
-    LargeBinary,
     String,
     UniqueConstraint,
-    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,28 +21,12 @@ class User(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
-    # Avatar is a server re-encoded WebP served by avatar_key (see auth/profile.py).
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    avatar: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
-    avatar_key: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
     # NULL until the address is proven via an emailed link.
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Which Terms + Privacy notice the account agreed to at sign-up.
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     terms_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    # Billing plan id (api/billing/plans.py); set by billing at launch.
-    plan: Mapped[str] = mapped_column(String(16), default="free", server_default="free")
-    # When the account picked its plan; NULL = not yet (onboarding asks).
-    plan_selected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    # Unset model choices use the system model (Auto) unless this is on;
-    # then they use the account's default own model.
-    prefer_own_model: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default=false()
-    )
-    # Gradis runs every change without an approval card when on.
-    agent_full_access: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default=false()
-    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

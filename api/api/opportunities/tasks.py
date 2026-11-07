@@ -12,13 +12,12 @@ from api.opportunities.prompts import (
     DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
 )
 
-TASK_TYPE = "discover_opportunities"
 #: Titles of known opportunities shown to the agent so it looks for new ones.
 KNOWN_TITLES = 60
 
 
 def category_of(task) -> str:
-    raw = (getattr(task, "target_name", None) or "").strip()
+    raw = (getattr(task, "target", None) or "").strip()
     category = raw.split(":", 1)[1] if raw.startswith("category:") else raw
     return category if category in CATEGORY_BRIEFS else "startup"
 
@@ -54,14 +53,14 @@ def user_message(*, region: str, category: str, focus: str, today: str, known: l
 async def run_discover_opportunities(
     session,
     task,
-    run,
+    scan,
     on_event=None,
     resume_messages=None,
     on_checkpoint=None,
 ):
     category = category_of(task)
-    region = (run.region or "").strip() or settings.opportunity_default_region
-    focus = run.interest_statement if run.interest_statement != "-" else ""
+    region = (scan.region or "").strip() or settings.opportunity_default_region
+    focus = scan.focus or ""
     message = user_message(
         region=region,
         category=category,
@@ -69,7 +68,7 @@ async def run_discover_opportunities(
         today=opp_service.today().isoformat(),
         known=await _known(session, category),
     )
-    ctx = ToolContext(session=session, run=run)
+    ctx = ToolContext(session=session, run=scan)
     return await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
         message,
@@ -77,6 +76,6 @@ async def run_discover_opportunities(
         on_event=on_event,
         resume_messages=resume_messages,
         on_checkpoint=on_checkpoint,
+        tools=["search_web", "fetch_page", "save_opportunity"],
         progress_tools={"save_opportunity"},
-        task_type=TASK_TYPE,
     )

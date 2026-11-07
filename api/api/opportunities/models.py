@@ -87,8 +87,8 @@ class Opportunity(Base):
     created_by: Mapped[str | None] = mapped_column(
         String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    run_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("runs.id", ondelete="SET NULL"), nullable=True, index=True
+    scan_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("scans.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # Last time an agent read the source page and confirmed the facts.
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

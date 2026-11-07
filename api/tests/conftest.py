@@ -12,7 +12,7 @@ TEST_USER_EMAIL = "test@example.com"
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://graduator:graduator@localhost:5432/graduator_test",
+    "postgresql+asyncpg://blesser:blesser@localhost:5432/blesser_test",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 # No pooling: asyncpg connections stay bound to the event loop that opened them.
@@ -74,8 +74,6 @@ def _authenticated_test_user(request):
                     )
                 )
             else:
-                # Verified so a local .env operator key doesn't trip the verified-email gate.
-                user.prefer_own_model = False
                 user.email_verified_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
 
@@ -90,110 +88,27 @@ def _authenticated_test_user(request):
 @pytest.fixture(autouse=True)
 def _robots_off(request, monkeypatch):
     """robots.txt checks add a request per origin that mocked transports don't expect."""
+    from api import web
+
     if request.node.get_closest_marker("robots") is None:
         from api.core.config import settings
 
         monkeypatch.setattr(settings, "respect_robots_txt", False)
-    from api.prospects import web
-
     web._ROBOTS.clear()
 
 
 @pytest.fixture(autouse=True)
-def _no_institution_lookup(request, monkeypatch):
-    """Resolving a school's OpenAlex institution is a network call; opt in with @pytest.mark.institutions."""
-    if request.node.get_closest_marker("institutions") is None:
-        from api.core.config import settings
-
-        monkeypatch.setattr(settings, "openalex_resolve_institutions", False)
-
-
-@pytest.fixture(autouse=True)
-def _no_openalex_store(request, monkeypatch):
-    """The shared-DB OpenAlex cache would leak mocked responses between tests; opt in with @pytest.mark.openalex_store."""
-    if request.node.get_closest_marker("openalex_store") is None:
-        from api.core.config import settings
-
-        monkeypatch.setattr(settings, "openalex_db_cache_days", 0)
-        monkeypatch.setattr(settings, "openalex_roster_pages", 0)
-
-
-@pytest.fixture(autouse=True)
-def _no_code_first_rosters(request, monkeypatch):
-    """The code-first faculty list fetches pages and stores rosters in the shared DB; opt in with @pytest.mark.rosters."""
-    if request.node.get_closest_marker("rosters") is None:
-        from api.core.config import settings
-
-        monkeypatch.setattr(settings, "roster_min_names", 0)
-
-
-@pytest.fixture(autouse=True)
-def _no_verification_sources(request, monkeypatch):
-    """DBLP, NIH and NSF lookups are network calls; opt in with @pytest.mark.verification_sources."""
-    from api.prospects import source_http
-
-    source_http.reset()
-    if request.node.get_closest_marker("verification_sources") is None:
-        from api.core.config import settings
-
-        monkeypatch.setattr(settings, "verification_sources", "")
-    yield
-    source_http.reset()
-
-
-@pytest.fixture(autouse=True)
-def _no_professor_index(request, monkeypatch):
-    """The account's professor index would leak between tests; opt in with @pytest.mark.professor_index."""
-    if request.node.get_closest_marker("professor_index") is None:
-        from api.core.config import settings
-
-        monkeypatch.setattr(settings, "professor_index_days", 0)
-
-
-@pytest.fixture(autouse=True)
-def _no_pipeline(request, monkeypatch):
-    """Narrow-task tests script the agent loop; the code-first pass opts in with @pytest.mark.pipeline."""
-    if request.node.get_closest_marker("pipeline") is None:
-        from api.core.config import settings
-
-        monkeypatch.setattr(settings, "deterministic_research", False)
-
-
-@pytest.fixture(autouse=True)
-def _cold_caches():
-    """Process-wide data caches would leak one test's mocked responses into the next."""
+def _cold_caches_and_clients():
+    """Process-wide caches and HTTP clients would leak between tests (and event loops)."""
+    from api import web
     from api.core.ttlcache import clear_all
-    from api.prospects import web
 
     clear_all()
     web._CACHE.clear()
+    web._search_client = web._fetch_client = None
+    web._SEARCH_SEM = web._FETCH_SEM = None
     yield
-
-
-@pytest.fixture(autouse=True)
-def _reset_shared_http_clients():
-    """Drop cached HTTP clients: a fake one would leak, and a real one is bound to another test's event loop."""
-    from api.prospects import openalex, web
-    from api.runs import service as run_service
-
-    web._search_client = None
-    web._fetch_client = None
-    web._SEARCH_SEM = None
-    web._FETCH_SEM = None
-    openalex._client = None
-    openalex._OPENALEX_SEM = None
-    # The budget breaker is process-wide: one test's spent budget would fail later lookups.
-    openalex.reset_breaker()
-    # A stream-slot Semaphore left contended by an earlier loop would block later tests.
-    run_service._stream_slots = None
-    run_service._stream_slots_capacity = 0
-    yield
-    web._search_client = None
-    web._fetch_client = None
-    openalex._client = None
-    openalex.reset_breaker()
-    run_service._stream_slots = None
-    run_service._stream_slots_capacity = 0
+    web._search_client = web._fetch_client = None
 
 
 @pytest.fixture(autouse=True)
@@ -207,18 +122,3 @@ def _rate_limits(request, monkeypatch):
     monkeypatch.setattr(settings, "rate_limits_enabled", enabled)
     yield
     limiter.reset()
-
-
-@pytest.fixture
-def prefer_own_model():
-    """The test account defaults unset model choices to its own model; `_authenticated_test_user` turns it off."""
-    from api.auth import models as auth_models
-    from api.core.db import SessionLocal
-
-    async def _opt_in():
-        async with SessionLocal() as session:
-            user = await session.get(auth_models.User, TEST_USER_ID)
-            user.prefer_own_model = True
-            await session.commit()
-
-    asyncio.run(_opt_in())

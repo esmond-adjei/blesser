@@ -1,5 +1,4 @@
 import asyncio
-import io
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,18 +7,6 @@ from api.core.body_limit import BodySizeLimitMiddleware
 from api.main import app
 
 pytestmark = pytest.mark.real_auth  # no session: the limit must come first
-
-
-def test_chat_body_allowance_is_scoped_to_post_chat_routes():
-    limits = BodySizeLimitMiddleware(
-        app, default_limit=1000,
-        route_limits={("POST", "/api/assistant/conversations/{conversation_id}/chat"): 9000},
-    )
-    assert limits.limit_for("POST", "/api/assistant/conversations/c1/chat") == 9000
-    assert limits.limit_for("POST", "/api/assistant/conversations/c1/chat/") == 9000
-    assert limits.limit_for("GET", "/api/assistant/conversations/c1/chat") == 1000
-    assert limits.limit_for("POST", "/api/auth/login") == 1000
-    assert limits.limit_for("POST", "/api/assistant/conversations/c1/chat/extra") == 1000
 
 
 def _drive(mw, headers, chunks):
@@ -50,7 +37,7 @@ def _drive(mw, headers, chunks):
     scope = {
         "type": "http",
         "method": "POST",
-        "path": "/api/cv/documents",
+        "path": "/api/opportunities",
         "headers": headers,
     }
     asyncio.run(BodySizeLimitMiddleware(inner, **mw)(scope, receive, send))
@@ -73,24 +60,14 @@ def test_undeclared_oversize_is_cut_off_at_the_limit():
     assert reads <= 4  # stopped right after crossing 3000 bytes, not all 50
 
 
-def test_unauthenticated_50mb_upload_gets_413():
+def test_unauthenticated_50mb_body_gets_413():
     with TestClient(app) as client:
         resp = client.post(
-            "/api/cv/documents",
+            "/api/opportunities",
             content=b"x" * (50 * 1024 * 1024),
             headers={"content-type": "multipart/form-data; boundary=x"},
         )
     assert resp.status_code == 413
-
-
-def test_5mb_docx_is_within_the_upload_limit():
-    """Fails on auth (no session), not on size."""
-    with TestClient(app) as client:
-        resp = client.post(
-            "/api/cv/documents",
-            files={"file": ("cv.docx", io.BytesIO(b"x" * (5 * 1024 * 1024)))},
-        )
-    assert resp.status_code == 401
 
 
 def test_large_json_body_is_refused():

@@ -4,17 +4,12 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
-    File,
     Request,
-    Response,
-    UploadFile,
 )
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import email_flows
-from api.auth import models as auth_models
 from api.auth import oauth as auth_oauth
 from api.auth import profile as auth_profile
 from api.auth import schemas as auth_schemas
@@ -22,7 +17,7 @@ from api.auth import security as auth_security
 from api.auth import service as auth_service
 from api.core import mailer
 from api.core.db import get_session
-from api.core.exceptions import AuthError, NotFoundError
+from api.core.exceptions import AuthError
 
 router = APIRouter(tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
@@ -219,60 +214,8 @@ async def update_me(
     # Only fields sent: toggling the model preference must not clear the name.
     if "display_name" in req.model_fields_set:
         await auth_profile.update_profile(session, user, req.display_name)
-    if req.prefer_own_model is not None:
-        user.prefer_own_model = req.prefer_own_model
-    if req.agent_full_access is not None:
-        user.agent_full_access = req.agent_full_access
     await session.commit()
     return auth_schemas.UserOut(**auth_service.to_user_out(user))
-
-
-@router.put("/auth/me/avatar", response_model=auth_schemas.UserOut)
-async def upload_avatar(
-    file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session),
-    current: auth_schemas.UserOut = Depends(get_current_user),
-):
-    """Upload a profile picture (PNG/JPEG/WebP, <= 5 MB); stored as a 256px WebP."""
-    # Lazy: core.ratelimit imports this module for get_current_user.
-    from api.core.ratelimit import enforce
-
-    enforce("upload", current.id)
-    data = await file.read(auth_profile.MAX_AVATAR_BYTES + 1)
-    user = await auth_service.get_user_or_401(session, current.id)
-    await auth_profile.set_avatar(session, user, data)
-    return auth_schemas.UserOut(**auth_service.to_user_out(user))
-
-
-@router.delete("/auth/me/avatar", response_model=auth_schemas.UserOut)
-async def delete_avatar(
-    session: AsyncSession = Depends(get_session),
-    current: auth_schemas.UserOut = Depends(get_current_user),
-):
-    """Remove your profile picture; avatars fall back to initials."""
-    user = await auth_service.get_user_or_401(session, current.id)
-    await auth_profile.clear_avatar(session, user)
-    return auth_schemas.UserOut(**auth_service.to_user_out(user))
-
-
-@router.get("/avatars/{key}", include_in_schema=False)
-async def get_avatar(key: str, session: AsyncSession = Depends(get_session)):
-    """Public by unguessable key (img tags can't send Bearer); rotates per upload."""
-    avatar = (
-        await session.execute(
-            select(auth_models.User.avatar).where(auth_models.User.avatar_key == key)
-        )
-    ).scalar_one_or_none()
-    if not avatar:
-        raise NotFoundError("Avatar not found")
-    return Response(
-        content=avatar,
-        media_type="image/webp",
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
 
 
 @router.post("/auth/change-password")

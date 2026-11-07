@@ -5,19 +5,19 @@ from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, select, update
 
 from api.agent.tools import ToolContext
 from api.applications.models import Application
 from api.core.config import settings
 from api.core.db import SessionLocal
 from api.main import app
-from api.opportunities import scans
 from api.opportunities import service as opp_service
+from api.opportunities import sweep as sweep_module
 from api.opportunities import tasks as opp_tasks
 from api.opportunities import tools as opp_tools
 from api.opportunities.models import Opportunity
-from api.runs.models import ResearchTask, Run
+from api.scans.models import Scan, ScanTask
 from api.todos import ics
 from api.todos.models import CalendarFeed, Todo
 from tests.conftest import TEST_USER_EMAIL, TEST_USER_ID
@@ -135,14 +135,7 @@ def test_names_opportunity_and_deadline_on_page():
 def _run_id() -> str:
     async def go():
         async with SessionLocal() as session:
-            run = Run(
-                user_id=TEST_USER_ID,
-                region="Ghana",
-                field="Opportunities: startup",
-                degree_level="either",
-                interest_statement="-",
-                status="running",
-            )
+            run = Scan(user_id=TEST_USER_ID, region="Ghana", categories=["startup"], status="running")
             session.add(run)
             await session.commit()
             return run.id
@@ -159,7 +152,7 @@ PAGE = (
 def _save(run_id, tool_input, pages=None):
     async def go():
         async with SessionLocal() as session:
-            run = await session.get(Run, run_id)
+            run = await session.get(Scan, run_id)
             ctx = ToolContext(session=session, run=run)
             for url, text in (pages or {}).items():
                 opp_tools.record_fetch(ctx, url, text)
@@ -348,9 +341,10 @@ def test_track_copies_into_applications_once():
     assert first.status_code == 200, first.text
     tracked = first.json()
     assert tracked["opportunity_id"] == opp
-    assert tracked["school"] == "Accra Ventures"
-    assert tracked["program"] == "Soon Grant"
-    assert tracked["degree_type"] == "Grant"
+    assert tracked["organization"] == "Accra Ventures"
+    assert tracked["title"] == "Soon Grant"
+    assert tracked["kind"] == "Grant"
+    assert tracked["status"] == "saved"
     assert [r["label"] for r in tracked["requirements"]] == ["Pitch deck", "Financials"]
     assert tracked["deadline_date"] == _future(10).isoformat()
     again = client.post(f"/api/opportunities/{opp}/track").json()
@@ -401,7 +395,7 @@ def test_calendar_feed_lists_deadlines_and_todos_and_rotates():
     path = "/api/calendar/feed/" + feed["url"].rsplit("/", 1)[1]
     body = client.get(path)
     assert body.status_code == 200
-    assert "SUMMARY:Deadline: Accra Ventures\\, Soon Grant" in body.text
+    assert "SUMMARY:Deadline: Soon Grant (Accra Ventures)" in body.text
     assert "SUMMARY:To-do: Ask for references" in body.text
     assert "Someday" not in body.text
 
@@ -411,33 +405,6 @@ def test_calendar_feed_lists_deadlines_and_todos_and_rotates():
 
 
 # --- scans --------------------------------------------------------------------------
-
-
-def test_start_scan_queues_one_task_per_category():
-    resp = _client().post(
-        "/api/opportunities/scans", json={"categories": ["student", "startup"], "focus": "agritech"}
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["tasks"] == 2
-
-    async def tasks():
-        async with SessionLocal() as session:
-            run = await session.get(Run, body["run_id"])
-            rows = (
-                await session.execute(
-                    select(ResearchTask).where(ResearchTask.run_id == body["run_id"])
-                )
-            ).scalars().all()
-            return run, sorted((t.task_type, t.target_name) for t in rows)
-
-    run, rows = asyncio.run(tasks())
-    assert run.region == settings.opportunity_default_region
-    assert run.field == "Opportunities: startup, student"
-    assert rows == [
-        ("discover_opportunities", "category:startup"),
-        ("discover_opportunities", "category:student"),
-    ]
 
 
 def test_task_brief_lists_known_titles_and_today():
@@ -457,14 +424,13 @@ def test_task_brief_lists_known_titles_and_today():
 def test_scheduled_sweep_runs_once_per_interval(monkeypatch):
     async def sweep():
         async with SessionLocal() as session:
-            return await scans.maybe_sweep(session)
+            return await sweep_module.maybe_sweep(session)
 
     async def age_earlier_scans():
         async with SessionLocal() as session:
             await session.execute(
-                update(Run)
-                .where(Run.field.like(f"{scans.SCAN_FIELD}:%"))
-                .values(created_at=func.localtimestamp() - timedelta(days=30))
+                update(Scan)
+                .values(created_at=opp_service.utcnow_naive() - timedelta(days=30))
             )
             await session.commit()
 
@@ -522,10 +488,10 @@ class ScriptedScout:
 
 
 def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
+    from api import web
     from api.agent import orchestrator as orch
-    from api.prospects import web
-    from api.runs import queue
-    from api.runs.models import TaskStatus
+    from api.scans import queue
+    from api.scans.models import TaskStatus
 
     async def fake_fetch(url, max_chars=None, offset=0):
         return "Example Fund presents the Kumasi Innovation Fund. Deadline: 30 April 2027."
@@ -534,22 +500,22 @@ def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
     model = ScriptedScout()
     monkeypatch.setattr(orch, "get_provider", lambda **_: model)
 
-    run_id = _client().post("/api/opportunities/scans", json={"categories": ["startup"]}).json()["run_id"]
+    run_id = _client().post("/api/scans", json={"categories": ["startup"]}).json()["id"]
 
     async def process():
         async with SessionLocal() as session:
             task = (
-                await session.execute(select(ResearchTask).where(ResearchTask.run_id == run_id))
+                await session.execute(select(ScanTask).where(ScanTask.scan_id == run_id))
             ).scalar_one()
             task.status = TaskStatus.running
             await session.commit()
-            await queue._process_claimed(session, task)
+            await queue.process_claimed(session, task)
         async with SessionLocal() as session:
             task = (
-                await session.execute(select(ResearchTask).where(ResearchTask.run_id == run_id))
+                await session.execute(select(ScanTask).where(ScanTask.scan_id == run_id))
             ).scalar_one()
             saved = (
-                await session.execute(select(Opportunity).where(Opportunity.run_id == run_id))
+                await session.execute(select(Opportunity).where(Opportunity.scan_id == run_id))
             ).scalars().all()
             return task, saved
 

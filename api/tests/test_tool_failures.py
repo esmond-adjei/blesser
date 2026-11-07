@@ -24,48 +24,6 @@ def _scripted_stub(script, seen):
     return StubProvider()
 
 
-def test_dispatch_exception_becomes_tool_error(monkeypatch):
-    import api.agent.orchestrator as orch
-
-    seen = []
-    stub = _scripted_stub(
-        [
-            ("call", "fetch_page", {"url": "https://www.ox.ac.uk/page"}),
-            ("call", "save_program", {"school_name": "Oxford"}),
-            ("final", "saved one despite the 403"),
-        ],
-        seen,
-    )
-    monkeypatch.setattr(orch, "get_provider", lambda: stub)
-
-    calls = []
-
-    # dispatch_batch is the seam: it takes [(name, arguments)] and returns results in request order.
-    async def flaky_dispatch(batch, ctx, task_type=None):
-        out = []
-        for name, _args in batch:
-            calls.append(name)
-            if name == "fetch_page":
-                out.append(
-                    {
-                        "error": "fetch_page failed: Client error '403 Forbidden' "
-                        "for url 'https://www.ox.ac.uk/page'"
-                    }
-                )
-            else:
-                out.append({"program_id": "p1"})
-        return out
-
-    monkeypatch.setattr(orch, "dispatch_batch", flaky_dispatch)
-
-    out = asyncio.run(orch.run_agent_task("sys", "go", ctx=object()))  # type: ignore[arg-type]
-    assert out["final_text"] == "saved one despite the 403"
-    assert calls == ["fetch_page", "save_program"]
-    assert out["tool_log"][0]["tool"] == "fetch_page"
-    assert "error" in out["tool_log"][0]["result"]
-    assert "403" in out["tool_log"][0]["result"]["error"]
-
-
 def _fake_client(response=None, exc=None):
     """Stand-in for web.py's cached AsyncClient; web.fetch_client rebuilds it when `is_closed` is True."""
 
@@ -102,7 +60,7 @@ def _public_dns(monkeypatch):
 def test_fetch_page_403_returns_guidance(monkeypatch):
     import httpx as real_httpx
 
-    from api.prospects import web
+    from api import web
 
     _public_dns(monkeypatch)
     req = real_httpx.Request("GET", "https://www.ox.ac.uk/dept")
@@ -120,7 +78,7 @@ def test_fetch_page_403_returns_guidance(monkeypatch):
 def test_fetch_page_connection_error_returns_guidance(monkeypatch):
     import httpx as real_httpx
 
-    from api.prospects import web
+    from api import web
 
     _public_dns(monkeypatch)
     monkeypatch.setattr(

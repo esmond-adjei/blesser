@@ -26,21 +26,8 @@ def to_user_out(user: auth_models.User) -> dict:
         "email": user.email,
         "created_at": user.created_at,
         "display_name": user.display_name,
-        "avatar_url": f"/api/avatars/{user.avatar_key}" if user.avatar_key else None,
         "email_verified": user.email_verified_at is not None,
         "has_password": not user.password_hash.startswith("!"),
-        "prefer_own_model": bool(user.prefer_own_model),
-        "agent_full_access": bool(user.agent_full_access),
-        **_plan_fields(user),
-    }
-
-
-def _plan_fields(user: auth_models.User) -> dict:
-    from api.billing import service as billing
-
-    return {
-        "plan": billing.plan_for(user).id,
-        "needs_plan": billing.plans_apply() and user.plan_selected_at is None,
     }
 
 
@@ -174,7 +161,7 @@ async def change_password(
 
 
 async def delete_account(session, user_id: str, password: str) -> dict:
-    """Delete the user row (domain rows cascade), then CV files and export archives."""
+    """Delete the user row; everything it owns cascades."""
     user = await get_user_or_401(session, user_id)
     if user.password_hash.startswith("!"):
         # Sign-in-provider accounts have no password: confirm with the email.
@@ -182,17 +169,6 @@ async def delete_account(session, user_id: str, password: str) -> dict:
             raise AuthError("Type your account email exactly to confirm.")
     elif not auth_security.check_password(password, user.password_hash):
         raise AuthError("Password is incorrect.")
-    from api.cv import models as cv_models
-
-    cv_document_ids = (
-        (
-            await session.execute(
-                select(cv_models.CvDocument.id).where(cv_models.CvDocument.user_id == user.id)
-            )
-        )
-        .scalars()
-        .all()
-    )
     await session.execute(
         delete(auth_models.RefreshToken).where(
             auth_models.RefreshToken.user_id == user.id
@@ -200,13 +176,4 @@ async def delete_account(session, user_id: str, password: str) -> dict:
     )
     await session.delete(user)
     await session.commit()
-    # Uploaded CVs are personal data: purge their files with the rows.
-    from api.cv.service import purge_document_files
-
-    for document_id in cv_document_ids:
-        purge_document_files(document_id)
-    # Export archives contain every CV and table: they go too.
-    from api.account.export import purge_user_exports
-
-    purge_user_exports(user.id)
     return {"status": "account deleted"}

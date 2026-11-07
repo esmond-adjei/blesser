@@ -1,5 +1,5 @@
-"""Opportunity routes. Reads are public (no account needed); tracking, submitting
-and scanning need a signed-in account; moderation needs an ops admin."""
+"""Opportunity routes. Reads are public (no account needed); tracking and submitting
+need a signed-in account; moderation needs an ops admin."""
 
 from typing import Literal
 
@@ -10,11 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.applications import schemas as application_schemas
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
-from api.billing import service as billing
 from api.core.db import get_session
 from api.core.ratelimit import rate_limit
 from api.core.time import utcnow_naive
-from api.opportunities import scans, schemas
+from api.opportunities import schemas
 from api.opportunities import service as opp_service
 from api.opportunities.models import OpportunityCategory, OpportunityKind
 from api.todos import ics
@@ -77,7 +76,7 @@ async def pending_opportunities(
 @router.post(
     "/opportunities",
     response_model=schemas.OpportunityOut,
-    dependencies=[Depends(rate_limit("agent_work"))],
+    dependencies=[Depends(rate_limit("submit"))],
 )
 async def submit_opportunity(
     req: schemas.OpportunitySubmit,
@@ -86,28 +85,6 @@ async def submit_opportunity(
 ):
     """Share an opportunity. It goes public once an ops admin publishes it."""
     return await opp_service.submit(session, current.id, req)
-
-
-@router.post(
-    "/opportunities/scans",
-    response_model=schemas.ScanOut,
-    dependencies=[Depends(rate_limit("agent_work"))],
-)
-async def start_scan(
-    req: schemas.ScanCreate,
-    session: AsyncSession = Depends(get_session),
-    current: auth_schemas.UserOut = Depends(get_current_user),
-):
-    """Send agents to find new opportunities; follow the run at /runs/{run_id}."""
-    await billing.gate_new_run(session, current.id, None)
-    run, count = await scans.start_scan(
-        session,
-        current.id,
-        categories=[c.value for c in req.categories],
-        region=req.region,
-        focus=req.focus,
-    )
-    return {"run_id": run.id, "tasks": count}
 
 
 @router.get("/opportunities/{opportunity_id}", response_model=schemas.OpportunityOut)

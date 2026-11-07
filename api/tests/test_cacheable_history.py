@@ -3,7 +3,7 @@
 import json
 
 from api.agent.llm.anthropic_provider import AnthropicProvider
-from api.agent.orchestrator import _compact_old_tool_results
+from api.agent.orchestrator import compact_old_tool_results
 from api.core.config import settings
 
 
@@ -19,7 +19,7 @@ def test_compaction_moves_in_blocks_so_the_prefix_stays_the_same():
     sent = {}
     for turn in range(3, 10):
         history = _history(turn - 1)  # the history the model sees on `turn`
-        sent[turn] = _compact_old_tool_results(history, turn, max_age_turns=2, block_turns=3)
+        sent[turn] = compact_old_tool_results(history, turn, max_age_turns=2, block_turns=3)
     # Rewritten only when the cutoff moves (turns 5 and 8); in between the prefix is byte-identical.
     moved = [t for t in range(4, 10) if sent[t][: len(sent[t - 1])] != sent[t - 1]]
     assert moved == [5, 8]
@@ -34,7 +34,7 @@ def test_compaction_moves_in_blocks_so_the_prefix_stays_the_same():
 
 def test_block_size_comes_from_settings(monkeypatch):
     monkeypatch.setattr(settings, "compaction_block_turns", 1)
-    out = _compact_old_tool_results(_history(3), current_turn=4, max_age_turns=2)
+    out = compact_old_tool_results(_history(3), current_turn=4, max_age_turns=2)
     assert [m["content"] for m in out if m.get("role") == "tool"][:2] == [
         "[fetch_page result already used - omitted]",
         "[fetch_page result already used - omitted]",

@@ -301,7 +301,7 @@ async def upsert_from_agent(
     session,
     *,
     user_id: str | None,
-    run_id: str | None,
+    scan_id: str | None,
     data: schemas.AgentOpportunityIn,
 ) -> tuple[m.Opportunity, bool, list[str]]:
     """Create, or refresh the matching row. Returns (row, created, updated_fields).
@@ -341,7 +341,7 @@ async def upsert_from_agent(
             source=m.OpportunitySource.agent.value,
             dedupe_key=key,
             created_by=user_id,
-            run_id=run_id,
+            scan_id=scan_id,
             verified_at=now,
         )
         session.add(opp)
@@ -415,30 +415,19 @@ async def track(session, user_id: str, opportunity_id: str) -> tuple[dict, bool]
     ).scalar_one_or_none()
     if existing is not None:
         return application_service.to_out(existing), False
-    notes = "\n\n".join(
-        part
-        for part in (
-            opp.summary,
-            f"Eligibility: {opp.eligibility}" if opp.eligibility else "",
-            f"Benefits: {opp.benefits}" if opp.benefits else "",
-        )
-        if part
-    )
     app = application_models.Application(
         user_id=user_id,
-        school=opp.organization or opp.title,
-        program=opp.title if opp.organization else "",
-        degree_type=kind_label(opp.kind),
+        title=opp.title,
+        organization=opp.organization,
+        kind=kind_label(opp.kind),
         location=opp.location,
         link=opp.link or opp.source_url,
+        benefits=opp.benefits,
         requirements=[{"label": r, "done": False} for r in opp.requirements or []],
-        offer=opp.benefits,
         deadline=opp.deadline,
         deadline_date=opp.deadline_date,
-        status=application_models.ApplicationStatus.wishlist.value,
-        professors=[],
-        notes=notes,
-        source=application_models.ApplicationSource.manual.value,
+        status=application_models.ApplicationStatus.saved.value,
+        notes=f"Eligibility: {opp.eligibility}" if opp.eligibility else "",
         opportunity_id=opp.id,
     )
     session.add(app)

@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from api.core.ids import new_id
 from api.core.time import utcnow_naive
 from api.notifications import models as notification_models
-from api.runs.notify import CHANNEL
+from api.scans.notify import CHANNEL
 
 CHANNELS = ("inbox", "push", "email")
 
@@ -31,22 +31,11 @@ class Kind:
 
 
 KINDS: dict[str, Kind] = {
-    "run_finished": Kind(
-        "Run finished", "A run is done, with its candidate count.", push=True
+    "scan_finished": Kind(
+        "Scan finished", "An opportunity scan is done, with how many it added.", push=True
     ),
-    "first_candidate": Kind(
-        "First candidate saved", "A run saved its first matching professor."
-    ),
-    "run_paused": Kind(
-        "Run paused",
-        "A run stopped because the model allowance ran out.",
-        push=True,
-    ),
-    "run_attention": Kind(
-        "Run needs attention", "A task in a run failed after its retries."
-    ),
-    "drafts_ready": Kind(
-        "Email drafts ready", "Drafts you asked for are ready to review.", push=True
+    "scan_attention": Kind(
+        "Scan needs attention", "A task in a scan failed after its retries."
     ),
     "deadline": Kind(
         "Application deadlines",

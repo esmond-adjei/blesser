@@ -1,6 +1,6 @@
 """Daily jobs from the worker's reaper loop: deadline reminders and the email digest.
 
-Reminders fire 14, 7 and 1 days out for wishlist/applying rows, counted in the
+Reminders fire 14, 7 and 1 days out for saved/preparing applications, counted in the
 owner's timezone from REMINDER_HOUR on. Each fires once per deadline date
 (moving the deadline re-arms them); one missed while no worker ran goes out
 under the next threshold.
@@ -23,10 +23,7 @@ REMINDER_DAYS = (1, 7, 14)
 #: Local hour from which a day's reminders and digest go out.
 REMINDER_HOUR = 8
 #: Statuses that still need the deadline; anything later stops reminders.
-OPEN_STATUSES = (
-    application_models.ApplicationStatus.wishlist.value,
-    application_models.ApplicationStatus.applying.value,
-)
+OPEN_STATUSES = application_models.OPEN_STATUSES
 
 
 def threshold_for(days_left: int) -> int | None:
@@ -75,7 +72,7 @@ async def check_deadlines(session, now: datetime | None = None) -> int:
         threshold = threshold_for(days_left)
         if threshold is None:
             continue
-        name = application.school + (f", {application.program}" if application.program else "")
+        name = application.title + (f" ({application.organization})" if application.organization else "")
         if await notify(
             session,
             user_id=application.user_id,

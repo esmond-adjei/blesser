@@ -5,9 +5,10 @@ from __future__ import annotations
 from api.agent.llm.anthropic_provider import AnthropicProvider
 from api.agent.llm.base import BaseLLMProvider
 from api.agent.llm.openai_compat_provider import OpenAICompatProvider
+from api.core.config import DEFAULT_ANTHROPIC_MODEL
 
 PROVIDER_DEFAULT_MODELS = {
-    "anthropic": "claude-sonnet-4-6",
+    "anthropic": DEFAULT_ANTHROPIC_MODEL,
     "openai": "gpt-4o-mini",
     "ollama": "llama3.1",
     "gemini": "gemini-2.0-flash",
@@ -19,7 +20,7 @@ SUPPORTED_PROVIDERS = sorted(PROVIDER_DEFAULT_MODELS)
 
 def _default_model_for(provider: str, configured_model: str) -> str:
     """The configured model, unless it's still the Anthropic default for another provider."""
-    if configured_model and configured_model != "claude-sonnet-4-6":
+    if configured_model and configured_model != DEFAULT_ANTHROPIC_MODEL:
         return configured_model
     return PROVIDER_DEFAULT_MODELS.get(provider, configured_model)
 
@@ -66,24 +67,3 @@ def get_provider(
     raise ValueError(
         f"Unknown LLM_PROVIDER={provider!r}. Supported: {', '.join(SUPPORTED_PROVIDERS)}"
     )
-
-
-def get_provider_info(settings=None) -> dict:
-    """Non-sensitive summary of the active provider."""
-    if settings is None:
-        from api.core.config import settings as app_settings
-
-        settings = app_settings
-    provider = (settings.llm_provider or "anthropic").lower().strip()
-    try:
-        active = get_provider(settings)
-        model = getattr(active, "model", settings.llm_model)
-    except Exception:  # noqa: BLE001 - info endpoint must never fail on bad config
-        model = settings.llm_model
-    return {
-        "llm_provider": provider,
-        "llm_model": model,
-        "llm_base_url": settings.resolve_llm_base_url(),
-        "embedding_provider": (settings.embedding_provider or "voyage").lower().strip(),
-        "supported_providers": SUPPORTED_PROVIDERS,
-    }

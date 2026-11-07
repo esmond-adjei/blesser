@@ -6,14 +6,13 @@ from api.agent.llm.anthropic_provider import AnthropicProvider
 from api.agent.llm.base import to_anthropic_tools, to_openai_tools
 from api.agent.llm.factory import (
     get_provider,
-    get_provider_info,
 )
 from api.agent.llm.openai_compat_provider import OpenAICompatProvider
 from api.agent.tools import TOOL_DEFINITIONS
-from api.core.config import Settings
+from api.core.config import DEFAULT_ANTHROPIC_MODEL, Settings
 
 
-def _settings_for(provider: str, model: str = "claude-sonnet-4-6") -> Settings:
+def _settings_for(provider: str, model: str = DEFAULT_ANTHROPIC_MODEL) -> Settings:
     return Settings(
         _env_file=None,  # pyright: ignore[reportCallIssue]
         llm_provider=provider,
@@ -178,63 +177,8 @@ def test_only_gemini_requires_tool_call_extras():
     assert OpenAICompatProvider(model="m", api_key="k").requires_tool_call_extras is False
 
 
-def test_gemini_streams_and_keeps_thought_signatures():
-    """Gemini's signature rides on a tool call's first delta and must reach the final ToolCall."""
-    from types import SimpleNamespace
-
-    from api.agent.llm.openai_compat_provider import OpenAICompatProvider
-
-    sig = {"google": {"thought_signature": "sig-123"}}
-
-    def _delta(content=None, tool_calls=None):
-        return SimpleNamespace(
-            usage=None,
-            choices=[SimpleNamespace(delta=SimpleNamespace(content=content, tool_calls=tool_calls))],
-        )
-
-    def _tc(**kw):
-        call = SimpleNamespace(
-            index=0,
-            id=kw.get("id"),
-            function=SimpleNamespace(name=kw.get("name"), arguments=kw.get("arguments")),
-        )
-        if "extra" in kw:
-            call.extra_content = kw["extra"]
-        return call
-
-    chunks = [
-        _delta(content="Looking"),
-        _delta(tool_calls=[_tc(id="c1", name="search_web", arguments='{"query":', extra=sig)]),
-        _delta(tool_calls=[_tc(arguments=' "x"}')]),
-    ]
-    sent: list[dict] = []
-
-    async def _stream():
-        for c in chunks:
-            yield c
-
-    async def _create(**kwargs):
-        sent.append(kwargs)
-        return _stream()
-
-    provider = OpenAICompatProvider(model="m", api_key="k", provider_label="gemini")
-    provider._client = SimpleNamespace(  # pyright: ignore[reportAttributeAccessIssue]
-        chat=SimpleNamespace(completions=SimpleNamespace(create=_create))
-    )
-
-    async def _collect():
-        return [e async for e in provider.chat_stream([{"role": "user", "content": "hi"}], "sys", [])]
-
-    events = asyncio.run(_collect())
-    assert sent[0]["stream"] is True
-    assert [e["text"] for e in events if e["type"] == "token"] == ["Looking"]
-    call = events[-1]["response"].tool_calls[0]
-    assert call.arguments == {"query": "x"}
-    assert call.extra_content == sig
-
-
 def test_tool_definitions_are_provider_neutral():
-    assert len(TOOL_DEFINITIONS) >= 8
+    assert {t["name"] for t in TOOL_DEFINITIONS} == {"search_web", "fetch_page", "save_opportunity"}
     for t in TOOL_DEFINITIONS:
         assert "name" in t and "description" in t and "parameters" in t
         assert t["parameters"]["type"] == "object"
@@ -245,12 +189,6 @@ def test_converters_keep_each_tools_schema():
     for anthropic, openai, definition in pairs:
         assert anthropic["input_schema"] == definition["parameters"]
         assert openai["function"]["parameters"] == definition["parameters"]
-
-
-def test_provider_info_is_safe_to_log():
-    info = get_provider_info(_settings_for("ollama"))
-    assert info["llm_provider"] == "ollama"
-    assert "test-key" not in str(info)
 
 
 def test_generic_key_reaches_every_provider():
@@ -370,69 +308,3 @@ def test_openai_message_conversion_keeps_tool_call_ids():
     assert native[0] == {"role": "system", "content": "sys"}
     assert native[2]["tool_calls"][0]["id"] == "t1"
     assert native[3] == {"role": "tool", "tool_call_id": "t1", "content": "{}"}
-
-
-def test_a_stream_that_stops_at_its_limit_is_marked_truncated():
-    """A thinking model behind Ollama can reason until max_tokens and say nothing."""
-    from types import SimpleNamespace
-
-    from api.agent.llm.openai_compat_provider import OpenAICompatProvider
-
-    def _run(finish):
-        async def _stream():
-            yield SimpleNamespace(
-                usage=None,
-                choices=[SimpleNamespace(delta=SimpleNamespace(content=None, tool_calls=None), finish_reason=finish)],
-            )
-
-        async def _create(**kwargs):
-            return _stream()
-
-        provider = OpenAICompatProvider(model="m", api_key="k")
-        provider._client = SimpleNamespace(  # pyright: ignore[reportAttributeAccessIssue]
-            chat=SimpleNamespace(completions=SimpleNamespace(create=_create))
-        )
-
-        async def _done():
-            async for event in provider.chat_stream([{"role": "user", "content": "hi"}], "sys", []):
-                if event["type"] == "done":
-                    return event["response"]
-
-        return asyncio.run(_done())
-
-    cut = _run("length")
-    assert cut.truncated and cut.empty_at_limit
-    assert not _run("stop").truncated
-
-
-def test_a_thinking_models_reasoning_streams_apart_from_its_reply():
-    """Ollama sends reasoning as `delta.reasoning` (vLLM as `reasoning_content`)."""
-    from types import SimpleNamespace
-
-    from api.agent.llm.openai_compat_provider import OpenAICompatProvider
-
-    def _delta(**fields):
-        base = {"content": None, "tool_calls": None}
-        return SimpleNamespace(usage=None, choices=[SimpleNamespace(delta=SimpleNamespace(**{**base, **fields}), finish_reason=None)])
-
-    async def _stream():
-        yield _delta(reasoning="The user wants ")
-        yield _delta(reasoning_content="a shorter summary.")
-        yield _delta(content="Here it is.")
-
-    async def _create(**kwargs):
-        return _stream()
-
-    provider = OpenAICompatProvider(model="m", api_key="k")
-    provider._client = SimpleNamespace(  # pyright: ignore[reportAttributeAccessIssue]
-        chat=SimpleNamespace(completions=SimpleNamespace(create=_create))
-    )
-
-    async def _events():
-        return [e async for e in provider.chat_stream([{"role": "user", "content": "hi"}], "sys", [])]
-
-    events = asyncio.run(_events())
-    assert [e["text"] for e in events if e["type"] == "reasoning"] == ["The user wants ", "a shorter summary."]
-    assert [e["text"] for e in events if e["type"] == "token"] == ["Here it is."]
-    done = events[-1]["response"]
-    assert done.text == "Here it is." and done.reasoning == "The user wants a shorter summary."

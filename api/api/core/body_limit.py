@@ -1,19 +1,14 @@
 """Request-size ceiling enforced before anything reads the body.
 
-FastAPI parses multipart forms before dependencies run, so route-level checks
-come too late. Over-limit Content-Length gets 413 unread; a chunked or lying
-body is cut off with 413 once it crosses the limit.
+Over-limit Content-Length gets 413 unread; a chunked or lying body is cut off
+with 413 once it crosses the limit.
 """
 
 from __future__ import annotations
 
 import json
 
-from starlette.routing import compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
-#: Room for multipart boundaries and the other form fields.
-MULTIPART_OVERHEAD = 64 * 1024
 
 
 class _TooLarge(Exception):
@@ -21,34 +16,15 @@ class _TooLarge(Exception):
 
 
 class BodySizeLimitMiddleware:
-    def __init__(
-        self,
-        app: ASGIApp,
-        default_limit: int,
-        route_limits: dict[tuple[str, str], int] | None = None,
-    ) -> None:
+    def __init__(self, app: ASGIApp, default_limit: int) -> None:
         self.app = app
         self.default_limit = default_limit
-        self.route_limits = route_limits or {}
-        self.pattern_limits = [
-            (method, compile_path(path)[0], limit)
-            for (method, path), limit in self.route_limits.items() if "{" in path
-        ]
-
-    def limit_for(self, method: str, path: str) -> int:
-        method, path = method.upper(), path.rstrip("/")
-        for route_method, pattern, limit in self.pattern_limits:
-            if method == route_method and pattern.fullmatch(path):
-                return limit
-        return self.route_limits.get(
-            (method, path), self.default_limit
-        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        limit = self.limit_for(scope.get("method", "GET"), scope.get("path", ""))
+        limit = self.default_limit
         declared = _content_length(scope)
         if declared is not None and declared > limit:
             await _reject(send, limit)
