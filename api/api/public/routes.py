@@ -11,7 +11,7 @@ from api.core.exceptions import NotFoundError
 from api.core.ratelimit import enforce
 from api.editorial import models as m
 from api.editorial import service as editorial
-from api.opportunities import service
+from api.opportunities import service, share
 from api.opportunities.models import Opportunity, OpportunityCategory, OpportunityKind
 from api.opportunities.schemas import OpportunityFacets
 from api.public import schemas
@@ -113,6 +113,26 @@ async def calendar(slug: str, session: AsyncSession = Depends(get_session)):
         media_type="text/calendar; charset=utf-8",
         headers={"Cache-Control": CACHE_CONTROL},
     )
+
+
+@router.get("/opportunities/{slug}/share", response_model=share.ShareKit)
+async def share_kit(slug: str, session: AsyncSession = Depends(get_session)):
+    row = await by_slug(session, slug)
+    if response := redirect(row, slug, "/share"):
+        return response
+    if row.status != "published":
+        raise NotFoundError("Opportunity not found")
+    return share.kit(row, None)
+
+
+@router.get("/shared/{token}", response_model=share.SharedTeaser)
+async def shared(token: str, session: AsyncSession = Depends(get_session)):
+    """What a share link may show: members-only rows too, but never their official link."""
+    ids = share.read_token(token)
+    row = await session.get(Opportunity, ids[0]) if ids else None
+    if row is None or row.status not in share.SHAREABLE:
+        raise NotFoundError("Shared opportunity not found")
+    return share.teaser(row)
 
 
 @router.post("/submissions", status_code=201)

@@ -3,6 +3,7 @@ import { Chip, Countdown, OpportunityArt, buttonVariants, cn, formatDay } from "
 import Base from "../../layouts/Base.astro"
 import NotFound from "../../components/NotFound.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
+import ShareBox from "../../components/ShareBox.astro"
 import { ArrowRightIcon, CalendarIcon, CheckCircleIcon, ExternalIcon, PlusIcon, ShieldIcon } from "../../components/icons"
 import { ApiError, api, movedSlug, settle } from "../../lib/api"
 import { registerUrl, siteUrl } from "../../lib/config"
@@ -11,7 +12,11 @@ import { landingForKind } from "../../lib/landings"
 import { opportunityLd } from "../../lib/seo"
 
 const slug = Astro.params.slug ?? ""
-const [result, collections] = await Promise.all([settle(api.opportunity(slug)), settle(api.collections())])
+const [result, collections, shareKit] = await Promise.all([
+  settle(api.opportunity(slug)),
+  settle(api.collections()),
+  settle(api.shareKit(slug)),
+])
 
 if (result instanceof ApiError && result.moved) {
   const to = movedSlug(result)
@@ -28,6 +33,7 @@ const related =
     ? collections.filter((c) => c.item_ids.includes(opp.id) || c.items.some((i) => i.id === opp.id))
     : []
 const kindLanding = opp ? landingForKind(opp.kind) : undefined
+const kit = opp && !opp.closed && !(shareKit instanceof ApiError) ? shareKit : null
 const applyUrl = opp && isHttpUrl(opp.link) ? opp.link : opp && isHttpUrl(opp.source_url) ? opp.source_url : null
 const sourceHost = opp ? hostname(opp.source_url || opp.link) : ""
 const checked = opp ? checkedAgo(opp.verified_at) : null
@@ -48,6 +54,7 @@ const deadlineText = opp
   description={description}
   path={opp ? `/opportunities/${encodeURIComponent(opp.slug)}` : path}
   type="article"
+  image={opp ? `/opportunities/${encodeURIComponent(opp.slug)}/og.png` : undefined}
   noindex={!opp || opp.closed}
   jsonLd={opp ? opportunityLd(opp, `${siteUrl()}/opportunities/${encodeURIComponent(opp.slug)}`) : undefined}
 >
@@ -207,6 +214,11 @@ const deadlineText = opp
                     </a>
                   )}
                 </div>
+                {kit && (
+                  <div class="mt-2">
+                    <ShareBox kit={kit} title={opp.title} slug={opp.slug} />
+                  </div>
+                )}
                 {!opp.closed && (
                   <p class="m-0 mt-4 text-footnote text-ink-tertiary">
                     Tracking needs a free account. We'll bring you back here once it's set up.

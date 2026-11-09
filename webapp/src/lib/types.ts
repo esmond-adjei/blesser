@@ -239,3 +239,11 @@ export interface CalendarFeed {
   webcal_url: string
   created_at: string
 }
+
+export type ShareFormat = "square" | "wide" | "story"
+export interface ShareKit {
+  share_url: string
+  images: Record<ShareFormat, string>
+  captions: { short: string; standard: string; hashtags: string }
+  disclaimer: string
+}

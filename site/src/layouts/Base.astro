@@ -55,6 +55,7 @@ const ldJson = (o: object) => JSON.stringify(o).replace(/</g, "\\u003c")
     <meta property="og:image" content={ogImage} />
     <meta property="og:locale" content="en_GH" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={ogImage} />
     {ld.map((o) => <script type="application/ld+json" set:html={ldJson(o)} />)}
   </head>
   <body class="flex min-h-dvh flex-col bg-canvas text-ink">

@@ -73,3 +73,36 @@ export const CheckIcon = () => (
     <path d="M20 6 9 17l-5-5" />
   </Icon>
 )
+
+export const ShareIcon = () => (
+  <Icon>
+    <path d="M12 15V3M8 7l4-4 4 4" />
+    <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+  </Icon>
+)
+
+export const CopyIcon = () => (
+  <Icon>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </Icon>
+)
+
+export const DownloadIcon = () => (
+  <Icon>
+    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+  </Icon>
+)
+
+export const LinkIcon = () => (
+  <Icon>
+    <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+    <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+  </Icon>
+)
+
+export const CloseIcon = () => (
+  <Icon>
+    <path d="M18 6 6 18M6 6l12 12" />
+  </Icon>
+)

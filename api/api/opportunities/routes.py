@@ -9,9 +9,10 @@ from api.applications import schemas as application_schemas
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
 from api.core.db import get_session
+from api.core.exceptions import NotFoundError
 from api.core.ratelimit import rate_limit
 from api.core.time import utcnow_naive
-from api.opportunities import schemas
+from api.opportunities import schemas, share
 from api.opportunities import service as opp_service
 from api.opportunities.models import OpportunityCategory, OpportunityKind
 from api.todos import ics
@@ -131,3 +132,16 @@ async def track_opportunity(
     checklist, notes and deadline reminders then work as for any application."""
     app, _created = await opp_service.track(session, current.id, opportunity_id)
     return app
+
+
+@router.post("/opportunities/{opportunity_id}/share", response_model=share.ShareKit)
+async def share_opportunity(
+    opportunity_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Share link, images and captions; the link carries who shared it."""
+    opp = await opp_service.get_or_404(session, opportunity_id, public=False)
+    if opp.status not in share.SHAREABLE:
+        raise NotFoundError("Opportunity not found")
+    return share.kit(opp, current.id)

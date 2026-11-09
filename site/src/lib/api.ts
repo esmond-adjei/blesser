@@ -28,6 +28,29 @@ export type PublicOpportunity = {
 
 export type Page<T> = { items: T[]; total: number }
 
+export type ShareFormat = "square" | "wide" | "story"
+export type ShareKit = {
+  share_url: string
+  images: Record<ShareFormat, string>
+  captions: { short: string; standard: string; hashtags: string }
+  disclaimer: string
+}
+
+export type SharedTeaser = {
+  slug: string
+  audience: "public" | "members"
+  status: "published" | "archived"
+  title: string
+  organization: string
+  category: string
+  kind: string
+  benefits: string
+  deadline: string
+  deadline_date: string | null
+  rolling: boolean
+  seed: string
+}
+
 export type Collection = {
   id: string
   slug: string
@@ -117,6 +140,8 @@ export const api = {
   opportunities: (q: OpportunityQuery = {}) => get<Page<PublicOpportunity>>(`/opportunities${query(q)}`),
   opportunity: (slug: string) => get<PublicOpportunity>(slugPath(slug)),
   calendar: (slug: string) => request(`${slugPath(slug)}/calendar.ics`),
+  shareKit: (slug: string) => get<ShareKit>(`${slugPath(slug)}/share`),
+  shared: (token: string) => get<SharedTeaser>(`/shared/${encodeURIComponent(token)}`),
   facets: () => get<Facets>("/facets"),
   collections: () => get<PublicCollection[]>("/collections"),
   collection: (slug: string) => get<PublicCollection>(`/collections/${encodeURIComponent(slug)}`),

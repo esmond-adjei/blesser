@@ -1,0 +1,211 @@
+---
+import { buttonVariants, cn } from "@blesser/ui"
+import type { ShareKit } from "../lib/api"
+import { quickLinks } from "../lib/share/links"
+import { SIZES } from "../lib/share/model"
+import { CloseIcon, CopyIcon, DownloadIcon, LinkIcon, ShareIcon } from "./icons"
+
+interface Props {
+  kit: ShareKit
+  title: string
+  slug: string
+}
+const { kit, title, slug } = Astro.props
+const formats = [
+  { key: "square", label: "Square", hint: "Instagram, WhatsApp, Facebook" },
+  { key: "wide", label: "Wide", hint: "LinkedIn, X, link previews" },
+  { key: "story", label: "Story", hint: "Stories and status" },
+] as const
+const captions = [
+  { key: "short", label: "Short", hint: "fits X" },
+  { key: "standard", label: "Standard", hint: "LinkedIn, Facebook" },
+  { key: "hashtags", label: "With hashtags", hint: "Instagram" },
+] as const
+const chip = "rounded-full px-3 py-1.5 text-footnote font-semibold"
+---
+
+<div data-share-root data-images={JSON.stringify(kit.images)} data-url={kit.share_url} data-title={title} data-slug={slug} data-caption={kit.captions.standard}>
+  <button type="button" data-share-open class={cn(buttonVariants({ variant: "quiet", size: "md" }), "w-full")}>
+    <ShareIcon />
+    Share
+  </button>
+
+  <dialog
+    data-share-dialog
+    aria-labelledby="share-title"
+    class="m-auto max-h-[92dvh] w-[min(720px,calc(100vw-2rem))] overflow-hidden rounded-lg bg-surface p-0 text-ink shadow-elevation-3 backdrop:bg-scrim"
+  >
+    <div class="flex max-h-[92dvh] flex-col">
+      <div class="flex items-start justify-between gap-4 px-6 pt-6">
+        <div>
+          <h2 id="share-title" class="m-0 type-title-3 text-ink">Share this opportunity</h2>
+          <p class="m-0 mt-1 text-callout text-ink-secondary">A ready-made image and post for any network.</p>
+        </div>
+        <button type="button" data-share-close aria-label="Close" class="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-surface-sunk text-ink-secondary hover:text-ink [&_svg]:size-4">
+          <CloseIcon />
+        </button>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div class="grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div class="flex flex-col gap-3">
+            <div class="grid h-[300px] place-items-center rounded-md bg-surface-sunk p-3">
+              <img data-share-preview src={kit.images.square} alt={`Share image for ${title}`} width={SIZES.square.width} height={SIZES.square.height} class="h-auto max-h-[276px] w-auto max-w-full rounded-sm shadow-elevation-1" />
+            </div>
+            <div role="radiogroup" aria-label="Image format" class="flex gap-1 rounded-full bg-surface-sunk p-1">
+              {
+                formats.map((f, i) => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={i === 0 ? "true" : "false"}
+                    data-share-format={f.key}
+                    title={f.hint}
+                    class={cn(chip, "flex-1 cursor-pointer border-0 bg-transparent text-ink-secondary aria-checked:bg-surface aria-checked:text-ink aria-checked:shadow-elevation-1")}
+                  >
+                    {f.label}
+                  </button>
+                ))
+              }
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <a data-share-download href={kit.images.square} download={`blesser-${slug}-square.png`} class={buttonVariants({ variant: "secondary", size: "sm" })}>
+                <DownloadIcon />
+                Download image
+              </a>
+              <button type="button" data-share-copy-link class={buttonVariants({ variant: "quiet", size: "sm" })}>
+                <LinkIcon />
+                Copy link
+              </button>
+              <button type="button" data-share-native hidden class={buttonVariants({ variant: "quiet", size: "sm" })}>
+                <ShareIcon />
+                Share…
+              </button>
+            </div>
+            <ul class="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-callout">
+              {
+                quickLinks(kit, title).map((l) => (
+                  <li>
+                    <a href={l.href} target="_blank" rel="noopener noreferrer" class="font-semibold text-link">
+                      {l.label}
+                    </a>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            {
+              captions.map((c) => (
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <label for={`cap-${c.key}`} class="text-callout font-semibold text-ink">
+                      {c.label} <span class="font-normal text-ink-tertiary">· {c.hint}</span>
+                    </label>
+                    <button type="button" data-share-copy={`cap-${c.key}`} class={buttonVariants({ variant: "quiet", size: "sm" })}>
+                      <CopyIcon />
+                      Copy
+                    </button>
+                  </div>
+                  <textarea
+                    id={`cap-${c.key}`}
+                    readonly
+                    rows={c.key === "short" ? 4 : 6}
+                    class="mt-1 w-full resize-none rounded-sm border border-separator bg-surface-sunk p-3 text-footnote leading-5 text-ink"
+                  >{kit.captions[c.key]}</textarea>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        <p class="m-0 mt-5 text-footnote text-ink-tertiary">{kit.disclaimer} The image and text show Blesser as where you found it, not as the funder.</p>
+      </div>
+      <p data-share-status role="status" aria-live="polite" class="sr-only"></p>
+    </div>
+  </dialog>
+</div>
+
+<script>
+  type Images = Record<"square" | "wide" | "story", string>
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-share-root]")) {
+    const dialog = root.querySelector<HTMLDialogElement>("[data-share-dialog]")!
+    const preview = root.querySelector<HTMLImageElement>("[data-share-preview]")!
+    const download = root.querySelector<HTMLAnchorElement>("[data-share-download]")!
+    const native = root.querySelector<HTMLButtonElement>("[data-share-native]")!
+    const status = root.querySelector<HTMLElement>("[data-share-status]")!
+    const images = JSON.parse(root.dataset.images ?? "{}") as Images
+    const { url = "", title = "", slug = "", caption = "" } = root.dataset
+    let format: keyof Images = "square"
+
+    const say = (text: string) => {
+      status.textContent = ""
+      requestAnimationFrame(() => (status.textContent = text))
+    }
+    const flash = (button: HTMLElement, text: string) => {
+      const label = [...button.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim())
+      if (!label) return
+      const before = label.textContent
+      label.textContent = ` ${text}`
+      window.setTimeout(() => (label.textContent = before), 1600)
+    }
+    const copy = async (text: string, button: HTMLElement) => {
+      try {
+        await navigator.clipboard.writeText(text)
+        flash(button, "Copied")
+        say("Copied")
+      } catch {
+        say("Copy didn't work. Select the text and copy it yourself.")
+      }
+    }
+    // Fetched ahead of the click: Safari drops the user gesture across a slow await.
+    const files: Partial<Record<keyof Images, Promise<File>>> = {}
+    const file = (f: keyof Images) => {
+      const pending = (files[f] ??= fetch(images[f]).then(async (res) => {
+        if (!res.ok) throw new Error("image")
+        return new File([await res.blob()], `blesser-${slug}-${f}.png`, { type: "image/png" })
+      }))
+      pending.catch(() => delete files[f])
+      return pending
+    }
+
+    root.querySelector("[data-share-open]")!.addEventListener("click", () => {
+      dialog.showModal()
+      if (!native.hidden) void file(format)
+    })
+    root.querySelector("[data-share-close]")!.addEventListener("click", () => dialog.close())
+    dialog.addEventListener("click", (e) => e.target === dialog && dialog.close())
+
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-share-format]")) {
+      button.addEventListener("click", () => {
+        format = button.dataset.shareFormat as keyof Images
+        for (const b of root.querySelectorAll("[data-share-format]")) b.setAttribute("aria-checked", String(b === button))
+        preview.src = images[format]
+        download.href = images[format]
+        download.download = `blesser-${slug}-${format}.png`
+        if (!native.hidden) void file(format)
+      })
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-share-copy]")) {
+      button.addEventListener("click", () => {
+        const area = root.querySelector<HTMLTextAreaElement>(`#${button.dataset.shareCopy}`)
+        if (area) void copy(area.value, button)
+      })
+    }
+    const linkButton = root.querySelector<HTMLButtonElement>("[data-share-copy-link]")!
+    linkButton.addEventListener("click", () => void copy(url, linkButton))
+
+    if (typeof navigator.share === "function" && typeof navigator.canShare === "function") {
+      const probe = new File([""], "probe.png", { type: "image/png" })
+      if (navigator.canShare({ files: [probe] })) native.hidden = false
+    }
+    native.addEventListener("click", async () => {
+      try {
+        await navigator.share({ files: [await file(format)], title, text: caption })
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") say("Sharing didn't work. Download the image instead.")
+      }
+    })
+  }
+</script>

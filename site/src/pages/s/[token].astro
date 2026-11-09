@@ -1,0 +1,94 @@
+---
+import { buttonVariants, cn } from "@blesser/ui"
+import Base from "../../layouts/Base.astro"
+import NotFound from "../../components/NotFound.astro"
+import ApiErrorSection from "../../components/ApiError.astro"
+import { ShieldIcon } from "../../components/icons"
+import { ApiError, api, settle } from "../../lib/api"
+import { loginUrl, registerUrl } from "../../lib/config"
+import { cardFromTeaser } from "../../lib/share/model"
+import { siteHost } from "../../lib/share/route"
+
+const token = Astro.params.token ?? ""
+const result = await settle(api.shared(token))
+const teaser = result instanceof ApiError ? null : result
+
+if (teaser?.audience === "public") return Astro.redirect(`/opportunities/${encodeURIComponent(teaser.slug)}?ref=share`, 302)
+if (result instanceof ApiError) Astro.response.status = result.notFound ? 404 : 503
+
+const card = teaser ? cardFromTeaser(teaser, siteHost()) : null
+const image = `/share/${encodeURIComponent(token)}`
+const description = teaser
+  ? [teaser.organization && `Offered by ${teaser.organization}`, teaser.benefits].filter(Boolean).join(". ").slice(0, 300)
+  : undefined
+---
+
+<Base
+  title={teaser ? teaser.title : "Not found"}
+  description={description}
+  path={`/s/${encodeURIComponent(token)}`}
+  image={teaser ? `${image}/wide.png` : undefined}
+  noindex
+>
+  {result instanceof ApiError && result.notFound && <NotFound title="We couldn't find that shared opportunity" description="The link may be mistyped, or the opportunity is no longer listed. Browse what's open now instead." />}
+  {result instanceof ApiError && !result.notFound && <ApiErrorSection title="We can't load this opportunity right now" />}
+  {
+    teaser && card && (
+      <section class="site-container pt-6 pb-12 sm:pt-10">
+        <div class="mx-auto grid max-w-[1080px] items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-14">
+          <div class="min-w-0">
+            <p class="m-0 text-callout font-semibold text-ink-secondary">
+              {card.closed ? "Shared with you, now closed" : "Shared with you on Blesser"}
+            </p>
+            <h1 class="m-0 mt-2 type-title-1 text-balance text-ink">{teaser.title}</h1>
+            {teaser.organization && <p class="m-0 mt-3 text-body text-ink-secondary">Offered by {teaser.organization}</p>}
+            {teaser.benefits && <p class="m-0 mt-5 max-w-reading text-body leading-7 font-semibold text-ink">{teaser.benefits}</p>}
+            {card.deadline && <p class="m-0 mt-3 text-callout text-ink">{card.deadline}</p>}
+
+            {card.closed ? (
+              <div class="mt-8 rounded-lg bg-surface-sunk p-5">
+                <p class="m-0 text-headline text-ink">This opportunity has closed</p>
+                <p class="m-0 mt-1 text-ink-secondary">
+                  Its deadline has passed. Keep going, more are coming:{" "}
+                  <a href="/opportunities" class="text-link underline">see what's open now</a>.
+                </p>
+              </div>
+            ) : (
+              <div class="mt-8 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
+                <p class="m-0 text-headline text-ink">This one is for Blesser members</p>
+                <p class="m-0 mt-1 text-callout text-ink-secondary">
+                  Create a free account to see the details and apply. You'll get the official link and deadline reminders.
+                </p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <a href={registerUrl(teaser.slug)} class={buttonVariants({ variant: "primary", size: "lg" })}>
+                    Create a free account
+                  </a>
+                  <a href={loginUrl()} class={cn(buttonVariants({ variant: "quiet", size: "lg" }))}>
+                    Sign in
+                  </a>
+                </div>
+              </div>
+            )}
+
+            <div class="mt-5 flex gap-3 text-footnote text-ink-tertiary">
+              <span class="mt-0.5 shrink-0 text-link [&_svg]:size-4">
+                <ShieldIcon />
+              </span>
+              <p class="m-0">
+                Blesser gathers open opportunities for people in Ghana. It is not affiliated with {teaser.organization || "the organization offering this"};
+                always apply on the official page.
+              </p>
+            </div>
+          </div>
+          <img
+            src={`${image}/square.png`}
+            alt=""
+            width="1080"
+            height="1080"
+            class="order-first w-full max-w-[440px] rounded-lg shadow-elevation-2 md:order-none"
+          />
+        </div>
+      </section>
+    )
+  }
+</Base>

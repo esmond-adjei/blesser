@@ -12,6 +12,7 @@ import {
   MapPin,
   Plus,
   Search,
+  Share2,
   Sparkles,
 } from "lucide-react"
 import * as api from "../lib/api"
@@ -58,6 +59,7 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
+import { ShareDialog } from "../components/share/ShareDialog"
 import { ScanDialog } from "./Scans"
 
 const SORTS = [
@@ -137,7 +139,8 @@ export function Opportunities() {
   const shownDetail = detail ?? (openParam ? linked.data ?? null : null)
   const [todoFor, setTodoFor] = React.useState<Opportunity | null>(null)
   const [scanOpen, setScanOpen] = React.useState(false)
-  const [shareOpen, setShareOpen] = React.useState(false)
+  const [submitOpen, setSubmitOpen] = React.useState(false)
+  const [shareFor, setShareFor] = React.useState<Opportunity | null>(null)
   const filtered = !!(query || category || kind || soonParam || newParam || closedParam)
 
   return (
@@ -147,7 +150,7 @@ export function Opportunities() {
         description="Grants, accelerators, fellowships and scholarships open to people in Ghana, checked against each opportunity's own page."
         actions={
           <>
-            <Button size="sm" variant="quiet" onClick={() => setShareOpen(true)} icon={<Plus />}>
+            <Button size="sm" variant="quiet" onClick={() => setSubmitOpen(true)} icon={<Plus />}>
               Share one
             </Button>
             <Button size="sm" variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
@@ -277,6 +280,7 @@ export function Opportunities() {
                     opp={opp}
                     applicationId={tracked.data?.[opp.id]}
                     onOpen={() => setDetail(opp)}
+                    onShare={() => setShareFor(opp)}
                   />
                 ))}
               </ul>
@@ -289,6 +293,7 @@ export function Opportunities() {
                   opp={opp}
                   applicationId={tracked.data?.[opp.id]}
                   onOpen={() => setDetail(opp)}
+                  onShare={() => setShareFor(opp)}
                 />
               ))}
             </ul>
@@ -311,10 +316,12 @@ export function Opportunities() {
           if (openParam) setOpenParam("")
         }}
         onTodo={setTodoFor}
+        onShare={setShareFor}
       />
       <TodoDialog opp={todoFor} onClose={() => setTodoFor(null)} />
       <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
-      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
+      <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
+      <ShareDialog opp={shareFor} onClose={() => setShareFor(null)} />
     </div>
   )
 }
@@ -419,7 +426,7 @@ function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean
   )
 }
 
-function RowActions({ opp, applicationId }: { opp: Opportunity; applicationId: string | undefined }) {
+function RowActions({ opp, applicationId, onShare }: { opp: Opportunity; applicationId: string | undefined; onShare: () => void }) {
   const { pending, onTrack } = useTrack(opp, applicationId)
   return (
     <>
@@ -432,6 +439,16 @@ function RowActions({ opp, applicationId }: { opp: Opportunity; applicationId: s
           Track
         </Button>
       )}
+      <Button
+        size="sm"
+        variant="quiet"
+        iconOnly
+        aria-label={`Share ${opp.title}`}
+        data-tooltip="Share"
+        className="text-ink-secondary"
+        onClick={onShare}
+        icon={<Share2 />}
+      />
       {opp.link || opp.source_url ? (
         <a
           href={opp.link || opp.source_url}
@@ -452,13 +469,14 @@ interface ItemProps {
   opp: Opportunity
   applicationId: string | undefined
   onOpen: () => void
+  onShare: () => void
 }
 
 function Art({ opp, shape, className }: { opp: Opportunity; shape: "banner" | "square"; className?: string }) {
   return <OpportunityArt seed={opp.slug || opp.id} category={opp.category} kind={opp.kind} shape={shape} className={className} />
 }
 
-function OpportunityTile({ opp, applicationId, onOpen }: ItemProps) {
+function OpportunityTile({ opp, applicationId, onOpen, onShare }: ItemProps) {
   const meta = [KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
   return (
     <li className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-separator bg-surface transition-shadow duration-200 hover:shadow-elevation-1">
@@ -483,14 +501,14 @@ function OpportunityTile({ opp, applicationId, onOpen }: ItemProps) {
         {opp.benefits ? <p className="mt-4 line-clamp-2 text-callout text-ink">{opp.benefits}</p> : null}
         <div className="mt-auto flex items-center gap-2 pt-5">
           <Countdown variant="text" {...countdownFor(opp)} className="mr-auto" />
-          <RowActions opp={opp} applicationId={applicationId} />
+          <RowActions opp={opp} applicationId={applicationId} onShare={onShare} />
         </div>
       </div>
     </li>
   )
 }
 
-function OpportunityRow({ opp, applicationId, onOpen }: ItemProps) {
+function OpportunityRow({ opp, applicationId, onOpen, onShare }: ItemProps) {
   const meta = [opp.organization, KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
   return (
     <li className="group relative flex flex-col gap-2 px-4 py-3 hover:bg-surface-sunk/50 sm:flex-row sm:items-center sm:gap-4">
@@ -515,7 +533,7 @@ function OpportunityRow({ opp, applicationId, onOpen }: ItemProps) {
       </div>
       <div className="flex shrink-0 items-center gap-3 sm:justify-end">
         <Countdown variant="text" {...countdownFor(opp)} className="mr-auto sm:mr-0 sm:w-24 sm:justify-end" />
-        <RowActions opp={opp} applicationId={applicationId} />
+        <RowActions opp={opp} applicationId={applicationId} onShare={onShare} />
       </div>
     </li>
   )
@@ -526,11 +544,13 @@ function OpportunityDetail({
   applicationId,
   onClose,
   onTodo,
+  onShare,
 }: {
   opp: Opportunity | null
   applicationId: string | undefined
   onClose: () => void
   onTodo: (opp: Opportunity) => void
+  onShare: (opp: Opportunity) => void
 }) {
   // Keep the last row while the dialog animates out.
   const [shown, setShown] = React.useState<Opportunity | null>(opp)
@@ -588,6 +608,9 @@ function OpportunityDetail({
               Add a to-do
             </Button>
             <CalendarButtons opp={shown} />
+            <Button size="sm" variant="quiet" onClick={() => onShare(shown)} icon={<Share2 />}>
+              Share
+            </Button>
             <TrackButton opp={shown} applicationId={applicationId} />
             {shown.link || shown.source_url ? (
               <a
@@ -672,7 +695,7 @@ function TodoDialog({ opp, onClose }: { opp: Opportunity | null; onClose: () => 
   )
 }
 
-function ShareDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [form, setForm] = React.useState({
     title: "",
     organization: "",
