@@ -1,0 +1,72 @@
+---
+import "../styles/global.css"
+import hero from "@blesser/ui/illustrations/site-hero.webp"
+import Header from "../components/Header.astro"
+import Footer from "../components/Footer.astro"
+import { siteUrl } from "../lib/config"
+
+interface Props {
+  title?: string
+  description?: string
+  path?: string
+  image?: string
+  type?: "website" | "article"
+  jsonLd?: object | object[]
+  noindex?: boolean
+}
+
+const {
+  title,
+  description = "Grants, fellowships, scholarships and accelerators for startups, researchers and students in Ghana, checked against the official page.",
+  path = Astro.url.pathname,
+  image = hero.src,
+  type = "website",
+  jsonLd,
+  noindex = false,
+} = Astro.props
+
+const site = siteUrl()
+const fullTitle = title ? `${title} | Blesser` : "Blesser | Opportunities in Ghana"
+const canonical = new URL(path, `${site}/`).href
+const ogImage = new URL(image, `${site}/`).href
+const ld = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
+// Escape "<" so listing text can never close the script tag.
+const ldJson = (o: object) => JSON.stringify(o).replace(/</g, "\\u003c")
+---
+
+<!doctype html>
+<html lang="en-GH">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f6f7f1" />
+    <meta property="og:site_name" content="Blesser" />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={title ?? "Blesser"} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="en_GH" />
+    <meta name="twitter:card" content="summary_large_image" />
+    {ld.map((o) => <script type="application/ld+json" set:html={ldJson(o)} />)}
+  </head>
+  <body class="flex min-h-dvh flex-col bg-canvas text-ink">
+    <a
+      href="#main"
+      class="sr-only z-50 rounded-full bg-surface px-4 py-2 font-semibold text-ink shadow-elevation-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+    >
+      Skip to content
+    </a>
+    <slot name="banner" />
+    <Header />
+    <main id="main" tabindex="-1" class="flex-1 outline-none">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

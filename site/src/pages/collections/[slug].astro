@@ -1,0 +1,48 @@
+---
+import Base from "../../layouts/Base.astro"
+import CardGrid from "../../components/CardGrid.astro"
+import NotFound from "../../components/NotFound.astro"
+import ApiErrorSection from "../../components/ApiError.astro"
+import { LinkEmptyState } from "../../components/States"
+import { ApiError, api, settle } from "../../lib/api"
+import { plural } from "../../lib/format"
+
+const slug = Astro.params.slug ?? ""
+const result = await settle(api.collection(slug))
+const collection = result instanceof ApiError ? null : result
+const missing = result instanceof ApiError && result.notFound
+if (missing) Astro.response.status = 404
+else if (!collection) Astro.response.status = 503
+const items = collection?.items.filter((o) => !o.closed) ?? []
+---
+
+<Base
+  title={collection ? collection.title : missing ? "Not found" : "Collections unavailable"}
+  description={collection?.intro || undefined}
+  path={`/collections/${encodeURIComponent(slug)}`}
+  noindex={!collection}
+>
+  {missing && <NotFound title="We couldn't find that collection" />}
+  {!missing && !collection && <ApiErrorSection />}
+  {
+    collection && (
+      <div class="mx-auto max-w-content px-4 py-10 sm:px-6">
+        <p class="m-0 text-callout font-semibold text-link">Collection</p>
+        <h1 class="m-0 mt-2 type-title-1 text-ink">{collection.title}</h1>
+        {collection.intro && <p class="m-0 mt-3 max-w-reading text-lg leading-7 whitespace-pre-line text-ink-secondary">{collection.intro}</p>}
+        <p class="m-0 mt-4 text-callout text-ink-tertiary">{plural(items.length, "opportunity", "opportunities")} open</p>
+        <div class="mt-8">
+          {items.length > 0 ? (
+            <CardGrid items={items} />
+          ) : (
+            <LinkEmptyState
+              title="Everything in this collection has closed"
+              description="Keep going, more are coming. See what's open now."
+              actions={[{ href: "/opportunities", label: "Browse opportunities" }]}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+</Base>

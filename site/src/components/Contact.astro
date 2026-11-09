@@ -1,0 +1,6 @@
+---
+import { contactEmail } from "../lib/config"
+const email = contactEmail()
+---
+
+{email ? <a href={`mailto:${email}`}>{email}</a> : <>the operator of this Blesser instance</>}

@@ -1,0 +1,20 @@
+---
+import { LinkEmptyState } from "../components/States"
+import offline from "@blesser/ui/illustrations/spot-offline.webp"
+import Base from "../layouts/Base.astro"
+---
+
+<Base title="Something went wrong" noindex>
+  <section class="mx-auto max-w-content px-4 py-16 sm:px-6">
+    <LinkEmptyState
+      error
+      illustration={offline.src}
+      title="This page didn't load"
+      description="Something went wrong on our side. Try again in a minute, or start from the opportunities list."
+      actions={[
+        { href: Astro.url.pathname, label: "Try again", primary: true },
+        { href: "/opportunities", label: "Browse opportunities" },
+      ]}
+    />
+  </section>
+</Base>

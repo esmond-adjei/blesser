@@ -1,0 +1,48 @@
+---
+import { Logo } from "@blesser/ui"
+import { CATEGORY_LANDINGS, KIND_LANDINGS } from "../lib/landings"
+import { loginUrl, registerUrl } from "../lib/config"
+
+const year = new Date().getUTCFullYear()
+const link = "text-on-forest/85 no-underline hover:text-on-forest hover:underline"
+---
+
+<footer class="mt-16 bg-forest text-on-forest">
+  <div class="mx-auto grid max-w-content gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <div class="flex flex-col gap-3">
+      <a href="/" class="flex items-center gap-2.5 text-on-forest no-underline" aria-label="Blesser home">
+        <Logo variant="symbol-white" title="" className="size-8" />
+        <span class="font-display text-xl font-bold tracking-[-0.02em]">Blesser</span>
+      </a>
+      <p class="m-0 max-w-[32ch] text-callout text-on-forest/85">
+        Opportunities, made visible. Grants, fellowships, scholarships and accelerators for Ghana.
+      </p>
+    </div>
+    <nav aria-label="Who it's for">
+      <h2 class="m-0 mb-3 text-headline">Who it's for</h2>
+      <ul class="m-0 flex list-none flex-col gap-2 p-0 text-callout">
+        {CATEGORY_LANDINGS.map((l) => <li><a class={link} href={`/${l.slug}`}>{l.slug.charAt(0).toUpperCase() + l.slug.slice(1)}</a></li>)}
+      </ul>
+    </nav>
+    <nav aria-label="Kinds">
+      <h2 class="m-0 mb-3 text-headline">Browse</h2>
+      <ul class="m-0 flex list-none flex-col gap-2 p-0 text-callout">
+        <li><a class={link} href="/opportunities">All opportunities</a></li>
+        {KIND_LANDINGS.slice(0, 4).map((l) => <li><a class={link} href={`/${l.slug}`}>{l.title}</a></li>)}
+      </ul>
+    </nav>
+    <nav aria-label="Blesser">
+      <h2 class="m-0 mb-3 text-headline">Blesser</h2>
+      <ul class="m-0 flex list-none flex-col gap-2 p-0 text-callout">
+        <li><a class={link} href="/about">About</a></li>
+        <li><a class={link} href={registerUrl()}>Create account</a></li>
+        <li><a class={link} href={loginUrl()}>Sign in</a></li>
+        <li><a class={link} href="/privacy">Privacy</a></li>
+        <li><a class={link} href="/terms">Terms</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="mx-auto max-w-content border-t border-on-forest/20 px-4 py-5 text-footnote text-on-forest/80 sm:px-6">
+    © {year} Blesser. Always confirm details on the official page before you apply.
+  </div>
+</footer>

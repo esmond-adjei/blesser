@@ -1,0 +1,48 @@
+---
+import { buttonVariants, cn } from "@blesser/ui"
+
+interface Props {
+  total: number
+  page: number
+  pageSize: number
+}
+const { total, page, pageSize } = Astro.props
+const pages = Math.max(1, Math.ceil(total / pageSize))
+
+const href = (n: number) => {
+  const params = new URLSearchParams(Astro.url.search)
+  if (n <= 1) params.delete("page")
+  else params.set("page", String(n))
+  const qs = params.toString()
+  return `${Astro.url.pathname}${qs ? `?${qs}` : ""}`
+}
+
+const shown = [...new Set([1, page - 1, page, page + 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b)
+const pill = (active: boolean) => cn(buttonVariants({ variant: active ? "brand" : "quiet", size: "md" }), "min-w-control-md tabular-nums")
+---
+
+{
+  pages > 1 && (
+    <nav aria-label="Pages" class="mt-10 flex flex-wrap items-center justify-center gap-1">
+      {page > 1 && (
+        <a href={href(page - 1)} rel="prev" class={buttonVariants({ variant: "secondary", size: "md" })}>
+          Previous
+        </a>
+      )}
+      {shown.map((n, i) => (
+        <>
+          {i > 0 && n - shown[i - 1]! > 1 && <span class="px-1 text-ink-tertiary" aria-hidden="true">…</span>}
+          <a href={href(n)} aria-current={n === page ? "page" : undefined} class={pill(n === page)}>
+            <span class="sr-only">Page </span>
+            {n}
+          </a>
+        </>
+      ))}
+      {page < pages && (
+        <a href={href(page + 1)} rel="next" class={buttonVariants({ variant: "secondary", size: "md" })}>
+          Next
+        </a>
+      )}
+    </nav>
+  )
+}

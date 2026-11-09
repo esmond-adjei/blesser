@@ -1,0 +1,87 @@
+---
+import { Logo, buttonVariants, cn } from "@blesser/ui"
+import { MenuIcon } from "./icons"
+import { loginUrl, registerUrl } from "../lib/config"
+
+const NAV = [
+  { href: "/opportunities", label: "Opportunities" },
+  { href: "/grants", label: "Grants" },
+  { href: "/scholarships", label: "Scholarships" },
+  { href: "/fellowships", label: "Fellowships" },
+  { href: "/accelerators", label: "Accelerators" },
+  { href: "/about", label: "About" },
+]
+
+const path = Astro.url.pathname
+const current = (href: string) => path === href || path.startsWith(`${href}/`)
+---
+
+<header class="border-b border-separator bg-canvas">
+  <div class="mx-auto flex h-16 max-w-content items-center gap-6 px-4 sm:px-6">
+    <a href="/" class="flex items-center gap-2.5 rounded-full no-underline" aria-label="Blesser home">
+      <Logo title="" className="size-8" />
+      <span class="font-display text-xl font-bold tracking-[-0.02em] text-ink">Blesser</span>
+    </a>
+    <nav aria-label="Main" class="hidden flex-1 lg:block">
+      <ul class="m-0 flex list-none items-center gap-1 p-0">
+        {
+          NAV.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                aria-current={current(item.href) ? "page" : undefined}
+                class={cn(
+                  "relative inline-flex h-control-md items-center rounded-full px-3 text-callout text-ink-secondary no-underline transition-colors duration-160 hover:bg-surface-sunk hover:text-ink",
+                  current(item.href) &&
+                    "text-ink after:absolute after:inset-x-3 after:bottom-1 after:h-0.5 after:rounded-full after:bg-sun",
+                )}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+    <div class="ml-auto flex items-center gap-2">
+      <a href={loginUrl()} class={cn(buttonVariants({ variant: "quiet", size: "md" }), "hidden sm:inline-flex")}>
+        Sign in
+      </a>
+      <a href={registerUrl()} class={cn(buttonVariants({ variant: "brand", size: "md" }), "hidden sm:inline-flex")}>
+        Create account
+      </a>
+      <details class="group relative lg:hidden">
+        <summary
+          class={cn(buttonVariants({ variant: "quiet", size: "md", iconOnly: true }), "list-none [&::-webkit-details-marker]:hidden")}
+          aria-label="Menu"
+        >
+          <MenuIcon />
+        </summary>
+        <nav
+          aria-label="Main"
+          class="absolute right-0 z-40 mt-2 w-64 rounded-lg border border-separator bg-surface-raised p-2 shadow-elevation-3"
+        >
+          <ul class="m-0 list-none p-0">
+            {
+              NAV.map((item) => (
+                <li>
+                  <a
+                    href={item.href}
+                    aria-current={current(item.href) ? "page" : undefined}
+                    class="flex h-control-md items-center rounded-sm px-3 text-ink no-underline hover:bg-surface-sunk aria-[current=page]:font-semibold"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+          <div class="mt-2 flex flex-col gap-2 border-t border-separator pt-3 sm:hidden">
+            <a href={registerUrl()} class={buttonVariants({ variant: "brand", size: "lg" })}>Create account</a>
+            <a href={loginUrl()} class={buttonVariants({ variant: "secondary", size: "lg" })}>Sign in</a>
+          </div>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>

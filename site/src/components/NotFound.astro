@@ -1,0 +1,25 @@
+---
+import { LinkEmptyState } from "./States"
+import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
+
+interface Props {
+  title?: string
+  description?: string
+}
+const {
+  title = "We couldn't find that page",
+  description = "The link may be old, or the page may have moved. Browse what's open now instead.",
+} = Astro.props
+---
+
+<section class="mx-auto max-w-content px-4 py-16 sm:px-6">
+  <LinkEmptyState
+    illustration={notFound.src}
+    title={title}
+    description={description}
+    actions={[
+      { href: "/opportunities", label: "Browse opportunities", primary: true },
+      { href: "/", label: "Go home" },
+    ]}
+  />
+</section>

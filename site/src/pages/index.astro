@@ -1,0 +1,233 @@
+---
+import { buttonVariants, cn } from "@blesser/ui"
+import hero from "@blesser/ui/illustrations/site-hero.webp"
+import hero768 from "@blesser/ui/illustrations/site-hero-768.webp"
+import startups from "@blesser/ui/illustrations/site-startups.webp"
+import startups768 from "@blesser/ui/illustrations/site-startups-768.webp"
+import researchers from "@blesser/ui/illustrations/site-researchers.webp"
+import researchers768 from "@blesser/ui/illustrations/site-researchers-768.webp"
+import students from "@blesser/ui/illustrations/site-students.webp"
+import students768 from "@blesser/ui/illustrations/site-students-768.webp"
+import path from "@blesser/ui/illustrations/site-path.webp"
+import path768 from "@blesser/ui/illustrations/site-path-768.webp"
+import community from "@blesser/ui/illustrations/site-community.webp"
+import community768 from "@blesser/ui/illustrations/site-community-768.webp"
+import Base from "../layouts/Base.astro"
+import CardGrid from "../components/CardGrid.astro"
+import SectionHead from "../components/SectionHead.astro"
+import Illustration from "../components/Illustration.astro"
+import ApiErrorSection from "../components/ApiError.astro"
+import { ArrowRightIcon } from "../components/icons"
+import { ApiError, api, settle, type Announcement } from "../lib/api"
+import { loginUrl, registerUrl, siteUrl } from "../lib/config"
+import { plural } from "../lib/format"
+import { organizationLd } from "../lib/seo"
+
+const [siteData, collections] = await Promise.all([settle(api.site()), settle(api.collections())])
+const failed = siteData instanceof ApiError
+if (failed) Astro.response.status = 503
+
+const content = failed ? null : siteData.content
+const heroTitle = content?.hero_title || "Find your next opportunity"
+const heroSubtitle =
+  content?.hero_subtitle ||
+  "Grants, fellowships, scholarships and accelerators for startups, researchers and students in Ghana, checked against the official page."
+
+const today = new Date().toISOString().slice(0, 10)
+const isActive = (a: Announcement | null | undefined): a is Announcement =>
+  !!a?.text && (!a.starts_on || a.starts_on <= today) && (!a.ends_on || a.ends_on >= today)
+const announcement = isActive(content?.announcement) ? content.announcement : null
+
+// Whole rows of three on desktop; closing soon skips what Featured already shows.
+const rows = <T,>(items: T[]) => items.slice(0, items.length >= 3 ? Math.min(6, items.length - (items.length % 3)) : items.length)
+const featured = failed ? [] : rows(siteData.featured)
+const featuredIds = new Set(featured.map((o) => o.id))
+const closingSoon = failed ? [] : rows(siteData.closing_soon.filter((o) => !featuredIds.has(o.id)))
+const publicCollections = collections instanceof ApiError ? [] : collections.filter((c) => c.items.length > 0)
+
+const audiences = [
+  {
+    slug: "startups",
+    title: "For startups",
+    body: "Accelerators, pitch competitions and equity-free grants for founders building in Ghana, from first idea to first hire.",
+    full: startups,
+    small: startups768,
+  },
+  {
+    slug: "researchers",
+    title: "For researchers",
+    body: "Research grants, calls for proposals and fellowships, with eligibility and requirements laid out so you can decide quickly.",
+    full: researchers,
+    small: researchers768,
+  },
+  {
+    slug: "students",
+    title: "For students",
+    body: "Scholarships, internships and exchanges at home and abroad, with the deadline and what to prepare in one place.",
+    full: students,
+    small: students768,
+  },
+]
+
+const steps = [
+  { title: "Track", body: "Save an opportunity in one tap and see every deadline you care about count down." },
+  { title: "Plan", body: "Turn requirements into to-dos: transcripts, references, a budget, a pitch deck." },
+  { title: "Sync", body: "Send deadlines to Google Calendar, Outlook or Apple Calendar and get reminders before they close." },
+  { title: "Find more", body: "Members see new finds from our discovery agent first, before they reach the public site." },
+]
+---
+
+<Base path="/" jsonLd={organizationLd(siteUrl())}>
+  {
+    announcement && (
+      <div slot="banner" class="bg-sun-soft text-sun-ink">
+        <p class="mx-auto m-0 flex max-w-content flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2.5 text-center text-callout sm:px-6">
+          <span>{announcement.text}</span>
+          {announcement.link && (
+            <a href={announcement.link} class="font-semibold text-sun-ink underline">
+              Read more
+            </a>
+          )}
+        </p>
+      </div>
+    )
+  }
+
+  <section aria-labelledby="hero-title" class="mx-auto max-w-content px-4 pt-10 pb-12 sm:px-6 md:pt-16 md:pb-16">
+    <div class="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr]">
+      <div>
+        <h1 id="hero-title" class="m-0 type-title-1 text-ink md:type-hero">{heroTitle}</h1>
+        <p class="m-0 mt-5 max-w-[52ch] text-lg leading-7 text-ink-secondary">{heroSubtitle}</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="/opportunities" class={buttonVariants({ variant: "primary", size: "lg" })}>Browse opportunities</a>
+          <a href={registerUrl()} class={buttonVariants({ variant: "secondary", size: "lg" })}>Create account</a>
+        </div>
+        <p class="m-0 mt-4 text-footnote text-ink-tertiary">Free to browse. An account lets you track deadlines and plan each application.</p>
+      </div>
+      <Illustration full={hero} small={hero768} eager />
+    </div>
+  </section>
+
+  {failed && <ApiErrorSection />}
+
+  {
+    featured.length > 0 && (
+      <section aria-labelledby="featured" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+        <SectionHead id="featured" title="Featured" description="Picked by our editors this week." link={{ href: "/opportunities", label: "See all" }} />
+        <CardGrid items={featured} />
+      </section>
+    )
+  }
+
+  {
+    closingSoon.length > 0 && (
+      <section aria-labelledby="closing-soon" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+        <SectionHead
+          id="closing-soon"
+          title="Closing soon"
+          description="Deadlines in the next two weeks. There's still time."
+          link={{ href: "/opportunities?closing_within=14", label: "See all closing soon" }}
+        />
+        <CardGrid items={closingSoon} />
+      </section>
+    )
+  }
+
+  <section aria-labelledby="who" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+    <h2 id="who" class="m-0 mb-8 type-title-1 text-ink">Who it's for</h2>
+    <div class="flex flex-col gap-12 md:gap-16">
+      {
+        audiences.map((a, i) => (
+          <article class="grid items-center gap-6 md:grid-cols-2 md:gap-12">
+            <Illustration full={a.full} small={a.small} sizes="(min-width: 768px) 520px, 100vw" class={cn(i % 2 === 1 && "md:order-2")} />
+            <div>
+              <h3 class="m-0 type-title-2 text-ink">{a.title}</h3>
+              <p class="m-0 mt-3 max-w-[46ch] text-ink-secondary">{a.body}</p>
+              <a
+                href={`/${a.slug}`}
+                class="mt-5 inline-flex items-center gap-1.5 font-semibold text-link no-underline hover:underline [&_svg]:size-[18px]"
+              >
+                See opportunities for {a.slug}
+                <ArrowRightIcon />
+              </a>
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="how" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+    <div class="rounded-xl bg-surface p-6 shadow-elevation-1 sm:p-10">
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <div>
+          <h2 id="how" class="m-0 type-title-1 text-ink">How it works</h2>
+          <p class="m-0 mt-3 max-w-[46ch] text-ink-secondary">
+            Browse everything here for free. Create an account and Blesser walks each application with you to a yes.
+          </p>
+          <ol class="m-0 mt-8 grid list-none gap-6 p-0 sm:grid-cols-2">
+            {
+              steps.map((s, i) => (
+                <li class="flex gap-4">
+                  <span
+                    aria-hidden="true"
+                    class={cn(
+                      "grid size-10 shrink-0 place-items-center rounded-full font-display text-lg font-bold tabular-nums",
+                      i === 0 ? "bg-sun text-on-sun" : "bg-forest-soft text-link",
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h3 class="m-0 text-headline text-ink">{s.title}</h3>
+                    <p class="m-0 mt-1 text-callout text-ink-secondary">{s.body}</p>
+                  </div>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+        <Illustration full={path} small={path768} />
+      </div>
+    </div>
+  </section>
+
+  {
+    publicCollections.length > 0 && (
+      <section aria-labelledby="collections" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+        <SectionHead id="collections" title="Collections" description="Lists our editors keep up to date." />
+        <ul class="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 lg:grid-cols-3">
+          {publicCollections.map((c) => (
+            <li class="min-w-0">
+              <article class="relative flex h-full flex-col gap-2 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0">
+                <h3 class="m-0 text-title-3 text-ink">
+                  <a href={`/collections/${c.slug}`} class="text-ink no-underline after:absolute after:inset-0 after:content-[''] hover:underline">
+                    {c.title}
+                  </a>
+                </h3>
+                {c.intro && <p class="m-0 line-clamp-3 text-callout text-ink-secondary">{c.intro}</p>}
+                <p class="m-0 mt-auto pt-2 text-footnote font-semibold text-link">{plural(c.items.length, "opportunity", "opportunities")}</p>
+              </article>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  <section aria-labelledby="join" class="mx-auto max-w-content px-4 pt-12 sm:px-6">
+    <div class="grid items-center gap-8 overflow-hidden rounded-xl bg-forest p-6 text-on-forest sm:p-10 lg:grid-cols-[1fr_1fr]">
+      <div>
+        <h2 id="join" class="m-0 type-title-1">Keep every deadline in view</h2>
+        <p class="m-0 mt-3 max-w-[44ch] text-on-forest/85">
+          Create a free account to track opportunities, plan what each application needs and get reminded before anything closes.
+        </p>
+        <div class="mt-7 flex flex-wrap items-center gap-3">
+          <a href={registerUrl()} class={buttonVariants({ variant: "primary", size: "lg" })}>Create account</a>
+          <a href={loginUrl()} class="px-2 font-semibold text-on-forest underline">Sign in</a>
+        </div>
+      </div>
+      <Illustration full={community} small={community768} />
+    </div>
+  </section>
+</Base>

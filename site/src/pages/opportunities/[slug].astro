@@ -1,0 +1,230 @@
+---
+import { Chip, Countdown, buttonVariants, cn, formatDay } from "@blesser/ui"
+import Base from "../../layouts/Base.astro"
+import NotFound from "../../components/NotFound.astro"
+import ApiErrorSection from "../../components/ApiError.astro"
+import { ArrowRightIcon, CalendarIcon, CheckCircleIcon, ExternalIcon, PlusIcon, ShieldIcon } from "../../components/icons"
+import { ApiError, api, movedSlug, settle } from "../../lib/api"
+import { registerUrl, siteUrl } from "../../lib/config"
+import { categoryLabel, checkedAgo, countdownFor, hostname, isHttpUrl, kindLabel } from "../../lib/format"
+import { landingForKind } from "../../lib/landings"
+import { opportunityLd } from "../../lib/seo"
+
+const slug = Astro.params.slug ?? ""
+const [result, collections] = await Promise.all([settle(api.opportunity(slug)), settle(api.collections())])
+
+if (result instanceof ApiError && result.moved) {
+  const to = movedSlug(result)
+  if (to && to !== slug) return Astro.redirect(`/opportunities/${encodeURIComponent(to)}`, 301)
+}
+const opp = result instanceof ApiError ? null : result
+const missing = result instanceof ApiError && (result.notFound || result.moved)
+if (missing) Astro.response.status = 404
+else if (!opp) Astro.response.status = 503
+
+const path = `/opportunities/${encodeURIComponent(slug)}`
+const related =
+  opp && !(collections instanceof ApiError)
+    ? collections.filter((c) => c.item_ids.includes(opp.id) || c.items.some((i) => i.id === opp.id))
+    : []
+const kindLanding = opp ? landingForKind(opp.kind) : undefined
+const applyUrl = opp && isHttpUrl(opp.link) ? opp.link : opp && isHttpUrl(opp.source_url) ? opp.source_url : null
+const sourceHost = opp ? hostname(opp.source_url || opp.link) : ""
+const checked = opp ? checkedAgo(opp.verified_at) : null
+const description = opp
+  ? [opp.organization, opp.summary].filter(Boolean).join(": ").slice(0, 300) || `${kindLabel(opp.kind)} on Blesser`
+  : undefined
+const deadlineText = opp
+  ? opp.rolling
+    ? "Rolling, apply any time"
+    : opp.deadline_date
+      ? formatDay(opp.deadline_date)
+      : opp.deadline || "No deadline listed"
+  : ""
+---
+
+<Base
+  title={opp ? opp.title : missing ? "Not found" : "Opportunities unavailable"}
+  description={description}
+  path={opp ? `/opportunities/${encodeURIComponent(opp.slug)}` : path}
+  type="article"
+  noindex={!opp || opp.closed}
+  jsonLd={opp ? opportunityLd(opp, `${siteUrl()}/opportunities/${encodeURIComponent(opp.slug)}`) : undefined}
+>
+  {missing && <NotFound title="We couldn't find that opportunity" description="It may have been removed, or the link may be mistyped. Browse what's open now instead." />}
+  {!missing && !opp && <ApiErrorSection title="We can't load this opportunity right now" />}
+  {
+    opp && (
+      <article class="mx-auto max-w-content px-4 py-10 sm:px-6">
+        <nav aria-label="Breadcrumb" class="mb-6 text-callout text-ink-secondary">
+          <ol class="m-0 flex list-none flex-wrap items-center gap-1.5 p-0">
+            <li><a href="/opportunities" class="text-ink-secondary hover:text-ink">Opportunities</a></li>
+            {kindLanding && (
+              <li class="before:mr-1.5 before:content-['/']">
+                <a href={`/${kindLanding.slug}`} class="text-ink-secondary hover:text-ink">{kindLanding.title}</a>
+              </li>
+            )}
+          </ol>
+        </nav>
+
+        {opp.closed && (
+          <div role="status" class="mb-8 rounded-lg bg-surface-sunk p-5">
+            <p class="m-0 text-headline text-ink">This opportunity has closed</p>
+            <p class="m-0 mt-1 text-ink-secondary">
+              Its deadline has passed. Keep going, more are coming:{" "}
+              <a href={kindLanding ? `/${kindLanding.slug}` : "/opportunities"} class="text-link underline">
+                see what's open now
+              </a>
+              .
+            </p>
+          </div>
+        )}
+
+        <header class="max-w-reading">
+          {opp.organization && <p class="m-0 text-callout font-semibold text-ink-secondary">{opp.organization}</p>}
+          <h1 class="m-0 mt-2 type-title-1 text-ink">{opp.title}</h1>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <Chip tone="forest">{kindLabel(opp.kind)}</Chip>
+            <Chip>{categoryLabel(opp.category)}</Chip>
+            {opp.location && <Chip>{opp.location}</Chip>}
+          </div>
+        </header>
+
+        <div class="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div class="flex min-w-0 flex-col gap-8">
+            {opp.summary && (
+              <section aria-labelledby="about">
+                <h2 id="about" class="m-0 type-title-2 text-ink">About</h2>
+                <p class="m-0 mt-3 max-w-reading leading-7 whitespace-pre-line text-ink">{opp.summary}</p>
+              </section>
+            )}
+            {opp.benefits && (
+              <section aria-labelledby="benefits">
+                <h2 id="benefits" class="m-0 type-title-2 text-ink">What you get</h2>
+                <p class="m-0 mt-3 max-w-reading leading-7 whitespace-pre-line text-ink">{opp.benefits}</p>
+              </section>
+            )}
+            {opp.eligibility && (
+              <section aria-labelledby="eligibility">
+                <h2 id="eligibility" class="m-0 type-title-2 text-ink">Who can apply</h2>
+                <p class="m-0 mt-3 max-w-reading leading-7 whitespace-pre-line text-ink">{opp.eligibility}</p>
+              </section>
+            )}
+            {opp.requirements.length > 0 && (
+              <section aria-labelledby="requirements">
+                <h2 id="requirements" class="m-0 type-title-2 text-ink">What you'll need</h2>
+                <ul class="m-0 mt-4 flex max-w-reading list-none flex-col gap-3 p-0">
+                  {opp.requirements.map((r) => (
+                    <li class="flex gap-3 rounded-sm bg-surface p-3 shadow-elevation-1">
+                      <span class="mt-0.5 text-link [&_svg]:size-5">
+                        <CheckCircleIcon />
+                      </span>
+                      <span class="text-ink">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {opp.countries.length > 0 && (
+              <section aria-labelledby="countries">
+                <h2 id="countries" class="m-0 type-title-2 text-ink">Where</h2>
+                <ul class="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
+                  {opp.countries.map((c) => (
+                    <li><Chip>{c}</Chip></li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {related.length > 0 && (
+              <section aria-labelledby="related">
+                <h2 id="related" class="m-0 type-title-2 text-ink">In collections</h2>
+                <ul class="m-0 mt-3 flex list-none flex-col gap-2 p-0">
+                  {related.map((c) => (
+                    <li>
+                      <a href={`/collections/${c.slug}`} class="inline-flex items-center gap-1.5 font-semibold text-link no-underline hover:underline [&_svg]:size-[18px]">
+                        {c.title}
+                        <ArrowRightIcon />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          <aside aria-label="Deadline and actions" class="flex flex-col gap-4 lg:sticky lg:top-6">
+            <div class="rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
+              <h2 class="m-0 text-headline text-ink-secondary">Deadline</h2>
+              <div class="mt-3 flex flex-wrap items-center gap-3">
+                <Countdown {...countdownFor(opp)} className="text-callout" />
+              </div>
+              <p class="m-0 mt-3 text-ink">
+                {opp.deadline_date && !opp.rolling ? (
+                  <time datetime={opp.deadline_date}>{opp.closed ? "Closed" : "Closes"} {deadlineText}</time>
+                ) : (
+                  deadlineText
+                )}
+              </p>
+              {opp.deadline && opp.deadline_date && opp.deadline !== opp.deadline_date && opp.deadline !== deadlineText && (
+                <p class="m-0 mt-1 text-footnote text-ink-tertiary">As the source puts it: {opp.deadline}</p>
+              )}
+
+              <div class="mt-5 flex flex-col gap-2">
+                {!opp.closed && (
+                  <a href={registerUrl(opp.slug)} class={buttonVariants({ variant: "primary", size: "lg" })}>
+                    <PlusIcon />
+                    Track this opportunity
+                  </a>
+                )}
+                {applyUrl && (
+                  <a
+                    href={applyUrl}
+                    rel="noopener noreferrer external"
+                    target="_blank"
+                    class={buttonVariants({ variant: opp.closed ? "brand" : "secondary", size: "lg" })}
+                  >
+                    Open the official page
+                    <ExternalIcon />
+                    <span class="sr-only">(opens in a new tab)</span>
+                  </a>
+                )}
+                {!opp.closed && opp.deadline_date && (
+                  <a
+                    href={`/api/public/opportunities/${encodeURIComponent(opp.slug)}/calendar.ics`}
+                    class={cn(buttonVariants({ variant: "quiet", size: "md" }))}
+                    download={`${opp.slug}.ics`}
+                  >
+                    <CalendarIcon />
+                    Add to calendar
+                  </a>
+                )}
+              </div>
+              {!opp.closed && (
+                <p class="m-0 mt-4 text-footnote text-ink-tertiary">
+                  Tracking needs a free account. We'll bring you back here once it's set up.
+                </p>
+              )}
+            </div>
+
+            <div class="flex gap-3 rounded-lg bg-forest-soft p-5 text-callout">
+              <span class="mt-0.5 shrink-0 text-link [&_svg]:size-5">
+                <ShieldIcon />
+              </span>
+              <div class="text-ink">
+                {sourceHost && (
+                  <p class="m-0">
+                    Source: <span class="font-semibold">{sourceHost}</span>
+                  </p>
+                )}
+                <p class={cn("m-0", sourceHost && "mt-1")}>
+                  {checked ? `${checked} from the official page.` : "Not yet re-checked by our team."} Always confirm the details on the
+                  official page before you apply.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </article>
+    )
+  }
+</Base>

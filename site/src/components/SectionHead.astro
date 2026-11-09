@@ -1,0 +1,26 @@
+---
+import { ArrowRightIcon } from "./icons"
+
+interface Props {
+  id: string
+  title: string
+  description?: string
+  link?: { href: string; label: string }
+}
+const { id, title, description, link } = Astro.props
+---
+
+<div class="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+  <div>
+    <h2 id={id} class="m-0 type-title-2 text-ink">{title}</h2>
+    {description && <p class="m-0 mt-1 text-ink-secondary">{description}</p>}
+  </div>
+  {
+    link && (
+      <a href={link.href} class="inline-flex items-center gap-1.5 font-semibold text-link no-underline hover:underline [&_svg]:size-[18px]">
+        {link.label}
+        <ArrowRightIcon />
+      </a>
+    )
+  }
+</div>

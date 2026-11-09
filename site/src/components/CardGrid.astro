@@ -1,0 +1,20 @@
+---
+import { SiteCard } from "./SiteCard"
+import type { PublicOpportunity } from "../lib/api"
+import { registerUrl } from "../lib/config"
+
+interface Props {
+  items: PublicOpportunity[]
+}
+const { items } = Astro.props
+---
+
+<ul class="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 lg:grid-cols-3">
+  {
+    items.map((opp) => (
+      <li class="min-w-0">
+        <SiteCard opp={opp} trackUrl={registerUrl(opp.slug)} />
+      </li>
+    ))
+  }
+</ul>

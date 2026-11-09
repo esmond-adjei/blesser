@@ -1,0 +1,70 @@
+---
+import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
+import Base from "../../layouts/Base.astro"
+import CardGrid from "../../components/CardGrid.astro"
+import Pagination from "../../components/Pagination.astro"
+import ApiErrorSection from "../../components/ApiError.astro"
+import { Filters } from "../../components/Filters"
+import { LinkEmptyState } from "../../components/States"
+import { ApiError, api, settle } from "../../lib/api"
+import { categoryLabel, kindLabel, plural } from "../../lib/format"
+import { PAGE_SIZE, isFiltered, readFilters, toQuery } from "../../lib/listing"
+
+const filters = readFilters(Astro.url.searchParams)
+const [result, facets] = await Promise.all([settle(api.opportunities(toQuery(filters))), settle(api.facets())])
+const failed = result instanceof ApiError
+if (failed) Astro.response.status = 503
+
+const heading = filters.kind
+  ? `${kindLabel(filters.kind)} opportunities`
+  : filters.category
+    ? `Opportunities for ${categoryLabel(filters.category).toLowerCase()}`
+    : "Opportunities"
+const filtered = isFiltered(filters)
+const pageNote = filters.page > 1 ? `, page ${filters.page}` : ""
+---
+
+<Base
+  title={`${heading}${pageNote}`}
+  description="Browse open grants, fellowships, scholarships and accelerators for startups, researchers and students in Ghana."
+  path="/opportunities"
+  noindex={filtered || filters.page > 1 || filters.sort === "new"}
+>
+  <div class="mx-auto max-w-content px-4 py-10 sm:px-6">
+    <h1 class="m-0 type-title-1 text-ink">{heading}</h1>
+    <p class="m-0 mt-2 max-w-reading text-ink-secondary">
+      Everything here is checked against the official page. Track any of them with a free account.
+    </p>
+
+    <div class="mt-8">
+      <Filters filters={filters} facets={facets instanceof ApiError ? null : facets} />
+    </div>
+
+    {
+      failed ? (
+        <ApiErrorSection />
+      ) : result.items.length === 0 ? (
+        <LinkEmptyState
+          className="mt-8"
+          illustration={notFound.src}
+          title={filtered ? "Nothing matches those filters" : "Nothing open right now"}
+          description={
+            filtered
+              ? "Try fewer filters or a different word. New opportunities arrive every day."
+              : "New opportunities arrive every day. Create an account and we'll tell you when they do."
+          }
+          actions={filtered ? [{ href: "/opportunities", label: "Clear filters" }] : []}
+        />
+      ) : (
+        <section aria-labelledby="results" class="mt-8">
+          <h2 id="results" class="m-0 mb-4 text-callout text-ink-secondary" aria-live="polite">
+            {plural(result.total, "opportunity", "opportunities")}
+            {filters.page > 1 && ` · page ${filters.page}`}
+          </h2>
+          <CardGrid items={result.items} />
+          <Pagination total={result.total} page={filters.page} pageSize={PAGE_SIZE} />
+        </section>
+      )
+    }
+  </div>
+</Base>

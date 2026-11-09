@@ -1,0 +1,67 @@
+---
+import { buttonVariants } from "@blesser/ui"
+import path from "@blesser/ui/illustrations/site-path.webp"
+import path768 from "@blesser/ui/illustrations/site-path-768.webp"
+import Base from "../layouts/Base.astro"
+import Illustration from "../components/Illustration.astro"
+import { registerUrl } from "../lib/config"
+
+const points = [
+  {
+    title: "Found every day",
+    body: "A discovery agent searches funders' and universities' pages on a regular schedule, and people in the community share what they hear about.",
+  },
+  {
+    title: "Checked by people",
+    body: "Our editors check each listing against its official page before it appears here, and re-check them when a source changes.",
+  },
+  {
+    title: "Plain and specific",
+    body: "Real amounts in the currency the funder states, deadlines as days to go, and what you'll need to prepare.",
+  },
+]
+---
+
+<Base title="About" description="Blesser makes grants, fellowships, scholarships and accelerators visible to startups, researchers and students in Ghana.">
+  <section class="mx-auto max-w-content px-4 pt-10 pb-12 sm:px-6">
+    <div class="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
+      <div>
+        <h1 class="m-0 type-title-1 text-ink md:type-hero">Opportunities, made visible</h1>
+        <p class="m-0 mt-5 max-w-[52ch] text-lg leading-7 text-ink-secondary">
+          Good opportunities for people in Ghana are scattered across hundreds of websites, newsletters and group chats, and too
+          many are found a week after they close. Blesser puts them in one place, with the deadline up front, and helps you see
+          each application through to a yes.
+        </p>
+      </div>
+      <Illustration full={path} small={path768} eager />
+    </div>
+  </section>
+
+  <section aria-labelledby="how-we-work" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+    <h2 id="how-we-work" class="m-0 mb-6 type-title-2 text-ink">How we work</h2>
+    <ul class="m-0 grid list-none gap-6 p-0 md:grid-cols-3">
+      {
+        points.map((p) => (
+          <li class="rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
+            <h3 class="m-0 text-title-3 text-ink">{p.title}</h3>
+            <p class="m-0 mt-2 text-ink-secondary">{p.body}</p>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="m-0 mt-8 max-w-reading text-ink-secondary">
+      Listings can still change after we check them. Always confirm the details on the official page before you apply.
+    </p>
+  </section>
+
+  <section aria-labelledby="start" class="mx-auto max-w-content px-4 py-12 sm:px-6">
+    <div class="rounded-xl bg-forest p-6 text-on-forest sm:p-10">
+      <h2 id="start" class="m-0 type-title-2">Start with what's open now</h2>
+      <p class="m-0 mt-2 max-w-[52ch] text-on-forest/85">Browse for free. Create an account when you want to track deadlines and plan applications.</p>
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <a href="/opportunities" class={buttonVariants({ variant: "primary", size: "lg" })}>Browse opportunities</a>
+        <a href={registerUrl()} class="px-2 font-semibold text-on-forest underline">Create account</a>
+      </div>
+    </div>
+  </section>
+</Base>

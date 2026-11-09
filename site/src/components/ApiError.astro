@@ -1,0 +1,20 @@
+---
+import { LinkEmptyState } from "./States"
+import offline from "@blesser/ui/illustrations/spot-offline.webp"
+
+interface Props {
+  title?: string
+}
+const { title = "We can't load opportunities right now" } = Astro.props
+const retry = Astro.url.pathname + Astro.url.search
+---
+
+<section class="mx-auto max-w-content px-4 py-12 sm:px-6">
+  <LinkEmptyState
+    error
+    illustration={offline.src}
+    title={title}
+    description="Our listings service didn't answer. Try again in a minute."
+    actions={[{ href: retry, label: "Try again" }]}
+  />
+</section>

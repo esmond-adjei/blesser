@@ -1,0 +1,68 @@
+@import "tailwindcss";
+@import "@blesser/ui/fonts.css";
+@import "@blesser/ui/tokens.css" layer(base);
+@import "@blesser/ui/theme.css";
+
+@layer base {
+  * {
+    @apply border-separator;
+  }
+
+  :where(time) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  p {
+    overflow-wrap: break-word;
+  }
+
+  a {
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+}
+
+@utility rich-text {
+  max-width: var(--reading-max);
+  line-height: 1.65;
+  overflow-wrap: break-word;
+
+  & :where(p, ul, ol) {
+    margin-block: 0.75em;
+  }
+
+  & :where(h2) {
+    margin-block: 1.5em 0.4em;
+    font-size: 19px;
+    line-height: 26px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  & :where(ul) {
+    list-style: disc;
+    padding-left: 1.35em;
+  }
+
+  & :where(li + li) {
+    margin-top: 0.35em;
+  }
+
+  & :where(a) {
+    color: var(--link);
+    text-decoration: underline;
+  }
+
+  & > :first-child,
+  & > section:first-child > :first-child {
+    margin-top: 0;
+  }
+}
+
+
+/* Tailwind does not generate Select's data-URI chevron class from the package source, so draw it here. */
+@utility select-chevron {
+  & select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f8a7b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+}

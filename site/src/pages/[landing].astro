@@ -1,0 +1,97 @@
+---
+import { buttonVariants } from "@blesser/ui"
+import { LinkEmptyState } from "../components/States"
+import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
+import Base from "../layouts/Base.astro"
+import CardGrid from "../components/CardGrid.astro"
+import Pagination from "../components/Pagination.astro"
+import NotFound from "../components/NotFound.astro"
+import ApiErrorSection from "../components/ApiError.astro"
+import { ArrowRightIcon } from "../components/icons"
+import { ApiError, api, settle } from "../lib/api"
+import { registerUrl } from "../lib/config"
+import { plural } from "../lib/format"
+import { landingFor, CATEGORY_LANDINGS, KIND_LANDINGS } from "../lib/landings"
+import { PAGE_SIZE, readFilters } from "../lib/listing"
+
+const landing = landingFor(Astro.params.landing ?? "")
+const { page } = readFilters(Astro.url.searchParams)
+const result = landing
+  ? await settle(api.opportunities({ ...landing.filter, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }))
+  : null
+if (!landing) Astro.response.status = 404
+else if (result instanceof ApiError) Astro.response.status = 503
+
+const listHref = landing ? `/opportunities?${new URLSearchParams(landing.filter).toString()}` : "/opportunities"
+const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : KIND_LANDINGS.slice(0, 6)).filter((l) => l.slug !== landing.slug) : []
+---
+
+{
+  !landing ? (
+    <Base title="Not found" noindex>
+      <NotFound />
+    </Base>
+  ) : (
+    <Base title={landing.title} description={`${landing.intro} Open now in Ghana, checked against the official page.`} path={`/${landing.slug}`} noindex={page > 1}>
+      <section class="mx-auto max-w-content px-4 pt-10 pb-6 sm:px-6">
+        <div class:list={["grid items-center gap-8", landing.illustration && "md:grid-cols-[1.2fr_1fr]"]}>
+          <div>
+            <h1 class="m-0 type-title-1 text-ink md:type-hero">{landing.title}</h1>
+            <p class="m-0 mt-4 max-w-[52ch] text-lg leading-7 text-ink-secondary">{landing.intro}</p>
+            <div class="mt-6 flex flex-wrap gap-3">
+              <a href={listHref} class={buttonVariants({ variant: "secondary" })}>Filter and search</a>
+              <a href={registerUrl()} class={buttonVariants({ variant: "quiet" })}>Create account to track</a>
+            </div>
+          </div>
+          {landing.illustration && (
+            <img
+              src={landing.illustration.src}
+              width={landing.illustration.width}
+              height={landing.illustration.height}
+              alt=""
+              fetchpriority="high"
+              class="block h-auto w-full rounded-xl"
+            />
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="open-now" class="mx-auto max-w-content px-4 py-8 sm:px-6">
+        {result instanceof ApiError || !result ? (
+          <ApiErrorSection />
+        ) : result.items.length === 0 ? (
+          <LinkEmptyState
+            illustration={notFound.src}
+            title="Nothing open here right now"
+            description="New opportunities arrive every day. Create an account and we'll tell you when they do."
+            actions={[{ href: "/opportunities", label: "See everything open" }]}
+          />
+        ) : (
+          <>
+            <h2 id="open-now" class="m-0 mb-4 type-title-2 text-ink">
+              Open now <span class="text-ink-tertiary">· {plural(result.total, "opportunity", "opportunities")}</span>
+            </h2>
+            <CardGrid items={result.items} />
+            <Pagination total={result.total} page={page} pageSize={PAGE_SIZE} />
+          </>
+        )}
+      </section>
+
+      {siblings.length > 0 && (
+        <nav aria-label="More to explore" class="mx-auto max-w-content px-4 py-8 sm:px-6">
+          <h2 class="m-0 mb-4 text-headline text-ink">More to explore</h2>
+          <ul class="m-0 flex list-none flex-wrap gap-3 p-0">
+            {siblings.map((l) => (
+              <li>
+                <a href={`/${l.slug}`} class={buttonVariants({ variant: "secondary", size: "sm" })}>
+                  {l.title}
+                  <ArrowRightIcon />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+    </Base>
+  )
+}
