@@ -1,6 +1,6 @@
 # Opportunities
 
-Blesser lists grants, accelerators, incubators, fellowships, scholarships, internships, competitions and calls for proposals. Agents find opportunities and check each one against a page they fetched. The public site shows the team's published public listings. Members also see published members-only finds, track applications, plan to-dos and sync deadlines to their calendars.
+Blesser lists grants, accelerators, incubators, fellowships, scholarships, internships, competitions and calls for proposals. A crawler finds candidate pages. Code removes duplicates and passed deadlines before a model extracts fields. Discovery agents search for gaps. Every save is checked against a fetched page. The public site shows the team's published public listings. Members also see published members-only finds, track applications, plan to-dos and sync deadlines to their calendars.
 
 ## What lives where
 
@@ -11,6 +11,7 @@ Blesser lists grants, accelerators, incubators, fellowships, scholarships, inter
 | Member API | `api/api/app/` and the feature routers | Member response schema, tracking, scans, applications, notifications and to-dos. |
 | Admin API | `api/api/admin/` | Staff authentication, editorial changes, people management and auditing. |
 | Curation | `api/api/editorial/` | Collections, versioned homepage content, settings, reports and slug history. |
+| Crawling | `opportunities/crawler.py`, `page_cache.py`, `triage.py`, `pipeline.py` | Registered sources, persistent page cache, candidate triage and structured extraction. |
 | Discovery | `opportunities/tasks.py`, `prompts.py`, `tools.py` | Category discovery and single-opportunity verification tasks. |
 | Scans | `api/api/scans/` | Postgres-backed queue with leases, retries, traces and a reaper. |
 | Tracking | `applications.opportunity_id` | Copies listing details into a member's private application. |
@@ -22,7 +23,7 @@ Blesser lists grants, accelerators, incubators, fellowships, scholarships, inter
 
 1. `source_url` is a page that `fetch_page` returned in the same task.
 2. The page names the opportunity or its organization.
-3. A stated deadline appears on the page. Passed deadlines are refused unless applications are rolling.
+3. The complete calendar date of a stated deadline appears on the page. Passed deadlines are refused unless applications are rolling.
 4. The task and scan have room in their opportunity budgets.
 
 An existing listing is refreshed instead of duplicated. Agent saves fill empty fields, merge requirements, countries and tags, replace a passed deadline with a verified newer cycle, and stamp `verified_at`. They preserve editorial status and audience, including hidden rows. A Postgres advisory lock serializes saves on the dedupe key.
@@ -93,3 +94,36 @@ Public GET responses send `Cache-Control: public, max-age=60, s-maxage=300, stal
 Existing member paths under `/api/*` remain aliases for one release. The old pending-list and status-moderation routes are removed.
 
 Private calendar feed tokens are stored encrypted, with a SHA-256 hash for lookup. Rotation invalidates the previous URL; disabled accounts' feeds stop working. Links use `PUBLIC_API_URL`, or `APP_BASE_URL` when the web app proxies `/api`.
+
+## Crawler-first scans
+
+The worker crawls enabled sources on their due schedule and when staff request a crawl. Each scan's existing category tasks process the crawler pipeline before their discovery agent. Sweeps use the same tasks. The extraction budget defaults to eight pages per category, with at most eighty candidates examined so deterministic rejections do not consume model calls. This budget is separate from the existing opportunity save limits.
+
+Sources can be RSS or Atom feeds, sitemaps, or HTML listings. Migration `0003` seeds seven sources checked live with BlesserBot on 9 November 2026: Wellcome funding schemes, DAAD Ghana funding, NEIP, Grand Challenges grant opportunities, the Tony Elumelu Foundation, Opportunities for Africans RSS and Opportunity Desk RSS. An unreachable Youth feed, a removed Gates Cambridge page and an old redirected Anzisha page were excluded.
+
+The crawler removes navigation and sharing links, normalizes tracking parameters, and records new item URLs only once. Generic funding listings can expand into more candidates without a model call. Triage checks catalogue source URLs, application links, known dedupe keys, content hashes and explicit deadline dates. Publication dates do not count as deadlines. Ambiguous dates and pages with future or rolling application dates survive date triage.
+
+One extraction request returns strict JSON on trimmed page text. It identifies a named open opportunity, its category, regional eligibility and confidence. The same grounding validator handles pipeline and agent saves. Missing required fields, invalid JSON, unsupported names and unsupported deadlines cannot be saved. Results below `EXTRACTION_MIN_CONFIDENCE` default to staff review. Regional exclusions and categories outside the requested scan remain available for later scans that match them.
+
+The database page cache is shared across tasks, workers and scans, including failed fetches. It respects conditional GETs and robots.txt. Repeated fetches of the same window within a task return only a short reminder; a new offset can still read unseen text. Known catalogue and rejected URLs are suppressed before HTTP. Code-confirmed closed URLs become closed candidates. Agent irrelevance is recorded as a rejected outcome scoped to its category and region, so another scope can still consider the page. Domains that produce saves become disabled source proposals, unless the registry already contains that domain.
+
+An agent no longer has to spend turns trying to save something when no useful leads remain. It stops after `DISCOVERY_NO_YIELD_TURNS` without a new save, default five, or `DISCOVERY_MAX_TURNS`, default twelve, and records a Saved/Skipped summary. The global `MAX_AGENT_TURNS` remains an additional ceiling. Explicit staff re-verification can still fetch a known opportunity and refresh its verified deadline.
+
+Crawler settings live under `site_settings.crawler` and are editable in admin Settings. Config supplies defaults:
+
+| Setting | Config default | Purpose |
+|---|---|---|
+| `hours` | `CRAWL_HOURS=6` | Crawl cadence; zero pauses automatic crawls, while explicit crawl requests still run. |
+| `max_sources` | `CRAWL_MAX_SOURCES=12` | Sources per pass. |
+| `max_items_per_source` | `CRAWL_MAX_ITEMS_PER_SOURCE=40` | Candidate links per source. |
+| `max_candidates_per_task` | `CRAWL_MAX_CANDIDATES_PER_TASK=8` | Extraction budget per category. |
+| `host_interval_seconds` | `CRAWL_HOST_INTERVAL_SECONDS=2` | Minimum time between host requests, across workers. |
+| `page_cache_seconds` | `FETCH_CACHE_SECONDS=21600` | Shared page TTL. |
+
+`EXTRACTION_MAX_CHARS=10000` bounds extraction text and `EXTRACTION_MIN_CONFIDENCE=0.85` sets the review threshold. Temporary page failures retry after 30 minutes. Rejected and closed outcomes remain recorded; staff can explicitly re-verify catalogue entries for a later cycle. Automated annual-cycle reactivation of rejected URLs is not implemented.
+
+Editors can list, add, edit, enable, disable, delete and request crawls at `/api/admin/sources`. Deleting a source preserves its candidates and opportunities. Every staff write is audited. The Sources page shows candidates and saves, last-crawl yield, errors, failure counts and queued requests.
+
+Scan and task responses add `metrics` without changing existing fields. Metrics distinguish candidates found and considered, extraction attempts and valid extractions, rejection reasons, new saves, model calls, input/output tokens and elapsed task time. `triaged_out` also includes post-extraction decisions such as regional exclusions and failed grounding. Its reasons distinguish these from deterministic rejections.
+
+Run the reviewable probe with `cd api && uv run python -m scripts.scan_pipeline_probe --crawl-only --output ../.agent-logs/crawl.json`, then omit `--crawl-only` for a new three-category scan. It uses the existing enabled account with the earliest creation date and the worker claim/process path. It does not claim other scans. The scan run changes the dev catalogue according to publishing settings.

@@ -29,6 +29,7 @@ class ScanCreate(BaseModel):
 
 
 class TaskOut(BaseModel):
+    metrics: dict = Field(default_factory=dict)
     id: str
     task_type: str
     target: str | None
@@ -45,6 +46,7 @@ class TaskOut(BaseModel):
 
 
 class ScanOut(BaseModel):
+    metrics: dict = Field(default_factory=dict)
     id: str
     region: str
     categories: list[str]

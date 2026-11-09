@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from api.scans.models import Scan
+    from api.scans.models import Scan, ScanTask
 
 
 class ToolContext:
@@ -23,3 +23,11 @@ class ToolContext:
         self.fetched_pages: dict[str, str] = {}
         # Reads that failed in this task, so the same call isn't resent.
         self.failed_calls: dict[str, str] = {}
+        self.page_notes: dict[str, str] = {}
+        self.known_pages: dict[str, str] = {}
+        self.fetch_windows: set[tuple[str, int]] = set()
+        self.fetch_locks: dict = {}
+        self.saved_titles: list[str] = []
+        self.category: str = "startup"
+        self.extraction_confidence: float = 1.0
+        self.scan_task: ScanTask | None = None

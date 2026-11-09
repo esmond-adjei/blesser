@@ -117,7 +117,42 @@ const settingsSchema = s.shape({
   auto_archive: s.boolean,
   member_scan_limits: s.shape({ per_hour: s.number, per_day: s.number }),
   sweep_hours: s.number,
+  crawler: s.optional(
+    s.shape({
+      hours: s.number,
+      max_sources: s.number,
+      max_items_per_source: s.number,
+      max_candidates_per_task: s.number,
+      host_interval_seconds: s.number,
+      page_cache_seconds: s.number,
+    }),
+  ),
 });
+export const sourceKindSchema = s.choice("rss", "sitemap", "listing");
+const sourceSchema = s.shape({
+  id: s.text,
+  url: s.text,
+  kind: sourceKindSchema,
+  category_hints: s.array(s.text),
+  enabled: s.boolean,
+  proposed: s.boolean,
+  last_crawled_at: s.nullable(s.text),
+  next_crawl_at: s.text,
+  crawl_requested: s.boolean,
+  etag: s.text,
+  last_modified: s.text,
+  consecutive_failures: s.number,
+  last_error: s.text,
+  candidates_found: s.number,
+  opportunities_saved: s.number,
+  last_candidates: s.number,
+  created_at: s.text,
+});
+export type Source = ReturnType<typeof sourceSchema>;
+export type SourceInput = Pick<
+  Source,
+  "url" | "kind" | "category_hints" | "enabled"
+>;
 const scanTaskSchema = s.shape({
   id: s.text,
   task_type: s.text,
@@ -477,3 +512,13 @@ export const audit = (params: {
   limit: number;
   offset: number;
 }) => request(`/audit${query(params)}`, page(auditSchema));
+
+export const sources = () => request("/sources", s.array(sourceSchema));
+export const createSource = (body: SourceInput) =>
+  request("/sources", sourceSchema, "POST", body);
+export const updateSource = (id: string, body: Partial<SourceInput>) =>
+  request(`/sources/${idPath(id)}`, sourceSchema, "PATCH", body);
+export const deleteSource = (id: string) =>
+  request(`/sources/${idPath(id)}`, () => undefined, "DELETE");
+export const crawlSource = (id: string) =>
+  request(`/sources/${idPath(id)}/crawl`, sourceSchema, "POST");

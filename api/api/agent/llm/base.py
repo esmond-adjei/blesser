@@ -75,7 +75,9 @@ def to_anthropic_tools(tools: list[dict]) -> list[Any]:
     ]
 
 
-def cached_input_usage(input_tokens: int, cache_read: int, cache_write: int = 0) -> dict:
+def cached_input_usage(
+    input_tokens: int, cache_read: int, cache_write: int = 0
+) -> dict:
     """`input_tokens` stays the whole prompt, so totals compare across providers."""
     usage = {"input_tokens": input_tokens}
     if cache_read:
@@ -93,6 +95,7 @@ def to_openai_tools(tools: list[dict]) -> list[Any]:
                 "name": t["name"],
                 "description": t.get("description", ""),
                 "parameters": t.get("parameters", {"type": "object", "properties": {}}),
+                **({"strict": True} if t.get("strict") else {}),
             },
         }
         for t in tools

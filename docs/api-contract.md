@@ -129,3 +129,50 @@ Every admin write appends an `audit_log` row in the same transaction (`action` l
 | Member app | `:5173` | `:8000` |
 | Admin console | `:5174` | `:8000` |
 | Public site | `:4321` | `:8000` (server-side fetches use `API_INTERNAL_URL`, default `http://localhost:8000`) |
+
+## Scan metrics and sources
+
+Member scan list, start, detail and cancel responses, their legacy aliases, and admin scan responses add `metrics`. Existing fields and task types stay unchanged. Tasks also add `metrics`.
+
+```ts
+type ScanMetrics = {
+  candidates_found: number; candidates_considered: number;
+  extracted: number; saved: number; model_calls: number;
+  input_tokens: number; output_tokens: number; duration_seconds: number;
+  triaged_out: Record<string, number>;
+  sources: Record<string, {seen: number; new: number; error: string}>;
+};
+// Tasks may additionally expose extraction_attempts, cache_hits,
+// pipeline_seconds and pipeline_complete. Metrics for legacy rows are empty.
+```
+
+`saved` counts new opportunities, including new finds held in review. `extracted` counts valid extraction responses, including decisions not to save. `model_calls` includes logical provider attempts and agent turns; SDK-level transport retries are not separately counted. Tokens use provider-reported totals. Scan duration sums task durations, including crawler and extraction work, so parallel tasks overlap. A scan with no stored metrics has zero aggregate counters. A standalone scheduled crawl updates source yield counters rather than inventing a scan owner.
+
+`triaged_out` records deterministic reasons such as `url_duplicate`, `dedupe_key`, `content_duplicate`, `deadline_passed`, `navigation`, `empty_page`, `listing_expanded` and `fetch_failed:*`. Post-extraction decisions include `not_relevant`, `region_excluded`, `category_deferred`, `source_mismatch`, `grounding` and `invalid_extraction`. Fetch failures stay queued with a delay. Regional exclusions stay queued for other regions. Agent rejections with `scope:<region>:<category>:` reasons suppress only that scope; confirmed past deadlines can be global closed outcomes.
+
+```ts
+type SourceInput = {
+  url: string; kind: "rss" | "sitemap" | "listing";
+  category_hints: ("startup" | "research" | "student")[];
+  enabled: boolean;
+};
+type Source = SourceInput & {
+  id: string; proposed: boolean; last_crawled_at: string | null;
+  next_crawl_at: string; crawl_requested: boolean;
+  etag: string; last_modified: string; consecutive_failures: number;
+  last_error: string; candidates_found: number; opportunities_saved: number;
+  last_candidates: number; created_at: string;
+};
+```
+
+| Method, path | Role | Body | Returns |
+|---|---|---|---|
+| `GET /api/admin/sources` | editor | | `Source[]`, enabled first |
+| `POST /api/admin/sources` | editor | `SourceInput`; category hints default empty and enabled defaults true | `201 Source` |
+| `PATCH /api/admin/sources/{id}` | editor | Partial `SourceInput`, no null fields | `Source` |
+| `DELETE /api/admin/sources/{id}` | editor | | `204`; candidates and opportunities retained |
+| `POST /api/admin/sources/{id}/crawl` | editor | | `202 Source`; queues an enabled source, disabled sources return 400 |
+
+URLs must be public HTTP(S) addresses; normalized duplicates return 409. Source writes append `source.create`, `source.update`, `source.delete` or `source.crawl` audit entries in the same transaction. Agent domain proposals are disabled listings with `proposed=true`; staff decides whether to enable them.
+
+Admin settings add `crawler: {hours, max_sources, max_items_per_source, max_candidates_per_task, host_interval_seconds, page_cache_seconds}`. Omitting `crawler` on an existing settings client preserves its stored values. Bounds are 0 to 8760 hours, 1 to 100 sources, 1 to 200 items per source, 0 to 100 extractions per task, 0.5 to 60 seconds between host requests and 60 to 604800 seconds of page-cache lifetime.

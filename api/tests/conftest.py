@@ -122,3 +122,11 @@ def _rate_limits(request, monkeypatch):
     monkeypatch.setattr(settings, "rate_limits_enabled", enabled)
     yield
     limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def _no_live_crawls(monkeypatch):
+    from api.core.config import settings
+
+    monkeypatch.setattr(settings, "crawl_hours", 0)
+    monkeypatch.setattr(settings, "crawl_max_candidates_per_task", 0)

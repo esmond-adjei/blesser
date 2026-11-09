@@ -1081,7 +1081,7 @@ def test_reverify_worker_reads_only_target_and_retains_hidden_status(monkeypatch
                 )
             return LLMResponse(text="Verified the Climate Grant.")
 
-    async def fetch(url, max_chars=None, offset=0):
+    async def fetch(url, max_chars=None, offset=0, **kwargs):
         return "Climate Grant is open to Ghanaian founders."
 
     model = Verifier()
@@ -1121,3 +1121,87 @@ def test_reverify_worker_reads_only_target_and_retains_hidden_status(monkeypatch
     assert detail["history"][0]["action"] == "opportunity.reverify"
     assert detail["trace_excerpt"] == "Climate Grant is open to Ghanaian founders."
     assert "Only the requested opportunity" in tasks[0].log
+
+
+def test_editors_manage_sources_and_every_write_is_audited(monkeypatch):
+    from api.core import egress
+    from api.opportunities.crawl_models import Source
+
+    async def public_url(value):
+        return value
+
+    monkeypatch.setattr(egress, "check_url", public_url)
+    editor = user("editor")
+    member = user("member")
+    assert client(member).get("/api/admin/sources").status_code == 403
+    staff = client(editor)
+    response = staff.post(
+        "/api/admin/sources",
+        json={
+            "url": "https://fund.example.org/rss",
+            "kind": "rss",
+            "category_hints": ["student"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    source = response.json()
+    assert source["created_at"].endswith("Z")
+    assert (
+        staff.patch(
+            f"/api/admin/sources/{source['id']}",
+            json={
+                "url": "https://fund.example.org/feed",
+                "kind": "rss",
+                "enabled": True,
+                "category_hints": ["research"],
+            },
+        ).status_code
+        == 200
+    )
+    assert staff.post(f"/api/admin/sources/{source['id']}/crawl").status_code == 202
+    assert read(Source, source["id"]).crawl_requested
+    assert (
+        staff.patch(
+            f"/api/admin/sources/{source['id']}", json={"enabled": False}
+        ).status_code
+        == 200
+    )
+    assert staff.post(f"/api/admin/sources/{source['id']}/crawl").status_code == 400
+    assert (
+        staff.patch(
+            f"/api/admin/sources/{source['id']}", json={"url": None}
+        ).status_code
+        == 400
+    )
+    assert staff.delete(f"/api/admin/sources/{source['id']}").status_code == 204
+
+    async def actions():
+        async with SessionLocal() as session:
+            return list(
+                (
+                    await session.execute(
+                        select(m.AuditLog.action)
+                        .where(m.AuditLog.entity_id == source["id"])
+                        .order_by(m.AuditLog.at)
+                    )
+                ).scalars()
+            )
+
+    assert run(actions()) == [
+        "source.create",
+        "source.update",
+        "source.crawl",
+        "source.update",
+        "source.delete",
+    ]
+
+
+def test_old_settings_client_preserves_crawler_settings():
+    staff = client(user("admin"))
+    values = staff.get("/api/admin/settings").json()
+    values["crawler"]["max_candidates_per_task"] = 3
+    assert staff.put("/api/admin/settings", json=values).status_code == 200
+    values.pop("crawler")
+    response = staff.put("/api/admin/settings", json=values)
+    assert response.status_code == 200
+    assert response.json()["crawler"]["max_candidates_per_task"] == 3

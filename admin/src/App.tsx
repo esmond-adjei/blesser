@@ -12,6 +12,7 @@ import {
   Rows3,
   Layers,
   Radar,
+  Rss,
   Flag,
   Users,
   History,
@@ -28,6 +29,7 @@ import Opportunities from "./pages/Opportunities";
 import Curation from "./pages/Curation";
 import Scans from "./pages/Scans";
 import Reports from "./pages/Reports";
+import Sources from "./pages/Sources";
 import People from "./pages/People";
 import Audit from "./pages/Audit";
 import SettingsPage from "./pages/Settings";
@@ -42,6 +44,7 @@ const navigation: {
   { path: "/opportunities", label: "Opportunities", icon: Rows3 },
   { path: "/curation", label: "Curation", icon: Layers },
   { path: "/scans", label: "Scans", icon: Radar },
+  { path: "/sources", label: "Sources", icon: Rss },
   { path: "/reports", label: "Reports", icon: Flag },
   { path: "/people", label: "People", icon: Users, admin: true },
   { path: "/audit", label: "Audit log", icon: History, admin: true },
@@ -149,6 +152,7 @@ export default function App() {
             <Route path="opportunities" element={<Opportunities />} />
             <Route path="curation" element={<Curation />} />
             <Route path="scans" element={<Scans />} />
+            <Route path="sources" element={<Sources />} />
             <Route path="reports" element={<Reports />} />
             <Route
               path="people"

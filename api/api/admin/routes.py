@@ -17,6 +17,7 @@ from api.editorial import models as m
 from api.editorial import service as editorial
 from api.opportunities import service as opportunities
 from api.opportunities.models import Opportunity
+from api.opportunities.source_routes import router as sources_router
 from api.public.schemas import CollectionOut, SiteContent
 from api.scans import service as scans
 from api.scans.models import Scan
@@ -561,6 +562,8 @@ async def update_settings(
     )
     before = await editorial.get_settings(session)
     values = req.model_dump(mode="json")
+    if values.get("crawler") is None:
+        values["crawler"] = before["crawler"]
     for key, value in values.items():
         row = await session.get(m.SiteSetting, key)
         if row:
@@ -717,3 +720,6 @@ async def audit(
     )
     rows = (await session.execute(query.limit(limit).offset(offset))).scalars().all()
     return {"items": [service.snapshot(r) for r in rows], "total": total}
+
+
+router.include_router(sources_router)

@@ -92,6 +92,7 @@ def _parse_log(raw: str | None) -> list[dict]:
 def task_out(task: m.ScanTask) -> dict:
     return {
         "id": task.id,
+        "metrics": task.metrics or {},
         "task_type": task.task_type,
         "target": task.target,
         "status": m.status_str(task.status),
@@ -120,6 +121,7 @@ async def _added_counts(session, scan_ids: list[str]) -> dict[str, int]:
 
 def _scan_out(scan: m.Scan, added: int, tasks: list[m.ScanTask] | None = None) -> dict:
     out = {
+        "metrics": aggregate_metrics(tasks or []),
         "id": scan.id,
         "region": scan.region,
         "categories": scan.categories or [],
@@ -130,6 +132,29 @@ def _scan_out(scan: m.Scan, added: int, tasks: list[m.ScanTask] | None = None) -
     }
     if tasks is not None:
         out["tasks"] = [task_out(t) for t in sorted(tasks, key=lambda t: t.created_at)]
+    return out
+
+
+def aggregate_metrics(tasks) -> dict:
+    out = {
+        "candidates_found": 0,
+        "candidates_considered": 0,
+        "extracted": 0,
+        "saved": 0,
+        "model_calls": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "duration_seconds": 0,
+        "triaged_out": {},
+        "sources": {},
+    }
+    for task in tasks:
+        metrics = task.metrics or {}
+        for key in out.keys() - {"triaged_out", "sources"}:
+            out[key] += metrics.get(key, 0)
+        for reason, count in metrics.get("triaged_out", {}).items():
+            out["triaged_out"][reason] = out["triaged_out"].get(reason, 0) + count
+        out["sources"].update(metrics.get("sources", {}))
     return out
 
 
@@ -147,7 +172,21 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
         .all()
     )
     added = await _added_counts(session, [s.id for s in scans])
-    return [_scan_out(s, added.get(s.id, 0)) for s in scans]
+    tasks = (
+        (
+            await session.execute(
+                select(m.ScanTask).where(m.ScanTask.scan_id.in_([s.id for s in scans]))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    result = []
+    for scan in scans:
+        out = _scan_out(scan, added.get(scan.id, 0))
+        out["metrics"] = aggregate_metrics([t for t in tasks if t.scan_id == scan.id])
+        result.append(out)
+    return result
 
 
 async def scan_detail(session, user_id: str, scan_id: str) -> dict:

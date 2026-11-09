@@ -317,6 +317,7 @@ async def upsert_from_agent(
     user_id: str | None,
     scan_id: str | None,
     data: schemas.AgentOpportunityIn,
+    low_confidence: bool = False,
 ) -> tuple[m.Opportunity, bool, list[str]]:
     """Return the grounded row, whether created, and the fields refreshed."""
     key = dedupe_key(data.organization, data.title)
@@ -324,11 +325,29 @@ async def upsert_from_agent(
     deadline_date = parse_deadline(data.deadline)
     # Parallel scan tasks can find the same opportunity: serialize on its key until commit.
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(key))))
+    from api.opportunities.page_content import normalized_url
+
+    source_key = normalized_url(data.source_url)
+    urls = {source_key, normalized_url(data.link)} if data.link else {source_key}
+    for url in sorted(urls):
+        await session.execute(
+            select(func.pg_advisory_xact_lock(func.hashtext("source-save:" + url)))
+        )
     opp = await find_by_key(session, key)
+    if opp is None:
+        rows = (await session.execute(select(m.Opportunity))).scalars().all()
+        for row in rows:
+            if any(
+                value and normalized_url(value) in urls
+                for value in (row.source_url, row.link)
+            ):
+                return row, False, []
     if opp is None:
         from api.editorial.service import get_settings, new_slug
 
         default = (await get_settings(session))["agent_default"]
+        if low_confidence:
+            default = {**default, "status": "in_review"}
         opp = m.Opportunity(
             title=data.title.strip(),
             organization=data.organization.strip(),

@@ -45,7 +45,10 @@ TOOL_DEFINITIONS = [
         "parameters": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "Name as the page writes it."},
+                "title": {
+                    "type": "string",
+                    "description": "Name as the page writes it.",
+                },
                 "organization": {
                     "type": "string",
                     "description": "Who runs or funds it, as the page writes it.",
@@ -58,9 +61,18 @@ TOOL_DEFINITIONS = [
                 "kind": {
                     "type": "string",
                     "enum": [
-                        "grant", "fellowship", "scholarship", "accelerator", "incubator",
-                        "competition", "internship", "call_for_proposals", "training",
-                        "conference", "job", "other",
+                        "grant",
+                        "fellowship",
+                        "scholarship",
+                        "accelerator",
+                        "incubator",
+                        "competition",
+                        "internship",
+                        "call_for_proposals",
+                        "training",
+                        "conference",
+                        "job",
+                        "other",
                     ],
                 },
                 "summary": {
@@ -99,7 +111,10 @@ TOOL_DEFINITIONS = [
                     "type": "boolean",
                     "description": "True when the page says applications are rolling or always open.",
                 },
-                "link": {"type": "string", "description": "Where to apply, if different from source_url."},
+                "link": {
+                    "type": "string",
+                    "description": "Where to apply, if different from source_url.",
+                },
                 "source_url": {
                     "type": "string",
                     "description": "The fetched page these facts come from.",
@@ -109,3 +124,19 @@ TOOL_DEFINITIONS = [
         },
     },
 ]
+
+TOOL_DEFINITIONS.append(
+    {
+        "name": "reject_candidate",
+        "description": "Remember a fetched URL that is closed or irrelevant so later scans skip it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "reason": {"type": "string"},
+                "closed": {"type": "boolean"},
+            },
+            "required": ["url", "reason"],
+        },
+    }
+)

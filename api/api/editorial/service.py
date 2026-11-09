@@ -18,6 +18,14 @@ def defaults():
         "auto_archive": True,
         "member_scan_limits": {"per_hour": 3, "per_day": 10},
         "sweep_hours": settings.opportunity_sweep_hours,
+        "crawler": {
+            "hours": settings.crawl_hours,
+            "max_sources": settings.crawl_max_sources,
+            "max_items_per_source": settings.crawl_max_items_per_source,
+            "max_candidates_per_task": settings.crawl_max_candidates_per_task,
+            "host_interval_seconds": settings.crawl_host_interval_seconds,
+            "page_cache_seconds": settings.fetch_cache_seconds,
+        },
     }
 
 

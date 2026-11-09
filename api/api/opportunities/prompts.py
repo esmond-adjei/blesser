@@ -52,8 +52,9 @@ Rules:
   CV, proposal, references) in requirements.
 - Skip anything already in the catalogue unless you are confirming a new \
   deadline for it.
-- Quality over quantity: a handful of verified, well-described \
-  opportunities beats a long list of thin ones. But you must call \
-  save_opportunity at least once before finishing; if searches aren't \
-  landing, try different queries rather than giving up.
+- The crawler has already processed known sources. Look for gaps and new sources.
+- Do not fetch any URL listed as known, rejected, closed or already read. A repeated
+  fetch returns only a short reminder. Use a new offset only for unread text.
+- Remember closed and irrelevant pages with reject_candidate and a reason.
+- Stop when searches stop yielding new saves. It is fine to finish with none.
 """

@@ -59,6 +59,16 @@ class Settings(BaseSettings):
     # Verified member accounts to seed as admins on boot.
     ops_admin_emails: str = ""
 
+    crawl_hours: int = 6
+    crawl_max_sources: int = 12
+    crawl_max_items_per_source: int = 40
+    crawl_max_candidates_per_task: int = 8
+    crawl_host_interval_seconds: float = 2.0
+    extraction_max_chars: int = 10000
+    extraction_min_confidence: float = 0.85
+    discovery_no_yield_turns: int = 5
+    discovery_max_turns: int = 12
+
     # --- Web search and page fetches (api/web.py) ---
     # Ordered search chain, e.g. "tavily,brave"; empty = [SEARCH_PROVIDER].
     # Keyless duckduckgo is opt-in only.

@@ -525,7 +525,7 @@ def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
     from api.scans import queue
     from api.scans.models import TaskStatus
 
-    async def fake_fetch(url, max_chars=None, offset=0):
+    async def fake_fetch(url, max_chars=None, offset=0, **kwargs):
         return (
             "Example Fund presents the Kumasi Innovation Fund. Deadline: 30 April 2027."
         )

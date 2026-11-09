@@ -166,6 +166,65 @@ function SettingsForm({ initial }: { initial: api.Settings }) {
           }
         />
       </section>
+      {draft.crawler && (
+        <section className="section-stack">
+          <h2>Crawler</h2>
+          <p className="text-ink-secondary">
+            Set hours to zero to pause scheduled crawls. Scans can still process
+            queued candidates.
+          </p>
+          <div className="form-grid">
+            {(
+              [
+                ["hours", "Hours between crawls", 0, 8760, 1],
+                ["max_sources", "Sources per pass", 1, 100, 1],
+                ["max_items_per_source", "Items per source", 1, 200, 1],
+                [
+                  "max_candidates_per_task",
+                  "Pages to extract per category",
+                  0,
+                  100,
+                  1,
+                ],
+                [
+                  "host_interval_seconds",
+                  "Seconds between requests to a host",
+                  0.5,
+                  60,
+                  0.5,
+                ],
+                [
+                  "page_cache_seconds",
+                  "Page cache lifetime in seconds",
+                  60,
+                  604800,
+                  1,
+                ],
+              ] as const
+            ).map(([key, label, min, max, step]) => (
+              <Field
+                key={key}
+                label={label}
+                type="number"
+                min={min}
+                max={max}
+                step={step}
+                required
+                value={draft.crawler?.[key]}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    crawler: draft.crawler && {
+                      ...draft.crawler,
+                      [key]: Number(event.target.value),
+                    },
+                  })
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
       <MutationError error={update.error} />
       <Button type="submit" variant="primary" disabled={update.isPending}>
         {update.isPending ? "Saving…" : "Save settings"}

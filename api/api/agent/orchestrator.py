@@ -62,11 +62,7 @@ def compact_old_tool_results(
     max_age_turns: int,
     block_turns: int | None = None,
 ) -> list[dict]:
-    """Replace tool results older than max_age_turns with a marker, in a new list.
-
-    The cutoff moves in blocks of `block_turns` so the prefix stays byte-identical for the
-    prompt cache.
-    """
+    """Compact aged results in blocks while retaining page facts and stable prefixes."""
     if max_age_turns < 1:
         return messages
     block = max(
@@ -74,7 +70,12 @@ def compact_old_tool_results(
     )
     cutoff = ((current_turn - max_age_turns) // block) * block
     return [
-        {**m, "content": f"[{m.get('name', 'tool')} result already used - omitted]"}
+        {
+            **m,
+            "content": wrap_tool_result(m.get("name", "tool"), m["_summary"])
+            if m.get("_summary")
+            else f"[{m.get('name', 'tool')} result already used - omitted]",
+        }
         if m.get("role") == "tool" and m.get("_turn", current_turn) <= cutoff
         else m
         for m in messages
@@ -118,6 +119,9 @@ async def _chat_with_retry(provider, messages, system: str, tools, turn: int):
         try:
             # Slot waits don't count against the deadline.
             async with model_slot(provider):
+                totals = task_usage.get()
+                if totals is not None:
+                    totals["model_calls"] = totals.get("model_calls", 0) + 1
                 call = provider.chat(
                     messages=messages,
                     system=system,
@@ -181,14 +185,9 @@ async def run_agent_task(
     on_checkpoint: CheckpointCallback | None = None,
     progress_tools: set[str] | None = None,
     max_turns: int | None = None,
+    no_yield_turns: int | None = None,
 ) -> dict:
-    """Run one bounded agent task to completion.
-
-    - tools: names offered to the model (default: every tool); dispatch refuses the rest.
-    - resume_messages: a checkpoint to continue from; its turns count against the cap.
-    - progress_tools: finishing without calling one is nudged back, up to
-      MAX_EMPTY_FINISH_NUDGES times.
-    """
+    """Run a bounded tool loop, resuming checkpointed messages when provided."""
     definitions = [t for t in TOOL_DEFINITIONS if tools is None or t["name"] in tools]
     try:
         ctx.offered_tools = {t["name"] for t in definitions}
@@ -212,6 +211,27 @@ async def run_agent_task(
         for m in messages
         for tc in (m.get("tool_calls") or [])
     )
+
+    last_save_turn = turns_used
+    if resume_messages and getattr(ctx, "page_notes", None) is not None:
+        for message in resume_messages:
+            if message.get("_page_url"):
+                from api.opportunities.tools import url_key
+
+                key = url_key(message["_page_url"])
+                ctx.page_notes[key] = message.get("_summary", "")
+                ctx.fetch_windows.add((key, message.get("_offset", 0)))
+
+    def summary(reason):
+        titles = getattr(ctx, "saved_titles", [])
+        notes = list(getattr(ctx, "page_notes", {}).values())
+        return (
+            reason
+            + "\nSaved: "
+            + ("; ".join(titles) or "None")
+            + "\nSkipped: "
+            + ("; ".join(notes[-12:]) or "None")
+        )
 
     turn_limit = max_turns or settings.max_agent_turns
     for turn in range(turns_used, turn_limit):
@@ -245,7 +265,13 @@ async def run_agent_task(
                 nudges += 1
                 messages.append({"role": "user", "content": EMPTY_FINISH_NUDGE})
                 continue
-            return _result(response.text, turn + 1, usage_in, usage_out, nudges)
+            return _result(
+                response.text or summary("Discovery finished."),
+                turn + 1,
+                usage_in,
+                usage_out,
+                nudges,
+            )
 
         messages.append(
             {
@@ -271,8 +297,14 @@ async def run_agent_task(
         )
         # Request order keeps the trace and replayed history deterministic.
         for tool_use, result in zip(response.tool_calls, results, strict=True):
-            if progress_tools and tool_use.name in progress_tools:
+            if (
+                progress_tools
+                and tool_use.name in progress_tools
+                and "error" not in result
+            ):
                 progress_made = True
+            if tool_use.name == "save_opportunity" and result.get("created"):
+                last_save_turn = turn + 1
             if on_event is not None:
                 await on_event(
                     {
@@ -294,7 +326,33 @@ async def run_agent_task(
                         json.dumps(result, default=str, ensure_ascii=False),
                     ),
                     "_turn": turn + 1,
+                    **(
+                        {
+                            "_summary": result["page_note"],
+                            "_page_url": tool_use.arguments.get("url"),
+                            "_offset": tool_use.arguments.get("offset", 0),
+                        }
+                        if result.get("page_note")
+                        else {}
+                    ),
                 }
+            )
+
+        if getattr(ctx, "page_notes", None):
+            from api.opportunities.tools import url_key
+
+            for message in messages:
+                if message.get("_page_url"):
+                    message["_summary"] = ctx.page_notes.get(
+                        url_key(message["_page_url"]), message.get("_summary", "")
+                    )
+        if no_yield_turns and turn + 1 - last_save_turn >= no_yield_turns:
+            return _result(
+                summary(f"Stopped after {no_yield_turns} turns without a new save."),
+                turn + 1,
+                usage_in,
+                usage_out,
+                nudges,
             )
 
         if on_checkpoint is not None:
@@ -306,7 +364,7 @@ async def run_agent_task(
             )
 
     return _result(
-        "Hit the turn limit before the agent finished.",
+        summary("Reached the turn limit."),
         turn_limit,
         usage_in,
         usage_out,

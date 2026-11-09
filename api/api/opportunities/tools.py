@@ -1,15 +1,9 @@
-"""save_opportunity: the discovery agent's only write, grounded in a fetched page.
+"""Ground opportunity saves and remember rejected pages."""
 
-A save must cite a page fetch_page returned in the same task (source_url), the
-page must name the opportunity, and a stated deadline must appear on it. That
-keeps the public catalogue to what a real page says, not what a model recalls.
-"""
-
-import re
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from api.agent.tools.context import ToolContext
 from api.applications.dates import parse_deadline
@@ -17,6 +11,7 @@ from api.core.config import settings
 from api.opportunities import models as m
 from api.opportunities import schemas
 from api.opportunities import service as opp_service
+from api.opportunities.page_content import dates_in, expired, normalized_url
 
 #: Fetched text kept per page for grounding checks.
 MAX_PAGE_CHARS = 400_000
@@ -48,32 +43,10 @@ _STOPWORDS = frozenset(
         "2028",
     ]
 )
-_MONTHS = [
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-]
 
 
 def url_key(url: str) -> str:
-    """Scheme, host case, fragment and a trailing slash don't make a different page."""
-    try:
-        parts = urlsplit((url or "").strip())
-    except ValueError:
-        return (url or "").strip()
-    path = parts.path.rstrip("/") or "/"
-    return urlunsplit(
-        ("https", parts.netloc.lower().removeprefix("www."), path, parts.query, "")
-    )
+    return normalized_url(url)
 
 
 def record_fetch(ctx, url: str, text: str) -> None:
@@ -82,7 +55,8 @@ def record_fetch(ctx, url: str, text: str) -> None:
     if pages is None:
         return
     key = url_key(url)
-    pages[key] = (pages.get(key, "") + "\n" + (text or ""))[:MAX_PAGE_CHARS]
+    if not (text or "").startswith("[Could not fetch"):
+        pages[key] = (pages.get(key, "") + "\n" + (text or ""))[:MAX_PAGE_CHARS]
 
 
 def _words(text: str) -> list[str]:
@@ -106,14 +80,34 @@ def names_opportunity(page: str, title: str, organization: str) -> bool:
 
 
 def deadline_on_page(page: str, deadline_date) -> bool:
-    """The year, and the month or day, of a stated deadline appear on the page."""
-    text = page.lower()
-    if str(deadline_date.year) not in text:
-        return False
-    month = _MONTHS[deadline_date.month - 1]
-    if month in text or month[:3] in re.findall(r"[a-z]+", text):
-        return True
-    return bool(re.search(rf"(?<!\d)0?{deadline_date.day}(?!\d)", text))
+    return deadline_date in dates_in(page)
+
+
+def validate_grounding(
+    data: schemas.AgentOpportunityIn, pages: dict[str, str]
+) -> str | None:
+    for url in (data.source_url, data.link or data.source_url):
+        parsed = urlsplit(url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username
+        ):
+            return "Source and application links must be public http(s) URLs."
+    page = pages.get(url_key(data.source_url))
+    if page is None:
+        return "source_url must be a page you fetched with fetch_page in this task."
+    if not names_opportunity(page, data.title, data.organization):
+        return "The fetched source page doesn't name this opportunity."
+    deadline = parse_deadline(data.deadline)
+    if data.deadline.strip() and deadline is None:
+        return "Use an unambiguous deadline date or leave it empty."
+    if deadline is not None:
+        if not deadline_on_page(page, deadline):
+            return "That deadline isn't on the fetched page."
+        if deadline < opp_service.today() and not data.rolling:
+            return "This opportunity's deadline has passed: skip it."
+    return None
 
 
 async def _scan_created(session, scan_id: str) -> int:
@@ -126,7 +120,9 @@ async def _scan_created(session, scan_id: str) -> int:
     ).scalar_one()
 
 
-async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
+async def handle_save_opportunity(
+    tool_input: dict, ctx: ToolContext, *, commit: bool = True
+) -> dict:
     saved = getattr(ctx, "opportunities_saved", 0)
     if saved >= settings.max_opportunities_per_task:
         return {
@@ -146,33 +142,13 @@ async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
         if opp_service.dedupe_key(data.organization, data.title) != target.dedupe_key:
             return {"error": "Only the requested opportunity may be re-verified."}
     pages = getattr(ctx, "fetched_pages", None) or {}
-    page = pages.get(url_key(data.source_url))
-    if page is None:
-        return {
-            "error": (
-                "source_url must be a page you fetched with fetch_page in this task. "
-                "Fetch the opportunity's page first, then save it with that URL."
-            )
-        }
-    if not names_opportunity(page, data.title, data.organization):
-        return {
-            "error": (
-                "The fetched source page doesn't name this opportunity: use the title "
-                "and organization as the page writes them, or fetch the right page."
-            )
-        }
-    deadline_date = parse_deadline(data.deadline)
-    if data.deadline.strip() and deadline_date is not None:
-        if not deadline_on_page(page, deadline_date):
-            return {
-                "error": (
-                    "That deadline isn't on the fetched page. Copy the deadline as the "
-                    "page states it, or leave it empty when the page gives none."
-                )
-            }
-        if deadline_date < opp_service.today() and not data.rolling:
-            return {"error": "This opportunity's deadline has passed: skip it."}
+    if error := validate_grounding(data, pages):
+        return {"error": error}
     scan_id = getattr(getattr(ctx, "run", None), "id", None)
+    if scan_id:
+        await ctx.session.execute(
+            select(func.pg_advisory_xact_lock(func.hashtext("scan-budget:" + scan_id)))
+        )
     if (
         scan_id
         and await _scan_created(ctx.session, scan_id)
@@ -185,10 +161,50 @@ async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
             )
         }
     opp, created, updated = await opp_service.upsert_from_agent(
-        ctx.session, user_id=getattr(ctx, "user_id", None), scan_id=scan_id, data=data
+        ctx.session,
+        user_id=getattr(ctx, "user_id", None),
+        scan_id=scan_id,
+        data=data,
+        low_confidence=getattr(ctx, "extraction_confidence", 1)
+        < settings.extraction_min_confidence,
     )
-    await ctx.session.commit()
+    from api.opportunities.crawler import propose_source, record_candidate
+
+    source_id = await propose_source(ctx.session, data.source_url, data.category.value)
+    added = await record_candidate(
+        ctx.session,
+        data.source_url,
+        source_id=source_id,
+        category_hints=[data.category.value],
+        title=data.title,
+        status="extracted",
+        reason="agent_save",
+    )
+    if getattr(ctx, "scan_task", None) is not None and created:
+        from api.opportunities.crawl_models import Source
+
+        await ctx.session.execute(
+            update(Source)
+            .where(Source.id == source_id)
+            .values(
+                opportunities_saved=Source.opportunities_saved + 1,
+                candidates_found=Source.candidates_found + int(added),
+            )
+        )
+    if created and getattr(ctx, "scan_task", None) is not None:
+        ctx.scan_task.metrics = {
+            **(ctx.scan_task.metrics or {}),
+            "saved": (ctx.scan_task.metrics or {}).get("saved", 0) + 1,
+        }
+    if commit:
+        await ctx.session.commit()
+    notes = getattr(ctx, "page_notes", {})
+    key = url_key(data.source_url)
+    if key in notes:
+        notes[key] = notes[key].rsplit(" | ", 1)[0] + " | saved: " + data.title
     ctx.opportunities_saved = saved + 1
+    if created:
+        ctx.saved_titles.append(opp.title)
     return {
         "opportunity_id": opp.id,
         "created": created,
@@ -196,3 +212,42 @@ async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
         "deadline_date": opp.deadline_date.isoformat() if opp.deadline_date else None,
         "status": opp.status,
     }
+
+
+async def handle_reject_candidate(tool_input: dict, ctx: ToolContext) -> dict:
+    url = tool_input.get("url", "")
+    if url_key(url) not in ctx.fetched_pages:
+        return {"error": "Fetch the page before rejecting it."}
+    reason = str(tool_input.get("reason", "irrelevant"))[:500]
+    closed = bool(tool_input.get("closed")) and expired(
+        ctx.fetched_pages[url_key(url)], {}, opp_service.today()
+    )
+    status = "closed" if closed else "rejected"
+    if not closed:
+        region = (getattr(ctx.run, "region", "") or "").strip().casefold()
+        reason = f"scope:{region}:{ctx.category}:" + reason
+    from api.opportunities.crawl_models import CrawlCandidate
+    from api.opportunities.crawler import record_candidate
+
+    await record_candidate(
+        ctx.session,
+        url,
+        category_hints=[ctx.category] if closed else [],
+        status=status,
+        reason=reason,
+    )
+    row = (
+        await ctx.session.execute(
+            select(CrawlCandidate)
+            .where(CrawlCandidate.url == url_key(url))
+            .with_for_update()
+        )
+    ).scalar_one()
+    if row.claim_token:
+        return {"error": "This candidate is already being processed."}
+    if row.status == "new" or row.reason.startswith("scope:"):
+        row.status, row.reason = status, reason
+        if not closed:
+            row.category_hints = []
+    await ctx.session.commit()
+    return {"url": url, "verdict": status, "reason": reason}

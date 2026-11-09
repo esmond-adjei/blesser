@@ -72,6 +72,10 @@ def _tables(url: str) -> list[str]:
 
 EXPECTED_TABLES = sorted(
     [
+        "sources",
+        "crawl_candidates",
+        "page_cache",
+        "crawl_hosts",
         "audit_log",
         "collections",
         "collection_items",

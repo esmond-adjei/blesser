@@ -101,8 +101,10 @@ async def prune_heartbeats(session) -> None:
     await session.commit()
 
 
-async def claim_next_task(session, scan_id: str | None = None) -> m.ScanTask | None:
-    """Claim the oldest pending task of a running scan (scan_id is a test seam)."""
+async def claim_next_task(
+    session, scan_id: str | None = None, *, commit: bool = True
+) -> m.ScanTask | None:
+    """Claim the oldest pending task of a running scan."""
     query = (
         select(m.ScanTask)
         .join(m.Scan, m.ScanTask.scan_id == m.Scan.id)
@@ -127,7 +129,10 @@ async def claim_next_task(session, scan_id: str | None = None) -> m.ScanTask | N
         task.started_at = utcnow_naive()
         task.claimed_by = WORKER_ID
         task.attempt = (task.attempt or 0) + 1
-        await session.commit()
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
     return task
 
 
@@ -209,6 +214,16 @@ def _event_sink(session, task: m.ScanTask, label: str):
 def _charge(task: m.ScanTask, usage: dict) -> None:
     task.input_tokens = (task.input_tokens or 0) + usage.get("input_tokens", 0)
     task.output_tokens = (task.output_tokens or 0) + usage.get("output_tokens", 0)
+    task.metrics = {
+        **(task.metrics or {}),
+        "model_calls": (task.metrics or {}).get("model_calls", 0)
+        + usage.get("model_calls", 0),
+        "input_tokens": task.input_tokens or 0,
+        "output_tokens": task.output_tokens or 0,
+        "duration_seconds": round((utcnow_naive() - task.started_at).total_seconds(), 2)
+        if task.started_at
+        else 0,
+    }
     if usage.get("turns"):
         task.turns = usage["turns"]
 
@@ -438,6 +453,17 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
                 traceback.print_exc()
             await asyncio.sleep(max(settings.worker_heartbeat_seconds, 1))
 
+    async def crawling():
+        from api.opportunities.crawler import crawl_due
+
+        while True:
+            try:
+                async with SessionLocal() as session:
+                    await crawl_due(session)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[worker] crawler error: {exc!r}", flush=True)
+            await asyncio.sleep(30)
+
     async def delivery() -> None:
         from api.notifications.delivery import deliver_pending
 
@@ -456,6 +482,7 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
             *(worker(i) for i in range(concurrency)),
             _listen(work, notifications_due),
             housekeeping(),
+            crawling(),
             delivery(),
         )
     finally:

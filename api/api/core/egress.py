@@ -74,12 +74,18 @@ async def safe_get(
     *,
     max_bytes: int,
     max_redirects: int = MAX_REDIRECTS,
+    headers: dict | None = None,
+    before_request=None,
 ) -> tuple[httpx.Response, str]:
     """Checked GET on every hop; returns the response and its text cut at `max_bytes`."""
     current = httpx.URL(url)
     for _ in range(max_redirects + 1):
         await check_url(current)
-        async with client.stream("GET", current, follow_redirects=False) as resp:
+        if before_request is not None:
+            await before_request(current)
+        async with client.stream(
+            "GET", current, follow_redirects=False, headers=headers
+        ) as resp:
             location = resp.headers.get("location")
             if resp.is_redirect and location:
                 current = current.join(location)
@@ -163,7 +169,11 @@ def needs_guard(base_url: str, default: str = "") -> bool:
 
 
 # Fixed advice for common provider failures; the body is only matched, never shown.
-_OUT_OF_CREDIT_PHRASES = ("credit balance is too low", "insufficient_quota", "exceeded your current quota")
+_OUT_OF_CREDIT_PHRASES = (
+    "credit balance is too low",
+    "insufficient_quota",
+    "exceeded your current quota",
+)
 _OUT_OF_CREDIT = "The provider account is out of credit or quota: top it up in the provider's billing settings."
 _STATUS_HINTS = {
     401: "The provider rejected the API key: check it in your model settings.",
@@ -197,7 +207,9 @@ def public_error(exc: BaseException) -> str:
         status = response.status_code
     if status is not None:
         hint = _upstream_hint(exc, status, response)
-        return f"{type(exc).__name__}: the upstream service answered HTTP {status}." + (f" {hint}" if hint else "")
+        return f"{type(exc).__name__}: the upstream service answered HTTP {status}." + (
+            f" {hint}" if hint else ""
+        )
     if isinstance(exc, httpx.HTTPError) or type(exc).__module__.split(".")[0] in (
         "openai",
         "anthropic",

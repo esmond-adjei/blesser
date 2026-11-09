@@ -259,9 +259,17 @@ async def search_web(query: str, max_results: int = 8) -> list[dict]:
     )
 
 
-async def fetch_page(url: str, max_chars: int = 6000, offset: int = 0) -> str:
-    """Cleaned page text; unfetchable pages return a guidance string, never raise.
-    Long text ends with a note giving the `offset` to read on from (served from cache)."""
+async def fetch_page(
+    url: str, max_chars: int = 6000, offset: int = 0, *, persistent: bool = False
+) -> str:
+    """Return a page window from the shared database cache or the legacy fetcher."""
+    if persistent:
+        from api.opportunities.page_cache import get_page
+
+        page = await get_page(url)
+        if page.error:
+            return f"[Could not fetch {url}: {page.error}. Use another source.]"
+        return _window(page.text, max(int(offset or 0), 0), max_chars)
     offset = max(int(offset or 0), 0)
     cached = _page_cache_get(url)
     if cached is not None:
@@ -338,8 +346,8 @@ def _robots_agent() -> str:
     return (settings.fetch_user_agent.split("/", 1)[0] or "BlesserBot").strip()
 
 
-async def _robots_allows(url: str) -> bool:
-    """Cached per origin; a missing or unreadable robots.txt allows (RFC 9309 for 4xx)."""
+async def _robots_allows(url: str, *, before_request=None) -> bool:
+    """Cache robots rules; unreachable origins temporarily disallow fetches."""
     import time
     from urllib.robotparser import RobotFileParser
 
@@ -358,10 +366,15 @@ async def _robots_allows(url: str) -> bool:
         for attempt in range(2):
             try:
                 resp, text = await egress.safe_get(
-                    fetch_client(), f"{origin}/robots.txt", max_bytes=512_000
+                    fetch_client(),
+                    f"{origin}/robots.txt",
+                    max_bytes=512_000,
+                    before_request=before_request,
                 )
             except (httpx.HTTPError, egress.EgressBlocked):
-                parser = None
+                parser = RobotFileParser()
+                parser.disallow_all = True
+                ttl = _ROBOTS_ERROR_TTL
                 break
             if resp.status_code >= 500 and attempt == 0:
                 continue  # one retry: a single 5xx is usually transient

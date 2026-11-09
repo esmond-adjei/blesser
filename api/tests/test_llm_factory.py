@@ -171,21 +171,36 @@ def test_tool_call_extra_falls_back_to_model_dump():
 def test_only_gemini_requires_tool_call_extras():
     from api.agent.llm.openai_compat_provider import OpenAICompatProvider
 
-    assert OpenAICompatProvider(
-        model="m", api_key="k", provider_label="gemini"
-    ).requires_tool_call_extras is True
-    assert OpenAICompatProvider(model="m", api_key="k").requires_tool_call_extras is False
+    assert (
+        OpenAICompatProvider(
+            model="m", api_key="k", provider_label="gemini"
+        ).requires_tool_call_extras
+        is True
+    )
+    assert (
+        OpenAICompatProvider(model="m", api_key="k").requires_tool_call_extras is False
+    )
 
 
 def test_tool_definitions_are_provider_neutral():
-    assert {t["name"] for t in TOOL_DEFINITIONS} == {"search_web", "fetch_page", "save_opportunity"}
+    assert {t["name"] for t in TOOL_DEFINITIONS} == {
+        "search_web",
+        "fetch_page",
+        "save_opportunity",
+        "reject_candidate",
+    }
     for t in TOOL_DEFINITIONS:
         assert "name" in t and "description" in t and "parameters" in t
         assert t["parameters"]["type"] == "object"
 
 
 def test_converters_keep_each_tools_schema():
-    pairs = zip(to_anthropic_tools(TOOL_DEFINITIONS), to_openai_tools(TOOL_DEFINITIONS), TOOL_DEFINITIONS, strict=True)
+    pairs = zip(
+        to_anthropic_tools(TOOL_DEFINITIONS),
+        to_openai_tools(TOOL_DEFINITIONS),
+        TOOL_DEFINITIONS,
+        strict=True,
+    )
     for anthropic, openai, definition in pairs:
         assert anthropic["input_schema"] == definition["parameters"]
         assert openai["function"]["parameters"] == definition["parameters"]
@@ -239,7 +254,9 @@ def _user_text(message: dict) -> str:
     if not isinstance(content, list):
         return ""
     return "\n\n".join(
-        b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
+        b.get("text", "")
+        for b in content
+        if isinstance(b, dict) and b.get("type") == "text"
     )
 
 

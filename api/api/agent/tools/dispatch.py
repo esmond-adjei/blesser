@@ -23,19 +23,73 @@ async def _search_web(tool_input: dict, ctx: ToolContext) -> dict:
 
 
 async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
-    text = await web.fetch_page(
-        tool_input["url"],
-        max_chars=settings.fetch_max_chars,
-        offset=tool_input.get("offset") or 0,
-    )
-    opportunity_tools.record_fetch(ctx, tool_input["url"], text)
-    return {"text": text}
+    from api.opportunities.page_content import Page, expired, page_note
+
+    key = opportunity_tools.url_key(tool_input["url"])
+    if key in ctx.known_pages and not ctx.reverify_id:
+        note = ctx.known_pages[key]
+        return {
+            "text": "Skip known URL. " + note,
+            "page_note": note,
+            "cached_summary": True,
+        }
+    offset = max(0, tool_input.get("offset") or 0)
+    async with ctx.fetch_locks.setdefault(key, asyncio.Lock()):
+        if (key, offset) in ctx.fetch_windows:
+            if key not in ctx.fetched_pages:
+                from api.opportunities.page_cache import get_page
+
+                page = await get_page(tool_input["url"])
+                if not page.error:
+                    opportunity_tools.record_fetch(ctx, key, page.text)
+            return {
+                "text": "Already read. " + ctx.page_notes.get(key, key),
+                "cached_summary": True,
+            }
+        text = await web.fetch_page(
+            tool_input["url"],
+            max_chars=settings.fetch_max_chars,
+            offset=offset,
+            persistent=True,
+        )
+        ctx.fetch_windows.add((key, offset))
+        opportunity_tools.record_fetch(ctx, tool_input["url"], text)
+        closed = expired(text, {}, opportunity_tools.opp_service.today())
+        verdict = (
+            "fetch failed"
+            if text.startswith("[Could not fetch")
+            else "closed"
+            if closed
+            else "read"
+        )
+        ctx.page_notes[key] = page_note(
+            Page(url=key, text=text, title=text.splitlines()[0][:120] if text else ""),
+            verdict,
+        )
+        if closed:
+            from api.core.db import SessionLocal
+            from api.opportunities.crawler import record_candidate
+
+            async with SessionLocal() as session:
+                await record_candidate(
+                    session,
+                    key,
+                    category_hints=[ctx.category],
+                    status="closed",
+                    reason="deadline_passed",
+                )
+                await session.commit()
+        result = {"text": text, "page_note": ctx.page_notes[key]}
+        if verdict == "fetch failed":
+            result["error"] = text
+        return result
 
 
 HANDLERS = {
     "search_web": _search_web,
     "fetch_page": _fetch_page,
     "save_opportunity": opportunity_tools.handle_save_opportunity,
+    "reject_candidate": opportunity_tools.handle_reject_candidate,
 }
 
 #: Safe to run concurrently: they never touch the (not concurrency-safe) DB session.
@@ -56,7 +110,9 @@ async def run_halted(ctx: ToolContext) -> str | None:
 async def _invoke(name: str, args: dict, ctx: ToolContext, halted: str | None) -> dict:
     """Never raises: inside a gather an exception would also discard its siblings' work."""
     if halted is not None:
-        return {"error": f"This task was halted ({halted}); write your final summary instead."}
+        return {
+            "error": f"This task was halted ({halted}); write your final summary instead."
+        }
     offered = getattr(ctx, "offered_tools", None)
     if offered is not None and name not in offered:
         return {"error": f"Tool {name} is not available in this task."}

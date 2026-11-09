@@ -57,7 +57,9 @@ class ScanTask(Base):
     __tablename__ = "scan_tasks"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
-    scan_id: Mapped[str] = mapped_column(ForeignKey("scans.id", ondelete="CASCADE"), index=True)
+    scan_id: Mapped[str] = mapped_column(
+        ForeignKey("scans.id", ondelete="CASCADE"), index=True
+    )
     user_id: Mapped[str] = mapped_column(
         String, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
@@ -65,7 +67,9 @@ class ScanTask(Base):
     # What the task covers, e.g. "category:startup".
     target: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
-        Enum(TaskStatus, native_enum=False, length=16), default=TaskStatus.pending, index=True
+        Enum(TaskStatus, native_enum=False, length=16),
+        default=TaskStatus.pending,
+        index=True,
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Python-side UTC: staleness checks compare against utcnow_naive().
@@ -85,10 +89,14 @@ class ScanTask(Base):
     turns: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Checkpointed every turn; a task that dies resumes from here.
     messages_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    __mapper_args__: ClassVar[dict] = {"version_id_col": attempt, "version_id_generator": False}
+    __mapper_args__: ClassVar[dict] = {
+        "version_id_col": attempt,
+        "version_id_generator": False,
+    }
 
     scan: Mapped["Scan"] = relationship(back_populates="tasks")
 
@@ -101,4 +109,6 @@ class WorkerHeartbeat(Base):
     worker_id: Mapped[str] = mapped_column(String, primary_key=True)
     concurrency: Mapped[int] = mapped_column(Integer, default=1)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow_naive, index=True
+    )

@@ -8,7 +8,7 @@ Blesser is three products on one backend:
 | **Member app** | Signed-up members | Discover more (including member-only finds), track applications, plan to-dos, sync calendars, run scans. | `app.blesser.org` |
 | **Admin console** | Staff (editors, admins) | Decide what the public site and the member app show. Review agent and community finds, edit, publish, feature, hide. Manage people and scans. | `admin.blesser.org` |
 
-All three talk to the same FastAPI service and Postgres database. The worker keeps running the discovery agent. The admin console is the only place that changes what is public.
+All three talk to the same FastAPI service and Postgres database. The worker crawls registered sources, triages and extracts candidate pages, then runs discovery agents for gaps. The admin console is the only place that changes what is public.
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ flowchart LR
   W --> M
   A --> D
   P & M & D --> DB[(Postgres)]
-  K[Worker<br/>discovery agent, reminders] --> DB
+  K[Worker<br/>crawler, extraction, gap discovery, reminders] --> DB
 ```
 
 ## Principles
@@ -203,3 +203,25 @@ Each phase ships on its own and leaves the product working.
 - **Members-only finds.** The default above keeps agent finds members-only until an editor promotes them. The alternative is to publish everything verified straight to the public site and use membership only for tracking. The first makes membership more valuable and the public site more trustworthy; the second gets more pages indexed sooner.
 - **Who can run scans.** Today any member can (3 an hour, 10 a day) on the operator's API keys. Options: keep it, limit it to staff, or make it a perk of a future paid tier.
 - **Astro or a second React app for the site.** Astro gives fast, indexable pages for little JavaScript. If the team prefers one framework, a React app with server-side prerendering (React Router framework mode) also works, at the cost of a heavier public page.
+
+## Crawler and scan execution
+
+Migration `0003` adds `sources`, `crawl_candidates`, `page_cache`, `crawl_hosts` and a JSON `scan_tasks.metrics` column. The existing scan and category task types stay intact.
+
+Each category task first crawls due sources matching its hints and processes queued candidates. Source hints route work, but extraction identifies the page's actual category. Any category requested by the scan can be saved. Other categories stay queued with corrected hints. A regional exclusion stays queued for other regions. Generic pages and passed deadlines become persistent rejected or closed outcomes.
+
+The crawler reads RSS, Atom, bounded sitemaps and listing links without a model. It follows at most five child sitemaps, one level deep. Listing expansion can discover more candidates without extraction. Source rows reserve their next crawl before HTTP, so another worker skips the same due source. Conditional GETs preserve ETag and Last-Modified values. Failures back off by up to eight crawl intervals.
+
+Every outbound crawler or persistent page request uses the existing public-address guard, including redirects. BlesserBot observes robots.txt and reserves per-host request times in Postgres. Unreachable robots.txt temporarily disallows crawling. The host reservation also covers robots requests. A separate crawler loop runs alongside queue processing and housekeeping, so slow sites do not delay worker heartbeats.
+
+Page fetches use short independent database sessions. A short advisory lock on the normalized URL reserves a ten-minute fetch lease. HTTP runs without holding a pooled connection, has a five-minute bound, and completion checks the lease token. Concurrent misses wait for that fetch; an expired claim can be reclaimed. The cache stores main text, title, structured metadata, content hash, validators, errors and expiry. Pages use the configured TTL; failed fetches expire within 30 minutes. Persistent discovery fetches use live pages rather than archive copies.
+
+Candidates use row claims with a token and a 15-minute expiry. After model work, the handler locks the row and checks the token before saving. The opportunity, candidate outcome, yield counters and task metrics commit together. Transient fetch failures remain queued with a 30-minute delay. Scan and URL advisory locks protect save budgets and duplicate inserts across workers.
+
+Extraction makes one structured model request per surviving page, using the configured provider and model. The result is validated as JSON, checked against the fetched page and cached with the page's content hash, provider, model and region. Another category can reuse the result. Low-confidence new finds use `in_review` and `agent_find`; other new finds use `agent_default`. Existing editorial decisions remain intact.
+
+After extraction, a bounded discovery agent searches gaps. It receives compact known and rejected records. Known URLs return a reminder without fetching; repeated page windows return a summary. Compacted history retains URL, title, deadline and verdict inside the untrusted tool-result wrapper. New saves update metrics in the save transaction. The agent stops after five turns without a new save, with a default ceiling of twelve turns. Both limits are configurable.
+
+Source proposals from successful agent saves are disabled listings for the source domain. Staff must enable them, including domains that may expose feeds. This avoids automatically trusting a domain because it produced one grounded listing. Editors manage sources through audited admin routes.
+
+Task metrics are persisted, and scan responses sum their tasks. `duration_seconds` on a scan is summed task elapsed time, including crawling and extraction, not wall time. Legacy scans without metrics return zero totals. The standalone probe script records wall time separately and reserves its tasks before notifying other workers.
