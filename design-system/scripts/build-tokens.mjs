@@ -39,6 +39,11 @@ const tokensCss =
 const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => ({ ...s, family: g.family })))
 const radius = (name) => tokens.radius.tokens.find((t) => t.name === name).value
 
+// A data-URI SVG can't read CSS variables, so each theme gets its own literal ink-secondary.
+const inkSecondary = tokens.color.tokens.find((t) => t.name === "ink-secondary").value
+const chevron = (color) =>
+  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(color)}' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`
+
 const theme = [
   header,
   '@source "./components";',
@@ -86,6 +91,15 @@ const theme = [
       ...(s.name === "numeral" ? ["font-variant-numeric: tabular-nums;"] : []),
     ]),
   ),
+  block("@utility select-chevron", [
+    `background-image: ${chevron(inkSecondary.light)};`,
+    "background-repeat: no-repeat;",
+    "background-position: right 12px center;",
+    "background-size: 16px;",
+    `&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *) {`,
+    `  background-image: ${chevron(inkSecondary.dark)};`,
+    "}",
+  ]),
   `@layer base {
   html {
     -webkit-font-smoothing: antialiased;

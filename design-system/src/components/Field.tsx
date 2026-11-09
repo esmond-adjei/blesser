@@ -16,19 +16,11 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
 )
 Textarea.displayName = "Textarea"
 
-const CHEVRON =
-  "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f8a7b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")]"
-
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
   ({ className, ...props }, ref) => (
     <select
       ref={ref}
-      className={cn(
-        controlClass,
-        CHEVRON,
-        "h-control-md cursor-pointer appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10",
-        className,
-      )}
+      className={cn(controlClass, "select-chevron h-control-md cursor-pointer appearance-none pr-10", className)}
       {...props}
     />
   ),

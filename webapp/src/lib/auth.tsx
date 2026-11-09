@@ -31,7 +31,7 @@ function accessExpiryMs(token: string | null): number | null {
 const AuthContext = React.createContext<
   AuthState & {
     signIn: (email: string, password: string) => Promise<void>
-    signUp: (email: string, password: string, acceptTerms: boolean) => Promise<void>
+    signUp: (email: string, password: string, acceptTerms: boolean, track?: string | null) => Promise<void>
     signOut: () => Promise<void>
     updateUser: (user: AuthUser) => void
     /** Adopt a session minted by another sign-in method (OAuth). */
@@ -128,14 +128,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Boot: one silent refresh, then render (anon or restored).
   React.useEffect(() => {
+    // Single-flight: StrictMode's second run would otherwise replay the rotated refresh token and sign out.
     let live = true
-    void doRefresh().finally(() => {
+    void refreshSoon().finally(() => {
       if (live) setReady(true)
     })
     return () => {
       live = false
     }
-  }, [doRefresh])
+  }, [refreshSoon])
 
   const signIn = React.useCallback(
     async (email: string, password: string) => {
@@ -145,8 +146,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signUp = React.useCallback(
-    async (email: string, password: string, acceptTerms: boolean) => {
-      applySession(await api.registerAccount(email, password, acceptTerms))
+    async (email: string, password: string, acceptTerms: boolean, track?: string | null) => {
+      applySession(await api.registerAccount(email, password, acceptTerms, track))
     },
     [applySession],
   )

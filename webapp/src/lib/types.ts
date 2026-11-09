@@ -127,8 +127,9 @@ export type OpportunityKind =
   | "job"
   | "other"
 
-export interface Opportunity {
+export interface MemberOpportunity {
   id: string
+  slug: string
   title: string
   organization: string
   category: OpportunityCategory
@@ -146,14 +147,18 @@ export interface Opportunity {
   rolling: boolean
   link: string
   source_url: string
-  status: "published" | "pending" | "hidden"
-  source: "agent" | "community"
   verified_at: string | null
-  created_at: string
-  updated_at: string
+  published_at: string | null
   is_open: boolean
   days_left: number | null
+  closed: boolean
+  audience: "public" | "members"
+  found_by: "agent" | "community" | "staff"
+  created_at: string
+  is_new: boolean
 }
+
+export type Opportunity = MemberOpportunity
 
 export interface OpportunityQuery {
   q?: string
@@ -161,6 +166,8 @@ export interface OpportunityQuery {
   kind?: OpportunityKind
   country?: string
   include_closed?: boolean
+  new?: boolean
+  audience?: "public" | "members"
   closing_within?: number
   sort?: "deadline" | "new"
   limit?: number

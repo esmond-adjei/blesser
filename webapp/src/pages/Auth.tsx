@@ -1,8 +1,11 @@
 import * as React from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { useQueryClient } from "@tanstack/react-query"
 import { useAuth } from "../lib/auth"
 import * as api from "../lib/api"
 import { apiMessage } from "../lib/api"
+import { toastError, toastSuccess } from "../lib/toast"
+import { authHref, trackAfterAuth, trackParam, trackedMessage, trackedTitle } from "../lib/track"
 import { CheckCircle2, MailCheck } from "lucide-react"
 import { Button, Field, Input, Logo } from "@blesser/ui"
 import { Alert, AlertDescription } from "../components/ui/feedback"
@@ -31,34 +34,74 @@ function AuthShell({
   )
 }
 
+/** Where a signed-in visitor goes from the auth pages: ?track= tracks first and opens Applications, else ?next=. */
+function useAfterAuth() {
+  const { user, ready } = useAuth()
+  const navigate = useNavigate()
+  const client = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const next = searchParams.get("next") || "/opportunities"
+  const track = trackParam(searchParams)
+  // Set while a submit owns the redirect, so the signed-in effect doesn't race it.
+  const handling = React.useRef(false)
+
+  const finish = React.useCallback(
+    async (tracked?: { title: string | null }) => {
+      if (!track) return navigate(next, { replace: true })
+      if (tracked) {
+        toastSuccess(trackedMessage(tracked.title))
+      } else {
+        try {
+          toastSuccess(trackedMessage(await trackAfterAuth(track)))
+        } catch (err) {
+          toastError(err, "That opportunity didn't track")
+        }
+      }
+      void client.invalidateQueries({ queryKey: ["applications"] })
+      void client.invalidateQueries({ queryKey: ["opportunities", "tracked"] })
+      navigate("/applications", { replace: true })
+    },
+    [track, next, navigate, client],
+  )
+
+  React.useEffect(() => {
+    if (!ready || !user || handling.current) return
+    handling.current = true
+    void finish()
+  }, [ready, user, finish])
+
+  const claim = React.useCallback((owned: boolean) => {
+    handling.current = owned
+  }, [])
+
+  return { next, track, claim, finish }
+}
+
 /** Email/password sign-in; lands on ?next= or the dossier. Errors show the backend message. */
 export function Login() {
-  const { user, ready, signIn } = useAuth()
-  const navigate = useNavigate()
+  const { ready, signIn } = useAuth()
   const [searchParams] = useSearchParams()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState<string | null>(null)
-  const next = searchParams.get("next") || "/opportunities"
+  const { next, track, claim, finish } = useAfterAuth()
   const oauthError = searchParams.get("oauth_error")
-
-  React.useEffect(() => {
-    if (ready && user) navigate(next, { replace: true })
-  }, [ready, user, next, navigate])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setErr(null)
+    claim(true)
     try {
       await signIn(email.trim(), password)
-      navigate(next, { replace: true })
     } catch (e2) {
+      claim(false)
       setErr(apiMessage(e2))
-    } finally {
       setBusy(false)
+      return
     }
+    await finish()
   }
 
   if (!ready) return null
@@ -68,7 +111,7 @@ export function Login() {
       subtitle={
         <>
           No account yet?{" "}
-          <Link to={`/register?next=${encodeURIComponent(next)}`} className="font-semibold text-link hover:underline">
+          <Link to={authHref("/register", { next, track })} className="font-semibold text-link hover:underline">
             Create one
           </Link>
         </>
@@ -79,7 +122,7 @@ export function Login() {
           <AlertDescription>{oauthError}</AlertDescription>
         </Alert>
       )}
-      <OAuthButtons next={next} />
+      <OAuthButtons next={track ? authHref("/login", { track }) : next} />
       <form onSubmit={onSubmit} className="space-y-3">
         <Field label="Email">
           <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -116,32 +159,29 @@ export function Login() {
 
 /** Registration: one account per email, straight into a session. */
 export function Register() {
-  const { user, ready, signUp } = useAuth()
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const { ready, signUp } = useAuth()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [agreed, setAgreed] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState<string | null>(null)
-  const next = searchParams.get("next") || "/opportunities"
-
-  React.useEffect(() => {
-    if (ready && user) navigate(next, { replace: true })
-  }, [ready, user, next, navigate])
+  const { next, track, claim, finish } = useAfterAuth()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setErr(null)
+    claim(true)
     try {
-      await signUp(email.trim(), password, agreed)
-      navigate(next, { replace: true })
+      await signUp(email.trim(), password, agreed, track)
     } catch (e2) {
+      claim(false)
       setErr(apiMessage(e2))
-    } finally {
       setBusy(false)
+      return
     }
+    // The register call already tracked it; the lookup only fetches the title for the toast.
+    await finish(track ? { title: await trackedTitle(track) } : undefined)
   }
 
   if (!ready) return null
@@ -150,14 +190,14 @@ export function Register() {
       title="Create your account"
       subtitle={
         <>
-          Already signed up?{" "}
-          <Link to={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-link hover:underline">
+          Already have an account?{" "}
+          <Link to={authHref("/login", { next, track })} className="font-semibold text-link hover:underline">
             Sign in
           </Link>
         </>
       }
     >
-      <OAuthButtons next={next} />
+      <OAuthButtons next={track ? authHref("/login", { track }) : next} />
       <form onSubmit={onSubmit} className="space-y-3">
         <Field label="Email">
           <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />

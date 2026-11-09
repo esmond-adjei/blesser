@@ -182,7 +182,7 @@ def _api_base() -> str:
 
 
 def feed_url(token: str) -> str:
-    return f"{_api_base()}/api/calendar/feed/{token}.ics"
+    return f"{_api_base()}/api/app/calendar/feed/{token}.ics"
 
 
 def _feed_out(feed: m.CalendarFeed) -> dict:

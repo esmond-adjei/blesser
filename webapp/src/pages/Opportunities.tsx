@@ -6,12 +6,12 @@ import {
   CalendarPlus,
   Download,
   ListPlus,
+  Lock,
   MapPin,
   Plus,
   Search,
   Sparkles,
 } from "lucide-react"
-import { useAuth } from "../lib/auth"
 import * as api from "../lib/api"
 import {
   CATEGORIES,
@@ -64,8 +64,6 @@ const SORTS = [
 ]
 
 export function Opportunities() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
   const [query, setQuery] = useUrlParam("q")
   const [draft, setDraft] = React.useState(query)
   const [categoryParam, setCategory] = useUrlParam("category")
@@ -73,6 +71,7 @@ export function Opportunities() {
   const [sortParam, setSort] = useUrlParam("sort", "deadline")
   const [soonParam, setSoon] = useUrlParam("soon")
   const [closedParam, setClosed] = useUrlParam("closed")
+  const [newParam, setNew] = useUrlParam("new")
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
   const sort = sortParam === "new" ? "new" : "deadline"
@@ -96,10 +95,11 @@ export function Opportunities() {
     kind,
     sort,
     closing_within: soonParam ? 14 : undefined,
+    new: newParam ? true : undefined,
     include_closed: closedParam ? true : undefined,
   })
   const facets = useOpportunityFacets()
-  const tracked = useTrackedOpportunities(!!user)
+  const tracked = useTrackedOpportunities()
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
   const total = list.data?.pages[0]?.total ?? 0
   const counts = new Map(facets.data?.categories.map((c) => [c.key, c.count]))
@@ -108,12 +108,6 @@ export function Opportunities() {
   const [todoFor, setTodoFor] = React.useState<Opportunity | null>(null)
   const [scanOpen, setScanOpen] = React.useState(false)
   const [shareOpen, setShareOpen] = React.useState(false)
-
-  const requireUser = (): boolean => {
-    if (user) return true
-    navigate(`/login?next=${encodeURIComponent("/opportunities")}`)
-    return false
-  }
 
   return (
     <div className="space-y-8">
@@ -126,16 +120,12 @@ export function Opportunities() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {user ? (
-            <>
-              <Button size="sm" onClick={() => setShareOpen(true)} icon={<Plus />}>
-                Share one
-              </Button>
-              <Button size="sm" variant="brand" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
-                Find more
-              </Button>
-            </>
-          ) : null}
+          <Button size="sm" onClick={() => setShareOpen(true)} icon={<Plus />}>
+            Share one
+          </Button>
+          <Button size="sm" variant="brand" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
+            Find more
+          </Button>
         </div>
       </header>
 
@@ -188,6 +178,9 @@ export function Opportunities() {
             </option>
           ))}
         </Select>
+        <Chip selected={!!newParam} onClick={() => setNew(newParam ? "" : "1")}>
+          New this week
+        </Chip>
         <Chip selected={!!soonParam} onClick={() => setSoon(soonParam ? "" : "1")}>
           Closing in 2 weeks{facets.data ? ` (${facets.data.closing_soon})` : ""}
         </Chip>
@@ -206,18 +199,12 @@ export function Opportunities() {
         <ErrorState title="Opportunities didn't load" description="Check your connection and try again." onRetry={() => void list.refetch()} />
       ) : items.length === 0 ? (
         <EmptyState
-          title={query || category || kind || soonParam ? "Nothing matches these filters" : "No opportunities yet"}
-          description={
-            user
-              ? "Send agents to look for new ones, or share one you know about."
-              : "Check back soon: agents add new opportunities as they find them."
-          }
+          title={query || category || kind || soonParam || newParam ? "Nothing matches these filters" : "No opportunities yet"}
+          description="Send agents to look for new ones, or share one you know about."
           action={
-            user ? (
-              <Button variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
-                Find more
-              </Button>
-            ) : undefined
+            <Button variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
+              Find more
+            </Button>
           }
         />
       ) : (
@@ -232,8 +219,7 @@ export function Opportunities() {
                 opp={opp}
                 applicationId={tracked.data?.[opp.id]}
                 onOpen={() => setDetail(opp)}
-                onTodo={() => requireUser() && setTodoFor(opp)}
-                requireUser={requireUser}
+                onTodo={() => setTodoFor(opp)}
               />
             ))}
           </div>
@@ -251,12 +237,11 @@ export function Opportunities() {
         opp={detail}
         applicationId={detail ? tracked.data?.[detail.id] : undefined}
         onClose={() => setDetail(null)}
-        onTodo={(opp) => requireUser() && setTodoFor(opp)}
-        requireUser={requireUser}
+        onTodo={setTodoFor}
       />
       <TodoDialog opp={todoFor} onClose={() => setTodoFor(null)} />
-      {user ? <ScanDialog open={scanOpen} onOpenChange={setScanOpen} /> : null}
-      {user ? <ShareDialog open={shareOpen} onOpenChange={setShareOpen} /> : null}
+      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
+      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
     </div>
   )
 }
@@ -288,6 +273,17 @@ function CategoryTile({
   )
 }
 
+/** "Members only" and "New" markers; info is the brand's tone for discovery context. */
+function DiscoveryChips({ opp }: { opp: Opportunity }) {
+  if (opp.audience !== "members" && !opp.is_new) return null
+  return (
+    <>
+      {opp.audience === "members" ? <Chip tone="info" icon={<Lock />}>Members only</Chip> : null}
+      {opp.is_new ? <Chip tone="sun">New</Chip> : null}
+    </>
+  )
+}
+
 function OpportunityMeta({ opp }: { opp: Opportunity }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -297,18 +293,24 @@ function OpportunityMeta({ opp }: { opp: Opportunity }) {
       {opp.location ? (
         <Chip icon={<MapPin />}>{opp.location}</Chip>
       ) : null}
+      <DiscoveryChips opp={opp} />
     </div>
   )
 }
 
-function useTrack(opp: Opportunity, applicationId: string | undefined, requireUser: () => boolean) {
+const FOUND_BY: Record<Opportunity["found_by"], string> = {
+  agent: "Found by an agent",
+  community: "Shared by the community",
+  staff: "Added by the Blesser team",
+}
+
+function useTrack(opp: Opportunity, applicationId: string | undefined) {
   const track = useTrackOpportunity()
   const navigate = useNavigate()
   return {
     pending: track.isPending,
     onTrack: () => {
       if (applicationId) return navigate("/applications")
-      if (!requireUser()) return
       track.mutate(opp.id, {
         onSuccess: () => toastSuccess("Tracked. Deadline reminders are on."),
         onError: (err) => toastError(err, "That didn't track. Try again."),
@@ -317,16 +319,8 @@ function useTrack(opp: Opportunity, applicationId: string | undefined, requireUs
   }
 }
 
-function TrackButton({
-  opp,
-  applicationId,
-  requireUser,
-}: {
-  opp: Opportunity
-  applicationId: string | undefined
-  requireUser: () => boolean
-}) {
-  const { pending, onTrack } = useTrack(opp, applicationId, requireUser)
+function TrackButton({ opp, applicationId }: { opp: Opportunity; applicationId: string | undefined }) {
+  const { pending, onTrack } = useTrack(opp, applicationId)
   if (applicationId)
     return (
       <Link to="/applications" className={buttonVariants({ size: "sm", variant: "quiet" })}>
@@ -356,14 +350,14 @@ function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean
         <CalendarPlus />
         {compact ? null : "Add to calendar"}
       </a>
-      <a
-        href={api.opportunityIcsUrl(opp.id)}
-        className={buttonVariants({ size: "sm", iconOnly: true, variant: "quiet" })}
+      <Button
+        size="sm"
+        variant="quiet"
         aria-label="Download the deadline as an .ics file"
         data-tooltip="Download .ics (Apple Calendar, Outlook)"
-      >
-        <Download />
-      </a>
+        onClick={() => api.downloadOpportunityIcs(opp.id).catch((err) => toastError(err, "The .ics didn't download"))}
+        icon={<Download />}
+      />
     </>
   )
 }
@@ -373,15 +367,13 @@ function OpportunityCard({
   applicationId,
   onOpen,
   onTodo,
-  requireUser,
 }: {
   opp: Opportunity
   applicationId: string | undefined
   onOpen: () => void
   onTodo: () => void
-  requireUser: () => boolean
 }) {
-  const { pending, onTrack } = useTrack(opp, applicationId, requireUser)
+  const { pending, onTrack } = useTrack(opp, applicationId)
   return (
     <Card
       organization={opp.organization}
@@ -416,6 +408,11 @@ function OpportunityCard({
         </>
       }
     >
+      {opp.audience === "members" || opp.is_new ? (
+        <div className="-mt-1 flex flex-wrap gap-2">
+          <DiscoveryChips opp={opp} />
+        </div>
+      ) : null}
       {opp.summary ? <p className="line-clamp-3 text-callout text-ink-secondary">{opp.summary}</p> : null}
     </Card>
   )
@@ -426,13 +423,11 @@ function OpportunityDetail({
   applicationId,
   onClose,
   onTodo,
-  requireUser,
 }: {
   opp: Opportunity | null
   applicationId: string | undefined
   onClose: () => void
   onTodo: (opp: Opportunity) => void
-  requireUser: () => boolean
 }) {
   // Keep the last row while the dialog animates out.
   const [shown, setShown] = React.useState<Opportunity | null>(opp)
@@ -469,7 +464,7 @@ function OpportunityDetail({
               </div>
             ) : null}
             <p className="text-footnote text-ink-tertiary">
-              {shown.source === "agent" ? "Found by an agent" : "Shared by the community"}
+              {FOUND_BY[shown.found_by] ?? FOUND_BY.community}
               {shown.verified_at ? `, checked ${formatAgo(shown.verified_at)}` : ""}
               {shown.source_url ? (
                 <>
@@ -487,7 +482,7 @@ function OpportunityDetail({
               Add a to-do
             </Button>
             <CalendarButtons opp={shown} />
-            <TrackButton opp={shown} applicationId={applicationId} requireUser={requireUser} />
+            <TrackButton opp={shown} applicationId={applicationId} />
             {shown.link || shown.source_url ? (
               <a
                 href={shown.link || shown.source_url}
@@ -593,12 +588,8 @@ function ShareDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
             e.preventDefault()
             setBusy(true)
             try {
-              const saved = await api.submitOpportunity({ ...form, deadline: form.rolling ? "" : form.deadline })
-              toastSuccess(
-                saved.status === "published"
-                  ? "Published. Thanks for sharing."
-                  : "Thanks for sharing. It goes public once it has been reviewed.",
-              )
+              await api.submitOpportunity({ ...form, deadline: form.rolling ? "" : form.deadline })
+              toastSuccess("Thanks for sharing. It goes live once it has been reviewed.")
               onOpenChange(false)
             } catch (err) {
               toastError(err, "That didn't send. Check the details and try again.")

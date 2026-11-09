@@ -118,14 +118,9 @@ export function useOpportunityFacets() {
   return useQuery({ queryKey: ["opportunities", "facets"], queryFn: api.opportunityFacets, staleTime: 60_000 })
 }
 
-/** {opportunity_id: application_id}; only for signed-in people. */
-export function useTrackedOpportunities(enabled: boolean) {
-  return useQuery({
-    queryKey: ["opportunities", "tracked"],
-    queryFn: api.trackedOpportunities,
-    enabled,
-    staleTime: 30_000,
-  })
+/** {opportunity_id: application_id}. */
+export function useTrackedOpportunities() {
+  return useQuery({ queryKey: ["opportunities", "tracked"], queryFn: api.trackedOpportunities, staleTime: 30_000 })
 }
 
 export function useTrackOpportunity() {

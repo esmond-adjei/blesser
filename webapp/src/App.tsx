@@ -1,10 +1,11 @@
 import * as React from "react"
-import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { ErrorState } from "./components/feedback/EmptyState"
 import { ErrorBoundary } from "./components/feedback/ErrorBoundary"
 import { LoadingScreen } from "./components/feedback/LoadingScreen"
-import { Logo, buttonVariants } from "@blesser/ui"
+import { buttonVariants } from "@blesser/ui"
 import { useAuth } from "./lib/auth"
+import { SITE_URL } from "./lib/site"
 import notFoundArt from "@blesser/ui/illustrations/spot-not-found.webp"
 
 const Shell = React.lazy(() => import("./components/layout/Shell").then((m) => ({ default: m.Shell })))
@@ -33,30 +34,15 @@ function RequireAuth() {
   return <Shell />
 }
 
-/** The catalogue is public: the app shell when signed in, a light frame otherwise. */
-function MaybeShell() {
+/** Signed-out visitors at "/" belong on the public site (or sign-in when none is configured). */
+function Home() {
   const { user, ready } = useAuth()
-  if (!ready) return <LoadingScreen />
-  if (user) return <Shell />
-  return (
-    <div className="min-h-dvh bg-canvas">
-      <header className="sticky top-0 z-10 border-b border-separator bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-content items-center gap-3 px-4 py-3 sm:px-6">
-          <Link to="/opportunities" className="flex items-center gap-2.5">
-            <Logo title="" className="size-8" />
-            <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Blesser</span>
-          </Link>
-          <nav className="ml-auto flex gap-2">
-            <Link to="/login" className={buttonVariants({ size: "sm", variant: "quiet" })}>Sign in</Link>
-            <Link to="/register" className={buttonVariants({ size: "sm", variant: "brand" })}>Create account</Link>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
-        <Outlet />
-      </main>
-    </div>
-  )
+  const leave = ready && !user && SITE_URL !== null
+  React.useEffect(() => {
+    if (leave && SITE_URL) window.location.replace(SITE_URL)
+  }, [leave])
+  if (!ready || leave) return <LoadingScreen />
+  return <Navigate to={user ? "/opportunities" : "/login"} replace />
 }
 
 function NotFound() {
@@ -76,11 +62,9 @@ export default function App() {
       <React.Suspense fallback={<LoadingScreen />}>
         <ErrorBoundary>
           <Routes>
-            <Route index element={<Navigate to="/opportunities" replace />} />
-            <Route element={<MaybeShell />}>
-              <Route path="opportunities" element={<Opportunities />} />
-            </Route>
+            <Route index element={<Home />} />
             <Route element={<RequireAuth />}>
+              <Route path="opportunities" element={<Opportunities />} />
               <Route path="applications" element={<Applications />} />
               <Route path="todos" element={<Todos />} />
               <Route path="scans" element={<Scans />} />

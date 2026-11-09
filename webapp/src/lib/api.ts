@@ -79,13 +79,13 @@ export function setRefreshHandler(fn: (() => Promise<string | null>) | null) {
 
 // Auth endpoints manage their own credentials and never carry a token.
 const TOKENLESS = new Set([
-  "/api/auth/login",
-  "/api/auth/register",
-  "/api/auth/refresh",
-  "/api/auth/password/forgot",
-  "/api/auth/password/reset",
-  "/api/auth/oauth/link",
-  "/api/notifications/unsubscribe",
+  "/api/app/auth/login",
+  "/api/app/auth/register",
+  "/api/app/auth/refresh",
+  "/api/app/auth/password/forgot",
+  "/api/app/auth/password/reset",
+  "/api/app/auth/oauth/link",
+  "/api/app/notifications/unsubscribe",
 ])
 
 function authedInit(path: string, init?: RequestInit): RequestInit {
@@ -132,38 +132,38 @@ const del = <T>(path: string, body?: unknown): Promise<T> =>
 
 // --- Account -------------------------------------------------------------------
 
-export const registerAccount = (email: string, password: string, acceptTerms: boolean) =>
-  post<AuthSession>("/api/auth/register", { email, password, accept_terms: acceptTerms })
+export const registerAccount = (email: string, password: string, acceptTerms: boolean, track?: string | null) =>
+  post<AuthSession>("/api/app/auth/register", { email, password, accept_terms: acceptTerms, track: track || undefined })
 export const loginAccount = (email: string, password: string) =>
-  post<AuthSession>("/api/auth/login", { email, password })
+  post<AuthSession>("/api/app/auth/login", { email, password })
 export const refreshSession = (refreshToken: string) =>
-  post<AuthSession>("/api/auth/refresh", { refresh_token: refreshToken })
+  post<AuthSession>("/api/app/auth/refresh", { refresh_token: refreshToken })
 export const logoutSession = (refreshToken: string, pushEndpoint?: string | null) =>
-  post<{ status: string }>("/api/auth/logout", { refresh_token: refreshToken, push_endpoint: pushEndpoint ?? null })
-export const getMe = () => get<AuthUser>("/api/auth/me")
+  post<{ status: string }>("/api/app/auth/logout", { refresh_token: refreshToken, push_endpoint: pushEndpoint ?? null })
+export const getMe = () => get<AuthUser>("/api/app/auth/me")
 export interface OAuthProvider { id: string; label: string }
 export interface OAuthLinkRequired { provider: string; email: string; link_token: string }
 export type OAuthCallbackResult =
   | { user: AuthUser; tokens: { access_token: string; refresh_token: string }; next: string }
   | { link_required: OAuthLinkRequired; next: string }
-export const oauthProviders = () => get<OAuthProvider[]>("/api/auth/oauth/providers")
+export const oauthProviders = () => get<OAuthProvider[]>("/api/app/auth/oauth/providers")
 export const oauthStart = (provider: string, next: string) =>
-  post<{ authorize_url: string; state: string }>(`/api/auth/oauth/${provider}/start`, { next })
+  post<{ authorize_url: string; state: string }>(`/api/app/auth/oauth/${provider}/start`, { next })
 export const oauthCallback = (provider: string, code: string, state: string) =>
-  post<OAuthCallbackResult>(`/api/auth/oauth/${provider}/callback`, { code, state })
+  post<OAuthCallbackResult>(`/api/app/auth/oauth/${provider}/callback`, { code, state })
 export const oauthLink = (link_token: string, password: string) =>
-  post<{ user: AuthUser; tokens: { access_token: string; refresh_token: string } }>("/api/auth/oauth/link", { link_token, password })
-export const forgotPassword = (email: string) => post<{ status: string }>("/api/auth/password/forgot", { email })
+  post<{ user: AuthUser; tokens: { access_token: string; refresh_token: string } }>("/api/app/auth/oauth/link", { link_token, password })
+export const forgotPassword = (email: string) => post<{ status: string }>("/api/app/auth/password/forgot", { email })
 export const resetPassword = (token: string, new_password: string) =>
-  post<{ status: string }>("/api/auth/password/reset", { token, new_password })
-export const verifyEmail = (token: string) => post<AuthUser>("/api/auth/verify", { token })
-export const resendVerification = () => post<{ status: string }>("/api/auth/verify/send", {})
-export const updateProfile = (display_name: string | null) => patch<AuthUser>("/api/auth/me", { display_name })
+  post<{ status: string }>("/api/app/auth/password/reset", { token, new_password })
+export const verifyEmail = (token: string) => post<AuthUser>("/api/app/auth/verify", { token })
+export const resendVerification = () => post<{ status: string }>("/api/app/auth/verify/send", {})
+export const updateProfile = (display_name: string | null) => patch<AuthUser>("/api/app/auth/me", { display_name })
 export const changePassword = (current_password: string, new_password: string) =>
-  post<{ status: string }>("/api/auth/change-password", { current_password, new_password })
-export const deleteAccount = (password: string) => del<{ status: string }>("/api/auth/account", { password })
+  post<{ status: string }>("/api/app/auth/change-password", { current_password, new_password })
+export const deleteAccount = (password: string) => del<{ status: string }>("/api/app/auth/account", { password })
 
-// --- Opportunities (reads are public) --------------------------------------------
+// --- Opportunities --------------------------------------------
 
 function query(params: object): string {
   const q = new URLSearchParams()
@@ -176,41 +176,51 @@ function query(params: object): string {
 }
 
 export const listOpportunities = (params: OpportunityQuery = {}) =>
-  get<Paged<Opportunity>>(`/api/opportunities${query(params)}`)
-export const getOpportunity = (id: string) => get<Opportunity>(`/api/opportunities/${id}`)
-export const opportunityFacets = () => get<OpportunityFacets>("/api/opportunities/facets")
-export const trackedOpportunities = () => get<Record<string, string>>("/api/opportunities/tracked")
-export const trackOpportunity = (id: string) => post<Application>(`/api/opportunities/${id}/track`)
-export const submitOpportunity = (body: OpportunitySubmit) => post<Opportunity>("/api/opportunities", body)
-/** Absolute URL of one opportunity's .ics file (no auth needed). */
-export const opportunityIcsUrl = (id: string) => `${API_BASE}/api/opportunities/${id}/calendar.ics`
+  get<Paged<Opportunity>>(`/api/app/opportunities${query(params)}`)
+export const getOpportunity = (id: string) => get<Opportunity>(`/api/app/opportunities/${encodeURIComponent(id)}`)
+export const opportunityFacets = () => get<OpportunityFacets>("/api/app/opportunities/facets")
+export const trackedOpportunities = () => get<Record<string, string>>("/api/app/opportunities/tracked")
+export const trackOpportunity = (id: string) => post<Application>(`/api/app/opportunities/${encodeURIComponent(id)}/track`)
+export const submitOpportunity = (body: OpportunitySubmit) => post<Opportunity>("/api/app/opportunities", body)
+/** Fetches one opportunity's .ics with the member token and hands it to the browser as a download. */
+export async function downloadOpportunityIcs(id: string): Promise<void> {
+  const path = `/api/app/opportunities/${encodeURIComponent(id)}/calendar.ics`
+  const { res, text } = await fetchWithAuth(path)
+  if (!res.ok) throw new ApiError(res.status, text, parseDetail(text).message.slice(0, 500))
+  const url = URL.createObjectURL(new Blob([text], { type: "text/calendar" }))
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `opportunity-${id}.ics`
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 // --- Applications ------------------------------------------------------------------
 
-export const listApplications = () => get<Application[]>("/api/applications")
-export const getApplication = (id: string) => get<Application>(`/api/applications/${id}`)
+export const listApplications = () => get<Application[]>("/api/app/applications")
+export const getApplication = (id: string) => get<Application>(`/api/app/applications/${id}`)
 export const createApplication = (body: ApplicationInput & { title: string }) =>
-  post<Application>("/api/applications", body)
+  post<Application>("/api/app/applications", body)
 export const updateApplication = (id: string, body: ApplicationInput) =>
-  patch<Application>(`/api/applications/${id}`, body)
-export const deleteApplication = (id: string) => del<{ status: string }>(`/api/applications/${id}`)
+  patch<Application>(`/api/app/applications/${id}`, body)
+export const deleteApplication = (id: string) => del<{ status: string }>(`/api/app/applications/${id}`)
 
 // --- To-dos and the calendar feed -------------------------------------------------
 
-export const listTodos = (status: "open" | "done" | "all" = "open") => get<Todo[]>(`/api/todos?status=${status}`)
-export const createTodo = (body: TodoCreate) => post<Todo>("/api/todos", body)
-export const updateTodo = (id: string, body: TodoUpdate) => patch<Todo>(`/api/todos/${id}`, body)
-export const deleteTodo = (id: string) => del<{ status: string }>(`/api/todos/${id}`)
-export const getCalendarFeed = () => get<CalendarFeed>("/api/calendar/feed")
-export const rotateCalendarFeed = () => post<CalendarFeed>("/api/calendar/feed/rotate")
+export const listTodos = (status: "open" | "done" | "all" = "open") => get<Todo[]>(`/api/app/todos?status=${status}`)
+export const createTodo = (body: TodoCreate) => post<Todo>("/api/app/todos", body)
+export const updateTodo = (id: string, body: TodoUpdate) => patch<Todo>(`/api/app/todos/${id}`, body)
+export const deleteTodo = (id: string) => del<{ status: string }>(`/api/app/todos/${id}`)
+export const getCalendarFeed = () => get<CalendarFeed>("/api/app/calendar/feed")
+export const rotateCalendarFeed = () => post<CalendarFeed>("/api/app/calendar/feed/rotate")
 
 // --- Scans ---------------------------------------------------------------------------
 
-export const listScans = () => get<Scan[]>("/api/scans")
-export const getScan = (id: string) => get<Scan>(`/api/scans/${id}`)
-export const startScan = (body: ScanRequest) => post<Scan>("/api/scans", body)
-export const cancelScan = (id: string) => post<Scan>(`/api/scans/${id}/cancel`)
-export const deleteScan = (id: string) => del<{ status: string }>(`/api/scans/${id}`)
+export const listScans = () => get<Scan[]>("/api/app/scans")
+export const getScan = (id: string) => get<Scan>(`/api/app/scans/${id}`)
+export const startScan = (body: ScanRequest) => post<Scan>("/api/app/scans", body)
+export const cancelScan = (id: string) => post<Scan>(`/api/app/scans/${id}/cancel`)
+export const deleteScan = (id: string) => del<{ status: string }>(`/api/app/scans/${id}`)
 
 // --- Notifications ------------------------------------------------------------------
 
@@ -260,27 +270,27 @@ export interface PushDevice {
   created_at: string
   last_ok_at: string | null
 }
-export const listNotifications = () => get<NotificationInbox>("/api/notifications")
-export const deleteNotification = (id: string) => del<{ removed: number }>(`/api/notifications/${encodeURIComponent(id)}`)
-export const clearNotifications = () => del<{ removed: number }>("/api/notifications")
-export const markNotificationRead = (id: string) => post<{ marked: number }>(`/api/notifications/${id}/read`)
-export const markAllNotificationsRead = () => post<{ marked: number }>("/api/notifications/read-all")
-export const getNotificationPreferences = () => get<NotificationPreferences>("/api/notifications/preferences")
+export const listNotifications = () => get<NotificationInbox>("/api/app/notifications")
+export const deleteNotification = (id: string) => del<{ removed: number }>(`/api/app/notifications/${encodeURIComponent(id)}`)
+export const clearNotifications = () => del<{ removed: number }>("/api/app/notifications")
+export const markNotificationRead = (id: string) => post<{ marked: number }>(`/api/app/notifications/${id}/read`)
+export const markAllNotificationsRead = () => post<{ marked: number }>("/api/app/notifications/read-all")
+export const getNotificationPreferences = () => get<NotificationPreferences>("/api/app/notifications/preferences")
 export const updateNotificationPreferences = (body: NotificationPreferencesPatch) =>
-  patch<NotificationPreferences>("/api/notifications/preferences", body)
-export const getPushConfig = () => get<{ enabled: boolean; public_key: string | null }>("/api/notifications/push/config")
-export const listPushDevices = () => get<PushDevice[]>("/api/notifications/push/subscriptions")
+  patch<NotificationPreferences>("/api/app/notifications/preferences", body)
+export const getPushConfig = () => get<{ enabled: boolean; public_key: string | null }>("/api/app/notifications/push/config")
+export const listPushDevices = () => get<PushDevice[]>("/api/app/notifications/push/subscriptions")
 export const savePushSubscription = (body: {
   endpoint: string
   keys: { p256dh: string; auth: string }
   timezone?: string
-}) => post<PushDevice>("/api/notifications/push/subscriptions", body)
+}) => post<PushDevice>("/api/app/notifications/push/subscriptions", body)
 export const removePushSubscription = (endpoint: string) =>
-  del<{ removed: number }>("/api/notifications/push/subscriptions", { endpoint })
+  del<{ removed: number }>("/api/app/notifications/push/subscriptions", { endpoint })
 export const sendTestNotification = () =>
-  post<{ push_enabled: boolean; devices: number; pushed: number }>("/api/notifications/test")
+  post<{ push_enabled: boolean; devices: number; pushed: number }>("/api/app/notifications/test")
 export const sendTestEmail = () =>
-  post<{ to: string; sent: boolean; backend: string }>("/api/notifications/test-email")
+  post<{ to: string; sent: boolean; backend: string }>("/api/app/notifications/test-email")
 export const unsubscribeNotificationEmail = (token: string) =>
-  post<{ status: string; kind: string; label: string }>("/api/notifications/unsubscribe", { token })
+  post<{ status: string; kind: string; label: string }>("/api/app/notifications/unsubscribe", { token })
 
