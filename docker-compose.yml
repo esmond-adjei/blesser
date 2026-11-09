@@ -1,11 +1,14 @@
 # Blesser compose.
 #
-# Full local stack:   docker compose up -d --build db api worker webapp
+# Full local stack:   docker compose up -d --build
 # Backend only:        docker compose up -d --build db api worker
 # Scale workers:       docker compose up -d --scale worker=3
 #
-#   api / worker  api/Dockerfile    (one image; the command decides the role)
-#   webapp        webapp/Dockerfile (VITE_API_URL baked in via build arg)
+#   api / worker  api/Dockerfile     (one image; the command decides the role)
+#   webapp        webapp/Dockerfile  member app on :8080
+#   admin         admin/Dockerfile   admin console on :8081
+#   site + edge   site/Dockerfile    public site on :8082 (edge nginx proxies /api)
+# Front-end images build from the repo root: they share the design-system workspace.
 services:
   db:
     image: postgres:16-alpine
@@ -67,13 +70,44 @@ services:
 
   webapp:
     build:
-      context: ./webapp
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: webapp/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-}
     restart: unless-stopped
     ports:
       - "${WEBAPP_PORT:-8080}:80"
+
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-8081}:80"
+
+  site:
+    build:
+      context: .
+      dockerfile: site/Dockerfile
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+      SITE_URL: ${SITE_URL:-http://localhost:8082}
+    depends_on:
+      api:
+        condition: service_healthy
+
+  edge:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./ops/nginx/site.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${SITE_PORT:-8082}:80"
+    depends_on:
+      - site
 
 volumes:
   pgdata:

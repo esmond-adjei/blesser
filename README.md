@@ -31,7 +31,7 @@ ops/        Backup and restore scripts
 
 ## Quick start
 
-You need Docker, [uv](https://docs.astral.sh/uv/) and Node 26 (`webapp/.nvmrc`).
+You need Docker, [uv](https://docs.astral.sh/uv/) and Node 26 (`.nvmrc`).
 
 ```bash
 make install                      # backend and web app dependencies

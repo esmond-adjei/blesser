@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/.astro
+api/.venv
+api/.env
+.git
+.agent-logs
+sample illustrations
+backups
