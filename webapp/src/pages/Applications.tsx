@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import trackedArt from "@blesser/ui/illustrations/spot-empty-tracked.webp"
 
 const stage = (status: Status): ApplicationStage => (status === "rejected" ? "not-this-time" : status)
 
@@ -98,6 +99,7 @@ export function Applications() {
         <ErrorState title="Your applications didn't load" description="Try again in a moment." onRetry={() => void refetch()} />
       ) : apps.length === 0 ? (
         <EmptyState
+          illustration={trackedArt}
           title={data?.length ? "Nothing with this status" : "Nothing tracked yet"}
           description="Track an opportunity from the catalogue, or add one by hand."
           action={

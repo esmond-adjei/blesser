@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import scanningArt from "@blesser/ui/illustrations/spot-scanning.webp"
 
 const STATUS_CHIP: Record<ScanTask["status"], { tone: ChipTone; label: string }> = {
   running: { tone: "info", label: "Running" },
@@ -59,6 +60,7 @@ export function Scans() {
         <ErrorState title="Your scans didn't load" description="Try again in a moment." onRetry={() => void scans.refetch()} />
       ) : !scans.data?.length ? (
         <EmptyState
+          illustration={scanningArt}
           title="No scans yet"
           description="Start one to find new opportunities for startups, researchers or students."
           action={

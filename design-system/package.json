@@ -10,7 +10,8 @@
     "./tokens.css": "./src/tokens.css",
     "./theme.css": "./src/theme.css",
     "./tokens.json": "./tokens.json",
-    "./logos/*": "./assets/logos/*"
+    "./logos/*": "./assets/logos/*",
+    "./illustrations/*": "./assets/illustrations/*"
   },
   "sideEffects": [
     "*.css"

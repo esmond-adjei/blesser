@@ -8,6 +8,7 @@ import { toastError, toastSuccess } from "../lib/toast"
 import type { Todo, TodoPriority } from "../lib/types"
 import { Button, Chip, Countdown, Input, Select, buttonVariants, cn } from "@blesser/ui"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import todosArt from "@blesser/ui/illustrations/spot-empty-todos.webp"
 
 /** Local yyyy-mm-dd: due dates are calendar days, not instants. */
 function todayIso(): string {
@@ -135,6 +136,7 @@ export function Todos() {
         <ErrorState title="Your to-dos didn't load" description="Try again in a moment." onRetry={() => void open.refetch()} />
       ) : groups.length === 0 ? (
         <EmptyState
+          illustration={todosArt}
           title="Nothing to do yet"
           description="Add a to-do above, or add one from any opportunity."
           action={

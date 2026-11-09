@@ -1,6 +1,7 @@
 import * as React from "react"
 import { RefreshCw } from "lucide-react"
 import { Button, EmptyState as BaseEmptyState, cn } from "@blesser/ui"
+import offlineArt from "@blesser/ui/illustrations/spot-offline.webp"
 
 type Props = {
   title: string
@@ -25,6 +26,7 @@ export function ErrorState({ onRetry, action, compact, className, ...props }: Pr
   return (
     <div className={cn("rounded-lg bg-surface shadow-elevation-1", className)}>
       <BaseEmptyState
+        illustration={compact ? undefined : offlineArt}
         {...props}
         error
         className={cn(compact && "py-5")}
