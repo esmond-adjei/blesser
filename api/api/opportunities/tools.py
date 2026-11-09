@@ -21,9 +21,47 @@ from api.opportunities import service as opp_service
 #: Fetched text kept per page for grounding checks.
 MAX_PAGE_CHARS = 400_000
 _STOPWORDS = frozenset(
-    ["the", "and", "for", "with", "from", "into", "of", "in", "on", "at", "to", "a", "an", "by", "or", "programme", "program", "call", "open", "2024", "2025", "2026", "2027", "2028"]
+    [
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "into",
+        "of",
+        "in",
+        "on",
+        "at",
+        "to",
+        "a",
+        "an",
+        "by",
+        "or",
+        "programme",
+        "program",
+        "call",
+        "open",
+        "2024",
+        "2025",
+        "2026",
+        "2027",
+        "2028",
+    ]
 )
-_MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+_MONTHS = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+]
 
 
 def url_key(url: str) -> str:
@@ -33,7 +71,9 @@ def url_key(url: str) -> str:
     except ValueError:
         return (url or "").strip()
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit(("https", parts.netloc.lower().removeprefix("www."), path, parts.query, ""))
+    return urlunsplit(
+        ("https", parts.netloc.lower().removeprefix("www."), path, parts.query, "")
+    )
 
 
 def record_fetch(ctx, url: str, text: str) -> None:
@@ -46,7 +86,11 @@ def record_fetch(ctx, url: str, text: str) -> None:
 
 
 def _words(text: str) -> list[str]:
-    return [w for w in opp_service.normalize(text).split() if len(w) >= 3 and w not in _STOPWORDS]
+    return [
+        w
+        for w in opp_service.normalize(text).split()
+        if len(w) >= 3 and w not in _STOPWORDS
+    ]
 
 
 def names_opportunity(page: str, title: str, organization: str) -> bool:
@@ -75,7 +119,9 @@ def deadline_on_page(page: str, deadline_date) -> bool:
 async def _scan_created(session, scan_id: str) -> int:
     return (
         await session.execute(
-            select(func.count()).select_from(m.Opportunity).where(m.Opportunity.scan_id == scan_id)
+            select(func.count())
+            .select_from(m.Opportunity)
+            .where(m.Opportunity.scan_id == scan_id)
         )
     ).scalar_one()
 
@@ -93,6 +139,12 @@ async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
         data = schemas.AgentOpportunityIn(**tool_input)
     except ValidationError as exc:
         return {"error": f"Invalid opportunity: {exc.errors()[0].get('msg', exc)}"}
+    if ctx.reverify_id:
+        target = await opp_service.get_or_404(
+            ctx.session, ctx.reverify_id, public=False
+        )
+        if opp_service.dedupe_key(data.organization, data.title) != target.dedupe_key:
+            return {"error": "Only the requested opportunity may be re-verified."}
     pages = getattr(ctx, "fetched_pages", None) or {}
     page = pages.get(url_key(data.source_url))
     if page is None:
@@ -121,7 +173,11 @@ async def handle_save_opportunity(tool_input: dict, ctx: ToolContext) -> dict:
         if deadline_date < opp_service.today() and not data.rolling:
             return {"error": "This opportunity's deadline has passed: skip it."}
     scan_id = getattr(getattr(ctx, "run", None), "id", None)
-    if scan_id and await _scan_created(ctx.session, scan_id) >= settings.max_opportunities_per_run:
+    if (
+        scan_id
+        and await _scan_created(ctx.session, scan_id)
+        >= settings.max_opportunities_per_run
+    ):
         return {
             "error": (
                 f"Scan budget reached: {settings.max_opportunities_per_run} new opportunities "

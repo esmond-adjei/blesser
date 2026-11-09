@@ -1,16 +1,17 @@
-"""Opportunity catalogue: grants, fellowships, accelerators, scholarships and more.
-
-Unlike the rest of the data model, opportunities are public: one shared catalogue,
-readable without an account. Rows are written by scan agents (grounded in a page
-the agent fetched) or submitted by people, and deduplicated on `dedupe_key`.
-What a person does with an opportunity is private and lives in their own rows:
-an Application (`applications.opportunity_id`) and to-dos (`todos.opportunity_id`).
-"""
-
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.core.db import Base
@@ -44,23 +45,51 @@ class OpportunityStatus(str, enum.Enum):
     """Moderation state: only `published` rows are public."""
 
     published = "published"
-    pending = "pending"
+    draft = "draft"
+    in_review = "in_review"
+    archived = "archived"
     hidden = "hidden"
 
 
 class OpportunitySource(str, enum.Enum):
     agent = "agent"
     community = "community"
+    staff = "staff"
 
 
 class Opportunity(Base):
     __tablename__ = "opportunities"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft','in_review','published','archived','hidden')",
+            name="ck_opportunity_status",
+        ),
+        CheckConstraint(
+            "audience IN ('public','members')", name="ck_opportunity_audience"
+        ),
+        CheckConstraint(
+            "review_reason IS NULL OR review_reason IN ('new_submission','agent_find','reported','source_changed')",
+            name="ck_opportunity_review_reason",
+        ),
+    )
+
+    slug: Mapped[str] = mapped_column(String, unique=True, default=lambda: new_id())
+    audience: Mapped[str] = mapped_column(String, default="public", index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    featured_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    editor_note: Mapped[str] = mapped_column(Text, default="")
+    review_reason: Mapped[str | None] = mapped_column(String, nullable=True)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String)
     organization: Mapped[str] = mapped_column(String, default="")
     category: Mapped[str] = mapped_column(String, index=True)
-    kind: Mapped[str] = mapped_column(String, default=OpportunityKind.other.value, index=True)
+    kind: Mapped[str] = mapped_column(
+        String, default=OpportunityKind.other.value, index=True
+    )
     summary: Mapped[str] = mapped_column(Text, default="")
     eligibility: Mapped[str] = mapped_column(Text, default="")
     # Free text: "Up to USD 50,000", "Fully funded", "Equity-free".

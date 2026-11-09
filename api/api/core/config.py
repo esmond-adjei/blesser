@@ -52,14 +52,11 @@ class Settings(BaseSettings):
     max_opportunities_per_run: int = 40
     # Region a scan targets when none is given.
     opportunity_default_region: str = "Ghana"
-    # Agent saves are grounded in a page the agent read, so they publish straight
-    # away; false holds them for an ops admin (OPS_ADMIN_EMAILS) to publish.
-    opportunity_auto_publish: bool = True
-    # Scheduled refresh: every N hours the worker scans every category as this
-    # existing account. Empty email or 0 turns it off.
+    # Scheduled scans run as this existing account.
     opportunity_sweep_email: str = ""
+    # Fallback if the database has no sweep_hours setting.
     opportunity_sweep_hours: int = 0
-    # Comma-separated emails that may moderate the catalogue (once verified).
+    # Verified member accounts to seed as admins on boot.
     ops_admin_emails: str = ""
 
     # --- Web search and page fetches (api/web.py) ---
@@ -165,7 +162,10 @@ class Settings(BaseSettings):
         if provider == "ollama":
             return self.llm_base_url or "http://localhost:11434/v1"
         if provider == "gemini":
-            return self.llm_base_url or "https://generativelanguage.googleapis.com/v1beta/openai/"
+            return (
+                self.llm_base_url
+                or "https://generativelanguage.googleapis.com/v1beta/openai/"
+            )
         return self.llm_base_url
 
     def resolve_cors_origins(self) -> list[str]:
@@ -184,8 +184,15 @@ def config_warnings(s: Settings | None = None) -> list[str]:
     warnings = []
     if not s.resolve_llm_api_key():
         warnings.append("LLM_API_KEY is not set: scans cannot run.")
-    if not (s.search_api_key or s.tavily_api_key or s.brave_api_key or "duckduckgo" in s.search_providers):
-        warnings.append("No web search key (TAVILY_API_KEY or BRAVE_API_KEY): scans cannot search.")
+    if not (
+        s.search_api_key
+        or s.tavily_api_key
+        or s.brave_api_key
+        or "duckduckgo" in s.search_providers
+    ):
+        warnings.append(
+            "No web search key (TAVILY_API_KEY or BRAVE_API_KEY): scans cannot search."
+        )
     return warnings
 
 

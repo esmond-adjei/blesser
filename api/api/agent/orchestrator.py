@@ -31,7 +31,7 @@ class TaskHalted(Exception):
 
 # Events: {"turn", "kind": "turn", "note"} per model text, and
 # {"turn", "tool", "input", "result", "result_preview", "ok"} per tool call.
-# "result" is the full payload; persisting sinks keep only the preview.
+# "result" is the full payload; sinks choose the excerpts they retain.
 EventCallback = Callable[[dict], Awaitable[None]]
 CheckpointCallback = Callable[[list[dict]], Awaitable[None]]
 
@@ -57,7 +57,10 @@ def with_closing_format(user_message: str) -> str:
 
 
 def compact_old_tool_results(
-    messages: list[dict], current_turn: int, max_age_turns: int, block_turns: int | None = None
+    messages: list[dict],
+    current_turn: int,
+    max_age_turns: int,
+    block_turns: int | None = None,
 ) -> list[dict]:
     """Replace tool results older than max_age_turns with a marker, in a new list.
 
@@ -66,7 +69,9 @@ def compact_old_tool_results(
     """
     if max_age_turns < 1:
         return messages
-    block = max(1, settings.compaction_block_turns if block_turns is None else block_turns)
+    block = max(
+        1, settings.compaction_block_turns if block_turns is None else block_turns
+    )
     cutoff = ((current_turn - max_age_turns) // block) * block
     return [
         {**m, "content": f"[{m.get('name', 'tool')} result already used - omitted]"}
@@ -114,22 +119,35 @@ async def _chat_with_retry(provider, messages, system: str, tools, turn: int):
             # Slot waits don't count against the deadline.
             async with model_slot(provider):
                 call = provider.chat(
-                    messages=messages, system=system, tools=tools, max_tokens=settings.llm_max_tokens
+                    messages=messages,
+                    system=system,
+                    tools=tools,
+                    max_tokens=settings.llm_max_tokens,
                 )
                 if deadline <= 0:
                     return await call
                 try:
                     return await asyncio.wait_for(call, deadline)
                 except TimeoutError as exc:
-                    raise TimeoutError(f"no model reply within {deadline:.0f}s") from exc
+                    raise TimeoutError(
+                        f"no model reply within {deadline:.0f}s"
+                    ) from exc
         except Exception as exc:
             if attempt == attempts - 1 or not is_transient(exc):
                 raise
             # Jittered so tasks that timed out together don't resend together.
-            delay = settings.llm_retry_backoff_seconds * (2**attempt) * random.uniform(0.5, 1.5)
+            delay = (
+                settings.llm_retry_backoff_seconds
+                * (2**attempt)
+                * random.uniform(0.5, 1.5)
+            )
             log.warning(
                 "model turn %s failed (%s); retry %s/%s in %.0fs",
-                turn + 1, type(exc).__name__, attempt + 1, attempts - 1, delay,
+                turn + 1,
+                type(exc).__name__,
+                attempt + 1,
+                attempts - 1,
+                delay,
             )
             await asyncio.sleep(delay)
     raise AssertionError("unreachable")  # pragma: no cover
@@ -181,7 +199,9 @@ async def run_agent_task(
     session = getattr(ctx, "session", None)
 
     fresh = [{"role": "user", "content": with_closing_format(user_message)}]
-    messages: list[dict] = list(resume_messages) if resume_messages is not None else fresh
+    messages: list[dict] = (
+        list(resume_messages) if resume_messages is not None else fresh
+    )
     if resume_messages is not None and _missing_required_extras(provider, messages):
         # Replaying this history would 400, so restart fresh; re-saves dedupe.
         messages = fresh
@@ -197,11 +217,15 @@ async def run_agent_task(
     for turn in range(turns_used, turn_limit):
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
-        call_messages = compact_old_tool_results(messages, turn + 1, settings.max_tool_result_age_turns)
+        call_messages = compact_old_tool_results(
+            messages, turn + 1, settings.max_tool_result_age_turns
+        )
         if session is not None:
             # Don't sit idle in a transaction during the model call.
             await session.commit()
-        response = await _chat_with_retry(provider, call_messages, system_prompt, definitions, turn)
+        response = await _chat_with_retry(
+            provider, call_messages, system_prompt, definitions, turn
+        )
         usage_in += (response.usage or {}).get("input_tokens", 0)
         usage_out += (response.usage or {}).get("output_tokens", 0)
         _add_usage(response.usage, turn + 1)
@@ -213,7 +237,11 @@ async def run_agent_task(
 
         if not response.tool_calls:
             messages.append({"role": "assistant", "content": response.text})
-            if progress_tools and not progress_made and nudges < settings.max_empty_finish_nudges:
+            if (
+                progress_tools
+                and not progress_made
+                and nudges < settings.max_empty_finish_nudges
+            ):
                 nudges += 1
                 messages.append({"role": "user", "content": EMPTY_FINISH_NUDGE})
                 continue
@@ -224,7 +252,12 @@ async def run_agent_task(
                 "role": "assistant",
                 "content": response.text,
                 "tool_calls": [
-                    {"id": tc.id, "name": tc.name, "arguments": tc.arguments, "extra_content": tc.extra_content}
+                    {
+                        "id": tc.id,
+                        "name": tc.name,
+                        "arguments": tc.arguments,
+                        "extra_content": tc.extra_content,
+                    }
                     for tc in response.tool_calls
                 ],
             }
@@ -233,7 +266,9 @@ async def run_agent_task(
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
 
-        results = await dispatch_batch([(tc.name, tc.arguments) for tc in response.tool_calls], ctx)
+        results = await dispatch_batch(
+            [(tc.name, tc.arguments) for tc in response.tool_calls], ctx
+        )
         # Request order keeps the trace and replayed history deterministic.
         for tool_use, result in zip(response.tool_calls, results, strict=True):
             if progress_tools and tool_use.name in progress_tools:
@@ -255,7 +290,8 @@ async def run_agent_task(
                     "tool_call_id": tool_use.id,
                     "name": tool_use.name,
                     "content": wrap_tool_result(
-                        tool_use.name, json.dumps(result, default=str, ensure_ascii=False)
+                        tool_use.name,
+                        json.dumps(result, default=str, ensure_ascii=False),
                     ),
                     "_turn": turn + 1,
                 }
@@ -264,11 +300,17 @@ async def run_agent_task(
         if on_checkpoint is not None:
             # Compacted: the raw history grows quadratically.
             await on_checkpoint(
-                compact_old_tool_results(messages, turn + 1, settings.max_tool_result_age_turns)
+                compact_old_tool_results(
+                    messages, turn + 1, settings.max_tool_result_age_turns
+                )
             )
 
     return _result(
-        "Hit the turn limit before the agent finished.", turn_limit, usage_in, usage_out, nudges
+        "Hit the turn limit before the agent finished.",
+        turn_limit,
+        usage_in,
+        usage_out,
+        nudges,
     )
 
 

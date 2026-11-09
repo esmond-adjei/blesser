@@ -66,7 +66,7 @@ async def register(
 ):
     """Create an account and sign in; it works unverified until the email is verified."""
     result = await auth_service.register(
-        session, req.email, req.password, req.accept_terms
+        session, req.email, req.password, req.accept_terms, req.track
     )
     user = await auth_service.get_user_or_401(session, result["user"]["id"])
     background.add_task(mailer.send, await email_flows.verification_mail(session, user))
@@ -139,7 +139,9 @@ async def oauth_callback(
 
 
 @router.post("/auth/oauth/link")
-async def oauth_link(req: auth_schemas.OAuthLinkIn, session: AsyncSession = Depends(get_session)):
+async def oauth_link(
+    req: auth_schemas.OAuthLinkIn, session: AsyncSession = Depends(get_session)
+):
     """Attach a pending provider identity by proving the existing account's password."""
     user = await auth_oauth.link(session, req.link_token, req.password)
     tokens = await auth_service.issue_pair(session, user)
@@ -164,7 +166,9 @@ async def forgot_password(
     mail = await email_flows.request_password_reset(session, str(req.email))
     if mail is not None:
         background.add_task(mailer.send, mail)
-    return {"status": "If an account exists for that email, a reset link is on its way."}
+    return {
+        "status": "If an account exists for that email, a reset link is on its way."
+    }
 
 
 @router.post("/auth/password/reset")
@@ -184,7 +188,9 @@ async def send_verification(
 ):
     """Resend the verification link (cooldown between sends)."""
     user = await auth_service.get_user_or_401(session, current.id)
-    background.add_task(mailer.send, await email_flows.resend_verification(session, user))
+    background.add_task(
+        mailer.send, await email_flows.resend_verification(session, user)
+    )
     return {"status": f"Sent a new link to {user.email}."}
 
 

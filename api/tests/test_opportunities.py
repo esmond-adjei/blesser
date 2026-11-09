@@ -135,7 +135,12 @@ def test_names_opportunity_and_deadline_on_page():
 def _run_id() -> str:
     async def go():
         async with SessionLocal() as session:
-            run = Scan(user_id=TEST_USER_ID, region="Ghana", categories=["startup"], status="running")
+            run = Scan(
+                user_id=TEST_USER_ID,
+                region="Ghana",
+                categories=["startup"],
+                status="running",
+            )
             session.add(run)
             await session.commit()
             return run.id
@@ -191,7 +196,9 @@ def test_save_refuses_deadline_missing_from_page_and_past_deadlines():
     wrong = _save(run_id, {**BASE, "deadline": "2027-09-01"}, pages)
     assert "isn't on the fetched page" in wrong["error"]
     past_page = PAGE + " Previous round closed 10 January 2020."
-    past = _save(run_id, {**BASE, "deadline": "2020-01-10"}, {BASE["source_url"]: past_page})
+    past = _save(
+        run_id, {**BASE, "deadline": "2020-01-10"}, {BASE["source_url"]: past_page}
+    )
     assert "passed" in past["error"]
 
 
@@ -236,9 +243,11 @@ def test_save_respects_task_budget(monkeypatch):
 def test_public_list_filters_and_hides_unpublished_and_closed():
     soon = _add(title="Soon Grant", deadline_date=_future(3))
     later = _add(title="Later Grant", deadline_date=_future(40))
-    rolling = _add(title="Rolling Fellowship", category="research", kind="fellowship", rolling=True)
+    rolling = _add(
+        title="Rolling Fellowship", category="research", kind="fellowship", rolling=True
+    )
     _add(title="Closed Grant", deadline_date=_future(-2))
-    _add(title="Pending Grant", status="pending")
+    _add(title="Pending Grant", status="in_review")
     _add(title="Hidden Grant", status="hidden")
     client = _client()
 
@@ -251,19 +260,24 @@ def test_public_list_filters_and_hides_unpublished_and_closed():
     assert [i["id"] for i in research["items"]] == [rolling]
     closing = client.get("/api/opportunities", params={"closing_within": 7}).json()
     assert [i["id"] for i in closing["items"]] == [soon]
-    with_closed = client.get("/api/opportunities", params={"include_closed": True}).json()
+    with_closed = client.get(
+        "/api/opportunities", params={"include_closed": True}
+    ).json()
     assert with_closed["total"] == 4
     search = client.get("/api/opportunities", params={"q": "fellowship"}).json()
     assert [i["id"] for i in search["items"]] == [rolling]
 
     facets = client.get("/api/opportunities/facets").json()
     assert facets["total"] == 3
-    assert {f["key"]: f["count"] for f in facets["categories"]} == {"startup": 2, "research": 1}
+    assert {f["key"]: f["count"] for f in facets["categories"]} == {
+        "startup": 2,
+        "research": 1,
+    }
     assert facets["closing_soon"] == 1
 
 
 def test_unpublished_opportunity_is_not_found():
-    pending = _add(title="Pending Grant", status="pending")
+    pending = _add(title="Pending Grant", status="in_review")
     assert _client().get(f"/api/opportunities/{pending}").status_code == 404
 
 
@@ -291,39 +305,25 @@ def test_submission_waits_for_review_and_moderation_is_ops_only():
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["status"] == "pending"
+    assert body["found_by"] == "community"
+    assert "status" not in body
     assert body["deadline_date"] == "2027-05-01"
     assert client.get("/api/opportunities").json()["total"] == 0
-    denied = client.patch(f"/api/opportunities/{body['id']}/status", json={"status": "published"})
-    assert denied.status_code == 403
+    denied = client.patch(
+        f"/api/opportunities/{body['id']}/status", json={"status": "published"}
+    )
+    assert denied.status_code == 404
 
 
-def _set_verified(value):
-    async def go():
-        from api.auth.models import User
-
-        async with SessionLocal() as session:
-            user = await session.get(User, TEST_USER_ID)
-            before = user.email_verified_at
-            user.email_verified_at = value
-            await session.commit()
-            return before
-
-    return asyncio.run(go())
-
-
-def test_ops_admin_can_publish(monkeypatch):
-    before = _set_verified(opp_service.utcnow_naive())
-    try:
-        monkeypatch.setattr(settings, "ops_admin_emails", TEST_USER_EMAIL)
-        pending = _add(title="Pending Grant", status="pending")
-        client = _client()
-        assert [o["id"] for o in client.get("/api/opportunities/pending").json()] == [pending]
-        resp = client.patch(f"/api/opportunities/{pending}/status", json={"status": "published"})
-        assert resp.status_code == 200
-        assert client.get("/api/opportunities").json()["total"] == 1
-    finally:
-        _set_verified(before)
+def test_legacy_moderation_routes_are_removed():
+    client = _client()
+    assert client.get("/api/opportunities/pending").status_code == 404
+    assert (
+        client.patch(
+            "/api/opportunities/nope/status", json={"status": "published"}
+        ).status_code
+        == 404
+    )
 
 
 # --- tracking --------------------------------------------------------------------
@@ -360,7 +360,11 @@ def test_todo_crud_and_links():
     client = _client()
     created = client.post(
         "/api/todos",
-        json={"title": "Draft pitch deck", "due_date": "2027-01-10", "opportunity_id": opp},
+        json={
+            "title": "Draft pitch deck",
+            "due_date": "2027-01-10",
+            "opportunity_id": opp,
+        },
     )
     assert created.status_code == 200, created.text
     todo = created.json()
@@ -373,9 +377,9 @@ def test_todo_crud_and_links():
     done = client.patch(f"/api/todos/{todo['id']}", json={"done": True}).json()
     assert done["done"] is True and done["done_at"] is not None
     assert client.get("/api/todos").json() == []
-    assert [t["id"] for t in client.get("/api/todos", params={"status": "done"}).json()] == [
-        todo["id"]
-    ]
+    assert [
+        t["id"] for t in client.get("/api/todos", params={"status": "done"}).json()
+    ] == [todo["id"]]
     reopened = client.patch(f"/api/todos/{todo['id']}", json={"done": False}).json()
     assert reopened["done_at"] is None
     assert client.delete(f"/api/todos/{todo['id']}").status_code == 200
@@ -386,7 +390,10 @@ def test_calendar_feed_lists_deadlines_and_todos_and_rotates():
     client = _client()
     opp = _add(title="Soon Grant", deadline_date=_future(5))
     client.post(f"/api/opportunities/{opp}/track")
-    client.post("/api/todos", json={"title": "Ask for references", "due_date": _future(2).isoformat()})
+    client.post(
+        "/api/todos",
+        json={"title": "Ask for references", "due_date": _future(2).isoformat()},
+    )
     client.post("/api/todos", json={"title": "Someday"})
 
     feed = client.get("/api/calendar/feed").json()
@@ -429,18 +436,38 @@ def test_scheduled_sweep_runs_once_per_interval(monkeypatch):
     async def age_earlier_scans():
         async with SessionLocal() as session:
             await session.execute(
-                update(Scan)
-                .values(created_at=opp_service.utcnow_naive() - timedelta(days=30))
+                update(Scan).values(
+                    created_at=opp_service.utcnow_naive() - timedelta(days=30)
+                )
             )
             await session.commit()
 
     asyncio.run(age_earlier_scans())
     assert asyncio.run(sweep()) is None  # off by default
     monkeypatch.setattr(settings, "opportunity_sweep_email", TEST_USER_EMAIL)
-    monkeypatch.setattr(settings, "opportunity_sweep_hours", 24)
+
+    async def enable():
+        from api.editorial.models import SiteSetting
+
+        async with SessionLocal() as session:
+            row = await session.get(SiteSetting, "sweep_hours")
+            row.value = 24
+            await session.commit()
+
+    asyncio.run(enable())
     first = asyncio.run(sweep())
     assert first is not None
     assert asyncio.run(sweep()) is None
+
+    async def disable():
+        from api.editorial.models import SiteSetting
+
+        async with SessionLocal() as session:
+            row = await session.get(SiteSetting, "sweep_hours")
+            row.value = 0
+            await session.commit()
+
+    asyncio.run(disable())
 
 
 # --- the agent loop, end to end with a scripted model --------------------------------
@@ -462,7 +489,10 @@ class ScriptedScout:
         assert {"fetch_page", "save_opportunity"} <= names
         if self.turn == 1:
             return LLMResponse(
-                text="", tool_calls=[ToolCall(id="f1", name="fetch_page", arguments={"url": self.URL})]
+                text="",
+                tool_calls=[
+                    ToolCall(id="f1", name="fetch_page", arguments={"url": self.URL})
+                ],
             )
         if self.turn == 2:
             return LLMResponse(
@@ -484,7 +514,9 @@ class ScriptedScout:
                     )
                 ],
             )
-        return LLMResponse(text="Saved 1 opportunity: Kumasi Innovation Fund.", tool_calls=[])
+        return LLMResponse(
+            text="Saved 1 opportunity: Kumasi Innovation Fund.", tool_calls=[]
+        )
 
 
 def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
@@ -494,7 +526,9 @@ def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
     from api.scans.models import TaskStatus
 
     async def fake_fetch(url, max_chars=None, offset=0):
-        return "Example Fund presents the Kumasi Innovation Fund. Deadline: 30 April 2027."
+        return (
+            "Example Fund presents the Kumasi Innovation Fund. Deadline: 30 April 2027."
+        )
 
     monkeypatch.setattr(web, "fetch_page", fake_fetch)
     model = ScriptedScout()
@@ -505,18 +539,28 @@ def test_discovery_task_saves_a_grounded_opportunity(monkeypatch):
     async def process():
         async with SessionLocal() as session:
             task = (
-                await session.execute(select(ScanTask).where(ScanTask.scan_id == run_id))
+                await session.execute(
+                    select(ScanTask).where(ScanTask.scan_id == run_id)
+                )
             ).scalar_one()
             task.status = TaskStatus.running
             await session.commit()
             await queue.process_claimed(session, task)
         async with SessionLocal() as session:
             task = (
-                await session.execute(select(ScanTask).where(ScanTask.scan_id == run_id))
+                await session.execute(
+                    select(ScanTask).where(ScanTask.scan_id == run_id)
+                )
             ).scalar_one()
             saved = (
-                await session.execute(select(Opportunity).where(Opportunity.scan_id == run_id))
-            ).scalars().all()
+                (
+                    await session.execute(
+                        select(Opportunity).where(Opportunity.scan_id == run_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
             return task, saved
 
     task, saved = asyncio.run(process())

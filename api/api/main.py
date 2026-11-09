@@ -3,24 +3,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from api import __version__
-from api.applications.routes import router as applications_router
-from api.auth.routes import router as auth_router
+from api.admin.routes import router as admin_router
+from api.app.routes import router as member_router
+from api.banner import print_banner
 from api.core.body_limit import BodySizeLimitMiddleware
 from api.core.config import log_config_warnings, settings
 from api.core.db import init_db
 from api.core.exceptions import AuthError, DomainError, RateLimitError
-from api.notifications.routes import router as notifications_router
-from api.opportunities.routes import router as opportunities_router
-from api.scans.routes import router as scans_router
-from api.todos.routes import router as todos_router
+from api.public.routes import router as public_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    print(f"==== [api] version {__version__} ====", flush=True)
+    print_banner()
     log_config_warnings()
     yield
 
@@ -51,7 +50,19 @@ async def _domain_error(request: Request, exc: DomainError):
         headers = {"WWW-Authenticate": "Bearer"}
     elif isinstance(exc, RateLimitError) and exc.retry_after:
         headers = {"Retry-After": str(exc.retry_after)}
-    return JSONResponse(status_code=exc.status_code, content={"detail": detail}, headers=headers)
+    return JSONResponse(
+        status_code=exc.status_code, content={"detail": detail}, headers=headers
+    )
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error(request: Request, exc: IntegrityError):
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": "A unique value or referenced record conflicts with this change."
+        },
+    )
 
 
 @app.get("/ready", tags=["ops"])
@@ -69,15 +80,11 @@ async def ready():
     return {"ready": True}
 
 
-for router in (
-    auth_router,
-    opportunities_router,
-    applications_router,
-    todos_router,
-    scans_router,
-    notifications_router,
-):
-    app.include_router(router, prefix="/api")
+app.include_router(member_router, prefix="/api/app")
+app.include_router(member_router, prefix="/api", include_in_schema=False)
+
+app.include_router(public_router, prefix="/api/public")
+app.include_router(admin_router, prefix="/api/admin")
 
 
 def main() -> None:

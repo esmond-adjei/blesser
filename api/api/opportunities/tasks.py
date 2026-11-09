@@ -35,14 +35,20 @@ async def _known(session, category: str) -> list[str]:
     return [f"{t} ({o})" if o else t for t, o in rows.all()]
 
 
-def user_message(*, region: str, category: str, focus: str, today: str, known: list[str]) -> str:
+def user_message(
+    *, region: str, category: str, focus: str, today: str, known: list[str]
+) -> str:
     known_block = "\n".join(f"- {k}" for k in known) if known else "(none yet)"
     focus = (focus or "").strip()
     return (
         f"Target region: {region}\n"
         f"Category: {category}: {CATEGORY_BRIEFS[category]}\n"
         f"Today's date: {today}\n"
-        + (f"Focus notes from the person who started this scan:\n{focus}\n" if focus else "")
+        + (
+            f"Focus notes from the person who started this scan:\n{focus}\n"
+            if focus
+            else ""
+        )
         + f"\nAlready in the catalogue for this category:\n{known_block}\n\n"
         f"Budget: save at most {settings.max_opportunities_per_task} opportunities in "
         f"this task. Save each one as soon as it is verified, then stop and summarize "
@@ -77,5 +83,23 @@ async def run_discover_opportunities(
         resume_messages=resume_messages,
         on_checkpoint=on_checkpoint,
         tools=["search_web", "fetch_page", "save_opportunity"],
+        progress_tools={"save_opportunity"},
+    )
+
+
+async def run_reverify_opportunity(
+    session, task, scan, on_event=None, resume_messages=None, on_checkpoint=None
+):
+    row = await opp_service.get_or_404(session, task.target, public=False)
+    ctx = ToolContext(session=session, run=scan)
+    ctx.reverify_id = row.id
+    return await run_agent_task(
+        DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
+        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url}. Save only this opportunity if the source still confirms it. Today: {opp_service.today().isoformat()}.",
+        ctx,
+        on_event=on_event,
+        resume_messages=resume_messages,
+        on_checkpoint=on_checkpoint,
+        tools=["fetch_page", "save_opportunity"],
         progress_tools={"save_opportunity"},
     )

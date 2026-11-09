@@ -64,27 +64,38 @@ async def _fetch(url: str, sql: str):
 
 
 def _tables(url: str) -> list[str]:
-    rows = _run(_fetch(url, "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"))
+    rows = _run(
+        _fetch(url, "SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+    )
     return sorted(r["tablename"] for r in rows)
 
 
-EXPECTED_TABLES = [
-    "alembic_version",
-    "applications",
-    "auth_email_tokens",
-    "auth_refresh_tokens",
-    "calendar_feeds",
-    "notification_preferences",
-    "notifications",
-    "opportunities",
-    "push_subscriptions",
-    "scan_tasks",
-    "scans",
-    "todos",
-    "user_identities",
-    "users",
-    "worker_heartbeats",
-]
+EXPECTED_TABLES = sorted(
+    [
+        "audit_log",
+        "collections",
+        "collection_items",
+        "opportunity_reports",
+        "opportunity_slug_history",
+        "site_content",
+        "site_settings",
+        "alembic_version",
+        "applications",
+        "auth_email_tokens",
+        "auth_refresh_tokens",
+        "calendar_feeds",
+        "notification_preferences",
+        "notifications",
+        "opportunities",
+        "push_subscriptions",
+        "scan_tasks",
+        "scans",
+        "todos",
+        "user_identities",
+        "users",
+        "worker_heartbeats",
+    ]
+)
 
 
 def test_fresh_upgrade_builds_full_schema():
@@ -107,7 +118,9 @@ def test_models_and_migrations_agree():
         try:
             async with engine.connect() as conn:
                 return await conn.run_sync(
-                    lambda sync: compare_metadata(MigrationContext.configure(sync), Base.metadata)
+                    lambda sync: compare_metadata(
+                        MigrationContext.configure(sync), Base.metadata
+                    )
                 )
         finally:
             await engine.dispose()
@@ -125,3 +138,58 @@ def test_downgrade_upgrade_cycle():
         assert _tables(url) == ["alembic_version"]
         command.upgrade(cfg, "head")
         assert _tables(url) == EXPECTED_TABLES
+
+
+def test_editorial_migration_preserves_data_and_reverses_states():
+    with _scratch_db() as url:
+        cfg = _cfg(url)
+        command.upgrade(cfg, "0001")
+        _run(
+            _fetch(
+                url,
+                """
+            INSERT INTO opportunities
+              (id, title, organization, category, kind, summary, eligibility, benefits,
+               location, countries, requirements, tags, deadline, rolling, link,
+               source_url, status, source, dedupe_key)
+            SELECT id, 'Same Grant', '', 'startup', 'grant', '', '', '', '', '[]',
+                   '[]', '[]', '', false, '', '', status, source, id
+            FROM (VALUES ('one', 'pending', 'community'), ('two', 'pending', 'agent'),
+                         ('three', 'published', 'agent'), ('four', 'hidden', 'agent'))
+                 AS seed(id, status, source)
+        """,
+            )
+        )
+        command.upgrade(cfg, "head")
+        rows = _run(
+            _fetch(
+                url,
+                "SELECT id, status, audience, review_reason, slug, published_at FROM opportunities",
+            )
+        )
+        by_id = {r["id"]: r for r in rows}
+        assert by_id["one"]["status"] == by_id["two"]["status"] == "in_review"
+        assert by_id["one"]["review_reason"] == "new_submission"
+        assert by_id["two"]["review_reason"] == "agent_find"
+        assert by_id["three"]["status"] == "published"
+        assert by_id["three"]["audience"] == "public"
+        assert by_id["three"]["published_at"] is not None
+        assert by_id["four"]["status"] == "hidden"
+        assert len({r["slug"] for r in rows}) == 4
+        assert all(r["slug"].startswith("same-grant") for r in rows)
+        _run(
+            _fetch(
+                url, "UPDATE opportunities SET status = 'archived' WHERE id = 'three'"
+            )
+        )
+        _run(_fetch(url, "UPDATE opportunities SET status = 'draft' WHERE id = 'four'"))
+        command.downgrade(cfg, "0001")
+        rows = _run(_fetch(url, "SELECT id, status FROM opportunities"))
+        assert {r["id"]: r["status"] for r in rows} == {
+            "one": "pending",
+            "two": "pending",
+            "three": "hidden",
+            "four": "pending",
+        }
+        command.upgrade(cfg, "head")
+        assert len(_run(_fetch(url, "SELECT slug FROM opportunities"))) == 4

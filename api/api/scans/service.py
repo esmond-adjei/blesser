@@ -16,7 +16,13 @@ TASK_TYPE = "discover_opportunities"
 
 
 async def start_scan(
-    session, user_id: str, *, categories: list[str], region: str = "", focus: str = ""
+    session,
+    user_id: str,
+    *,
+    categories: list[str],
+    region: str = "",
+    focus: str = "",
+    commit: bool = True,
 ) -> m.Scan:
     """Create the scan and queue one discovery task per category. Commits."""
     chosen = set(categories)
@@ -34,10 +40,16 @@ async def start_scan(
     await session.flush()
     for category in ordered:
         session.add(
-            m.ScanTask(scan_id=scan.id, user_id=user_id, task_type=TASK_TYPE, target=f"category:{category}")
+            m.ScanTask(
+                scan_id=scan.id,
+                user_id=user_id,
+                task_type=TASK_TYPE,
+                target=f"category:{category}",
+            )
         )
     await notify_work(session, scan.id)
-    await session.commit()
+    if commit:
+        await session.commit()
     return scan
 
 
@@ -48,9 +60,9 @@ async def note_tasks_drained(session, scan_id: str) -> None:
         return
     open_tasks = (
         await session.execute(
-            select(func.count()).select_from(m.ScanTask).where(
-                m.ScanTask.scan_id == scan_id, m.ScanTask.status.in_(m.INFLIGHT)
-            )
+            select(func.count())
+            .select_from(m.ScanTask)
+            .where(m.ScanTask.scan_id == scan_id, m.ScanTask.status.in_(m.INFLIGHT))
         )
     ).scalar() or 0
     if open_tasks == 0:
@@ -123,13 +135,17 @@ def _scan_out(scan: m.Scan, added: int, tasks: list[m.ScanTask] | None = None) -
 
 async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
     scans = (
-        await session.execute(
-            select(m.Scan)
-            .where(m.Scan.user_id == user_id)
-            .order_by(m.Scan.created_at.desc(), m.Scan.id)
-            .limit(limit)
+        (
+            await session.execute(
+                select(m.Scan)
+                .where(m.Scan.user_id == user_id)
+                .order_by(m.Scan.created_at.desc(), m.Scan.id)
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     added = await _added_counts(session, [s.id for s in scans])
     return [_scan_out(s, added.get(s.id, 0)) for s in scans]
 
@@ -137,8 +153,10 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
 async def scan_detail(session, user_id: str, scan_id: str) -> dict:
     scan = await get_or_404(session, user_id, scan_id)
     tasks = (
-        await session.execute(select(m.ScanTask).where(m.ScanTask.scan_id == scan.id))
-    ).scalars().all()
+        (await session.execute(select(m.ScanTask).where(m.ScanTask.scan_id == scan.id)))
+        .scalars()
+        .all()
+    )
     added = await _added_counts(session, [scan.id])
     return _scan_out(scan, added.get(scan.id, 0), list(tasks))
 
@@ -150,7 +168,9 @@ async def cancel_scan(session, user_id: str, scan_id: str) -> dict:
         scan.status = "cancelled"
         await session.execute(
             update(m.ScanTask)
-            .where(m.ScanTask.scan_id == scan.id, m.ScanTask.status == m.TaskStatus.pending)
+            .where(
+                m.ScanTask.scan_id == scan.id, m.ScanTask.status == m.TaskStatus.pending
+            )
             .values(status=m.TaskStatus.cancelled, finished_at=utcnow_naive())
             .execution_options(synchronize_session=False)
         )

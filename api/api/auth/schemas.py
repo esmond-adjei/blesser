@@ -8,6 +8,7 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     # The sign-up form's "I agree to the Terms and Privacy notice" box.
     accept_terms: bool = False
+    track: str | None = Field(default=None, max_length=300)
 
 
 class LoginIn(BaseModel):

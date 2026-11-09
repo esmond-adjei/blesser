@@ -21,7 +21,23 @@ def test_limiter_windows_and_isolation(monkeypatch):
 
 @pytest.mark.rate_limits
 def test_endpoint_returns_429_with_retry_after(monkeypatch):
-    monkeypatch.setitem(ratelimit.LIMITS, "scan", [(2, 60)])
+    import asyncio
+
+    from sqlalchemy import delete
+
+    from api.core.db import SessionLocal
+    from api.editorial.models import SiteSetting
+    from api.scans.models import Scan
+    from tests.conftest import TEST_USER_ID
+
+    async def configure():
+        async with SessionLocal() as session:
+            await session.execute(delete(Scan).where(Scan.user_id == TEST_USER_ID))
+            row = await session.get(SiteSetting, "member_scan_limits")
+            row.value = {"per_hour": 2, "per_day": 10}
+            await session.commit()
+
+    asyncio.run(configure())
     with TestClient(app) as client:
         body = {"categories": ["startup"]}
         assert client.post("/api/scans", json=body).status_code == 200
@@ -29,4 +45,12 @@ def test_endpoint_returns_429_with_retry_after(monkeypatch):
         blocked = client.post("/api/scans", json=body)
     assert blocked.status_code == 429
     assert int(blocked.headers["retry-after"]) > 0
-    assert "Too many scans" in blocked.json()["detail"]
+    assert "Scan limit reached" in blocked.json()["detail"]
+
+    async def reset():
+        async with SessionLocal() as session:
+            row = await session.get(SiteSetting, "member_scan_limits")
+            row.value = {"per_hour": 3, "per_day": 10}
+            await session.commit()
+
+    asyncio.run(reset())

@@ -35,9 +35,9 @@ async def _labels(session, rows: list[m.Todo]) -> tuple[dict[str, str], dict[str
     apps: dict[str, str] = {}
     if opp_ids:
         result = await session.execute(
-            select(opportunity_models.Opportunity.id, opportunity_models.Opportunity.title).where(
-                opportunity_models.Opportunity.id.in_(opp_ids)
-            )
+            select(
+                opportunity_models.Opportunity.id, opportunity_models.Opportunity.title
+            ).where(opportunity_models.Opportunity.id.in_(opp_ids))
         )
         opps = dict(result.all())
     if app_ids:
@@ -113,7 +113,7 @@ async def _get_or_404(session, user_id: str, todo_id: str) -> m.Todo:
 async def _check_links(session, user_id: str, opportunity_id, application_id) -> None:
     if opportunity_id:
         opp = await session.get(opportunity_models.Opportunity, opportunity_id)
-        if opp is None:
+        if opp is None or opp.status != "published":
             raise BadRequestError("Opportunity not found")
     if application_id:
         app = await session.get(application_models.Application, application_id)
@@ -144,7 +144,9 @@ async def create_todo(session, user_id: str, data: schemas.TodoCreate) -> dict:
     return await _one_out(session, row)
 
 
-async def update_todo(session, user_id: str, todo_id: str, data: schemas.TodoUpdate) -> dict:
+async def update_todo(
+    session, user_id: str, todo_id: str, data: schemas.TodoUpdate
+) -> dict:
     row = await _get_or_404(session, user_id, todo_id)
     patch = data.model_dump(exclude_unset=True)
     if "title" in patch and patch["title"] is not None:
@@ -193,7 +195,9 @@ async def get_or_create_feed(session, user_id: str) -> dict:
     feed = await session.get(m.CalendarFeed, user_id)
     if feed is None:
         token = secrets.token_urlsafe(24)
-        feed = m.CalendarFeed(user_id=user_id, token=token, token_hash=hash_token(token))
+        feed = m.CalendarFeed(
+            user_id=user_id, token=token, token_hash=hash_token(token)
+        )
         session.add(feed)
         await session.commit()
         await session.refresh(feed)
@@ -216,9 +220,16 @@ async def rotate_feed(session, user_id: str) -> dict:
 
 
 async def feed_owner(session, token: str) -> str | None:
+    from api.auth.models import User
+
     return (
         await session.execute(
-            select(m.CalendarFeed.user_id).where(m.CalendarFeed.token_hash == hash_token(token))
+            select(m.CalendarFeed.user_id)
+            .join(User, User.id == m.CalendarFeed.user_id)
+            .where(
+                m.CalendarFeed.token_hash == hash_token(token),
+                User.disabled_at.is_(None),
+            )
         )
     ).scalar_one_or_none()
 

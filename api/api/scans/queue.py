@@ -24,7 +24,7 @@ from api.core.config import settings
 from api.core.db import SessionLocal, listener_dsn
 from api.core.egress import public_error
 from api.core.time import utcnow_naive
-from api.opportunities.tasks import run_discover_opportunities
+from api.opportunities.tasks import run_discover_opportunities, run_reverify_opportunity
 from api.scans import models as m
 from api.scans.notify import CHANNEL, notify_work, parse_payload
 from api.scans.service import note_tasks_drained
@@ -34,6 +34,7 @@ HEARTBEAT_TTL = timedelta(days=1)
 
 TASK_HANDLERS = {
     "discover_opportunities": run_discover_opportunities,
+    "reverify_opportunity": run_reverify_opportunity,
 }
 
 #: (task_id, attempt) this coroutine runs, so dispatch can refuse work once it is halted.
@@ -60,7 +61,9 @@ async def current_lease_halt(session) -> str | None:
     task_id, attempt = lease
     row = (
         await session.execute(
-            select(m.ScanTask.status, m.ScanTask.attempt).where(m.ScanTask.id == task_id)
+            select(m.ScanTask.status, m.ScanTask.attempt).where(
+                m.ScanTask.id == task_id
+            )
         )
     ).one_or_none()
     if row is None:
@@ -75,7 +78,14 @@ async def heartbeat(session, worker_id: str = WORKER_ID, concurrency: int = 1) -
     now = utcnow_naive()
     row = await session.get(m.WorkerHeartbeat, worker_id)
     if row is None:
-        session.add(m.WorkerHeartbeat(worker_id=worker_id, concurrency=concurrency, started_at=now, last_seen_at=now))
+        session.add(
+            m.WorkerHeartbeat(
+                worker_id=worker_id,
+                concurrency=concurrency,
+                started_at=now,
+                last_seen_at=now,
+            )
+        )
     else:
         row.concurrency = concurrency
         row.last_seen_at = now
@@ -84,7 +94,9 @@ async def heartbeat(session, worker_id: str = WORKER_ID, concurrency: int = 1) -
 
 async def prune_heartbeats(session) -> None:
     await session.execute(
-        delete(m.WorkerHeartbeat).where(m.WorkerHeartbeat.last_seen_at < utcnow_naive() - HEARTBEAT_TTL)
+        delete(m.WorkerHeartbeat).where(
+            m.WorkerHeartbeat.last_seen_at < utcnow_naive() - HEARTBEAT_TTL
+        )
     )
     await session.commit()
 
@@ -98,7 +110,10 @@ async def claim_next_task(session, scan_id: str | None = None) -> m.ScanTask | N
             m.ScanTask.status == m.TaskStatus.pending,
             m.Scan.status == "running",
             # Not while an earlier attempt is still live; it releases the lease when it ends.
-            or_(m.ScanTask.claimed_by.is_(None), m.ScanTask.claimed_by.not_in(_live_worker_ids())),
+            or_(
+                m.ScanTask.claimed_by.is_(None),
+                m.ScanTask.claimed_by.not_in(_live_worker_ids()),
+            ),
         )
         .order_by(m.ScanTask.created_at)
         .limit(1)
@@ -120,19 +135,26 @@ async def reap_stale_tasks(session) -> int:
     """Requeue running tasks whose worker's heartbeat is stale or gone."""
     cutoff = utcnow_naive() - timedelta(minutes=settings.stale_task_minutes)
     rows = (
-        await session.execute(
-            select(m.ScanTask).where(
-                m.ScanTask.status == m.TaskStatus.running,
-                or_(
-                    and_(m.ScanTask.claimed_by.is_(None), m.ScanTask.updated_at < cutoff),
-                    and_(
-                        m.ScanTask.claimed_by.is_not(None),
-                        m.ScanTask.claimed_by.not_in(_live_worker_ids()),
+        (
+            await session.execute(
+                select(m.ScanTask).where(
+                    m.ScanTask.status == m.TaskStatus.running,
+                    or_(
+                        and_(
+                            m.ScanTask.claimed_by.is_(None),
+                            m.ScanTask.updated_at < cutoff,
+                        ),
+                        and_(
+                            m.ScanTask.claimed_by.is_not(None),
+                            m.ScanTask.claimed_by.not_in(_live_worker_ids()),
+                        ),
                     ),
-                ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for row in rows:
         row.status = m.TaskStatus.pending
         row.started_at = None
@@ -152,7 +174,7 @@ def _preview(value: object, limit: int = 100) -> str:
 
 
 def _event_sink(session, task: m.ScanTask, label: str):
-    """Persist the growing trace on the task row (previews only), for the live view."""
+    """Persist task events and fetched source excerpts for editorial review."""
     events: list[dict] = []
     if task.log:
         try:
@@ -163,10 +185,15 @@ def _event_sink(session, task: m.ScanTask, label: str):
 
     async def on_event(event: dict) -> None:
         entry = {k: v for k, v in event.items() if k != "result"}
+        if event.get("tool") == "fetch_page" and event.get("ok"):
+            entry["source_excerpt"] = event["result"].get("text", "")[:4000]
         entry["at"] = utcnow_naive().isoformat() + "Z"
         events.append(entry)
         if entry.get("kind") == "turn":
-            print(f"[worker] [{label} turn {entry['turn']}] {_preview(entry.get('note') or '')}", flush=True)
+            print(
+                f"[worker] [{label} turn {entry['turn']}] {_preview(entry.get('note') or '')}",
+                flush=True,
+            )
         else:
             status = "ok" if entry.get("ok") else "ERROR"
             print(
@@ -188,7 +215,9 @@ def _charge(task: m.ScanTask, usage: dict) -> None:
 
 async def _superseded(session, task_id: str, attempt: int) -> bool:
     current = (
-        await session.execute(select(m.ScanTask.attempt).where(m.ScanTask.id == task_id))
+        await session.execute(
+            select(m.ScanTask.attempt).where(m.ScanTask.id == task_id)
+        )
     ).scalar_one_or_none()
     return current != attempt
 
@@ -201,7 +230,11 @@ async def process_claimed(session, task: m.ScanTask) -> None:
     handler = TASK_HANDLERS.get(task.task_type)
     if scan is None or scan.user_id != task.user_id or handler is None:
         task.status = m.TaskStatus.error
-        task.error = "No handler for this task" if handler is None else "Task does not match its scan"
+        task.error = (
+            "No handler for this task"
+            if handler is None
+            else "Task does not match its scan"
+        )
         task.finished_at = utcnow_naive()
         await note_tasks_drained(session, scan_id)
         await session.commit()
@@ -237,11 +270,16 @@ async def process_claimed(session, task: m.ScanTask) -> None:
         task.messages_json = None
         _charge(task, spent)
         task.turns = result.get("turns")
-        print(f"[worker] done {label} in {task.turns} turns: {_preview(task.final_text or '', 80)}", flush=True)
+        print(
+            f"[worker] done {label} in {task.turns} turns: {_preview(task.final_text or '', 80)}",
+            flush=True,
+        )
     except Exception as exc:  # noqa: BLE001 - log and move on, never crash the worker
         # Roll back first: a poisoned transaction would fail the commit below.
         await session.rollback()
-        if isinstance(exc, StaleDataError) or await _superseded(session, task_id, attempt):
+        if isinstance(exc, StaleDataError) or await _superseded(
+            session, task_id, attempt
+        ):
             print(f"[worker] {label} attempt {attempt} superseded", flush=True)
             return
         task = await session.get(m.ScanTask, task_id)
@@ -358,6 +396,9 @@ async def hourly_jobs(session) -> None:
         print(f"[worker] {reminders} deadline reminder(s)", flush=True)
     await send_digests(session)
     await prune_traces(session)
+    from api.opportunities.archive import auto_archive
+
+    await auto_archive(session)
     if sweep := await maybe_sweep(session):
         print(f"[worker] started opportunity sweep {sweep[:8]}", flush=True)
 
@@ -406,7 +447,9 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
                     await deliver_pending(session)
             except Exception as exc:  # noqa: BLE001
                 print(f"[worker] notification delivery error: {exc!r}", flush=True)
-            await _wait(notifications_due, max(settings.notification_deliver_seconds, 1.0))
+            await _wait(
+                notifications_due, max(settings.notification_deliver_seconds, 1.0)
+            )
 
     try:
         await asyncio.gather(
@@ -418,7 +461,11 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
     finally:
         try:
             async with SessionLocal() as session:
-                await session.execute(delete(m.WorkerHeartbeat).where(m.WorkerHeartbeat.worker_id == WORKER_ID))
+                await session.execute(
+                    delete(m.WorkerHeartbeat).where(
+                        m.WorkerHeartbeat.worker_id == WORKER_ID
+                    )
+                )
                 await session.commit()
         except Exception:  # noqa: BLE001, S110 - staleness covers it
             pass

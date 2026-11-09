@@ -66,6 +66,11 @@ async def init_db() -> None:
     except Exception as exc:
         raise RuntimeError(f"Postgres migration failed: {exc}") from exc
 
+    from api.auth.service import seed_admins
+
+    async with SessionLocal() as session:
+        await seed_admins(session)
+
 
 async def get_session():
     async with SessionLocal() as session:

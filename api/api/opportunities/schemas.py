@@ -1,45 +1,11 @@
-from datetime import date, datetime
+from datetime import date
 
 from pydantic import BaseModel, Field
 
 from api.opportunities.models import (
     OpportunityCategory,
     OpportunityKind,
-    OpportunityStatus,
 )
-
-
-class OpportunityOut(BaseModel):
-    id: str
-    title: str
-    organization: str
-    category: str
-    kind: str
-    summary: str
-    eligibility: str
-    benefits: str
-    location: str
-    countries: list[str] = []
-    requirements: list[str] = []
-    tags: list[str] = []
-    deadline: str
-    deadline_date: date | None = None
-    rolling: bool
-    link: str
-    source_url: str
-    status: str
-    source: str
-    verified_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime
-    # Computed against today (UTC): rolling, undated, or a deadline not yet passed.
-    is_open: bool
-    days_left: int | None = None
-
-
-class OpportunityPage(BaseModel):
-    items: list[OpportunityOut]
-    total: int
 
 
 class FacetCount(BaseModel):
@@ -94,7 +60,3 @@ class AgentOpportunityIn(BaseModel):
     rolling: bool = False
     link: str = ""
     source_url: str = Field(min_length=8)
-
-
-class OpportunityModerate(BaseModel):
-    status: OpportunityStatus

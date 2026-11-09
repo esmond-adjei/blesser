@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     ForeignKey,
     String,
@@ -17,6 +18,12 @@ from api.core.ids import new_id
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("role IN ('member','editor','admin')", name="ck_user_role"),
+    )
+
+    role: Mapped[str] = mapped_column(String, default="member")
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
@@ -35,6 +42,8 @@ class RefreshToken(Base):
     issues a fresh one; logout deletes it. Only hashes are stored."""
 
     __tablename__ = "auth_refresh_tokens"
+
+    audience: Mapped[str] = mapped_column(String, default="app")
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(
@@ -67,7 +76,9 @@ class UserIdentity(Base):
 
     __tablename__ = "user_identities"
     __table_args__ = (
-        UniqueConstraint("provider", "subject", name="uq_user_identities_provider_subject"),
+        UniqueConstraint(
+            "provider", "subject", name="uq_user_identities_provider_subject"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)

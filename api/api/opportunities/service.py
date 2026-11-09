@@ -1,10 +1,3 @@
-"""Opportunity catalogue storage: public reads, agent upserts, submissions, tracking.
-
-The catalogue is shared and public; tracking an opportunity copies it into the
-person's own application tracker, where status, notes, checklist and deadline
-reminders already live (api/applications, api/notifications/deadlines.py).
-"""
-
 import re
 from datetime import date, timedelta
 
@@ -13,8 +6,7 @@ from sqlalchemy import String, cast, func, or_, select
 from api.applications import models as application_models
 from api.applications import service as application_service
 from api.applications.dates import parse_deadline
-from api.core.config import settings
-from api.core.exceptions import ForbiddenError, NotFoundError
+from api.core.exceptions import ConflictError, NotFoundError
 from api.core.time import utcnow_naive
 from api.opportunities import models as m
 from api.opportunities import schemas
@@ -39,6 +31,8 @@ def today() -> date:
 
 def is_open(opp: m.Opportunity, on: date | None = None) -> bool:
     on = on or today()
+    if opp.status == "archived":
+        return False
     return bool(opp.rolling) or opp.deadline_date is None or opp.deadline_date >= on
 
 
@@ -47,6 +41,19 @@ def to_out(opp: m.Opportunity, on: date | None = None) -> dict:
     days_left = (opp.deadline_date - on).days if opp.deadline_date else None
     return {
         "id": opp.id,
+        "slug": opp.slug,
+        "audience": opp.audience,
+        "found_by": opp.source,
+        "closed": opp.status == "archived",
+        "is_new": opp.created_at >= utcnow_naive() - timedelta(days=7),
+        "published_at": opp.published_at,
+        "published_by": opp.published_by,
+        "featured_rank": opp.featured_rank,
+        "editor_note": opp.editor_note,
+        "review_reason": opp.review_reason,
+        "created_by": opp.created_by,
+        "scan_id": opp.scan_id,
+        "dedupe_key": opp.dedupe_key,
         "title": opp.title,
         "organization": opp.organization,
         "category": opp.category,
@@ -97,9 +104,18 @@ async def list_public(
     sort: str = "deadline",
     limit: int = 30,
     offset: int = 0,
+    public_only: bool = False,
+    new: bool = False,
+    audience: str | None = None,
 ) -> dict:
     on = today()
     filters = [_published()]
+    if public_only:
+        filters.append(m.Opportunity.audience == "public")
+    elif audience:
+        filters.append(m.Opportunity.audience == audience)
+    if new:
+        filters.append(m.Opportunity.created_at >= utcnow_naive() - timedelta(days=7))
     if open_only:
         filters.append(_open_clause(on))
     if category:
@@ -130,7 +146,9 @@ async def list_public(
             )
         )
     total = (
-        await session.execute(select(func.count()).select_from(m.Opportunity).where(*filters))
+        await session.execute(
+            select(func.count()).select_from(m.Opportunity).where(*filters)
+        )
     ).scalar_one()
     stmt = select(m.Opportunity).where(*filters)
     if sort == "new":
@@ -143,7 +161,11 @@ async def list_public(
             m.Opportunity.id,
         )
     limit = max(1, min(limit, MAX_PAGE))
-    rows = (await session.execute(stmt.offset(max(offset, 0)).limit(limit))).scalars().all()
+    rows = (
+        (await session.execute(stmt.offset(max(offset, 0)).limit(limit)))
+        .scalars()
+        .all()
+    )
     return {"items": [to_out(r, on) for r in rows], "total": total}
 
 
@@ -151,9 +173,11 @@ def _plus_days(on: date, days: int) -> date:
     return on + timedelta(days=max(days, 0))
 
 
-async def facets(session) -> dict:
+async def facets(session, *, public_only=False) -> dict:
     on = today()
     base = [_published(), _open_clause(on)]
+    if public_only:
+        base.append(m.Opportunity.audience == "public")
     cats = (
         await session.execute(
             select(m.Opportunity.category, func.count())
@@ -163,7 +187,9 @@ async def facets(session) -> dict:
     ).all()
     kinds = (
         await session.execute(
-            select(m.Opportunity.kind, func.count()).where(*base).group_by(m.Opportunity.kind)
+            select(m.Opportunity.kind, func.count())
+            .where(*base)
+            .group_by(m.Opportunity.kind)
         )
     ).all()
     soon = (
@@ -171,7 +197,7 @@ async def facets(session) -> dict:
             select(func.count())
             .select_from(m.Opportunity)
             .where(
-                _published(),
+                *base,
                 m.Opportunity.deadline_date.is_not(None),
                 m.Opportunity.deadline_date >= on,
                 m.Opportunity.deadline_date <= _plus_days(on, CLOSING_SOON_DAYS),
@@ -179,28 +205,33 @@ async def facets(session) -> dict:
         )
     ).scalar_one()
     return {
-        "categories": [{"key": k, "count": c} for k, c in sorted(cats, key=lambda r: -r[1])],
-        "kinds": [{"key": k, "count": c} for k, c in sorted(kinds, key=lambda r: -r[1])],
+        "categories": [
+            {"key": k, "count": c} for k, c in sorted(cats, key=lambda r: -r[1])
+        ],
+        "kinds": [
+            {"key": k, "count": c} for k, c in sorted(kinds, key=lambda r: -r[1])
+        ],
         "total": sum(c for _, c in cats),
         "closing_soon": soon,
     }
 
 
-async def get_or_404(session, opportunity_id: str, *, public: bool = True) -> m.Opportunity:
-    opp = await session.get(m.Opportunity, opportunity_id)
-    if opp is None or (public and opp.status != m.OpportunityStatus.published.value):
+async def get_or_404(
+    session, opportunity_id: str, *, public: bool = True
+) -> m.Opportunity:
+    opp = (
+        await session.execute(
+            select(m.Opportunity).where(
+                or_(
+                    m.Opportunity.id == opportunity_id,
+                    m.Opportunity.slug == opportunity_id,
+                )
+            )
+        )
+    ).scalar_one_or_none()
+    if opp is None or (public and opp.status != "published"):
         raise NotFoundError("Opportunity not found")
     return opp
-
-
-async def is_ops_admin(session, user_id: str) -> bool:
-    from api.auth import service as auth_service
-
-    admins = {e.strip().lower() for e in settings.ops_admin_emails.split(",") if e.strip()}
-    if not admins:
-        return False
-    user = await auth_service.get_user_or_401(session, user_id)
-    return user.email.lower() in admins and user.email_verified_at is not None
 
 
 def _clean_list(values: list[str], limit: int = 20) -> list[str]:
@@ -218,18 +249,24 @@ def _clean_list(values: list[str], limit: int = 20) -> list[str]:
 
 async def find_by_key(session, key: str) -> m.Opportunity | None:
     return (
-        await session.execute(select(m.Opportunity).where(m.Opportunity.dedupe_key == key))
+        await session.execute(
+            select(m.Opportunity).where(m.Opportunity.dedupe_key == key)
+        )
     ).scalar_one_or_none()
 
 
-async def submit(session, user_id: str, data: schemas.OpportunitySubmit) -> dict:
-    """A person shares an opportunity. Ops admins publish directly; others wait for review."""
+async def submit(session, user_id: str | None, data: schemas.OpportunitySubmit) -> dict:
+    """Share an opportunity using the editorial publishing default."""
     key = dedupe_key(data.organization, data.title)
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(key))))
     existing = await find_by_key(session, key)
     if existing is not None:
+        if existing.status != "published" and user_id is not None:
+            raise ConflictError("This opportunity has already been submitted.")
         return to_out(existing)
-    admin = await is_ops_admin(session, user_id)
+    from api.editorial.service import get_settings, new_slug
+
+    default = (await get_settings(session))["community_default"]
     opp = m.Opportunity(
         title=data.title.strip(),
         organization=data.organization.strip(),
@@ -247,39 +284,16 @@ async def submit(session, user_id: str, data: schemas.OpportunitySubmit) -> dict
         rolling=data.rolling,
         link=data.link.strip(),
         source_url=data.link.strip(),
-        status=(
-            m.OpportunityStatus.published.value
-            if admin
-            else m.OpportunityStatus.pending.value
-        ),
+        status=default["status"],
+        audience="members",
+        slug=await new_slug(session, data.title),
+        review_reason="new_submission" if default["status"] == "in_review" else None,
+        published_at=utcnow_naive() if default["status"] == "published" else None,
         source=m.OpportunitySource.community.value,
         dedupe_key=key,
         created_by=user_id,
     )
     session.add(opp)
-    await session.commit()
-    await session.refresh(opp)
-    return to_out(opp)
-
-
-async def list_pending(session, user_id: str) -> list[dict]:
-    if not await is_ops_admin(session, user_id):
-        raise ForbiddenError("Ops access only.")
-    rows = (
-        await session.execute(
-            select(m.Opportunity)
-            .where(m.Opportunity.status == m.OpportunityStatus.pending.value)
-            .order_by(m.Opportunity.created_at.asc())
-        )
-    ).scalars().all()
-    return [to_out(r) for r in rows]
-
-
-async def moderate(session, user_id: str, opportunity_id: str, status: str) -> dict:
-    if not await is_ops_admin(session, user_id):
-        raise ForbiddenError("Ops access only.")
-    opp = await get_or_404(session, opportunity_id, public=False)
-    opp.status = status
     await session.commit()
     await session.refresh(opp)
     return to_out(opp)
@@ -304,11 +318,7 @@ async def upsert_from_agent(
     scan_id: str | None,
     data: schemas.AgentOpportunityIn,
 ) -> tuple[m.Opportunity, bool, list[str]]:
-    """Create, or refresh the matching row. Returns (row, created, updated_fields).
-
-    A re-read fills empty fields, merges lists and stamps verified_at; it never
-    overwrites what is there, and never republishes a row ops hid.
-    """
+    """Return the grounded row, whether created, and the fields refreshed."""
     key = dedupe_key(data.organization, data.title)
     now = utcnow_naive()
     deadline_date = parse_deadline(data.deadline)
@@ -316,6 +326,9 @@ async def upsert_from_agent(
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(key))))
     opp = await find_by_key(session, key)
     if opp is None:
+        from api.editorial.service import get_settings, new_slug
+
+        default = (await get_settings(session))["agent_default"]
         opp = m.Opportunity(
             title=data.title.strip(),
             organization=data.organization.strip(),
@@ -333,11 +346,11 @@ async def upsert_from_agent(
             rolling=data.rolling,
             link=(data.link or data.source_url).strip(),
             source_url=data.source_url.strip(),
-            status=(
-                m.OpportunityStatus.published.value
-                if settings.opportunity_auto_publish
-                else m.OpportunityStatus.pending.value
-            ),
+            status=default["status"],
+            audience=default["audience"],
+            slug=await new_slug(session, data.title),
+            review_reason="agent_find" if default["status"] == "in_review" else None,
+            published_at=now if default["status"] == "published" else None,
             source=m.OpportunitySource.agent.value,
             dedupe_key=key,
             created_by=user_id,
@@ -353,7 +366,9 @@ async def upsert_from_agent(
         if incoming and not (getattr(opp, field) or "").strip():
             setattr(opp, field, incoming)
             updated.append(field)
-    if "deadline" in updated or (opp.deadline_date is None and deadline_date is not None):
+    if "deadline" in updated or (
+        opp.deadline_date is None and deadline_date is not None
+    ):
         opp.deadline_date = deadline_date
         if "deadline" not in updated:
             updated.append("deadline_date")
@@ -367,7 +382,9 @@ async def upsert_from_agent(
         opp.deadline_date = deadline_date
         updated.append("deadline")
     for field, limit in (("countries", 20), ("requirements", 30), ("tags", 20)):
-        merged = _clean_list([*(getattr(opp, field) or []), *getattr(data, field)], limit)
+        merged = _clean_list(
+            [*(getattr(opp, field) or []), *getattr(data, field)], limit
+        )
         if merged != (getattr(opp, field) or []):
             setattr(opp, field, merged)
             updated.append(field)

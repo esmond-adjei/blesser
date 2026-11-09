@@ -18,6 +18,7 @@ class ToolContext:
         # Dispatch refuses tools not shown to the model.
         self.offered_tools: set[str] | None = None
         self.opportunities_saved = 0
+        self.reverify_id: str | None = None
         # {url_key: text} of pages fetch_page returned; save_opportunity cites one.
         self.fetched_pages: dict[str, str] = {}
         # Reads that failed in this task, so the same call isn't resent.

@@ -14,10 +14,13 @@ from fastapi import Depends
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
 from api.core.config import settings
+from api.core.db import get_session
 from api.core.exceptions import RateLimitError
 
 # bucket -> [(max_calls, window_seconds), ...]; every window must allow.
 LIMITS: dict[str, list[tuple[int, int]]] = {
+    "public_submit": [(5, 3600)],
+    "public_report": [(10, 3600)],
     # Agent scans spend model tokens and search calls.
     "scan": [(3, 3600), (10, 86400)],
     # Community submissions to the catalogue.
@@ -31,6 +34,8 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
 }
 
 _LABEL = {
+    "public_submit": "submissions",
+    "public_report": "reports",
     "scan": "scans",
     "submit": "submissions",
     "reset_email": "reset requests",
@@ -44,10 +49,17 @@ class RateLimiter:
         self._hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
 
-    def hit(self, bucket: str, key: str, now: float | None = None) -> float | None:
+    def hit(
+        self,
+        bucket: str,
+        key: str,
+        now: float | None = None,
+        *,
+        windows: list[tuple[int, int]] | None = None,
+    ) -> float | None:
         """Record one call; return seconds to wait if over a limit (not counted), else None."""
         now = time.monotonic() if now is None else now
-        windows = LIMITS[bucket]
+        windows = LIMITS[bucket] if windows is None else windows
         longest = max(w for _, w in windows)
         with self._lock:
             hits = self._hits[(bucket, key)]
@@ -55,6 +67,8 @@ class RateLimiter:
                 hits.popleft()
             wait = 0.0
             for limit, window in windows:
+                if limit <= 0:
+                    return float(window)
                 recent = [t for t in hits if now - t < window]
                 if len(recent) >= limit:
                     wait = max(wait, window - (now - recent[-limit]))
@@ -100,3 +114,47 @@ def rate_limit(bucket: str):
         enforce(bucket, current.id)
 
     return dependency
+
+
+async def enforce_scan_limit(
+    session=Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    if not settings.rate_limits_enabled:
+        return
+    from datetime import timedelta
+
+    from sqlalchemy import func, select
+
+    from api.core.time import utcnow_naive
+    from api.editorial.service import get_settings
+    from api.scans.models import Scan
+
+    limits = (await get_settings(session))["member_scan_limits"]
+    await session.execute(
+        select(func.pg_advisory_xact_lock(func.hashtext(f"member-scans:{current.id}")))
+    )
+    now = utcnow_naive()
+    for key, seconds in (("per_hour", 3600), ("per_day", 86400)):
+        count = await session.scalar(
+            select(func.count())
+            .select_from(Scan)
+            .where(
+                Scan.user_id == current.id,
+                Scan.created_at > now - timedelta(seconds=seconds),
+            )
+        )
+        if count >= limits[key]:
+            raise RateLimitError(
+                "Scan limit reached. Try again later.", retry_after=seconds
+            )
+
+    wait = limiter.hit(
+        "member_scan",
+        current.id,
+        windows=[(limits["per_hour"], 3600), (limits["per_day"], 86400)],
+    )
+    if wait is not None:
+        raise RateLimitError(
+            "Scan limit reached. Try again later.", retry_after=math.ceil(wait)
+        )

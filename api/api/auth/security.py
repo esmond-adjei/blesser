@@ -39,19 +39,25 @@ def check_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def issue_access_token(user_id: str) -> str:
+def issue_access_token(user_id: str, audience: str = "app") -> str:
     expiry = utcnow_naive() + timedelta(minutes=settings.auth_access_minutes)
     return jwt.encode(
-        {"sub": user_id, "exp": expiry, "iat": utcnow_naive()},
+        {"sub": user_id, "exp": expiry, "iat": utcnow_naive(), "aud": audience},
         _SIGNING_KEY,
         algorithm="HS256",
     )
 
 
-def parse_access_token(token: str) -> str | None:
+def parse_access_token(token: str, audience: str = "app") -> str | None:
     """User id for a valid token, else None (expired, forged, or garbage)."""
     try:
-        payload = jwt.decode(token, _SIGNING_KEY, algorithms=["HS256"])
+        payload = jwt.decode(
+            token,
+            _SIGNING_KEY,
+            algorithms=["HS256"],
+            audience=audience,
+            options={"require": ["aud", "exp", "sub"]},
+        )
     except jwt.PyJWTError:
         return None
     # Purpose-typed tokens (OAuth state, link tokens) are never sessions.
@@ -79,11 +85,15 @@ def read_signed(typ: str, token: str) -> dict | None:
     return payload if payload.get("typ") == typ else None
 
 
-def new_refresh_token() -> tuple[str, str, datetime]:
+def new_refresh_token(audience: str = "app") -> tuple[str, str, datetime]:
     """(presented token, stored hash, expiry). Only the hash hits the DB."""
     raw = secrets.token_urlsafe(48)
     digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    expiry = utcnow_naive() + timedelta(days=settings.auth_refresh_days)
+    expiry = utcnow_naive() + (
+        timedelta(hours=12)
+        if audience == "admin"
+        else timedelta(days=settings.auth_refresh_days)
+    )
     return raw, digest, expiry
 
 

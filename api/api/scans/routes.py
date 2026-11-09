@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
 from api.core.db import get_session
-from api.core.ratelimit import rate_limit
+from api.core.ratelimit import enforce_scan_limit
 from api.opportunities.models import OpportunityCategory
 from api.scans import service
 
@@ -17,10 +17,14 @@ router = APIRouter(tags=["scans"])
 
 
 class ScanCreate(BaseModel):
-    categories: list[OpportunityCategory] = Field(default_factory=lambda: list(OpportunityCategory))
+    categories: list[OpportunityCategory] = Field(
+        default_factory=lambda: list(OpportunityCategory)
+    )
     region: str = Field(default="", max_length=120)
     focus: str = Field(
-        default="", max_length=2000, description="Optional: sectors, fields or kinds to look for first."
+        default="",
+        max_length=2000,
+        description="Optional: sectors, fields or kinds to look for first.",
     )
 
 
@@ -51,7 +55,9 @@ class ScanOut(BaseModel):
     tasks: list[TaskOut] | None = None
 
 
-@router.post("/scans", response_model=ScanOut, dependencies=[Depends(rate_limit("scan"))])
+@router.post(
+    "/scans", response_model=ScanOut, dependencies=[Depends(enforce_scan_limit)]
+)
 async def start_scan(
     req: ScanCreate,
     session: AsyncSession = Depends(get_session),
