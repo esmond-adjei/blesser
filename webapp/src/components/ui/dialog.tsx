@@ -1,7 +1,7 @@
 import * as React from "react"
 import { createPortal } from "react-dom"
 import { X } from "lucide-react"
-import { cn } from "../../lib/utils"
+import { cn } from "@blesser/ui"
 import { useOpenTransition } from "../../lib/transition"
 
 const ShownContext = React.createContext(false)
@@ -38,7 +38,7 @@ export function Dialog({
   return createPortal(
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pb-4 pt-[12dvh] transition-opacity duration-200 motion-reduce:transition-none",
+        "fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pb-4 pt-[12dvh] transition-opacity duration-200 motion-reduce:transition-none",
         shown ? "opacity-100" : "opacity-0",
       )}
       onMouseDown={(e) => {
@@ -66,7 +66,7 @@ export function DialogContent({
       role="dialog"
       aria-modal="true"
       className={cn(
-        "relative flex max-h-[calc(88dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-surface p-0 text-label shadow-xl transition-[opacity,translate] duration-[320ms] ease-out motion-reduce:transform-none motion-reduce:transition-none",
+        "relative flex max-h-[calc(88dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface-raised p-0 text-ink shadow-elevation-3 transition-[opacity,translate] duration-[320ms] ease-out motion-reduce:transform-none motion-reduce:transition-none",
         // Dialogs rise 8px and fade; no scale.
         shown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
         className,
@@ -76,7 +76,7 @@ export function DialogContent({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute right-4 top-4 z-20 flex size-7 cursor-pointer items-center justify-center rounded-full bg-fill-quiet text-label-secondary transition-colors hover:bg-fill hover:text-label"
+        className="absolute right-4 top-4 z-20 flex size-8 cursor-pointer items-center justify-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink"
       >
         <X className="size-4" />
       </button>
@@ -99,11 +99,11 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
 }
 
 export function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("type-panel-title", className)} {...props} />
+  return <h3 className={cn("type-title-3", className)} {...props} />
 }
 
 export function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn("type-meta", className)} {...props} />
+  return <p className={cn("text-callout text-ink-secondary", className)} {...props} />
 }
 
 /** The only scrolling region in a dialog. */

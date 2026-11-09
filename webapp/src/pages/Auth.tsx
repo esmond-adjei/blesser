@@ -4,10 +4,8 @@ import { useAuth } from "../lib/auth"
 import * as api from "../lib/api"
 import { apiMessage } from "../lib/api"
 import { CheckCircle2, MailCheck } from "lucide-react"
-import { Button } from "../components/ui/button"
-import { Field, Input } from "../components/ui/input"
+import { Button, Field, Input, Logo } from "@blesser/ui"
 import { Alert, AlertDescription } from "../components/ui/feedback"
-import { AppLogo } from "../components/layout/AppLogo"
 import { OAUTH_STATE_KEY, OAuthButtons } from "../components/auth/OAuthButtons"
 
 function AuthShell({
@@ -20,18 +18,15 @@ function AuthShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[448px] flex-col justify-center gap-6 p-6">
-      <div className="flex items-center gap-2.5">
-        <AppLogo className="size-9" />
-        <div>
-          <p className="text-lg font-bold tracking-tight">Blesser</p>
-          <p className="type-caption">{title}</p>
-        </div>
+    <div className="mx-auto flex min-h-dvh w-full max-w-[448px] flex-col justify-center gap-6 px-4 py-8">
+      <div className="flex flex-col items-start gap-4">
+        <Logo className="size-10" />
+        <h1 className="type-title-2 text-ink">{title}</h1>
       </div>
-      <div className="space-y-4 rounded-xl bg-card p-6 shadow-sm">
+      <div className="space-y-4 rounded-lg border border-separator bg-surface p-6 shadow-elevation-1">
         {children}
       </div>
-      <p className="text-center type-caption">{subtitle}</p>
+      <p className="text-center text-callout text-ink-secondary">{subtitle}</p>
     </div>
   )
 }
@@ -73,7 +68,7 @@ export function Login() {
       subtitle={
         <>
           No account yet?{" "}
-          <Link to={`/register?next=${encodeURIComponent(next)}`} className="text-primary hover:underline">
+          <Link to={`/register?next=${encodeURIComponent(next)}`} className="font-semibold text-link hover:underline">
             Create one
           </Link>
         </>
@@ -92,7 +87,7 @@ export function Login() {
         <div className="flex justify-end">
           <Link
             to={`/forgot-password${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ""}`}
-            className="-mb-2 type-caption hover:text-foreground hover:underline"
+            className="-mb-2 text-footnote font-semibold text-link hover:underline"
           >
             Forgot password?
           </Link>
@@ -111,7 +106,7 @@ export function Login() {
             <AlertDescription>{err}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={busy}>
+        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </Button>
       </form>
@@ -156,7 +151,7 @@ export function Register() {
       subtitle={
         <>
           Already signed up?{" "}
-          <Link to={`/login?next=${encodeURIComponent(next)}`} className="text-primary hover:underline">
+          <Link to={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-link hover:underline">
             Sign in
           </Link>
         </>
@@ -177,18 +172,18 @@ export function Register() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </Field>
-        <label className="flex items-start gap-2 type-caption">
+        <label className="flex items-start gap-2 text-footnote text-ink-secondary">
           <input
             type="checkbox"
             required
-            className="mt-0.5"
+            className="mt-0.5 size-4 accent-forest"
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
           />
           <span>
             I agree to the{" "}
-            <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms</Link> and the{" "}
-            <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy notice</Link>.
+            <Link to="/terms" target="_blank" className="font-semibold text-link hover:underline">Terms</Link> and the{" "}
+            <Link to="/privacy" target="_blank" className="font-semibold text-link hover:underline">Privacy notice</Link>.
           </span>
         </label>
         {err && (
@@ -196,7 +191,7 @@ export function Register() {
             <AlertDescription>{err}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={busy || !agreed}>
+        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy || !agreed}>
           {busy ? "Creating…" : "Create account"}
         </Button>
       </form>
@@ -229,20 +224,20 @@ export function ForgotPassword() {
   return (
     <AuthShell
       title="Reset your password"
-      subtitle={<Link to="/login" className="text-primary hover:underline">Back to sign in</Link>}
+      subtitle={<Link to="/login" className="font-semibold text-link hover:underline">Back to sign in</Link>}
     >
       {sent ? (
         <div className="space-y-2 text-center">
-          <MailCheck className="mx-auto size-10 text-primary" aria-hidden />
-          <p className="font-semibold">Check your email</p>
-          <p className="type-meta">
-            If an account exists for <span className="font-medium text-foreground">{email.trim()}</span>, a reset
+          <MailCheck className="mx-auto size-10 text-link" strokeWidth={1.75} aria-hidden />
+          <p className="text-headline text-ink">Check your email</p>
+          <p className="text-callout text-ink-secondary">
+            If an account exists for <span className="font-medium text-ink">{email.trim()}</span>, a reset
             link is on its way. It works once and expires in 30 minutes.
           </p>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-3">
-          <p className="type-meta">
+          <p className="text-callout text-ink-secondary">
             Enter your account's email and we'll send you a link to choose a new password.
           </p>
           <Field label="Email">
@@ -253,7 +248,7 @@ export function ForgotPassword() {
               <AlertDescription>{err}</AlertDescription>
             </Alert>
           )}
-          <Button type="submit" className="w-full" disabled={busy}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy}>
             {busy ? "Sending…" : "Send reset link"}
           </Button>
         </form>
@@ -291,14 +286,14 @@ export function ResetPassword() {
   return (
     <AuthShell
       title="Choose a new password"
-      subtitle={<Link to="/login" className="text-primary hover:underline">Back to sign in</Link>}
+      subtitle={<Link to="/login" className="font-semibold text-link hover:underline">Back to sign in</Link>}
     >
       {done ? (
         <div className="space-y-3 text-center">
           <CheckCircle2 className="mx-auto size-10 text-positive" aria-hidden />
-          <p className="font-semibold">Password updated</p>
-          <p className="type-meta">For safety, every device was signed out.</p>
-          <Link to="/login" className="inline-block text-sm font-medium text-primary hover:underline">Sign in</Link>
+          <p className="text-headline text-ink">Password updated</p>
+          <p className="text-callout text-ink-secondary">For safety, every device was signed out.</p>
+          <Link to="/login" className="inline-block text-callout font-semibold text-link hover:underline">Sign in</Link>
         </div>
       ) : !token ? (
         <Alert variant="destructive">
@@ -314,7 +309,7 @@ export function ResetPassword() {
           <Field label="Confirm new password">
             <Input type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </Field>
-          {mismatch && <p className="text-xs text-destructive">Passwords don't match.</p>}
+          {mismatch && <p className="text-footnote font-medium text-critical">Passwords don't match.</p>}
           {err && (
             <Alert variant="destructive">
               <AlertDescription>
@@ -322,7 +317,7 @@ export function ResetPassword() {
               </AlertDescription>
             </Alert>
           )}
-          <Button type="submit" className="w-full" disabled={busy || mismatch || password.length < 8}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy || mismatch || password.length < 8}>
             {busy ? "Saving…" : "Set new password"}
           </Button>
         </form>
@@ -358,15 +353,15 @@ export function VerifyEmail() {
   return (
     <AuthShell
       title="Confirm your email"
-      subtitle={<Link to={user ? "/new" : "/login"} className="text-primary hover:underline">{user ? "Back to Blesser" : "Sign in"}</Link>}
+      subtitle={<Link to={user ? "/new" : "/login"} className="font-semibold text-link hover:underline">{user ? "Back to Blesser" : "Sign in"}</Link>}
     >
       {state === "working" ? (
-        <p className="text-center type-meta">Confirming…</p>
+        <p className="text-center text-callout text-ink-secondary">Confirming…</p>
       ) : state === "done" ? (
         <div className="space-y-2 text-center">
           <CheckCircle2 className="mx-auto size-10 text-positive" aria-hidden />
-          <p className="font-semibold">Email confirmed</p>
-          <p className="type-meta">Thanks. Everything in your account is unlocked.</p>
+          <p className="text-headline text-ink">Email confirmed</p>
+          <p className="text-callout text-ink-secondary">Thanks. Everything in your account is unlocked.</p>
         </div>
       ) : (
         <Alert variant="destructive">
@@ -403,13 +398,13 @@ export function UnsubscribeEmail() {
   return (
     <AuthShell
       title="Email notifications"
-      subtitle={<Link to={user ? "/new?settings=notifications" : "/login"} className="text-primary hover:underline">{user ? "Notification settings" : "Sign in"}</Link>}
+      subtitle={<Link to={user ? "/new?settings=notifications" : "/login"} className="font-semibold text-link hover:underline">{user ? "Notification settings" : "Sign in"}</Link>}
     >
       {state === "done" ? (
         <div className="space-y-2 text-center">
           <CheckCircle2 className="mx-auto size-10 text-positive" aria-hidden />
-          <p className="font-semibold">Unsubscribed</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-headline text-ink">Unsubscribed</p>
+          <p className="text-callout text-ink-secondary">
             No more {label ? `"${label}"` : "of these"} emails. Turn them back on any time in Settings, Notifications.
           </p>
         </div>
@@ -419,8 +414,8 @@ export function UnsubscribeEmail() {
         </Alert>
       ) : (
         <div className="space-y-3 text-center">
-          <p className="text-sm text-muted-foreground">Stop emails like the one you followed this link from?</p>
-          <Button onClick={confirm} disabled={state === "working"}>
+          <p className="text-callout text-ink-secondary">Stop emails like the one you followed this link from?</p>
+          <Button variant="primary" onClick={confirm} disabled={state === "working"}>
             {state === "working" ? "Unsubscribing…" : "Unsubscribe"}
           </Button>
         </div>
@@ -493,19 +488,19 @@ export function OAuthCallback() {
 
   if (!link) {
     return (
-      <AuthShell title="Signing you in" subtitle={<Link to="/login" className="text-primary hover:underline">Back to sign in</Link>}>
-        <p className="text-center type-meta">Finishing sign-in…</p>
+      <AuthShell title="Signing you in" subtitle={<Link to="/login" className="font-semibold text-link hover:underline">Back to sign in</Link>}>
+        <p className="text-center text-callout text-ink-secondary">Finishing sign-in…</p>
       </AuthShell>
     )
   }
   return (
     <AuthShell
       title={`Link ${link.data.provider}`}
-      subtitle={<Link to="/login" className="text-primary hover:underline">Cancel</Link>}
+      subtitle={<Link to="/login" className="font-semibold text-link hover:underline">Cancel</Link>}
     >
       <form onSubmit={onLink} className="space-y-3">
-        <p className="type-meta">
-          <span className="font-medium text-foreground">{link.data.email}</span> already has a Blesser account.
+        <p className="text-callout text-ink-secondary">
+          <span className="font-medium text-ink">{link.data.email}</span> already has a Blesser account.
           Enter its password once to link {link.data.provider}; after that you can use either to sign in.
         </p>
         <Field label="Password">
@@ -516,11 +511,11 @@ export function OAuthCallback() {
             <AlertDescription>{err}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={busy || !password}>
+        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy || !password}>
           {busy ? "Linking…" : `Link ${link.data.provider} and sign in`}
         </Button>
-        <p className="text-center type-caption">
-          Forgot it? <Link to={`/forgot-password?email=${encodeURIComponent(link.data.email)}`} className="text-primary hover:underline">Reset your password</Link>
+        <p className="text-center text-footnote text-ink-secondary">
+          Forgot it? <Link to={`/forgot-password?email=${encodeURIComponent(link.data.email)}`} className="font-semibold text-link hover:underline">Reset your password</Link>
         </p>
       </form>
     </AuthShell>

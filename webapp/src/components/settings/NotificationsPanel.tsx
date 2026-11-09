@@ -5,8 +5,8 @@ import * as api from "../../lib/api"
 import { browserTimezone, currentSubscription, disablePush, enablePush, permission, pushSupport } from "../../lib/push"
 import { toastError, toastInfo, toastSuccess } from "../../lib/toast"
 import { formatAgo } from "../../lib/format"
-import { Button } from "../ui/button"
-import { Input } from "../ui/input"
+import { Button } from "@blesser/ui"
+import { Input } from "@blesser/ui"
 import { Skeleton, SkeletonStack } from "../ui/feedback"
 import { SettingRow, SettingSection, SettingsPanel, Switch } from "./controls"
 
@@ -42,7 +42,7 @@ export function NotificationsPanel() {
           <div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left type-caption">
+                <tr className="text-left type-caption text-ink-secondary">
                   <th className="py-2 font-normal">Event</th>
                   {CHANNELS.map((channel) => (
                     <th key={channel.id} className="w-16 py-2 text-center font-normal sm:w-20">{channel.label}</th>
@@ -54,7 +54,7 @@ export function NotificationsPanel() {
                   <tr key={kind.kind}>
                     <td className="py-3 pr-3 align-top">
                       <span className="block font-medium">{kind.label}</span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{kind.description}</span>
+                      <span className="mt-0.5 block text-footnote text-ink-secondary">{kind.description}</span>
                     </td>
                     {CHANNELS.map((channel) => (
                       <td key={channel.id} className="py-3 text-center align-top">
@@ -68,7 +68,7 @@ export function NotificationsPanel() {
                 ))}
               </tbody>
             </table>
-            <p className="py-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="py-3 text-footnote text-ink-secondary">
               Push and email include a brief update and a link back here. CV text, draft content and professor details stay private. Email goes to verified addresses only.
             </p>
           </div>
@@ -124,7 +124,7 @@ function QuietHours({
               onChange={(e) => setStart(e.target.value)}
               onBlur={() => onSave({ quiet_start: start || null, quiet_end: end || null })}
             />
-            <span className="text-xs text-muted-foreground">to</span>
+            <span className="text-footnote text-ink-secondary">to</span>
             <Input
               type="time"
               aria-label="Quiet hours end"
@@ -273,7 +273,7 @@ function ThisBrowser() {
           subscribed ? (
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               onClick={() => {
                 const own = devices.data?.find((d) => d.endpoint === endpoint)
                 if (own) void remove(own)
@@ -290,16 +290,16 @@ function ThisBrowser() {
       />
       {(devices.data ?? []).filter((d) => d.endpoint !== endpoint).length > 0 && (
         <div className="py-3">
-          <p className="text-sm">Other devices</p>
+          <p className="text-callout font-semibold">Other devices</p>
           <ul className="mt-1.5 space-y-1.5">
             {(devices.data ?? [])
               .filter((d) => d.endpoint !== endpoint)
               .map((d) => (
-                <li key={d.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <li key={d.id} className="flex items-center gap-2 text-footnote text-ink-secondary">
                   <Smartphone className="size-3.5 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{deviceName(d.user_agent)}</span>
                   <span>added {formatAgo(d.created_at)}</span>
-                  <Button size="sm" variant="ghost" className="h-7" onClick={() => remove(d)}>
+                  <Button size="sm" variant="quiet" onClick={() => remove(d)}>
                     Remove
                   </Button>
                 </li>
@@ -311,7 +311,7 @@ function ThisBrowser() {
         title="Send a test notification"
         description="Goes to your inbox and every device with push on, right away (quiet hours don't apply)."
         control={
-          <Button data-tooltip="Send a test notification to your registered devices" size="sm" variant="outline" onClick={test}>
+          <Button data-tooltip="Send a test notification to your registered devices" size="sm" variant="secondary" onClick={test}>
             Send test
           </Button>
         }
@@ -320,7 +320,7 @@ function ThisBrowser() {
         title="Send a test email"
         description="Emails your verified address right away, so you can check email notifications arrive."
         control={
-          <Button data-tooltip="Send a test email to your account's address" size="sm" variant="outline" onClick={testEmail}>
+          <Button data-tooltip="Send a test email to your account's address" size="sm" variant="secondary" onClick={testEmail}>
             Send test email
           </Button>
         }

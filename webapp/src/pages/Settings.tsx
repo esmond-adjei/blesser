@@ -3,15 +3,15 @@ import { useNavigate } from "react-router-dom"
 import * as api from "../lib/api"
 import { useAuth } from "../lib/auth"
 import { toastError, toastSuccess } from "../lib/toast"
-import { Button } from "../components/ui/button"
-import { Field, Input } from "../components/ui/input"
+import { Button } from "@blesser/ui"
+import { Field, Input } from "@blesser/ui"
 import { NotificationsPanel } from "../components/settings/NotificationsPanel"
 import { SettingSection, SettingsPanel } from "../components/settings/controls"
 
 export function Settings() {
   return (
-    <div className="space-y-10">
-      <h1 className="type-page-title">Settings</h1>
+    <div className="space-y-8">
+      <h1 className="type-title-2">Settings</h1>
       <AccountPanel />
       <NotificationsPanel />
     </div>
@@ -52,7 +52,7 @@ function AccountPanel() {
           }}
         >
           <Input aria-label="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className="min-w-[220px] flex-1" />
-          <Button type="submit" size="sm" variant="outline" disabled={busy === "name"}>
+          <Button type="submit" size="sm" variant="secondary" disabled={busy === "name"}>
             Save
           </Button>
         </form>
@@ -79,7 +79,7 @@ function AccountPanel() {
               <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} minLength={8} required />
             </Field>
             <div>
-              <Button type="submit" size="sm" variant="outline" disabled={busy === "password"}>
+              <Button type="submit" size="sm" variant="secondary" disabled={busy === "password"}>
                 Change password
               </Button>
             </div>
@@ -111,7 +111,7 @@ function AccountPanel() {
             className="min-w-[220px] flex-1"
             required
           />
-          <Button type="submit" size="sm" variant="destructive" disabled={busy === "delete" || !confirmDelete}>
+          <Button type="submit" size="sm" variant="danger" disabled={busy === "delete" || !confirmDelete}>
             Delete account
           </Button>
         </form>

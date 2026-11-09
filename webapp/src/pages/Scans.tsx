@@ -6,11 +6,9 @@ import * as api from "../lib/api"
 import { formatAgo } from "../lib/format"
 import { CATEGORIES, CATEGORY_DESCRIPTIONS, CATEGORY_LABELS } from "../lib/opportunities"
 import { toastError, toastSuccess } from "../lib/toast"
-import { cn } from "../lib/utils"
+import { cn } from "@blesser/ui"
 import type { OpportunityCategory, Scan, ScanTask } from "../lib/types"
-import { Badge } from "../components/ui/badge"
-import { Button, buttonVariants } from "../components/ui/button"
-import { Field, Input, Textarea } from "../components/ui/input"
+import { Button, Chip, Field, Input, Textarea, buttonVariants, type ChipTone } from "@blesser/ui"
 import {
   Dialog,
   DialogBody,
@@ -22,13 +20,18 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 
-const STATUS_VARIANT = {
-  running: "info",
-  pending: "secondary",
-  done: "success",
-  error: "destructive",
-  cancelled: "outline",
-} as const
+const STATUS_CHIP: Record<ScanTask["status"], { tone: ChipTone; label: string }> = {
+  running: { tone: "info", label: "Running" },
+  pending: { tone: "neutral", label: "Waiting" },
+  done: { tone: "forest", label: "Finished" },
+  error: { tone: "critical", label: "Stopped with an error" },
+  cancelled: { tone: "neutral", label: "Stopped" },
+}
+
+function StatusChip({ status }: { status: ScanTask["status"] }) {
+  const chip = STATUS_CHIP[status]
+  return <Chip tone={chip.tone}>{chip.label}</Chip>
+}
 
 function scanTitle(scan: Scan): string {
   return `${scan.categories.map((c) => CATEGORY_LABELS[c] ?? c).join(", ")} in ${scan.region}`
@@ -38,45 +41,45 @@ export function Scans() {
   const scans = useQuery({ queryKey: ["scans"], queryFn: api.listScans, refetchInterval: 10_000 })
   const [open, setOpen] = React.useState(false)
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="type-page-title">Scans</h1>
-          <p className="type-meta max-w-2xl">
+          <h1 className="type-title-2">Scans</h1>
+          <p className="text-callout text-ink-secondary max-w-2xl">
             Agents search the web, read each opportunity's own page and add what they verify to the public catalogue.
           </p>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}>
-          <Sparkles /> New scan
+        <Button size="sm" variant="primary" onClick={() => setOpen(true)} icon={<Sparkles />}>
+          Start a scan
         </Button>
       </header>
       {scans.isLoading ? (
-        <div className="h-24 animate-pulse rounded-lg bg-fill-quiet" />
+        <div className="h-24 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
       ) : scans.isError ? (
-        <ErrorState title="Couldn't load your scans" description="Try again in a moment." onRetry={() => void scans.refetch()} />
+        <ErrorState title="Your scans didn't load" description="Try again in a moment." onRetry={() => void scans.refetch()} />
       ) : !scans.data?.length ? (
         <EmptyState
           title="No scans yet"
           description="Start one to find new opportunities for startups, researchers or students."
           action={
-            <Button size="sm" onClick={() => setOpen(true)}>
-              <Sparkles /> New scan
+            <Button onClick={() => setOpen(true)} icon={<Sparkles />}>
+              Start a scan
             </Button>
           }
         />
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+        <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1">
           {scans.data.map((scan) => (
             <li key={scan.id}>
-              <Link to={`/scans/${scan.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-fill-quiet">
-                <Radar className="size-4 shrink-0 text-label-tertiary" />
+              <Link to={`/scans/${scan.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-surface-sunk">
+                <Radar className="size-5 shrink-0 text-ink-tertiary" strokeWidth={1.75} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-label">{scanTitle(scan)}</span>
-                  <span className="block text-xs text-label-secondary">
+                  <span className="block truncate text-headline text-ink">{scanTitle(scan)}</span>
+                  <span className="block text-footnote text-ink-secondary">
                     Started {formatAgo(scan.created_at)} · {scan.opportunities_added} added
                   </span>
                 </span>
-                <Badge variant={STATUS_VARIANT[scan.status]}>{scan.status === "done" ? "Finished" : scan.status}</Badge>
+                <StatusChip status={scan.status} />
               </Link>
             </li>
           ))}
@@ -122,13 +125,13 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           </DialogHeader>
           <DialogBody className="space-y-4">
             <fieldset className="space-y-2">
-              <legend className="g-label mb-1">Look for</legend>
+              <legend className="mb-1 text-sm font-semibold text-ink">Look for</legend>
               {CATEGORIES.map((c) => (
-                <label key={c} className="flex items-start gap-2 text-sm">
-                  <input type="checkbox" className="mt-0.5" checked={categories.includes(c)} onChange={() => toggle(c)} />
+                <label key={c} className="flex items-start gap-2 text-callout">
+                  <input type="checkbox" className="mt-0.5 size-4 accent-forest" checked={categories.includes(c)} onChange={() => toggle(c)} />
                   <span>
-                    <span className="font-medium text-label">{CATEGORY_LABELS[c]}</span>
-                    <span className="block text-label-secondary">{CATEGORY_DESCRIPTIONS[c]}</span>
+                    <span className="font-medium text-ink">{CATEGORY_LABELS[c]}</span>
+                    <span className="block text-ink-secondary">{CATEGORY_DESCRIPTIONS[c]}</span>
                   </span>
                 </label>
               ))}
@@ -147,11 +150,11 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
             </Field>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="quiet" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={start.isPending || !categories.length}>
-              <Sparkles /> Start scan
+            <Button type="submit" variant="primary" disabled={start.isPending || !categories.length} icon={<Sparkles />}>
+              Start a scan
             </Button>
           </DialogFooter>
         </form>
@@ -185,36 +188,36 @@ export function ScanDetail() {
     onError: (e) => toastError(e),
   })
 
-  if (scan.isLoading) return <div className="h-40 animate-pulse rounded-lg bg-fill-quiet" />
+  if (scan.isLoading) return <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
   if (scan.isError || !scan.data)
-    return <ErrorState title="Couldn't load this scan" description="It may have been deleted." onRetry={() => void scan.refetch()} />
+    return <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
   const data = scan.data
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <Link to="/scans" className="text-sm text-label-secondary hover:underline">
+        <Link to="/scans" className="text-callout font-semibold text-link hover:underline">
           Scans
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="type-page-title min-w-0 flex-1">{scanTitle(data)}</h1>
-          <Badge variant={STATUS_VARIANT[data.status]}>{data.status === "done" ? "Finished" : data.status}</Badge>
+          <h1 className="type-title-2 min-w-0 flex-1">{scanTitle(data)}</h1>
+          <StatusChip status={data.status} />
         </div>
-        <p className="type-meta">
+        <p className="text-callout text-ink-secondary">
           Started {formatAgo(data.created_at)} · {data.opportunities_added} new{" "}
           {data.opportunities_added === 1 ? "opportunity" : "opportunities"}
           {data.focus ? ` · Focus: ${data.focus}` : ""}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Link to="/opportunities?sort=new" className={buttonVariants({ size: "sm", variant: "outline" })}>
+          <Link to="/opportunities?sort=new" className={buttonVariants({ size: "sm", variant: "secondary" })}>
             See the newest opportunities
           </Link>
           {data.status === "running" ? (
-            <Button size="sm" variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
-              <Ban /> Stop
+            <Button size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Ban />}>
+              Stop
             </Button>
           ) : (
-            <Button size="sm" variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>
-              <Trash2 /> Delete
+            <Button size="sm" variant="quiet" disabled={remove.isPending} onClick={() => remove.mutate()} icon={<Trash2 />}>
+              Delete
             </Button>
           )}
         </div>
@@ -245,43 +248,43 @@ function TaskCard({ task }: { task: ScanTask }) {
   const [open, setOpen] = React.useState(task.status === "running")
   const saves = task.log.filter((e) => e.tool === "save_opportunity" && e.ok).length
   return (
-    <section className="rounded-lg border border-border bg-surface">
+    <section className="rounded-lg border border-separator bg-surface shadow-elevation-1">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
       >
         <span className="min-w-0 flex-1">
-          <span className={cn("block text-sm font-semibold text-label", task.status === "running" && "shimmer-text")}>
+          <span className={cn("block text-headline text-ink", task.status === "running" && "shimmer-text")}>
             {taskLabel(task)}
           </span>
-          <span className="block text-xs text-label-secondary">
+          <span className="block text-footnote text-ink-secondary">
             {task.log.length} steps · {saves} saved{task.turns ? ` · ${task.turns} turns` : ""}
           </span>
         </span>
-        <Badge variant={STATUS_VARIANT[task.status]}>{task.status}</Badge>
-        <ChevronDown className={cn("size-4 text-label-tertiary transition-transform", open && "rotate-180")} />
+        <StatusChip status={task.status} />
+        <ChevronDown className={cn("size-4 text-ink-tertiary transition-transform", open && "rotate-180")} />
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-border px-4 py-3">
+        <div className="space-y-2 border-t border-separator px-5 py-3">
           {task.error ? <p className="text-sm text-critical">{task.error}</p> : null}
           {task.log.length === 0 ? (
-            <p className="text-sm text-label-secondary">{task.status === "pending" ? "Waiting for a worker." : "No steps recorded."}</p>
+            <p className="text-sm text-ink-secondary">{task.status === "pending" ? "Waiting for a worker." : "No steps recorded."}</p>
           ) : (
             <ol className="space-y-1.5">
               {task.log.map((event, i) =>
                 event.kind === "turn" ? (
-                  <li key={i} className="text-sm whitespace-pre-wrap text-label-secondary italic">
+                  <li key={i} className="text-sm whitespace-pre-wrap text-ink-secondary italic">
                     {event.note}
                   </li>
                 ) : (
                   <li key={i} className="flex gap-2 text-sm">
-                    <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", event.ok ? "bg-positive" : "bg-critical")} />
-                    <span className="min-w-0 break-words text-label">
+                    <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", event.ok ? "bg-positive" : "bg-caution")} />
+                    <span className="min-w-0 break-words text-ink">
                       {describe(event)}
                       {!event.ok && event.result_preview ? (
-                        <span className="block text-xs text-label-tertiary">{event.result_preview.slice(0, 240)}</span>
+                        <span className="block text-xs text-ink-tertiary">{event.result_preview.slice(0, 240)}</span>
                       ) : null}
                     </span>
                   </li>
@@ -290,7 +293,7 @@ function TaskCard({ task }: { task: ScanTask }) {
             </ol>
           )}
           {task.final_text ? (
-            <p className="rounded-md bg-fill-quiet p-3 text-sm whitespace-pre-wrap text-label">{task.final_text}</p>
+            <p className="rounded-sm bg-surface-sunk p-3 text-callout whitespace-pre-wrap text-ink">{task.final_text}</p>
           ) : null}
         </div>
       ) : null}

@@ -2,9 +2,8 @@ import * as React from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   ArrowUpRight,
-  BadgeCheck,
-  CalendarPlus,
   Check,
+  CalendarPlus,
   Download,
   ListPlus,
   MapPin,
@@ -20,8 +19,8 @@ import {
   CATEGORY_LABELS,
   KINDS,
   KIND_LABELS,
+  countdownFor,
   deadlineLabel,
-  deadlineTone,
   googleCalendarUrl,
   isCategory,
   isKind,
@@ -31,14 +30,22 @@ import {
   useTrackOpportunity,
   useTrackedOpportunities,
 } from "../lib/opportunities"
+import { formatAgo } from "../lib/format"
 import { useUrlParam } from "../lib/urlParams"
 import { toastError, toastSuccess } from "../lib/toast"
-import { cn } from "../lib/utils"
 import type { Opportunity, OpportunityCategory, OpportunityKind } from "../lib/types"
-import { Badge } from "../components/ui/badge"
-import { Button, buttonVariants } from "../components/ui/button"
-import { Field, Input, Textarea } from "../components/ui/input"
-import { Select } from "../components/ui/select"
+import {
+  Button,
+  Chip,
+  Countdown,
+  Field,
+  Input,
+  OpportunityCard as Card,
+  Select,
+  Textarea,
+  buttonVariants,
+  cn,
+} from "@blesser/ui"
 import {
   Dialog,
   DialogBody,
@@ -109,11 +116,11 @@ export function Opportunities() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h1 className="type-page-title">Opportunities</h1>
-          <p className="type-meta max-w-2xl">
+          <h1 className="type-title-2">Opportunities</h1>
+          <p className="text-callout text-ink-secondary max-w-2xl">
             Grants, accelerators, fellowships, scholarships and more, open to people in Ghana. Found and checked
             by agents against each opportunity's own page.
           </p>
@@ -121,18 +128,18 @@ export function Opportunities() {
         <div className="flex flex-wrap gap-2">
           {user ? (
             <>
-              <Button size="sm" variant="outline" onClick={() => setShareOpen(true)}>
-                <Plus /> Share one
+              <Button size="sm" onClick={() => setShareOpen(true)} icon={<Plus />}>
+                Share one
               </Button>
-              <Button size="sm" onClick={() => setScanOpen(true)}>
-                <Sparkles /> Find more
+              <Button size="sm" variant="brand" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
+                Find more
               </Button>
             </>
           ) : null}
         </div>
       </header>
 
-      <nav aria-label="Audience" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <nav aria-label="Audience" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <CategoryTile
           active={!category}
           label="Everything"
@@ -152,13 +159,13 @@ export function Opportunities() {
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-label-tertiary" />
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-ink-tertiary" />
           <Input
             aria-label="Search opportunities"
             placeholder="Search by name, funder, sector…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full pl-9"
+            className="w-full pl-10"
           />
         </div>
         <Select
@@ -181,22 +188,22 @@ export function Opportunities() {
             </option>
           ))}
         </Select>
-        <ToggleChip active={!!soonParam} onClick={() => setSoon(soonParam ? "" : "1")}>
+        <Chip selected={!!soonParam} onClick={() => setSoon(soonParam ? "" : "1")}>
           Closing in 2 weeks{facets.data ? ` (${facets.data.closing_soon})` : ""}
-        </ToggleChip>
-        <ToggleChip active={!!closedParam} onClick={() => setClosed(closedParam ? "" : "1")}>
+        </Chip>
+        <Chip selected={!!closedParam} onClick={() => setClosed(closedParam ? "" : "1")}>
           Include closed
-        </ToggleChip>
+        </Chip>
       </div>
 
       {list.isLoading ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="h-48 animate-pulse rounded-lg bg-fill-quiet" />
+            <div key={i} className="h-56 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
           ))}
         </div>
       ) : list.isError ? (
-        <ErrorState title="Couldn't load opportunities" description="Check your connection and try again." onRetry={() => void list.refetch()} />
+        <ErrorState title="Opportunities didn't load" description="Check your connection and try again." onRetry={() => void list.refetch()} />
       ) : items.length === 0 ? (
         <EmptyState
           title={query || category || kind || soonParam ? "Nothing matches these filters" : "No opportunities yet"}
@@ -207,18 +214,18 @@ export function Opportunities() {
           }
           action={
             user ? (
-              <Button size="sm" onClick={() => setScanOpen(true)}>
-                <Sparkles /> Find more
+              <Button variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
+                Find more
               </Button>
             ) : undefined
           }
         />
       ) : (
         <>
-          <p className="type-meta" aria-live="polite">
+          <p className="text-callout text-ink-secondary" aria-live="polite">
             {total} {total === 1 ? "opportunity" : "opportunities"}
           </p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {items.map((opp) => (
               <OpportunityCard
                 key={opp.id}
@@ -232,7 +239,7 @@ export function Opportunities() {
           </div>
           {list.hasNextPage ? (
             <div className="flex justify-center">
-              <Button variant="outline" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
+              <Button onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
                 {list.isFetchingNextPage ? "Loading…" : "Load more"}
               </Button>
             </div>
@@ -271,47 +278,43 @@ function CategoryTile({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active ? "border-tint bg-tint-soft" : "border-border bg-surface hover:bg-fill-quiet",
+        "cursor-pointer rounded-lg border p-4 text-left transition-colors duration-160",
+        active ? "border-forest bg-forest-soft" : "border-separator bg-surface hover:bg-surface-sunk",
       )}
     >
-      <span className="block text-sm font-semibold text-label">{label}</span>
-      <span className="mt-0.5 line-clamp-2 block text-xs text-label-secondary">{description}</span>
-    </button>
-  )
-}
-
-function ToggleChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active ? "border-tint bg-tint-soft text-tint" : "border-border text-label-secondary hover:bg-fill-quiet",
-      )}
-    >
-      {active ? <Check className="size-3.5" /> : null}
-      {children}
+      <span className="block text-headline text-ink">{label}</span>
+      <span className="mt-1 line-clamp-2 block text-footnote text-ink-secondary">{description}</span>
     </button>
   )
 }
 
 function OpportunityMeta({ opp }: { opp: Opportunity }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Badge variant={deadlineTone(opp)}>{deadlineLabel(opp)}</Badge>
-      <Badge variant="info">{KIND_LABELS[opp.kind] ?? opp.kind}</Badge>
-      <Badge variant="outline">{CATEGORY_LABELS[opp.category] ?? opp.category}</Badge>
+    <div className="flex flex-wrap items-center gap-2">
+      <Countdown {...countdownFor(opp)} />
+      <Chip tone="forest">{KIND_LABELS[opp.kind] ?? opp.kind}</Chip>
+      <Chip>{CATEGORY_LABELS[opp.category] ?? opp.category}</Chip>
       {opp.location ? (
-        <span className="inline-flex items-center gap-1 text-xs text-label-secondary">
-          <MapPin className="size-3" />
-          {opp.location}
-        </span>
+        <Chip icon={<MapPin />}>{opp.location}</Chip>
       ) : null}
     </div>
   )
+}
+
+function useTrack(opp: Opportunity, applicationId: string | undefined, requireUser: () => boolean) {
+  const track = useTrackOpportunity()
+  const navigate = useNavigate()
+  return {
+    pending: track.isPending,
+    onTrack: () => {
+      if (applicationId) return navigate("/applications")
+      if (!requireUser()) return
+      track.mutate(opp.id, {
+        onSuccess: () => toastSuccess("Tracked. Deadline reminders are on."),
+        onError: (err) => toastError(err, "That didn't track. Try again."),
+      })
+    },
+  }
 }
 
 function TrackButton({
@@ -323,31 +326,21 @@ function TrackButton({
   applicationId: string | undefined
   requireUser: () => boolean
 }) {
-  const track = useTrackOpportunity()
+  const { pending, onTrack } = useTrack(opp, applicationId, requireUser)
   if (applicationId)
     return (
-      <Link to={`/applications/${applicationId}`} className={buttonVariants({ size: "sm", variant: "secondary" })}>
+      <Link to="/applications" className={buttonVariants({ size: "sm", variant: "quiet" })}>
         <Check /> Tracking
       </Link>
     )
   return (
-    <Button
-      size="sm"
-      disabled={track.isPending}
-      onClick={() => {
-        if (!requireUser()) return
-        track.mutate(opp.id, {
-          onSuccess: () => toastSuccess("Added to your applications. Deadline reminders are on."),
-          onError: (err) => toastError(err, "Couldn't track it"),
-        })
-      }}
-    >
-      <BadgeCheck /> Track
+    <Button size="sm" variant="primary" disabled={pending} onClick={onTrack} icon={<Plus />}>
+      Track
     </Button>
   )
 }
 
-function CalendarButtons({ opp }: { opp: Opportunity }) {
+function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean }) {
   const google = googleCalendarUrl(opp)
   if (!google) return null
   return (
@@ -356,14 +349,16 @@ function CalendarButtons({ opp }: { opp: Opportunity }) {
         href={google}
         target="_blank"
         rel="noopener noreferrer"
-        className={buttonVariants({ size: "sm", variant: "outline" })}
+        aria-label={compact ? "Add to Google Calendar" : undefined}
+        className={buttonVariants({ size: "sm", variant: compact ? "quiet" : "secondary", iconOnly: compact })}
         data-tooltip="Add the deadline to Google Calendar"
       >
-        <CalendarPlus /> Calendar
+        <CalendarPlus />
+        {compact ? null : "Add to calendar"}
       </a>
       <a
         href={api.opportunityIcsUrl(opp.id)}
-        className={buttonVariants({ size: "icon", variant: "ghost" })}
+        className={buttonVariants({ size: "sm", iconOnly: true, variant: "quiet" })}
         aria-label="Download the deadline as an .ics file"
         data-tooltip="Download .ics (Apple Calendar, Outlook)"
       >
@@ -386,37 +381,43 @@ function OpportunityCard({
   onTodo: () => void
   requireUser: () => boolean
 }) {
+  const { pending, onTrack } = useTrack(opp, applicationId, requireUser)
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
-      <OpportunityMeta opp={opp} />
-      <div className="min-w-0">
-        <h2 className="text-base leading-snug font-semibold text-label">
-          <button type="button" onClick={onOpen} className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            {opp.title}
-          </button>
-        </h2>
-        {opp.organization ? <p className="text-sm text-label-secondary">{opp.organization}</p> : null}
-      </div>
-      {opp.summary ? <p className="line-clamp-3 text-sm text-label-secondary">{opp.summary}</p> : null}
-      {opp.benefits ? <p className="text-sm font-medium text-label">{opp.benefits}</p> : null}
-      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
-        <TrackButton opp={opp} applicationId={applicationId} requireUser={requireUser} />
-        <CalendarButtons opp={opp} />
-        <Button size="icon" variant="ghost" aria-label="Add a to-do" data-tooltip="Add a to-do" onClick={onTodo}>
-          <ListPlus />
-        </Button>
-        {opp.link || opp.source_url ? (
-          <a
-            href={opp.link || opp.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(buttonVariants({ size: "sm", variant: "link" }), "ml-auto")}
-          >
-            Apply <ArrowUpRight />
-          </a>
-        ) : null}
-      </div>
-    </article>
+    <Card
+      organization={opp.organization}
+      title={
+        <button type="button" onClick={onOpen} className="cursor-pointer text-left hover:underline">
+          {opp.title}
+        </button>
+      }
+      kind={KIND_LABELS[opp.kind] ?? opp.kind}
+      amount={opp.benefits || undefined}
+      audiences={[CATEGORY_LABELS[opp.category] ?? opp.category]}
+      countdown={countdownFor(opp)}
+      tracked={!!applicationId}
+      onTrack={onTrack}
+      trackDisabled={pending}
+      actions={
+        <>
+          <CalendarButtons opp={opp} compact />
+          <Button size="sm" variant="quiet" aria-label="Add a to-do" data-tooltip="Add a to-do" onClick={onTodo} icon={<ListPlus />} />
+          {opp.link || opp.source_url ? (
+            <a
+              href={opp.link || opp.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open the official page for ${opp.title}`}
+              data-tooltip="Official page"
+              className={buttonVariants({ size: "sm", variant: "quiet", iconOnly: true })}
+            >
+              <ArrowUpRight />
+            </a>
+          ) : null}
+        </>
+      }
+    >
+      {opp.summary ? <p className="line-clamp-3 text-callout text-ink-secondary">{opp.summary}</p> : null}
+    </Card>
   )
 }
 
@@ -446,8 +447,8 @@ function OpportunityDetail({
           </DialogHeader>
           <DialogBody className="space-y-4">
             <OpportunityMeta opp={shown} />
-            {shown.summary ? <p className="text-sm text-label">{shown.summary}</p> : null}
-            <dl className="grid gap-3 text-sm sm:grid-cols-[140px_1fr]">
+            {shown.summary ? <p className="max-w-reading text-body text-ink">{shown.summary}</p> : null}
+            <dl className="grid gap-3 text-callout sm:grid-cols-[140px_1fr]">
               {shown.benefits ? <Fact label="What you get">{shown.benefits}</Fact> : null}
               {shown.eligibility ? <Fact label="Who can apply">{shown.eligibility}</Fact> : null}
               <Fact label="Deadline">
@@ -459,31 +460,31 @@ function OpportunityDetail({
             </dl>
             {shown.requirements.length ? (
               <div>
-                <h3 className="mb-1.5 text-sm font-semibold text-label">What to prepare</h3>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-label-secondary">
+                <h3 className="mb-1.5 text-headline text-ink">What to prepare</h3>
+                <ul className="list-disc space-y-1 pl-5 text-callout text-ink-secondary">
                   {shown.requirements.map((r) => (
                     <li key={r}>{r}</li>
                   ))}
                 </ul>
               </div>
             ) : null}
-            <p className="text-xs text-label-tertiary">
+            <p className="text-footnote text-ink-tertiary">
               {shown.source === "agent" ? "Found by an agent" : "Shared by the community"}
-              {shown.verified_at ? `, last checked ${new Date(shown.verified_at + "Z").toLocaleDateString()}` : ""}
+              {shown.verified_at ? `, checked ${formatAgo(shown.verified_at)}` : ""}
               {shown.source_url ? (
                 <>
-                  {" against "}
+                  {" from "}
                   <a href={shown.source_url} target="_blank" rel="noopener noreferrer" className="underline">
-                    its source page
+                    the official page
                   </a>
                 </>
               ) : null}
-              . Always confirm details on the official page before applying.
+              . Confirm the details on the official page before you apply.
             </p>
           </DialogBody>
           <DialogFooter className="flex-wrap">
-            <Button size="sm" variant="ghost" onClick={() => onTodo(shown)}>
-              <ListPlus /> To-do
+            <Button size="sm" variant="quiet" onClick={() => onTodo(shown)} icon={<ListPlus />}>
+              Add a to-do
             </Button>
             <CalendarButtons opp={shown} />
             <TrackButton opp={shown} applicationId={applicationId} requireUser={requireUser} />
@@ -492,9 +493,9 @@ function OpportunityDetail({
                 href={shown.link || shown.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={buttonVariants({ size: "sm", variant: "outline" })}
+                className={buttonVariants({ size: "sm", variant: "secondary" })}
               >
-                Apply <ArrowUpRight />
+                Official page <ArrowUpRight />
               </a>
             ) : null}
           </DialogFooter>
@@ -507,8 +508,8 @@ function OpportunityDetail({
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="font-medium text-label-secondary">{label}</dt>
-      <dd className="text-label">{children}</dd>
+      <dt className="font-medium text-ink-secondary">{label}</dt>
+      <dd className="text-ink">{children}</dd>
     </>
   )
 }
@@ -557,10 +558,10 @@ function TodoDialog({ opp, onClose }: { opp: Opportunity | null; onClose: () => 
             </Field>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="quiet" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={create.isPending || !title.trim()}>
+            <Button type="submit" variant="primary" disabled={create.isPending || !title.trim()}>
               Add
             </Button>
           </DialogFooter>
@@ -596,11 +597,11 @@ function ShareDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
               toastSuccess(
                 saved.status === "published"
                   ? "Published. Thanks for sharing."
-                  : "Thanks! It goes public once it has been reviewed.",
+                  : "Thanks for sharing. It goes public once it has been reviewed.",
               )
               onOpenChange(false)
             } catch (err) {
-              toastError(err, "Couldn't share it")
+              toastError(err, "That didn't send. Check the details and try again.")
             } finally {
               setBusy(false)
             }
@@ -641,8 +642,8 @@ function ShareDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
             <Field label="Deadline">
               <Input type="date" value={form.deadline} disabled={form.rolling} onChange={(e) => set("deadline", e.target.value)} />
             </Field>
-            <label className="flex items-center gap-2 self-end pb-2 text-sm">
-              <input type="checkbox" checked={form.rolling} onChange={(e) => set("rolling", e.target.checked)} />
+            <label className="flex items-center gap-2 self-end pb-2 text-callout">
+              <input type="checkbox" className="size-4 accent-forest" checked={form.rolling} onChange={(e) => set("rolling", e.target.checked)} />
               Rolling / always open
             </label>
             <Field label="Summary" className="sm:col-span-2">
@@ -650,10 +651,10 @@ function ShareDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
             </Field>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="quiet" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" variant="primary" disabled={busy}>
               Share
             </Button>
           </DialogFooter>

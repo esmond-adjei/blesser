@@ -32,7 +32,7 @@ createRoot(document.getElementById("root")!).render(
         className="bg-transparent!"
         position="bottom-right"
         theme="system"
-        toastOptions={{ style: { background: "var(--surface-raised)", color: "var(--label)", border: 0, borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-2)", font: "400 14px/20px var(--font-sans)" }, classNames: { success: "toast-success", error: "toast-error", warning: "toast-warning" } }}
+        toastOptions={{ style: { background: "var(--surface-raised)", color: "var(--ink)", border: 0, borderRadius: "var(--radius-md)", boxShadow: "var(--elevation-2)", font: "400 14px/20px var(--font-sans)" }, classNames: { success: "toast-success", error: "toast-error", warning: "toast-warning" } }}
         closeButton
       />
     </QueryClientProvider>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { deadlineLabel, deadlineTone, googleCalendarUrl } from "./opportunities"
+import { countdownFor, deadlineLabel, googleCalendarUrl } from "./opportunities"
 import type { Opportunity } from "./types"
 
 const base = { rolling: false, deadline: "", is_open: true, days_left: null } as const
@@ -14,10 +14,16 @@ describe("deadline labels", () => {
     expect(deadlineLabel({ ...base, deadline: "End of March" })).toBe("End of March")
   })
 
-  it("gets more urgent as the deadline nears", () => {
-    expect(deadlineTone({ ...base, days_left: 3 })).toBe("destructive")
-    expect(deadlineTone({ ...base, days_left: 14 })).toBe("warning")
-    expect(deadlineTone({ ...base, days_left: 40 })).toBe("success")
+  it("feeds the countdown: days left, rolling, closed and wording-only deadlines", () => {
+    const day = { ...base, deadline_date: "2027-03-14" }
+    expect(countdownFor({ ...day, days_left: 12 })).toEqual({ daysLeft: 12, date: "2027-03-14", label: undefined })
+    expect(countdownFor({ ...day, rolling: true })).toEqual({ rolling: true })
+    expect(countdownFor({ ...day, days_left: -2, is_open: false }).daysLeft).toBe(-1)
+    expect(countdownFor({ ...base, deadline_date: null, deadline: "End of March" })).toEqual({
+      daysLeft: null,
+      date: null,
+      label: "End of March",
+    })
   })
 })
 

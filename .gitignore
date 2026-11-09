@@ -14,3 +14,7 @@ webapp/dist/
 # ephemeral review pages (deleted after review)
 progress.html
 .claude/worktrees/*
+.agent-logs/
+admin/dist/
+site/dist/
+site/.astro/

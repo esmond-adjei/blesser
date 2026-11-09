@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { AppLogo } from "../components/layout/AppLogo"
+import { Logo } from "@blesser/ui"
 
 /** Bumped with api TERMS_VERSION when either notice changes. */
 export const TERMS_VERSION = "2026-11-07"
@@ -15,17 +15,17 @@ function LegalShell({ title, children }: { title: string; children: React.ReactN
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <a href="/" className="mb-8 flex items-center gap-2.5">
-        <AppLogo className="size-8" />
-        <span className="text-lg font-bold tracking-tight">Blesser</span>
+        <Logo title="" className="size-8" />
+        <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Blesser</span>
       </a>
-      <h1 className="type-page-title">{title}</h1>
-      <p className="mt-1 type-caption">Version {TERMS_VERSION}</p>
+      <h1 className="type-title-2">{title}</h1>
+      <p className="mt-1 type-caption text-ink-secondary">Version {TERMS_VERSION}</p>
       <div className="rich-text mt-6 space-y-6">
         {children}
       </div>
-      <p className="mt-10 flex gap-4 type-caption">
-        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-        <Link to="/terms" className="hover:text-foreground">Terms</Link>
+      <p className="mt-10 flex gap-4 type-caption text-ink-secondary">
+        <Link to="/privacy" className="hover:text-ink">Privacy</Link>
+        <Link to="/terms" className="hover:text-ink">Terms</Link>
       </p>
     </div>
   )
@@ -33,7 +33,7 @@ function LegalShell({ title, children }: { title: string; children: React.ReactN
 
 function Contact() {
   return CONTACT ? (
-    <a className="text-primary hover:underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>
+    <a className="text-link underline-offset-2 hover:underline" href={`mailto:${CONTACT}`}>{CONTACT}</a>
   ) : (
     <>the operator of this Blesser instance</>
   )
@@ -96,7 +96,7 @@ export function Terms() {
         <h2>Accounts</h2>
         <p>
           You can delete your account at any time in Settings. We may suspend accounts that break these terms or put
-          the service at risk. See the <Link to="/privacy" className="text-primary hover:underline">Privacy notice</Link>{" "}
+          the service at risk. See the <Link to="/privacy" className="text-link underline-offset-2 hover:underline">Privacy notice</Link>{" "}
           for how your data is handled.
         </p>
       </section>

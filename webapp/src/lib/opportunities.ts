@@ -1,5 +1,6 @@
 /** Opportunity catalogue, to-dos and calendar hooks, plus labels and calendar links. */
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { CountdownProps } from "@blesser/ui"
 import * as api from "./api"
 import type {
   Opportunity,
@@ -59,12 +60,13 @@ export function deadlineLabel(opp: Pick<Opportunity, "rolling" | "days_left" | "
   return `${opp.days_left} days left`
 }
 
-export function deadlineTone(opp: Pick<Opportunity, "days_left" | "is_open" | "rolling">) {
-  if (opp.rolling || opp.days_left === null) return "secondary" as const
-  if (!opp.is_open || opp.days_left < 0) return "outline" as const
-  if (opp.days_left <= 7) return "destructive" as const
-  if (opp.days_left <= 21) return "warning" as const
-  return "success" as const
+/** Countdown props for an opportunity's deadline. */
+export function countdownFor(
+  opp: Pick<Opportunity, "rolling" | "days_left" | "deadline" | "deadline_date" | "is_open">,
+): CountdownProps {
+  if (opp.rolling) return { rolling: true }
+  const closed = !opp.is_open || (opp.days_left !== null && opp.days_left < 0)
+  return { daysLeft: closed ? -1 : opp.days_left, date: opp.deadline_date, label: opp.deadline || undefined }
 }
 
 /** yyyy-mm-dd plus one day, as yyyymmdd (all-day events end the next day). */

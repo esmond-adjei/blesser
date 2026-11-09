@@ -5,12 +5,8 @@ import * as api from "../lib/api"
 import { useCalendarFeed, useTodoMutations, useTodos } from "../lib/opportunities"
 import { useQueryClient } from "@tanstack/react-query"
 import { toastError, toastSuccess } from "../lib/toast"
-import { cn } from "../lib/utils"
 import type { Todo, TodoPriority } from "../lib/types"
-import { Badge } from "../components/ui/badge"
-import { Button } from "../components/ui/button"
-import { Input } from "../components/ui/input"
-import { Select } from "../components/ui/select"
+import { Button, Chip, Countdown, Input, Select, buttonVariants, cn } from "@blesser/ui"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 
 /** Local yyyy-mm-dd: due dates are calendar days, not instants. */
@@ -76,17 +72,17 @@ export function Todos() {
   const groups = groupTodos(open.data ?? [], today)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="space-y-1">
-        <h1 className="type-page-title">To-dos</h1>
-        <p className="type-meta">
+        <h1 className="type-title-2">To-dos</h1>
+        <p className="text-callout text-ink-secondary">
           Everything you need to do for the opportunities you're chasing. Deadlines of tracked applications and dated
           to-dos also flow into your calendar.
         </p>
       </header>
 
       <form
-        className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-3"
+        className="flex flex-wrap items-center gap-2 rounded-lg border border-separator bg-surface p-4 shadow-elevation-1"
         onSubmit={(e) => {
           e.preventDefault()
           if (!title.trim()) return
@@ -124,7 +120,7 @@ export function Todos() {
             </option>
           ))}
         </Select>
-        <Button type="submit" disabled={create.isPending || !title.trim()}>
+        <Button type="submit" variant="primary" disabled={create.isPending || !title.trim()}>
           Add
         </Button>
       </form>
@@ -132,17 +128,17 @@ export function Todos() {
       {open.isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="h-12 animate-pulse rounded-lg bg-fill-quiet" />
+            <div key={i} className="h-12 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
           ))}
         </div>
       ) : open.isError ? (
-        <ErrorState title="Couldn't load your to-dos" description="Try again in a moment." onRetry={() => void open.refetch()} />
+        <ErrorState title="Your to-dos didn't load" description="Try again in a moment." onRetry={() => void open.refetch()} />
       ) : groups.length === 0 ? (
         <EmptyState
           title="Nothing to do yet"
           description="Add a to-do above, or add one from any opportunity."
           action={
-            <Link to="/opportunities" className="text-sm font-medium text-tint underline-offset-4 hover:underline">
+            <Link to="/opportunities" className={buttonVariants()}>
               Browse opportunities
             </Link>
           }
@@ -153,14 +149,11 @@ export function Todos() {
             <section key={group.id} aria-labelledby={`todo-group-${group.id}`}>
               <h2
                 id={`todo-group-${group.id}`}
-                className={cn(
-                  "mb-2 text-xs font-semibold tracking-wide uppercase",
-                  group.id === "overdue" ? "text-critical" : "text-label-tertiary",
-                )}
+                className={cn("mb-2 text-headline", group.id === "overdue" ? "text-caution" : "text-ink-secondary")}
               >
                 {group.label} · {group.items.length}
               </h2>
-              <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+              <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1">
                 {group.items.map((todo) => (
                   <TodoRow
                     key={todo.id}
@@ -179,14 +172,14 @@ export function Todos() {
       )}
 
       <div>
-        <Button variant="ghost" size="sm" onClick={() => setShowDone((v) => !v)}>
+        <Button variant="quiet" size="sm" onClick={() => setShowDone((v) => !v)}>
           {showDone ? "Hide done" : "Show done"}
         </Button>
         {showDone && done.data ? (
           done.data.length === 0 ? (
-            <p className="type-meta mt-2">Nothing done yet.</p>
+            <p className="text-callout text-ink-secondary mt-2">Nothing done yet.</p>
           ) : (
-            <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+            <ul className="mt-2 divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1">
               {done.data.map((todo) => (
                 <TodoRow
                   key={todo.id}
@@ -219,22 +212,28 @@ function TodoRow({
 }) {
   const overdue = !todo.done && todo.due_date !== null && daysBetween(today, todo.due_date) < 0
   return (
-    <li className="group flex items-start gap-3 px-3 py-2.5">
+    <li className="group flex items-start gap-3 px-5 py-3">
       <input
         type="checkbox"
-        className="mt-1 size-4 shrink-0 cursor-pointer"
+        className="mt-1 size-4 shrink-0 cursor-pointer accent-forest"
         checked={todo.done}
         onChange={onToggle}
         aria-label={todo.done ? `Mark "${todo.title}" not done` : `Mark "${todo.title}" done`}
       />
       <div className="min-w-0 flex-1">
-        <p className={cn("text-sm text-label", todo.done && "text-label-tertiary line-through")}>
-          {todo.priority === "high" ? <Flag className="mr-1 inline size-3.5 text-critical" aria-label="High priority" /> : null}
+        <p className={cn("text-body text-ink", todo.done && "text-ink-tertiary line-through")}>
+          {todo.priority === "high" ? <Flag className="mr-1 inline size-3.5 text-sun-ink" aria-label="High priority" /> : null}
           {todo.title}
         </p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-label-secondary">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-footnote text-ink-secondary">
           {todo.due_date ? (
-            <Badge variant={overdue ? "destructive" : "outline"}>{dueLabel(todo.due_date, today)}</Badge>
+            todo.done ? (
+              <Chip>{dueLabel(todo.due_date, today)}</Chip>
+            ) : overdue ? (
+              <Chip tone="caution">{dueLabel(todo.due_date, today)}</Chip>
+            ) : (
+              <Countdown daysLeft={daysBetween(today, todo.due_date)} date={todo.due_date} className="py-0.5" />
+            )
           ) : null}
           {todo.application_id && todo.application_label ? (
             <Link to={`/applications/${todo.application_id}`} className="hover:underline">
@@ -250,14 +249,14 @@ function TodoRow({
         </div>
       </div>
       <Button
-        size="icon"
-        variant="ghost"
+        size="sm"
+        variant="quiet"
         aria-label={`Delete "${todo.title}"`}
+        data-tooltip="Delete"
         className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
         onClick={onDelete}
-      >
-        <Trash2 />
-      </Button>
+        icon={<Trash2 />}
+      />
     </li>
   )
 }
@@ -276,44 +275,44 @@ function CalendarPanel() {
     }
   }
   return (
-    <section aria-labelledby="calendar-heading" className="space-y-3 rounded-lg border border-border bg-surface p-4">
+    <section aria-labelledby="calendar-heading" className="space-y-3 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
       <div className="flex items-start gap-3">
-        <CalendarDays className="mt-0.5 size-5 shrink-0 text-tint" />
+        <CalendarDays className="mt-0.5 size-5 shrink-0 text-link" />
         <div className="space-y-1">
-          <h2 id="calendar-heading" className="text-sm font-semibold text-label">
+          <h2 id="calendar-heading" className="text-headline text-ink">
             Sync with your calendar
           </h2>
-          <p className="text-sm text-label-secondary">
+          <p className="text-callout text-ink-secondary">
             Subscribe once and your application deadlines and dated to-dos appear in Google Calendar, Apple Calendar or
             Outlook, and stay up to date. The link is private: anyone with it can see your deadlines.
           </p>
         </div>
       </div>
       {!enabled ? (
-        <Button size="sm" variant="outline" onClick={() => setEnabled(true)}>
+        <Button size="sm" variant="secondary" onClick={() => setEnabled(true)}>
           Get my calendar link
         </Button>
       ) : feed.isLoading ? (
-        <div className="h-9 animate-pulse rounded-md bg-fill-quiet" />
+        <div className="h-10 animate-pulse rounded-md bg-surface-sunk motion-reduce:animate-none" />
       ) : feed.data ? (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Input readOnly value={feed.data.url} aria-label="Calendar subscription link" className="min-w-[240px] flex-1 font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
-            <Button size="sm" variant="outline" onClick={() => void copy(feed.data.url)}>
-              <Copy /> Copy
+            <Input readOnly value={feed.data.url} aria-label="Calendar subscription link" className="h-control-sm min-w-[240px] flex-1 type-code" onFocus={(e) => e.currentTarget.select()} />
+            <Button size="sm" onClick={() => void copy(feed.data.url)} icon={<Copy />}>
+              Copy
             </Button>
-            <a href={feed.data.webcal_url} className="g-btn g-btn--secondary g-btn--sm">
+            <a href={feed.data.webcal_url} className={buttonVariants({ size: "sm", variant: "brand" })}>
               Open in calendar app
             </a>
           </div>
-          <ul className="list-disc space-y-1 pl-5 text-xs text-label-secondary">
+          <ul className="list-disc space-y-1 pl-5 text-footnote text-ink-secondary">
             <li>Google Calendar: Other calendars, then From URL, and paste the link.</li>
             <li>Apple Calendar: File, then New Calendar Subscription.</li>
             <li>Outlook: Add calendar, then Subscribe from web.</li>
           </ul>
           <Button
             size="sm"
-            variant="ghost"
+            variant="quiet"
             disabled={rotating}
             onClick={async () => {
               setRotating(true)
@@ -327,12 +326,13 @@ function CalendarPanel() {
                 setRotating(false)
               }
             }}
+            icon={<RefreshCw />}
           >
-            <RefreshCw /> Make a new link
+            Make a new link
           </Button>
         </div>
       ) : (
-        <ErrorState compact title="Couldn't load your calendar link" description="Try again in a moment." onRetry={() => void feed.refetch()} />
+        <ErrorState compact title="Your calendar link didn't load" description="Try again in a moment." onRetry={() => void feed.refetch()} />
       )}
     </section>
   )

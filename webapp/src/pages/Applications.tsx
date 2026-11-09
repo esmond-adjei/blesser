@@ -2,14 +2,22 @@ import * as React from "react"
 import { Link } from "react-router-dom"
 import { ArrowUpRight, Plus, Trash2 } from "lucide-react"
 import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useApplications } from "../lib/applications"
-import { formatDay } from "../lib/format"
 import { toastError, toastSuccess } from "../lib/toast"
-import { cn } from "../lib/utils"
-import type { Application, ApplicationStatus, RequirementItem } from "../lib/types"
-import { Badge } from "../components/ui/badge"
-import { Button, buttonVariants } from "../components/ui/button"
-import { Field, Input, Textarea } from "../components/ui/input"
-import { Select } from "../components/ui/select"
+import type { Application, ApplicationStatus as Status, RequirementItem } from "../lib/types"
+import {
+  ApplicationStatus,
+  Button,
+  Chip,
+  Countdown,
+  Field,
+  Input,
+  Select,
+  Textarea,
+  buttonVariants,
+  cn,
+  daysUntil,
+  type ApplicationStage,
+} from "@blesser/ui"
 import {
   Dialog,
   DialogBody,
@@ -21,26 +29,12 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 
-function todayIso(): string {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
-}
+const stage = (status: Status): ApplicationStage => (status === "rejected" ? "not-this-time" : status)
 
-function daysUntil(day: string): number {
-  return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${todayIso()}T00:00:00Z`)) / 86_400_000)
-}
-
-function DeadlineBadge({ app }: { app: Application }) {
-  if (!app.deadline_date) return app.deadline ? <Badge variant="secondary">{app.deadline}</Badge> : null
-  const days = daysUntil(app.deadline_date)
-  const open = OPEN_STATUSES.includes(app.status)
-  const label = days < 0 ? "Deadline passed" : days === 0 ? "Due today" : days === 1 ? "Due tomorrow" : `${days} days left`
-  const variant = !open ? "outline" : days < 0 ? "outline" : days <= 7 ? "destructive" : days <= 21 ? "warning" : "success"
-  return (
-    <Badge variant={variant} data-tooltip={formatDay(app.deadline_date)}>
-      {open ? label : formatDay(app.deadline_date)}
-    </Badge>
-  )
+function Deadline({ app }: { app: Application }) {
+  if (!OPEN_STATUSES.includes(app.status) && app.status !== "submitted") return null
+  if (!app.deadline_date) return app.deadline ? <Countdown label={app.deadline} /> : null
+  return <Countdown daysLeft={daysUntil(app.deadline_date)} date={app.deadline_date} />
 }
 
 const FILTERS = [
@@ -63,21 +57,21 @@ export function Applications() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="type-page-title">Applications</h1>
-          <p className="type-meta max-w-2xl">
+          <h1 className="type-title-2">Applications</h1>
+          <p className="text-callout text-ink-secondary max-w-2xl">
             Everything you're applying for, from saved to accepted. Saved and preparing applications get deadline
             reminders 14, 7 and 1 days before.
           </p>
         </div>
-        <Button size="sm" onClick={() => setAdding(true)}>
-          <Plus /> Add by hand
+        <Button size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
+          Add by hand
         </Button>
       </header>
 
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
         {FILTERS.map((f) => {
           const count =
             f.value === "all"
@@ -86,19 +80,10 @@ export function Applications() {
                 ? data?.filter((a) => a.status !== "accepted" && a.status !== "rejected").length
                 : data?.filter((a) => a.status === f.value).length
           return (
-            <button
-              key={f.value}
-              type="button"
-              aria-pressed={filter === f.value}
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                "inline-flex h-8 items-center rounded-full border px-3 text-sm transition-colors",
-                filter === f.value ? "border-tint bg-tint-soft text-tint" : "border-border text-label-secondary hover:bg-fill-quiet",
-              )}
-            >
+            <Chip key={f.value} selected={filter === f.value} onClick={() => setFilter(f.value)}>
               {f.label}
-              {count ? <span className="ml-1.5 text-xs opacity-70">{count}</span> : null}
-            </button>
+              {count ? <span className="tabular-nums opacity-70">{count}</span> : null}
+            </Chip>
           )
         })}
       </div>
@@ -106,52 +91,57 @@ export function Applications() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-lg bg-fill-quiet" />
+            <div key={i} className="h-28 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
           ))}
         </div>
       ) : isError ? (
-        <ErrorState title="Couldn't load your applications" description="Try again in a moment." onRetry={() => void refetch()} />
+        <ErrorState title="Your applications didn't load" description="Try again in a moment." onRetry={() => void refetch()} />
       ) : apps.length === 0 ? (
         <EmptyState
           title={data?.length ? "Nothing with this status" : "Nothing tracked yet"}
           description="Track an opportunity from the catalogue, or add one by hand."
           action={
-            <Link to="/opportunities" className={buttonVariants({ size: "sm" })}>
+            <Link to="/opportunities" className={buttonVariants({ variant: "primary" })}>
               Browse opportunities
             </Link>
           }
         />
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+        <ul className="grid gap-4">
           {apps.map((app) => {
             const done = app.requirements.filter((r) => r.done).length
             return (
-              <li key={app.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <button type="button" className="w-full min-w-0 text-left sm:w-auto sm:flex-1" onClick={() => setEditing(app)}>
-                  <span className="block truncate text-sm font-semibold text-label hover:underline">{app.title}</span>
-                  <span className="block truncate text-xs text-label-secondary">
-                    {[app.organization, app.kind].filter(Boolean).join(" · ")}
-                    {app.requirements.length ? ` · ${done}/${app.requirements.length} ready` : ""}
-                  </span>
-                </button>
-                <DeadlineBadge app={app} />
-                <Select
-                  aria-label={`Status of ${app.title}`}
-                  className="ml-auto w-auto min-w-[140px] sm:ml-0"
-                  value={app.status}
-                  onChange={(e) =>
-                    update.mutate(
-                      { id: app.id, body: { status: e.target.value as ApplicationStatus } },
-                      { onError: (err) => toastError(err, "Couldn't update the status") },
-                    )
-                  }
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </Select>
+              <li key={app.id} className="flex flex-col gap-4 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
+                <div className="flex flex-wrap items-start gap-3">
+                  <button type="button" className="min-w-0 flex-1 basis-60 cursor-pointer text-left" onClick={() => setEditing(app)}>
+                    <span className="block text-title-3 text-ink hover:underline">{app.title}</span>
+                    <span className="mt-0.5 block text-callout text-ink-secondary">
+                      {[app.organization, app.kind].filter(Boolean).join(" · ")}
+                      {app.requirements.length ? ` · ${done} of ${app.requirements.length} ready` : ""}
+                    </span>
+                  </button>
+                  <Deadline app={app} />
+                </div>
+                <div className="flex flex-wrap items-end gap-4">
+                  <ApplicationStatus status={stage(app.status)} className="min-w-0 flex-1 basis-60" />
+                  <Select
+                    aria-label={`Status of ${app.title}`}
+                    className="h-control-sm w-auto min-w-[150px] text-callout"
+                    value={app.status}
+                    onChange={(e) =>
+                      update.mutate(
+                        { id: app.id, body: { status: e.target.value as Status } },
+                        { onError: (err) => toastError(err, "The status didn't save. Try again.") },
+                      )
+                    }
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </li>
             )
           })}
@@ -192,7 +182,8 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            {shown.benefits ? <p className="text-sm font-medium text-label">{shown.benefits}</p> : null}
+            <ApplicationStatus status={stage(shown.status)} />
+            {shown.benefits ? <p className="text-callout font-semibold text-ink">{shown.benefits}</p> : null}
             <Field label="Deadline">
               <Input
                 type="date"
@@ -202,12 +193,13 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
               />
             </Field>
             <div>
-              <p className="g-label mb-1.5">What to prepare</p>
+              <p className="mb-1.5 text-headline text-ink">What to prepare</p>
               <ul className="space-y-1.5">
                 {requirements.map((r, i) => (
-                  <li key={`${r.label}-${i}`} className="flex items-center gap-2 text-sm">
+                  <li key={`${r.label}-${i}`} className="flex items-center gap-2 text-callout">
                     <input
                       type="checkbox"
+                      className="size-4 accent-forest"
                       checked={r.done}
                       aria-label={r.label}
                       onChange={() => {
@@ -216,7 +208,7 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
                         save({ requirements: next })
                       }}
                     />
-                    <span className={cn(r.done && "text-label-tertiary line-through")}>{r.label}</span>
+                    <span className={cn(r.done && "text-ink-tertiary line-through")}>{r.label}</span>
                   </li>
                 ))}
               </ul>
@@ -238,7 +230,7 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
                   onChange={(e) => setNewItem(e.target.value)}
                   className="flex-1"
                 />
-                <Button type="submit" size="sm" variant="outline" disabled={!newItem.trim()}>
+                <Button type="submit" size="sm" variant="secondary" disabled={!newItem.trim()}>
                   Add
                 </Button>
               </form>
@@ -255,8 +247,8 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
           <DialogFooter className="flex-wrap">
             <Button
               size="sm"
-              variant="ghost"
-              className="mr-auto text-critical"
+              variant="quiet"
+              className="mr-auto text-critical hover:bg-critical-soft"
               onClick={() =>
                 remove.mutate(shown.id, {
                   onSuccess: () => {
@@ -266,15 +258,16 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
                   onError: (err) => toastError(err, "Couldn't remove it"),
                 })
               }
+              icon={<Trash2 />}
             >
-              <Trash2 /> Remove
+              Remove
             </Button>
             {shown.link ? (
-              <a href={shown.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "outline" })}>
+              <a href={shown.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "secondary" })}>
                 Open <ArrowUpRight />
               </a>
             ) : null}
-            <Button size="sm" onClick={onClose}>
+            <Button size="sm" variant="primary" onClick={onClose}>
               Done
             </Button>
           </DialogFooter>
@@ -326,10 +319,10 @@ function AddDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
             </Field>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="quiet" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={create.isPending || !form.title.trim()}>
+            <Button type="submit" variant="primary" disabled={create.isPending || !form.title.trim()}>
               Add
             </Button>
           </DialogFooter>

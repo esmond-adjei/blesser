@@ -1,0 +1,33 @@
+{
+  "name": "blesser-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@astrojs/node": "^11.1.11",
+    "@astrojs/react": "^7.1.5",
+    "@astrojs/sitemap": "^3.7.4",
+    "@blesser/ui": "*",
+    "astro": "^7.4.8",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~6.0.2",
+    "vitest": "^3.2.7"
+  }
+}

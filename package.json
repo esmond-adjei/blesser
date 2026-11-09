@@ -1,0 +1,16 @@
+{
+  "name": "blesser",
+  "private": true,
+  "workspaces": [
+    "design-system",
+    "webapp",
+    "admin",
+    "site"
+  ],
+  "scripts": {
+    "tokens": "npm run --workspace @blesser/ui tokens"
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

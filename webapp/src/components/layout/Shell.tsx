@@ -6,10 +6,9 @@ import * as api from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { browserTimezone } from "../../lib/push"
 import { formatAgo, identityName } from "../../lib/format"
-import { cn } from "../../lib/utils"
+import { Logo, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
-import { AppLogo } from "./AppLogo"
 
 const NAV = [
   { to: "/opportunities", label: "Opportunities", icon: Sparkles },
@@ -36,8 +35,10 @@ function useDocumentTitle() {
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium transition-colors",
-    isActive ? "bg-fill text-label" : "text-label-secondary hover:bg-fill-quiet hover:text-label",
+    "relative flex h-10 items-center gap-3 rounded-full px-3.5 text-callout font-semibold transition-colors duration-160 [&_svg]:size-5",
+    isActive
+      ? "bg-forest text-on-forest after:absolute after:right-3.5 after:size-1.5 after:rounded-full after:bg-sun"
+      : "text-ink-secondary hover:bg-surface-sunk hover:text-ink",
   )
 
 export function Shell() {
@@ -45,23 +46,23 @@ export function Shell() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   return (
-    <div className="flex h-dvh flex-col bg-background md:flex-row">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
-        <Link to="/opportunities" className="flex items-center gap-2.5 px-4 py-4">
-          <AppLogo className="size-7" />
-          <span className="text-[17px] font-semibold tracking-[-0.02em] text-label">Blesser</span>
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-separator bg-canvas md:flex">
+        <Link to="/opportunities" className="flex items-center gap-2.5 px-5 py-5">
+          <Logo title="" className="size-8" />
+          <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Blesser</span>
         </Link>
-        <nav aria-label="App" className="flex-1 space-y-0.5 px-3">
+        <nav aria-label="App" className="flex-1 space-y-1 px-3">
           {NAV.map((item) => (
             <NavLink key={item.to} to={item.to} className={navClass}>
-              <item.icon className="size-4" />
+              <item.icon strokeWidth={1.75} />
               {item.label}
             </NavLink>
           ))}
         </nav>
-        <div className="space-y-0.5 border-t border-sidebar-border p-3">
+        <div className="space-y-1 border-t border-separator p-3">
           <NavLink to="/settings" className={navClass}>
-            <Settings className="size-4" />
+            <Settings strokeWidth={1.75} />
             Settings
           </NavLink>
           <button
@@ -70,19 +71,19 @@ export function Shell() {
               await signOut()
               navigate("/opportunities")
             }}
-            className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium text-label-secondary hover:bg-fill-quiet hover:text-label"
+            className="flex h-10 w-full cursor-pointer items-center gap-3 rounded-full px-3.5 text-callout font-semibold text-ink-secondary hover:bg-surface-sunk hover:text-ink"
           >
-            <LogOut className="size-4" />
+            <LogOut className="size-5" strokeWidth={1.75} />
             Sign out
           </button>
-          <p className="truncate px-2.5 pt-1 text-xs text-label-tertiary">{identityName(user)}</p>
+          <p className="truncate px-3.5 pt-1 text-footnote text-ink-tertiary">{identityName(user)}</p>
         </div>
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2 md:px-6">
-          <Link to="/opportunities" className="flex items-center gap-2 md:hidden">
-            <AppLogo className="size-7" />
+        <header className="flex items-center gap-2 border-b border-separator bg-surface px-4 py-2 md:px-6">
+          <Link to="/opportunities" aria-label="Blesser home" className="flex items-center gap-2 md:hidden">
+            <Logo title="" className="size-8" />
           </Link>
           <nav aria-label="App" className="flex items-center gap-1 md:hidden">
             {NAV.map((item) => (
@@ -91,10 +92,10 @@ export function Shell() {
                 to={item.to}
                 aria-label={item.label}
                 className={({ isActive }) =>
-                  cn("rounded-md p-2", isActive ? "bg-fill text-label" : "text-label-secondary")
+                  cn("flex size-10 items-center justify-center rounded-full", isActive ? "bg-forest text-on-forest" : "text-ink-secondary hover:bg-surface-sunk")
                 }
               >
-                <item.icon className="size-4" />
+                <item.icon className="size-5" strokeWidth={1.75} />
               </NavLink>
             ))}
           </nav>
@@ -104,15 +105,15 @@ export function Shell() {
               to="/settings"
               aria-label="Settings"
               className={({ isActive }) =>
-                cn("rounded-md p-2 md:hidden", isActive ? "bg-fill text-label" : "text-label-secondary")
+                cn("flex size-10 items-center justify-center rounded-full md:hidden", isActive ? "bg-forest text-on-forest" : "text-ink-secondary hover:bg-surface-sunk")
               }
             >
-              <Settings className="size-4" />
+              <Settings className="size-5" strokeWidth={1.75} />
             </NavLink>
           </div>
         </header>
         <main className="nice-scroll min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1080px] px-4 py-6 sm:px-6">
+          <div className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
             <React.Suspense fallback={<LoadingScreen />}>
               <ErrorBoundary>
                 <Outlet />
@@ -167,34 +168,34 @@ function NotificationBell() {
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-md p-2 text-label-secondary hover:bg-fill-quiet hover:text-label"
+        className="relative flex size-10 cursor-pointer items-center justify-center rounded-full text-ink-secondary hover:bg-surface-sunk hover:text-ink"
       >
-        <Bell className="size-4" />
+        <Bell className="size-5" strokeWidth={1.75} />
         {unread ? (
-          <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-critical text-[10px] font-semibold text-white">
+          <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sun px-1 text-[10px] font-bold text-on-sun tabular-nums">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
       </button>
       {open ? (
-        <div className="absolute right-0 z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border bg-surface-raised shadow-lg">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="text-sm font-semibold text-label">Notifications</span>
+        <div className="absolute right-0 z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-separator bg-surface-raised shadow-elevation-2">
+          <div className="flex items-center justify-between border-b border-separator px-3 py-2">
+            <span className="text-headline text-ink">Notifications</span>
             {unread ? (
-              <button type="button" className="text-xs text-tint hover:underline" onClick={() => readAll.mutate()}>
+              <button type="button" className="cursor-pointer text-footnote font-semibold text-link hover:underline" onClick={() => readAll.mutate()}>
                 Mark all read
               </button>
             ) : null}
           </div>
           <ul className="max-h-96 overflow-y-auto">
             {items.length === 0 ? (
-              <li className="px-3 py-6 text-center text-sm text-label-secondary">Nothing yet.</li>
+              <li className="px-3 py-6 text-center text-sm text-ink-secondary">Nothing yet.</li>
             ) : (
               items.map((n) => (
                 <li key={n.id}>
                   <button
                     type="button"
-                    className="block w-full px-3 py-2.5 text-left hover:bg-fill-quiet"
+                    className="block w-full px-3 py-2.5 text-left hover:bg-surface-sunk"
                     onClick={async () => {
                       setOpen(false)
                       if (!n.read_at) {
@@ -204,11 +205,11 @@ function NotificationBell() {
                       navigate(n.link)
                     }}
                   >
-                    <span className={cn("block text-sm", n.read_at ? "text-label-secondary" : "font-semibold text-label")}>
+                    <span className={cn("block text-sm", n.read_at ? "text-ink-secondary" : "font-semibold text-ink")}>
                       {n.title}
                     </span>
-                    <span className="block text-xs text-label-secondary">{n.body}</span>
-                    <span className="block text-xs text-label-tertiary">{formatAgo(n.created_at)}</span>
+                    <span className="block text-xs text-ink-secondary">{n.body}</span>
+                    <span className="block text-xs text-ink-tertiary">{formatAgo(n.created_at)}</span>
                   </button>
                 </li>
               ))

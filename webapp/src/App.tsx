@@ -3,8 +3,7 @@ import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } fro
 import { ErrorState } from "./components/feedback/EmptyState"
 import { ErrorBoundary } from "./components/feedback/ErrorBoundary"
 import { LoadingScreen } from "./components/feedback/LoadingScreen"
-import { AppLogo } from "./components/layout/AppLogo"
-import { buttonVariants } from "./components/ui/button"
+import { Logo, buttonVariants } from "@blesser/ui"
 import { useAuth } from "./lib/auth"
 
 const Shell = React.lazy(() => import("./components/layout/Shell").then((m) => ({ default: m.Shell })))
@@ -39,20 +38,20 @@ function MaybeShell() {
   if (!ready) return <LoadingScreen />
   if (user) return <Shell />
   return (
-    <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[1080px] items-center gap-3 px-4 py-3 sm:px-6">
-          <Link to="/opportunities" className="flex items-center gap-2">
-            <AppLogo className="size-7" />
-            <span className="text-[17px] font-semibold tracking-[-0.02em] text-label">Blesser</span>
+    <div className="min-h-dvh bg-canvas">
+      <header className="sticky top-0 z-10 border-b border-separator bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-content items-center gap-3 px-4 py-3 sm:px-6">
+          <Link to="/opportunities" className="flex items-center gap-2.5">
+            <Logo title="" className="size-8" />
+            <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Blesser</span>
           </Link>
           <nav className="ml-auto flex gap-2">
-            <Link to="/login" className={buttonVariants({ size: "sm", variant: "ghost" })}>Sign in</Link>
-            <Link to="/register" className={buttonVariants({ size: "sm" })}>Create account</Link>
+            <Link to="/login" className={buttonVariants({ size: "sm", variant: "quiet" })}>Sign in</Link>
+            <Link to="/register" className={buttonVariants({ size: "sm", variant: "brand" })}>Create account</Link>
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[1080px] px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-content px-4 py-8 sm:px-6">
         <Outlet />
       </main>
     </div>
@@ -63,8 +62,8 @@ function NotFound() {
   return (
     <ErrorState
       title="Page not found"
-      description="The link you followed doesn't exist."
-      action={<Link to="/opportunities" className={buttonVariants({ size: "sm" })}>Browse opportunities</Link>}
+      description="That link didn't open. Check the address, or head back to the opportunities."
+      action={<Link to="/opportunities" className={buttonVariants({ size: "sm", variant: "primary" })}>Browse opportunities</Link>}
     />
   )
 }

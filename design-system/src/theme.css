@@ -1,0 +1,236 @@
+/* Generated from tokens.json by scripts/build-tokens.mjs (npm run tokens). Do not edit. */
+
+@source "./components";
+
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-separator: var(--separator);
+  --color-control-border: var(--control-border);
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-sun: var(--sun);
+  --color-sun-hover: var(--sun-hover);
+  --color-on-sun: var(--on-sun);
+  --color-sun-soft: var(--sun-soft);
+  --color-sun-ink: var(--sun-ink);
+  --color-forest: var(--forest);
+  --color-forest-hover: var(--forest-hover);
+  --color-on-forest: var(--on-forest);
+  --color-forest-soft: var(--forest-soft);
+  --color-link: var(--link);
+  --color-bloom: var(--bloom);
+  --color-bloom-soft: var(--bloom-soft);
+  --color-bloom-ink: var(--bloom-ink);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+  --color-on-critical: var(--on-critical);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-focus: var(--focus);
+  --color-scrim: var(--scrim);
+  --shadow-elevation-1: var(--elevation-1);
+  --shadow-elevation-2: var(--elevation-2);
+  --shadow-elevation-3: var(--elevation-3);
+  --shadow-xs: var(--elevation-1);
+  --shadow-sm: var(--elevation-1);
+  --shadow-md: var(--elevation-2);
+  --shadow-lg: var(--elevation-2);
+  --shadow-xl: var(--elevation-3);
+  --shadow-2xl: var(--elevation-3);
+  --spacing-control-sm: var(--control-sm);
+  --spacing-control-md: var(--control-md);
+  --spacing-control-lg: var(--control-lg);
+  --container-content: var(--content-max);
+  --container-reading: var(--reading-max);
+}
+
+@theme {
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Figtree Variable", Figtree, -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --text-hero: 56px;
+  --text-hero--line-height: 60px;
+  --text-hero--font-weight: 700;
+  --text-hero--letter-spacing: -0.025em;
+  --text-title-1: 36px;
+  --text-title-1--line-height: 42px;
+  --text-title-1--font-weight: 700;
+  --text-title-1--letter-spacing: -0.02em;
+  --text-title-2: 26px;
+  --text-title-2--line-height: 32px;
+  --text-title-2--font-weight: 600;
+  --text-title-2--letter-spacing: -0.015em;
+  --text-numeral: 28px;
+  --text-numeral--line-height: 32px;
+  --text-numeral--font-weight: 700;
+  --text-numeral--letter-spacing: -0.02em;
+  --text-title-3: 19px;
+  --text-title-3--line-height: 26px;
+  --text-title-3--font-weight: 700;
+  --text-title-3--letter-spacing: -0.01em;
+  --text-headline: 16px;
+  --text-headline--line-height: 22px;
+  --text-headline--font-weight: 600;
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-body--font-weight: 400;
+  --text-callout: 14px;
+  --text-callout--line-height: 20px;
+  --text-callout--font-weight: 500;
+  --text-footnote: 13px;
+  --text-footnote--line-height: 18px;
+  --text-footnote--font-weight: 400;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 600;
+  --text-caption--letter-spacing: 0.02em;
+  --text-code: 13px;
+  --text-code--line-height: 20px;
+  --text-code--font-weight: 400;
+}
+
+@keyframes blesser-bloom-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@utility type-hero {
+  font-family: var(--font-display);
+  font-size: 56px;
+  line-height: 60px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+@utility type-title-1 {
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: 42px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+@utility type-title-2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+@utility type-numeral {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-title-3 {
+  font-family: var(--font-sans);
+  font-size: 19px;
+  line-height: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+@utility type-headline {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@utility type-callout {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+@utility type-footnote {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@utility type-caption {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+@utility type-code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font: 400 16px/24px var(--font-sans);
+  }
+
+  :where(h1, h2, h3, h4) {
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: var(--sun-soft);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
+  }
+}

@@ -2,7 +2,7 @@ import * as React from "react"
 import { Link } from "react-router-dom"
 import * as api from "../../lib/api"
 import { toastError } from "../../lib/toast"
-import { Button } from "../ui/button"
+import { Button } from "@blesser/ui"
 
 export const OAUTH_STATE_KEY = "blesser.oauth.state"
 
@@ -50,17 +50,17 @@ export function OAuthButtons({ next }: { next: string }) {
   return (
     <div className="space-y-3">
       {providers.map((p) => (
-        <Button key={p.id} type="button" variant="outline" className="w-full" disabled={busy !== null} onClick={() => void go(p.id)}>
+        <Button key={p.id} type="button" size="lg" className="w-full" disabled={busy !== null} onClick={() => void go(p.id)}>
           {MARKS[p.id]} {busy === p.id ? "Redirecting…" : `Continue with ${p.label}`}
         </Button>
       ))}
-      <p className="text-center type-caption">
+      <p className="text-center text-footnote text-ink-secondary">
         By continuing you agree to the{" "}
-        <Link to="/terms" className="text-primary hover:underline">Terms</Link> and the{" "}
-        <Link to="/privacy" className="text-primary hover:underline">Privacy notice</Link>.
+        <Link to="/terms" className="font-semibold text-link hover:underline">Terms</Link> and the{" "}
+        <Link to="/privacy" className="font-semibold text-link hover:underline">Privacy notice</Link>.
       </p>
-      <div className="flex items-center gap-3 type-caption" aria-hidden>
-        <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
+      <div className="flex items-center gap-3 text-footnote text-ink-tertiary" aria-hidden>
+        <span className="h-px flex-1 bg-separator" /> or <span className="h-px flex-1 bg-separator" />
       </div>
     </div>
   )

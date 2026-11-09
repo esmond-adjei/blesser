@@ -9,7 +9,7 @@ export const STATUSES: { value: ApplicationStatus; label: string }[] = [
   { value: "submitted", label: "Submitted" },
   { value: "interview", label: "Interview" },
   { value: "accepted", label: "Accepted" },
-  { value: "rejected", label: "Not selected" },
+  { value: "rejected", label: "Not this time" },
 ]
 
 export const STATUS_LABEL = Object.fromEntries(STATUSES.map((s) => [s.value, s.label])) as Record<

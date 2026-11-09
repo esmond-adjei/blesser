@@ -1,0 +1,107 @@
+/* Generated from tokens.json by scripts/build-tokens.mjs (npm run tokens). Do not edit. */
+
+:root {
+  color-scheme: light;
+  --canvas: #f6f7f1;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunk: #edf0e6;
+  --separator: #e1e5d9;
+  --control-border: #7f8a7b;
+  --ink: #14241c;
+  --ink-secondary: #475a4f;
+  --ink-tertiary: #5e6e64;
+  --sun: #ffbe1a;
+  --sun-hover: #f2ad00;
+  --on-sun: #1f1a06;
+  --sun-soft: #fff3cc;
+  --sun-ink: #875c00;
+  --forest: #0f4f3b;
+  --forest-hover: #0b3f2f;
+  --on-forest: #ffffff;
+  --forest-soft: #e1f1e8;
+  --link: #13704f;
+  --bloom: #ff7d66;
+  --bloom-soft: #ffe8e2;
+  --bloom-ink: #b23a22;
+  --positive: #17784a;
+  --positive-soft: #e1f3e8;
+  --caution: #8f5500;
+  --caution-soft: #fff0d4;
+  --critical: #c22f45;
+  --critical-soft: #fde6ea;
+  --on-critical: #ffffff;
+  --info: #1f62b0;
+  --info-soft: #e3eefb;
+  --focus: #13704f;
+  --scrim: rgba(20, 36, 28, 0.36);
+  --elevation-1: 0 1px 2px rgba(20, 36, 28, 0.06), 0 2px 8px rgba(20, 36, 28, 0.05);
+  --elevation-2: 0 10px 28px rgba(20, 36, 28, 0.10), 0 2px 6px rgba(20, 36, 28, 0.06);
+  --elevation-3: 0 24px 60px rgba(20, 36, 28, 0.16), 0 2px 8px rgba(20, 36, 28, 0.06);
+}
+
+.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0e1411;
+  --surface: #151d18;
+  --surface-raised: #1c2620;
+  --surface-sunk: #111813;
+  --separator: #26312b;
+  --control-border: #62716a;
+  --ink: #eef3ec;
+  --ink-secondary: #b4c0b8;
+  --ink-tertiary: #93a198;
+  --sun: #ffc83d;
+  --sun-hover: #ffd25e;
+  --on-sun: #1f1a06;
+  --sun-soft: #2f2710;
+  --sun-ink: #ffd166;
+  --forest: #1d6b50;
+  --forest-hover: #237a5c;
+  --on-forest: #ffffff;
+  --forest-soft: #13291f;
+  --link: #6fd6a6;
+  --bloom: #ff917d;
+  --bloom-soft: #331914;
+  --bloom-ink: #ff9f8c;
+  --positive: #6fd6a6;
+  --positive-soft: #11291d;
+  --caution: #ffc45c;
+  --caution-soft: #2c2210;
+  --critical: #ff8496;
+  --critical-soft: #33141a;
+  --on-critical: #2a0710;
+  --info: #86b8ff;
+  --info-soft: #12223a;
+  --focus: #6fd6a6;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --elevation-1: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --elevation-2: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --elevation-3: 0 32px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 48px;
+  --content-max: 1120px;
+  --reading-max: 680px;
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Figtree Variable", Figtree, -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
