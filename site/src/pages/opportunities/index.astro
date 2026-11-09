@@ -3,6 +3,7 @@ import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 import Base from "../../layouts/Base.astro"
 import CardGrid from "../../components/CardGrid.astro"
 import Pagination from "../../components/Pagination.astro"
+import PageHeader from "../../components/PageHeader.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import { Filters } from "../../components/Filters"
 import { LinkEmptyState } from "../../components/States"
@@ -30,15 +31,17 @@ const pageNote = filters.page > 1 ? `, page ${filters.page}` : ""
   path="/opportunities"
   noindex={filtered || filters.page > 1 || filters.sort === "new"}
 >
-  <div class="mx-auto max-w-content px-4 py-10 sm:px-6">
-    <h1 class="m-0 type-title-1 text-ink">{heading}</h1>
-    <p class="m-0 mt-2 max-w-reading text-ink-secondary">
-      Everything here is checked against the official page. Track any of them with a free account.
-    </p>
-
-    <div class="mt-8">
+  <PageHeader
+    eyebrow="Browse"
+    title={heading}
+    description="Everything here is checked against the official page. Track any of them with a free account."
+  >
+    <div class="relative mt-8">
       <Filters filters={filters} facets={facets instanceof ApiError ? null : facets} />
     </div>
+  </PageHeader>
+
+  <div class="site-container py-10">
 
     {
       failed ? (

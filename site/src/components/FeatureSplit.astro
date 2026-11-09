@@ -1,0 +1,38 @@
+---
+import type { ImageMetadata } from "astro"
+import { cn } from "@blesser/ui"
+import Illustration from "./Illustration.astro"
+
+interface Props {
+  id: string
+  eyebrow?: string
+  title: string
+  full: ImageMetadata
+  small: ImageMetadata
+  tone?: "sun" | "forest" | "sunk"
+  reverse?: boolean
+}
+const { id, eyebrow, title, full, small, tone = "sun", reverse = false } = Astro.props
+const tint = { sun: "bg-sun-soft", forest: "bg-forest-soft", sunk: "bg-surface-sunk" }[tone]
+---
+
+<section aria-labelledby={id} class="site-container py-10 md:py-14">
+  <div class="grid items-center gap-10 md:grid-cols-2 lg:gap-16">
+    <div class={cn("relative rounded-xl p-6 sm:p-10", tint, reverse && "md:order-2")}>
+      <Illustration full={full} small={small} sizes="(min-width: 768px) 520px, 100vw" class="rounded-lg" />
+      <div aria-hidden="true">
+        <slot name="chips" />
+      </div>
+    </div>
+    <div>
+      {eyebrow && <p class="m-0 mb-3 eyebrow text-ink">{eyebrow}</p>}
+      <h2 id={id} class="m-0 type-title-1 text-ink">{title}</h2>
+      <div class="mt-4 text-lg leading-7 text-ink-secondary">
+        <slot />
+      </div>
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <slot name="cta" />
+      </div>
+    </div>
+  </div>
+</section>

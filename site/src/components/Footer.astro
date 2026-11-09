@@ -4,45 +4,60 @@ import { CATEGORY_LANDINGS, KIND_LANDINGS } from "../lib/landings"
 import { loginUrl, registerUrl } from "../lib/config"
 
 const year = new Date().getUTCFullYear()
-const link = "text-on-forest/85 no-underline hover:text-on-forest hover:underline"
+const columns = [
+  {
+    title: "Who it's for",
+    links: CATEGORY_LANDINGS.map((l) => ({ href: `/${l.slug}`, label: l.slug.charAt(0).toUpperCase() + l.slug.slice(1) })),
+  },
+  {
+    title: "Browse",
+    links: [{ href: "/opportunities", label: "All opportunities" }, ...KIND_LANDINGS.slice(0, 4).map((l) => ({ href: `/${l.slug}`, label: l.title }))],
+  },
+  {
+    title: "Blesser",
+    links: [
+      { href: "/about", label: "About" },
+      { href: registerUrl(), label: "Create account" },
+      { href: loginUrl(), label: "Sign in" },
+      { href: "/privacy", label: "Privacy" },
+      { href: "/terms", label: "Terms" },
+    ],
+  },
+]
 ---
 
-<footer class="mt-16 bg-forest text-on-forest">
-  <div class="mx-auto grid max-w-content gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+<footer class="mt-20 bg-surface-sunk text-ink">
+  <div class="site-container grid gap-10 pt-14 pb-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
     <div class="flex flex-col gap-3">
-      <a href="/" class="flex items-center gap-2.5 text-on-forest no-underline" aria-label="Blesser home">
-        <Logo variant="symbol-white" title="" className="size-8" />
+      <a href="/" class="flex items-center gap-2.5 text-ink no-underline" aria-label="Blesser home">
+        <Logo title="" className="size-8" />
         <span class="font-display text-xl font-bold tracking-[-0.02em]">Blesser</span>
       </a>
-      <p class="m-0 max-w-[32ch] text-callout text-on-forest/85">
+      <p class="m-0 max-w-[34ch] text-callout text-ink-secondary">
         Opportunities, made visible. Grants, fellowships, scholarships and accelerators for Ghana.
       </p>
     </div>
-    <nav aria-label="Who it's for">
-      <h2 class="m-0 mb-3 text-headline">Who it's for</h2>
-      <ul class="m-0 flex list-none flex-col gap-2 p-0 text-callout">
-        {CATEGORY_LANDINGS.map((l) => <li><a class={link} href={`/${l.slug}`}>{l.slug.charAt(0).toUpperCase() + l.slug.slice(1)}</a></li>)}
-      </ul>
-    </nav>
-    <nav aria-label="Kinds">
-      <h2 class="m-0 mb-3 text-headline">Browse</h2>
-      <ul class="m-0 flex list-none flex-col gap-2 p-0 text-callout">
-        <li><a class={link} href="/opportunities">All opportunities</a></li>
-        {KIND_LANDINGS.slice(0, 4).map((l) => <li><a class={link} href={`/${l.slug}`}>{l.title}</a></li>)}
-      </ul>
-    </nav>
-    <nav aria-label="Blesser">
-      <h2 class="m-0 mb-3 text-headline">Blesser</h2>
-      <ul class="m-0 flex list-none flex-col gap-2 p-0 text-callout">
-        <li><a class={link} href="/about">About</a></li>
-        <li><a class={link} href={registerUrl()}>Create account</a></li>
-        <li><a class={link} href={loginUrl()}>Sign in</a></li>
-        <li><a class={link} href="/privacy">Privacy</a></li>
-        <li><a class={link} href="/terms">Terms</a></li>
-      </ul>
-    </nav>
+    {
+      columns.map((col) => (
+        <nav aria-label={col.title}>
+          <h2 class="m-0 mb-4 eyebrow text-ink">{col.title}</h2>
+          <ul class="m-0 flex list-none flex-col gap-2.5 p-0 text-callout">
+            {col.links.map((l) => (
+              <li>
+                <a class="text-ink-secondary no-underline hover:text-ink hover:underline" href={l.href}>
+                  {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
+    }
   </div>
-  <div class="mx-auto max-w-content border-t border-on-forest/20 px-4 py-5 text-footnote text-on-forest/80 sm:px-6">
-    © {year} Blesser. Always confirm details on the official page before you apply.
+  <div class="site-container">
+    <div class="flex flex-wrap justify-between gap-2 border-t border-separator py-6 text-footnote text-ink-tertiary">
+      <span>Always confirm details on the official page before you apply.</span>
+      <span>© {year} Blesser</span>
+    </div>
   </div>
 </footer>

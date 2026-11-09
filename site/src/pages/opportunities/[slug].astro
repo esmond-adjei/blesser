@@ -55,18 +55,7 @@ const deadlineText = opp
   {!missing && !opp && <ApiErrorSection title="We can't load this opportunity right now" />}
   {
     opp && (
-      <article class="mx-auto max-w-content px-4 py-10 sm:px-6">
-        <nav aria-label="Breadcrumb" class="mb-6 text-callout text-ink-secondary">
-          <ol class="m-0 flex list-none flex-wrap items-center gap-1.5 p-0">
-            <li><a href="/opportunities" class="text-ink-secondary hover:text-ink">Opportunities</a></li>
-            {kindLanding && (
-              <li class="before:mr-1.5 before:content-['/']">
-                <a href={`/${kindLanding.slug}`} class="text-ink-secondary hover:text-ink">{kindLanding.title}</a>
-              </li>
-            )}
-          </ol>
-        </nav>
-
+      <article class="site-container pt-6 pb-10 sm:pt-8">
         {opp.closed && (
           <div role="status" class="mb-8 rounded-lg bg-surface-sunk p-5">
             <p class="m-0 text-headline text-ink">This opportunity has closed</p>
@@ -80,7 +69,21 @@ const deadlineText = opp
           </div>
         )}
 
-        <header class="max-w-reading">
+        <div class="relative overflow-hidden rounded-xl bg-sun-soft px-5 py-8 sm:px-10 sm:py-10">
+          <span aria-hidden="true" class="absolute -top-10 -right-10 hidden size-32 rounded-full bg-sun md:block"></span>
+          <div class="relative">
+        <nav aria-label="Breadcrumb" class="mb-6 text-callout text-ink-secondary">
+          <ol class="m-0 flex list-none flex-wrap items-center gap-1.5 p-0">
+            <li><a href="/opportunities" class="text-ink-secondary hover:text-ink">Opportunities</a></li>
+            {kindLanding && (
+              <li class="before:mr-1.5 before:content-['/']">
+                <a href={`/${kindLanding.slug}`} class="text-ink-secondary hover:text-ink">{kindLanding.title}</a>
+              </li>
+            )}
+          </ol>
+        </nav>
+
+        <header class="max-w-[760px]">
           {opp.organization && <p class="m-0 text-callout font-semibold text-ink-secondary">{opp.organization}</p>}
           <h1 class="m-0 mt-2 type-title-1 text-ink">{opp.title}</h1>
           <div class="mt-4 flex flex-wrap gap-2">
@@ -89,6 +92,8 @@ const deadlineText = opp
             {opp.location && <Chip>{opp.location}</Chip>}
           </div>
         </header>
+          </div>
+        </div>
 
         <div class="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div class="flex min-w-0 flex-col gap-8">
@@ -152,7 +157,7 @@ const deadlineText = opp
             )}
           </div>
 
-          <aside aria-label="Deadline and actions" class="flex flex-col gap-4 lg:sticky lg:top-6">
+          <aside aria-label="Deadline and actions" class="order-first flex flex-col gap-4 lg:order-none lg:sticky lg:top-6">
             <div class="rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
               <h2 class="m-0 text-headline text-ink-secondary">Deadline</h2>
               <div class="mt-3 flex flex-wrap items-center gap-3">

@@ -1,0 +1,31 @@
+---
+import { cn } from "@blesser/ui"
+import ArrowLink from "./ArrowLink.astro"
+
+interface Props {
+  id: string
+  eyebrow?: string
+  title: string
+  description?: string
+  link?: { href: string; label: string }
+  tone?: "sunk" | "sun" | "forest"
+  class?: string
+}
+const { id, eyebrow, title, description, link, tone = "sunk", class: className } = Astro.props
+const tint = { sunk: "bg-surface-sunk", sun: "bg-sun-soft", forest: "bg-forest-soft" }[tone]
+---
+
+<section aria-labelledby={id} class={cn("site-container py-6 sm:py-8", className)}>
+  <div class={cn("relative rounded-xl px-4 py-12 sm:px-8 md:py-16 lg:px-12", tint)}>
+    <slot name="decor" />
+    <header class="relative mx-auto mb-10 max-w-[640px] text-center">
+      {eyebrow && <p class="m-0 mb-3 eyebrow text-ink">{eyebrow}</p>}
+      <h2 id={id} class="m-0 type-title-1 text-ink">{title}</h2>
+      {description && <p class="m-0 mt-3 text-lg leading-7 text-ink-secondary">{description}</p>}
+      {link && <ArrowLink href={link.href} class="mt-6">{link.label}</ArrowLink>}
+    </header>
+    <div class="relative">
+      <slot />
+    </div>
+  </div>
+</section>

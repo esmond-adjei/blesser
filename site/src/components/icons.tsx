@@ -67,3 +67,9 @@ export const MenuIcon = () => (
     <path d="M4 7h16M4 12h16M4 17h16" />
   </Icon>
 )
+
+export const CheckIcon = () => (
+  <Icon>
+    <path d="M20 6 9 17l-5-5" />
+  </Icon>
+)

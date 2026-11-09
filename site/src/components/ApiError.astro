@@ -9,7 +9,7 @@ const { title = "We can't load opportunities right now" } = Astro.props
 const retry = Astro.url.pathname + Astro.url.search
 ---
 
-<section class="mx-auto max-w-content px-4 py-12 sm:px-6">
+<section class="site-container py-12">
   <LinkEmptyState
     error
     illustration={offline.src}

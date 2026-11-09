@@ -1,0 +1,20 @@
+---
+import { cn } from "@blesser/ui"
+import { ArrowRightIcon } from "./icons"
+
+interface Props {
+  href: string
+  class?: string
+}
+const { href, class: className } = Astro.props
+---
+
+<a href={href} class={cn("group inline-flex items-center gap-2.5 font-semibold text-ink no-underline", className)}>
+  <span class="group-hover:underline"><slot /></span>
+  <span
+    aria-hidden="true"
+    class="grid size-7 place-items-center rounded-full bg-forest text-on-forest transition-transform duration-160 ease-out group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0 [&_svg]:size-4"
+  >
+    <ArrowRightIcon />
+  </span>
+</a>

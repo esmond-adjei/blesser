@@ -13,6 +13,7 @@ interface Props {
   type?: "website" | "article"
   jsonLd?: object | object[]
   noindex?: boolean
+  heroOnForest?: boolean
 }
 
 const {
@@ -23,6 +24,7 @@ const {
   type = "website",
   jsonLd,
   noindex = false,
+  heroOnForest = false,
 } = Astro.props
 
 const site = siteUrl()
@@ -63,7 +65,7 @@ const ldJson = (o: object) => JSON.stringify(o).replace(/</g, "\\u003c")
       Skip to content
     </a>
     <slot name="banner" />
-    <Header />
+    <Header onForest={heroOnForest} />
     <main id="main" tabindex="-1" class="flex-1 outline-none">
       <slot />
     </main>

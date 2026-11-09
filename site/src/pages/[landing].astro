@@ -6,6 +6,7 @@ import Base from "../layouts/Base.astro"
 import CardGrid from "../components/CardGrid.astro"
 import Pagination from "../components/Pagination.astro"
 import NotFound from "../components/NotFound.astro"
+import PageHeader from "../components/PageHeader.astro"
 import ApiErrorSection from "../components/ApiError.astro"
 import { ArrowRightIcon } from "../components/icons"
 import { ApiError, api, settle } from "../lib/api"
@@ -33,30 +34,21 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
     </Base>
   ) : (
     <Base title={landing.title} description={`${landing.intro} Open now in Ghana, checked against the official page.`} path={`/${landing.slug}`} noindex={page > 1}>
-      <section class="mx-auto max-w-content px-4 pt-10 pb-6 sm:px-6">
-        <div class:list={["grid items-center gap-8", landing.illustration && "md:grid-cols-[1.2fr_1fr]"]}>
-          <div>
-            <h1 class="m-0 type-title-1 text-ink md:type-hero">{landing.title}</h1>
-            <p class="m-0 mt-4 max-w-[52ch] text-lg leading-7 text-ink-secondary">{landing.intro}</p>
-            <div class="mt-6 flex flex-wrap gap-3">
-              <a href={listHref} class={buttonVariants({ variant: "secondary" })}>Filter and search</a>
-              <a href={registerUrl()} class={buttonVariants({ variant: "quiet" })}>Create account to track</a>
-            </div>
-          </div>
-          {landing.illustration && (
-            <img
-              src={landing.illustration.src}
-              width={landing.illustration.width}
-              height={landing.illustration.height}
-              alt=""
-              fetchpriority="high"
-              class="block h-auto w-full rounded-xl"
-            />
-          )}
+      <PageHeader
+        big
+        eyebrow={"category" in landing.filter ? "Who it's for" : "Opportunities"}
+        title={landing.title}
+        description={landing.intro}
+        tone={"category" in landing.filter ? "forest" : "sun"}
+        illustration={landing.illustration}
+      >
+        <div slot="meta" class="mt-6 flex flex-wrap gap-3">
+          <a href={listHref} class={buttonVariants({ variant: "brand" })}>Filter and search</a>
+          <a href={registerUrl()} class={buttonVariants({ variant: "secondary" })}>Create account to track</a>
         </div>
-      </section>
+      </PageHeader>
 
-      <section aria-labelledby="open-now" class="mx-auto max-w-content px-4 py-8 sm:px-6">
+      <section aria-labelledby="open-now" class="site-container py-8">
         {result instanceof ApiError || !result ? (
           <ApiErrorSection />
         ) : result.items.length === 0 ? (
@@ -78,7 +70,7 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
       </section>
 
       {siblings.length > 0 && (
-        <nav aria-label="More to explore" class="mx-auto max-w-content px-4 py-8 sm:px-6">
+        <nav aria-label="More to explore" class="site-container py-8">
           <h2 class="m-0 mb-4 text-headline text-ink">More to explore</h2>
           <ul class="m-0 flex list-none flex-wrap gap-3 p-0">
             {siblings.map((l) => (

@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro"
 import CardGrid from "../../components/CardGrid.astro"
 import NotFound from "../../components/NotFound.astro"
+import PageHeader from "../../components/PageHeader.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import { LinkEmptyState } from "../../components/States"
 import { ApiError, api, settle } from "../../lib/api"
@@ -26,12 +27,12 @@ const items = collection?.items.filter((o) => !o.closed) ?? []
   {!missing && !collection && <ApiErrorSection />}
   {
     collection && (
-      <div class="mx-auto max-w-content px-4 py-10 sm:px-6">
-        <p class="m-0 text-callout font-semibold text-link">Collection</p>
-        <h1 class="m-0 mt-2 type-title-1 text-ink">{collection.title}</h1>
-        {collection.intro && <p class="m-0 mt-3 max-w-reading text-lg leading-7 whitespace-pre-line text-ink-secondary">{collection.intro}</p>}
-        <p class="m-0 mt-4 text-callout text-ink-tertiary">{plural(items.length, "opportunity", "opportunities")} open</p>
-        <div class="mt-8">
+      <>
+      <PageHeader eyebrow="Collection" title={collection.title} description={collection.intro || undefined} tone="sun">
+        <p slot="meta" class="m-0 mt-4 text-callout font-semibold text-sun-ink">{plural(items.length, "opportunity", "opportunities")} open</p>
+      </PageHeader>
+      <div class="site-container py-10">
+        <div>
           {items.length > 0 ? (
             <CardGrid items={items} />
           ) : (
@@ -43,6 +44,7 @@ const items = collection?.items.filter((o) => !o.closed) ?? []
           )}
         </div>
       </div>
+      </>
     )
   }
 </Base>
