@@ -29,6 +29,17 @@ export function formatDay(day: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
 }
 
-export function identityName(user: Pick<AuthUser, "display_name" | "email"> | null): string {
-  return user?.display_name?.trim() || user?.email || ""
+/** Display name, else the email's local part: a short label for avatars and menus. */
+export function accountName(user: Pick<AuthUser, "display_name" | "email"> | null): string {
+  return user?.display_name?.trim() || user?.email.split("@")[0] || ""
+}
+
+export function initials(name: string): string {
+  const all = name.split(/[\s._-]+/).filter(Boolean)
+  const lettered = all.filter((w) => /^\p{L}/u.test(w))
+  const words = lettered.length ? lettered : all
+  if (!words.length) return "?"
+  const first = words[0][0]
+  const last = words.length > 1 ? words[words.length - 1][0] : ""
+  return (first + last).toUpperCase()
 }

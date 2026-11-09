@@ -2,11 +2,14 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ApiError } from "./lib/api"
-import { Toaster } from "sonner"
 import "./index.css"
 import App from "./App"
 import { TooltipProvider } from "./components/ui/tooltip"
 import { AuthProvider } from "./lib/auth"
+import { initTheme } from "./lib/theme"
+import { AppToaster } from "./components/feedback/AppToaster"
+
+initTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,13 +31,8 @@ createRoot(document.getElementById("root")!).render(
           <App />
         </TooltipProvider>
       </AuthProvider>
-      <Toaster
-        className="bg-transparent!"
-        position="bottom-right"
-        theme="system"
-        toastOptions={{ style: { background: "var(--surface-raised)", color: "var(--ink)", border: 0, borderRadius: "var(--radius-md)", boxShadow: "var(--elevation-2)", font: "400 14px/20px var(--font-sans)" }, classNames: { success: "toast-success", error: "toast-error", warning: "toast-warning" } }}
-        closeButton
-      />
+      <AppToaster />
     </QueryClientProvider>
   </StrictMode>,
 )
+

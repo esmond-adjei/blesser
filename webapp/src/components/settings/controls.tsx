@@ -1,6 +1,8 @@
 import * as React from "react"
-import { ChevronDown } from "lucide-react"
+import { Check } from "lucide-react"
 import { cn } from "@blesser/ui"
+import { AutosaveContext, type Track } from "../../lib/autosave"
+import { toastError } from "../../lib/toast"
 
 export function Switch({
   checked, mixed = false, onChange, label, title, disabled = false,
@@ -33,82 +35,88 @@ export function Switch({
   )
 }
 
-export function SettingsPanel({ title, description, action, children }: {
+type SaveState = "idle" | "saving" | "saved"
+
+export function SettingsSection({ id, title, description, children }: {
+  id: string
   title: string
   description: string
-  action?: React.ReactNode
   children: React.ReactNode
 }) {
+  const [state, setState] = React.useState<SaveState>("idle")
+  const timer = React.useRef<number | undefined>(undefined)
+  React.useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const track = React.useCallback<Track>(async (work) => {
+    window.clearTimeout(timer.current)
+    setState("saving")
+    try {
+      const result = await work
+      setState("saved")
+      timer.current = window.setTimeout(() => setState("idle"), 2400)
+      return result
+    } catch (err) {
+      setState("idle")
+      toastError(err, "Couldn't save")
+      return undefined
+    }
+  }, [])
+
   return (
-    <div className="min-w-0 pb-2">
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-1">
-        <div className="min-w-0 flex-1 basis-48">
-          <h2 className="text-headline text-ink">{title}</h2>
-          <p className="mt-0.5 max-w-xl text-footnote text-ink-secondary">{description}</p>
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
-      </header>
-      {children}
-    </div>
+    <AutosaveContext.Provider value={track}>
+      <section aria-labelledby={`${id}-title`} className="min-w-0">
+        <header className="flex items-start justify-between gap-4 border-b border-separator pb-4">
+          <div className="min-w-0">
+            <h2 id={`${id}-title`} className="type-title-3 text-ink">{title}</h2>
+            <p className="mt-1 text-footnote text-ink-secondary">{description}</p>
+          </div>
+          <p aria-live="polite" className="flex h-6 shrink-0 items-center gap-1 text-footnote text-ink-secondary">
+            {state === "saving" ? "Saving…" : state === "saved" ? <><Check className="size-3.5 text-positive" aria-hidden="true" /> Saved</> : null}
+          </p>
+        </header>
+        <div className="mt-6 space-y-8">{children}</div>
+      </section>
+    </AutosaveContext.Provider>
   )
 }
 
-export function SettingRow({ title, description, control }: {
-  title: string
+export function SettingsGroup({ title, description, danger = false, children }: {
+  title?: string
   description?: string
-  control: React.ReactNode
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-      <div className="min-w-0 flex-1">
-        <p className="text-callout font-semibold text-ink">{title}</p>
-        {description && <p className="mt-1 text-footnote text-ink-secondary">{description}</p>}
-      </div>
-      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2 sm:justify-end">{control}</div>
-    </div>
-  )
-}
-
-export function SettingSection({ title, description, children }: {
-  title: string
-  description?: string
+  danger?: boolean
   children: React.ReactNode
 }) {
-  return (
-    <section className="mt-5 min-w-0">
-      <header className="mb-2">
-        <h3 className="text-callout font-semibold text-ink">{title}</h3>
-        {description && <p className="mt-1 text-footnote text-ink-secondary">{description}</p>}
-      </header>
-      <div className="min-w-0 divide-y divide-separator/60 rounded-lg border border-separator bg-surface px-4">{children}</div>
-    </section>
-  )
-}
-
-export function SettingDisclosure({ title, description, leading, control, children }: {
-  title: string
-  description?: string
-  /** An icon tile after the chevron. */
-  leading?: React.ReactNode
-  control?: React.ReactNode
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = React.useState(false)
-  const id = React.useId()
   return (
     <div className="min-w-0">
-      <div className="flex items-start gap-3">
-        <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-md py-4 text-left ">
-          <ChevronDown aria-hidden className={cn("mt-0.5 size-4 shrink-0 text-ink-secondary transition-transform", !open && "-rotate-90")} />
-          {leading}
-          <span className="min-w-0">
-            <span className="block text-callout font-semibold text-ink">{title}</span>
-            {description && <span className="mt-1 block text-footnote text-ink-secondary">{description}</span>}
-          </span>
-        </button>
-        {control && <div className="flex shrink-0 flex-wrap items-center gap-2 py-4">{control}</div>}
+      {title ? <h3 className={cn("text-callout font-semibold", danger ? "text-critical" : "text-ink")}>{title}</h3> : null}
+      {description ? <p className="mt-0.5 text-footnote text-ink-secondary">{description}</p> : null}
+      <div className={cn(title && "mt-2.5", "min-w-0 divide-y rounded-lg border bg-surface", danger ? "divide-critical/20 border-critical/35" : "divide-separator border-separator")}>
+        {children}
       </div>
-      <div id={id} hidden={!open} className="min-w-0 border-t border-separator/60 pb-4 pt-1">{open && children}</div>
+    </div>
+  )
+}
+
+/** Label and helper text on the left, the control on the right; `stack` drops the control below on phones. */
+export function SettingRow({ label, description, control, htmlFor, stack = false, children }: {
+  label: React.ReactNode
+  description?: React.ReactNode
+  control?: React.ReactNode
+  htmlFor?: string
+  stack?: boolean
+  children?: React.ReactNode
+}) {
+  const Label = htmlFor ? "label" : "p"
+  return (
+    <div className="min-w-0 px-4 py-3.5 sm:px-5">
+      <div className={cn("flex min-w-0 gap-x-6 gap-y-3", stack ? "flex-col sm:flex-row sm:items-center" : "items-center")}>
+        <div className="min-w-0 flex-1">
+          <Label htmlFor={htmlFor} className="block text-callout font-medium text-ink">{label}</Label>
+          {description ? <div className="mt-0.5 text-footnote text-ink-secondary">{description}</div> : null}
+        </div>
+        {control ? <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{control}</div> : null}
+      </div>
+      {children}
     </div>
   )
 }

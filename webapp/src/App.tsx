@@ -70,6 +70,7 @@ export default function App() {
               <Route path="scans" element={<Scans />} />
               <Route path="scans/:scanId" element={<ScanDetail />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="settings/:section" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
             <Route path="login" element={<Login />} />

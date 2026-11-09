@@ -1,14 +1,14 @@
 import * as React from "react"
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
-import { Bell, ClipboardList, ListTodo, LogOut, Radar, Settings, Sparkles } from "lucide-react"
+import { Bell, ClipboardList, ListTodo, Radar, Sparkles } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as api from "../../lib/api"
-import { useAuth } from "../../lib/auth"
 import { browserTimezone } from "../../lib/push"
-import { formatAgo, identityName } from "../../lib/format"
+import { formatAgo } from "../../lib/format"
 import { Logo, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
+import { AccountMenu } from "./AccountMenu"
 
 const NAV = [
   { to: "/opportunities", label: "Opportunities", icon: Sparkles },
@@ -47,8 +47,6 @@ const mobileNavClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Shell() {
   useDocumentTitle()
-  const { user, signOut } = useAuth()
-  const navigate = useNavigate()
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-separator bg-canvas md:flex">
@@ -67,23 +65,8 @@ export function Shell() {
             </NavLink>
           ))}
         </nav>
-        <div className="space-y-0.5 border-t border-separator p-2">
-          <NavLink to="/settings" className={navClass}>
-            <Settings strokeWidth={1.75} />
-            Settings
-          </NavLink>
-          <button
-            type="button"
-            onClick={async () => {
-              await signOut()
-              navigate("/opportunities")
-            }}
-            className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-sm px-2.5 text-callout font-medium text-ink-secondary hover:bg-surface-sunk hover:text-ink"
-          >
-            <LogOut className="size-4" strokeWidth={1.75} />
-            Sign out
-          </button>
-          <p className="truncate px-2.5 pt-1 text-footnote text-ink-tertiary">{identityName(user)}</p>
+        <div className="border-t border-separator p-2">
+          <AccountMenu />
         </div>
       </aside>
 
@@ -106,13 +89,7 @@ export function Shell() {
           </nav>
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell />
-            <NavLink
-              to="/settings"
-              aria-label="Settings"
-              className={(state) => cn(mobileNavClass(state), "md:hidden")}
-            >
-              <Settings strokeWidth={1.75} />
-            </NavLink>
+            <AccountMenu variant="compact" />
           </div>
         </header>
         <main className="nice-scroll min-h-0 flex-1 overflow-y-auto">

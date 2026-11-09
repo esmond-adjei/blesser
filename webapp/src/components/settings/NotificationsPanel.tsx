@@ -5,10 +5,10 @@ import * as api from "../../lib/api"
 import { browserTimezone, currentSubscription, disablePush, enablePush, permission, pushSupport } from "../../lib/push"
 import { toastError, toastInfo, toastSuccess } from "../../lib/toast"
 import { formatAgo } from "../../lib/format"
-import { Button } from "@blesser/ui"
-import { Input } from "@blesser/ui"
-import { Skeleton, SkeletonStack } from "../ui/feedback"
-import { SettingRow, SettingSection, SettingsPanel, Switch } from "./controls"
+import { Button, Input } from "@blesser/ui"
+import { SkeletonStack } from "../ui/feedback"
+import { useAutosave } from "../../lib/autosave"
+import { SettingRow, SettingsGroup, Switch } from "./controls"
 
 const CHANNELS: { id: api.NotificationChannel; label: string }[] = [
   { id: "inbox", label: "Inbox" },
@@ -18,46 +18,41 @@ const CHANNELS: { id: api.NotificationChannel; label: string }[] = [
 
 export function NotificationsPanel() {
   const qc = useQueryClient()
+  const track = useAutosave()
   const prefs = useQuery({ queryKey: ["notification-prefs"], queryFn: api.getNotificationPreferences })
 
   async function save(patch: api.NotificationPreferencesPatch) {
-    try {
-      const next = await api.updateNotificationPreferences(patch)
-      qc.setQueryData(["notification-prefs"], next)
-      void qc.invalidateQueries({ queryKey: ["notifications"] })
-    } catch (err) {
-      toastError(err, "Couldn't save")
-    }
+    const next = await track(api.updateNotificationPreferences(patch))
+    if (!next) return
+    qc.setQueryData(["notification-prefs"], next)
+    void qc.invalidateQueries({ queryKey: ["notifications"] })
   }
 
   return (
-    <SettingsPanel title="Notifications" description="Choose what you hear about, where it arrives and when to pause it.">
-
-      <ThisBrowser />
-
-      <SettingSection title="What to notify you about" description="Choose where each event reaches you: inbox, push or email.">
+    <>
+      <SettingsGroup title="What to notify you about" description="Choose where each update reaches you.">
         {!prefs.data ? (
-          <Skeleton className="my-3 h-40" />
+          <SkeletonStack aria-label="Loading notification settings" aria-busy="true" className="space-y-3 p-4" blocks={["h-10", "h-10", "h-10"]} />
         ) : (
-          <div>
-            <table className="w-full text-sm">
+          <>
+            <table className="w-full text-callout">
               <thead>
-                <tr className="text-left type-caption text-ink-secondary">
-                  <th className="py-2 font-normal">Event</th>
+                <tr className="text-left text-footnote text-ink-secondary">
+                  <th scope="col" className="py-2.5 pr-3 pl-4 font-medium sm:pl-5">Update</th>
                   {CHANNELS.map((channel) => (
-                    <th key={channel.id} className="w-16 py-2 text-center font-normal sm:w-20">{channel.label}</th>
+                    <th key={channel.id} scope="col" className="w-14 py-2.5 text-center font-medium last:pr-3 sm:w-20 sm:last:pr-5">{channel.label}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-separator border-t border-separator">
                 {prefs.data.kinds.map((kind) => (
                   <tr key={kind.kind}>
-                    <td className="py-3 pr-3 align-top">
-                      <span className="block font-medium">{kind.label}</span>
+                    <th scope="row" className="py-3.5 pr-3 pl-4 text-left align-top font-normal sm:pl-5">
+                      <span className="block font-medium text-ink">{kind.label}</span>
                       <span className="mt-0.5 block text-footnote text-ink-secondary">{kind.description}</span>
-                    </td>
+                    </th>
                     {CHANNELS.map((channel) => (
-                      <td key={channel.id} className="py-3 text-center align-top">
+                      <td key={channel.id} className="py-3.5 text-center align-top last:pr-3 sm:last:pr-5">
                         <span className="inline-flex pt-0.5">
                           <Switch checked={kind.channels[channel.id]} label={`${kind.label}: ${channel.label}`}
                             onChange={(on) => save({ channels: { [kind.kind]: { [channel.id]: on } } })} />
@@ -68,31 +63,27 @@ export function NotificationsPanel() {
                 ))}
               </tbody>
             </table>
-            <p className="py-3 text-footnote text-ink-secondary">
-              Push and email include a brief update and a link back here. CV text, draft content and professor details stay private. Email goes to verified addresses only.
+            <p className="px-4 py-3 text-footnote text-ink-secondary sm:px-5">
+              Push and email carry a short update and a link back here. Your notes and application details stay private. Email goes to verified addresses only.
             </p>
-          </div>
+          </>
         )}
-      </SettingSection>
+      </SettingsGroup>
 
-      {prefs.data && <QuietHours prefs={prefs.data} onSave={save} />}
+      {prefs.data ? <QuietHours prefs={prefs.data} onSave={save} /> : null}
 
-      {prefs.data && (
-        <SettingSection title="Email digest">
+      {prefs.data ? (
+        <SettingsGroup title="Email digest">
           <SettingRow
-            title="Daily digest"
-            description="One email a morning listing unread notifications from the last day. Useful if you don't use push."
-            control={
-              <Switch
-                checked={prefs.data.email_digest}
-                label="Daily email digest"
-                onChange={(on) => save({ email_digest: on })}
-              />
-            }
+            label="Daily digest"
+            description="One email each morning listing the last day's unread notifications."
+            control={<Switch checked={prefs.data.email_digest} label="Daily email digest" onChange={(on) => save({ email_digest: on })} />}
           />
-        </SettingSection>
-      )}
-    </SettingsPanel>
+        </SettingsGroup>
+      ) : null}
+
+      <ThisBrowser />
+    </>
   )
 }
 
@@ -108,42 +99,42 @@ function QuietHours({
   const [zone, setZone] = React.useState(prefs.timezone ?? browserTimezone() ?? "UTC")
   const [zones] = React.useState(listZones)
   const listId = React.useId()
+  const zoneId = React.useId()
+
+  const saveWindow = (nextStart: string, nextEnd: string) => {
+    if (nextStart === (prefs.quiet_start ?? "") && nextEnd === (prefs.quiet_end ?? "")) return
+    void onSave({ quiet_start: nextStart || null, quiet_end: nextEnd || null })
+  }
 
   return (
-    <SettingSection title="Quiet hours">
+    <SettingsGroup title="Quiet hours" description="Push and email wait until the window ends. The inbox keeps updating.">
       <SettingRow
-        title="Pause push and email"
-        description="Push and email wait until this window ends. Inbox updates continue. Leave both times empty to turn quiet hours off."
+        stack
+        label="Pause push and email"
+        description="Leave both times empty to turn quiet hours off."
         control={
-          <div className="flex w-full flex-wrap items-center gap-1.5">
-            <Input
-              type="time"
-              aria-label="Quiet hours start"
-              className="h-9 w-28 min-w-0 flex-1 sm:flex-none"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              onBlur={() => onSave({ quiet_start: start || null, quiet_end: end || null })}
-            />
+          <div className="flex items-center gap-2">
+            <Input type="time" aria-label="Quiet hours start" className="h-control-sm w-[7.5rem] text-callout" value={start}
+              onChange={(e) => setStart(e.target.value)} onBlur={() => saveWindow(start, end)} />
             <span className="text-footnote text-ink-secondary">to</span>
-            <Input
-              type="time"
-              aria-label="Quiet hours end"
-              className="h-9 w-28 min-w-0 flex-1 sm:flex-none"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              onBlur={() => onSave({ quiet_start: start || null, quiet_end: end || null })}
-            />
+            <Input type="time" aria-label="Quiet hours end" className="h-control-sm w-[7.5rem] text-callout" value={end}
+              onChange={(e) => setEnd(e.target.value)} onBlur={() => saveWindow(start, end)} />
+            {start || end ? (
+              <Button size="sm" variant="quiet" onClick={() => { setStart(""); setEnd(""); saveWindow("", "") }}>Clear</Button>
+            ) : null}
           </div>
         }
       />
       <SettingRow
-        title="Timezone"
+        stack
+        htmlFor={zoneId}
+        label="Timezone"
         description="Quiet hours and deadline reminders (14, 7 and 1 days before, from 8:00) follow this clock."
         control={
           <>
             <Input
-              aria-label="Timezone"
-              className="h-9 w-full min-w-0 sm:w-48"
+              id={zoneId}
+              className="h-control-sm w-full text-callout sm:w-56"
               list={listId}
               value={zone}
               onChange={(e) => setZone(e.target.value)}
@@ -159,7 +150,7 @@ function QuietHours({
           </>
         }
       />
-    </SettingSection>
+    </SettingsGroup>
   )
 }
 
@@ -256,76 +247,63 @@ function ThisBrowser() {
 
   const canEnable = support === "supported" && config.data?.enabled && permission() !== "denied" && !subscribed
 
-  if (config.isLoading || devices.isLoading || own.isLoading) {
-    return (
-      <SettingSection title="This browser">
-        <SkeletonStack aria-label="Loading push settings" aria-busy="true" className="space-y-3 py-3" blocks={["h-10", "h-10"]} />
-      </SettingSection>
-    )
-  }
+  const others = (devices.data ?? []).filter((d) => d.endpoint !== endpoint)
 
   return (
-    <SettingSection title="This browser">
-      <SettingRow
-        title="Push notifications"
-        description={status}
-        control={
-          subscribed ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                const own = devices.data?.find((d) => d.endpoint === endpoint)
-                if (own) void remove(own)
-              }}
-            >
-              Remove
-            </Button>
-          ) : canEnable ? (
-            <Button data-tooltip="Allow browser notifications on this device" size="sm" onClick={turnOn} disabled={busy}>
-              <BellRing /> Turn on
-            </Button>
-          ) : null
-        }
-      />
-      {(devices.data ?? []).filter((d) => d.endpoint !== endpoint).length > 0 && (
-        <div className="py-3">
-          <p className="text-callout font-semibold">Other devices</p>
-          <ul className="mt-1.5 space-y-1.5">
-            {(devices.data ?? [])
-              .filter((d) => d.endpoint !== endpoint)
-              .map((d) => (
-                <li key={d.id} className="flex items-center gap-2 text-footnote text-ink-secondary">
-                  <Smartphone className="size-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{deviceName(d.user_agent)}</span>
-                  <span>added {formatAgo(d.created_at)}</span>
-                  <Button size="sm" variant="quiet" onClick={() => remove(d)}>
-                    Remove
-                  </Button>
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
-      <SettingRow
-        title="Send a test notification"
-        description="Goes to your inbox and every device with push on, right away (quiet hours don't apply)."
-        control={
-          <Button data-tooltip="Send a test notification to your registered devices" size="sm" variant="secondary" onClick={test}>
-            Send test
-          </Button>
-        }
-      />
-      <SettingRow
-        title="Send a test email"
-        description="Emails your verified address right away, so you can check email notifications arrive."
-        control={
-          <Button data-tooltip="Send a test email to your account's address" size="sm" variant="secondary" onClick={testEmail}>
-            Send test email
-          </Button>
-        }
-      />
-    </SettingSection>
+    <>
+      <SettingsGroup title="Push notifications" description="Push reaches a browser or phone even when Blesser isn't open.">
+        {config.isLoading || devices.isLoading || own.isLoading ? (
+          <SkeletonStack aria-label="Loading push settings" aria-busy="true" className="space-y-3 p-4" blocks={["h-10"]} />
+        ) : (
+          <SettingRow
+            stack
+            label="This browser"
+            description={status}
+            control={
+              subscribed ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const mine = devices.data?.find((d) => d.endpoint === endpoint)
+                    if (mine) void remove(mine)
+                  }}
+                >
+                  Turn off
+                </Button>
+              ) : canEnable ? (
+                <Button size="sm" variant="secondary" onClick={turnOn} disabled={busy} icon={<BellRing />}>
+                  Turn on
+                </Button>
+              ) : null
+            }
+          />
+        )}
+        {others.map((d) => (
+          <SettingRow
+            key={d.id}
+            label={<span className="flex items-center gap-2"><Smartphone className="size-4 shrink-0 text-ink-tertiary" aria-hidden="true" />{deviceName(d.user_agent)}</span>}
+            description={`Added ${formatAgo(d.created_at)}`}
+            control={<Button size="sm" variant="quiet" onClick={() => remove(d)}>Remove</Button>}
+          />
+        ))}
+      </SettingsGroup>
+
+      <SettingsGroup title="Check delivery" description="Tests send right away; quiet hours don't apply.">
+        <SettingRow
+          stack
+          label="Test notification"
+          description="Goes to your inbox and every device with push on."
+          control={<Button size="sm" variant="secondary" onClick={test}>Send test</Button>}
+        />
+        <SettingRow
+          stack
+          label="Test email"
+          description="Goes to your verified address, so you can check email notifications arrive."
+          control={<Button size="sm" variant="secondary" onClick={testEmail}>Send test email</Button>}
+        />
+      </SettingsGroup>
+    </>
   )
 }
 

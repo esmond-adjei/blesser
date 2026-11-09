@@ -13,13 +13,11 @@
     <meta name="theme-color" content="#0e1411" media="(prefers-color-scheme: dark)" />
     <title>Blesser | Opportunities in Ghana</title>
     <script>
-      // Follow the system's light or dark setting.
-      try {
-        var dark = window.matchMedia("(prefers-color-scheme: dark)")
-        var apply = function () { document.documentElement.classList.toggle("dark", dark.matches) }
-        apply()
-        dark.addEventListener("change", apply)
-      } catch (e) {}
+      // Set before first paint so the page never flashes the wrong theme; src/lib/theme.ts takes over after.
+      var t
+      try { t = localStorage.getItem("blesser.theme") } catch (e) {}
+      if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      document.documentElement.dataset.theme = t
     </script>
   </head>
   <body>

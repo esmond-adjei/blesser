@@ -43,7 +43,7 @@ class Notification(Base):
         String, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(32))
-    # Push-safe wording: never CV text, draft content or professor details.
+    # Push-safe wording: never application notes or other private content.
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(String(500), default="")
     # In-app path the notification opens (e.g. /runs/<id>).

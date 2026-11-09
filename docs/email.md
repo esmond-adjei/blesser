@@ -1,9 +1,8 @@
 # Transactional email
 
-Used for password reset and email verification (#35), and for
-notification emails (deadline reminders, the optional daily digest; see
-[notifications.md](notifications.md)). Never used to contact professors:
-outreach drafts are never sent.
+Used for password reset and email verification, and for notification
+emails (deadline reminders, the optional daily digest; see
+[notifications.md](notifications.md)).
 
 ## Decision: SMTP relay to a transactional provider
 
