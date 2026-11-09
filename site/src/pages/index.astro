@@ -24,6 +24,7 @@ import { ChecklistChip, FloatChip, Panelled } from "../components/FloatChip"
 import { ApiError, api, settle, type Announcement } from "../lib/api"
 import { loginUrl, registerUrl, siteUrl } from "../lib/config"
 import { plural } from "../lib/format"
+import { wholeRows } from "../lib/listing"
 import { organizationLd } from "../lib/seo"
 
 const [siteData, collections, recent] = await Promise.all([
@@ -45,11 +46,10 @@ const isActive = (a: Announcement | null | undefined): a is Announcement =>
   !!a?.text && (!a.starts_on || a.starts_on <= today) && (!a.ends_on || a.ends_on >= today)
 const announcement = isActive(content?.announcement) ? content.announcement : null
 
-// Whole rows of three on desktop; closing soon skips what Featured already shows.
-const rows = <T,>(items: T[]) => items.slice(0, items.length >= 3 ? Math.min(6, items.length - (items.length % 3)) : items.length)
-const featured = failed ? [] : rows(siteData.featured)
+// Closing soon skips what Featured already shows.
+const featured = failed ? [] : siteData.featured.slice(0, Math.max(wholeRows(siteData.featured.length, 3), wholeRows(siteData.featured.length, 4)))
 const featuredIds = new Set(featured.map((o) => o.id))
-const closingSoon = failed ? [] : rows(siteData.closing_soon.filter((o) => !featuredIds.has(o.id)))
+const closingSoon = failed ? [] : siteData.closing_soon.filter((o) => !featuredIds.has(o.id))
 const publicCollections = collections instanceof ApiError ? [] : collections.filter((c) => c.items.length > 0)
 const recentOrgs =
   recent instanceof ApiError ? [] : [...new Set(recent.items.map((o) => o.organization.trim()).filter(Boolean))]
@@ -160,7 +160,7 @@ const steps = [
         >
           <Decor slot="decor" kind="sun" class="-top-8 right-16 size-20" />
           <Decor slot="decor" kind="steps" class="top-20 left-12" />
-          <CardGrid items={featured} />
+          <CardGrid items={featured} rows />
         </Panel>
       )
     }
@@ -176,7 +176,7 @@ const steps = [
           link={{ href: "/opportunities?closing_within=14", label: "See everything closing soon" }}
         >
           <Decor slot="decor" kind="spot" src={tracked.src} class="-top-10 left-10 w-36" />
-          <CardGrid items={closingSoon} />
+          <CardGrid items={closingSoon} rows />
         </Panel>
       )
     }

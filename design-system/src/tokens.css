@@ -1,6 +1,7 @@
 /* Generated from tokens.json by scripts/build-tokens.mjs (npm run tokens). Do not edit. */
 
-:root {
+:root,
+[data-theme="light"] {
   color-scheme: light;
   --canvas: #f6f7f1;
   --surface: #ffffff;
@@ -99,7 +100,7 @@
   --control-sm: 32px;
   --control-md: 40px;
   --control-lg: 48px;
-  --content-max: 1120px;
+  --content-max: 1440px;
   --reading-max: 680px;
   --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --font-sans: "Figtree Variable", Figtree, -apple-system, "Segoe UI", system-ui, sans-serif;

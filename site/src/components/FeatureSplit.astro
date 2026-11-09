@@ -18,13 +18,13 @@ const tint = { sun: "bg-sun-soft", forest: "bg-forest-soft", sunk: "bg-surface-s
 
 <section aria-labelledby={id} class="site-container py-10 md:py-14">
   <div class="grid items-center gap-10 md:grid-cols-2 lg:gap-16">
-    <div class={cn("relative rounded-xl p-6 sm:p-10", tint, reverse && "md:order-2")}>
-      <Illustration full={full} small={small} sizes="(min-width: 768px) 520px, 100vw" class="rounded-lg" />
+    <div class={cn("relative w-full max-w-[640px] rounded-xl p-6 sm:p-10", tint, reverse ? "md:order-2 md:justify-self-start" : "md:justify-self-end")}>
+      <Illustration full={full} small={small} sizes="(min-width: 768px) 560px, 100vw" class="rounded-lg" />
       <div aria-hidden="true">
         <slot name="chips" />
       </div>
     </div>
-    <div>
+    <div class={cn("max-w-[600px]", reverse ? "md:justify-self-end" : "md:justify-self-start")}>
       {eyebrow && <p class="m-0 mb-3 eyebrow text-ink">{eyebrow}</p>}
       <h2 id={id} class="m-0 type-title-1 text-ink">{title}</h2>
       <div class="mt-4 text-lg leading-7 text-ink-secondary">

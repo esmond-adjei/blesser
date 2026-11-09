@@ -36,7 +36,7 @@ export function Segmented<T extends string>({
 }: {
   label: string
   value: T
-  options: { value: T; label: string; count?: number }[]
+  options: { value: T; label: string; count?: number; icon?: React.ReactNode }[]
   onChange: (value: T) => void
   className?: string
 }) {
@@ -75,11 +75,12 @@ export function Segmented<T extends string>({
               }
             }}
             className={cn(
-              "flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 text-footnote font-medium whitespace-nowrap transition-colors duration-160",
+              "flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 [&_svg]:size-3.5 text-footnote font-medium whitespace-nowrap transition-colors duration-160",
               selected ? "bg-surface text-ink shadow-elevation-1" : "text-ink-secondary hover:text-ink",
             )}
           >
-            {o.label}
+            {o.icon}
+            {o.icon ? <span className="max-sm:sr-only">{o.label}</span> : o.label}
             {o.count != null ? <span className="text-ink-tertiary tabular-nums">{o.count}</span> : null}
           </button>
         )

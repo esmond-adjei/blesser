@@ -42,3 +42,8 @@ export function toQuery(f: Filters): OpportunityQuery {
 }
 
 export const isFiltered = (f: Filters) => !!(f.q || f.category || f.kind || f.closing_within)
+
+/** How many of n cards fill whole rows of cols, at most two rows; fewer than one row shows them all. */
+export function wholeRows(n: number, cols: number): number {
+  return n < cols ? n : Math.min(2 * cols, n - (n % cols))
+}

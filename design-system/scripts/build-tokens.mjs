@@ -30,7 +30,7 @@ const fixed = [
 const tokensCss =
   header +
   "\n" +
-  block(":root", themed("light")) +
+  block(':root,\n[data-theme="light"]', themed("light")) +
   "\n" +
   block('.dark,\n[data-theme="dark"]', themed("dark")) +
   "\n" +

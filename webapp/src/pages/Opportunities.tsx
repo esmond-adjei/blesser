@@ -5,6 +5,8 @@ import {
   Check,
   CalendarPlus,
   Download,
+  LayoutGrid,
+  List,
   ListPlus,
   Lock,
   MapPin,
@@ -39,6 +41,7 @@ import {
   Countdown,
   Field,
   Input,
+  OpportunityArt,
   Select,
   Textarea,
   buttonVariants,
@@ -62,6 +65,30 @@ const SORTS = [
   { value: "new", label: "Newest" },
 ]
 
+type View = "cards" | "list"
+const VIEW_KEY = "blesser.opportunities.view"
+
+function useView(): [View, (view: View) => void] {
+  const [view, setView] = React.useState<View>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "cards"
+    } catch {
+      return "cards"
+    }
+  })
+  const choose = React.useCallback((next: View) => {
+    setView(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // Storage can be blocked; the choice still holds for this visit.
+    }
+  }, [])
+  return [view, choose]
+}
+
+const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @7xl:gap-6"
+
 export function Opportunities() {
   const [query, setQuery] = useUrlParam("q")
   const [draft, setDraft] = React.useState(query)
@@ -75,6 +102,7 @@ export function Opportunities() {
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
   const sort = sortParam === "new" ? "new" : "deadline"
+  const [view, setView] = useView()
 
   // Typing waits a beat before it touches the URL and the query; a URL change
   // (back/forward, a link) resets the box during render.
@@ -190,10 +218,34 @@ export function Opportunities() {
           <span className="ml-auto text-footnote text-ink-tertiary" aria-live="polite">
             {list.isSuccess ? `${total} ${total === 1 ? "result" : "results"}` : ""}
           </span>
+          <Segmented
+            label="View"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "cards", label: "Cards", icon: <LayoutGrid aria-hidden="true" /> },
+              { value: "list", label: "List", icon: <List aria-hidden="true" /> },
+            ]}
+          />
         </div>
       </div>
 
-      {list.isLoading ? (
+      {list.isLoading && view === "cards" ? (
+        <div className="@container">
+          <div className={GRID}>
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="overflow-hidden rounded-lg border border-separator bg-surface">
+                <div className="aspect-[16/7] animate-pulse bg-surface-sunk motion-reduce:animate-none" />
+                <div className="space-y-3 p-5">
+                  <div className="h-3 w-1/3 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
+                  <div className="h-4 w-3/4 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
+                  <div className="h-3 w-1/2 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : list.isLoading ? (
         <div className="divide-y divide-separator rounded-lg border border-separator bg-surface">
           {Array.from({ length: 6 }, (_, i) => (
             <div key={i} className="h-[72px] px-4 py-3">
@@ -216,16 +268,31 @@ export function Opportunities() {
         />
       ) : (
         <>
-          <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
-            {items.map((opp) => (
-              <OpportunityRow
-                key={opp.id}
-                opp={opp}
-                applicationId={tracked.data?.[opp.id]}
-                onOpen={() => setDetail(opp)}
-              />
-            ))}
-          </ul>
+          {view === "cards" ? (
+            <div className="@container">
+              <ul className={GRID}>
+                {items.map((opp) => (
+                  <OpportunityTile
+                    key={opp.id}
+                    opp={opp}
+                    applicationId={tracked.data?.[opp.id]}
+                    onOpen={() => setDetail(opp)}
+                  />
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
+              {items.map((opp) => (
+                <OpportunityRow
+                  key={opp.id}
+                  opp={opp}
+                  applicationId={tracked.data?.[opp.id]}
+                  onOpen={() => setDetail(opp)}
+                />
+              ))}
+            </ul>
+          )}
           {list.hasNextPage ? (
             <div className="flex justify-center">
               <Button size="sm" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
@@ -352,59 +419,103 @@ function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean
   )
 }
 
-function OpportunityRow({
-  opp,
-  applicationId,
-  onOpen,
-}: {
+function RowActions({ opp, applicationId }: { opp: Opportunity; applicationId: string | undefined }) {
+  const { pending, onTrack } = useTrack(opp, applicationId)
+  return (
+    <>
+      {applicationId ? (
+        <Link to="/applications" className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "w-[104px] text-link")}>
+          <Check /> Tracking
+        </Link>
+      ) : (
+        <Button size="sm" variant="secondary" className="w-[104px]" disabled={pending} onClick={onTrack} icon={<Plus />}>
+          Track
+        </Button>
+      )}
+      {opp.link || opp.source_url ? (
+        <a
+          href={opp.link || opp.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open the official page for ${opp.title}`}
+          data-tooltip="Official page"
+          className={cn(buttonVariants({ size: "sm", variant: "quiet", iconOnly: true }), "text-ink-secondary")}
+        >
+          <ArrowUpRight />
+        </a>
+      ) : null}
+    </>
+  )
+}
+
+interface ItemProps {
   opp: Opportunity
   applicationId: string | undefined
   onOpen: () => void
-}) {
-  const { pending, onTrack } = useTrack(opp, applicationId)
-  const meta = [opp.organization, KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
+}
+
+function Art({ opp, shape, className }: { opp: Opportunity; shape: "banner" | "square"; className?: string }) {
+  return <OpportunityArt seed={opp.slug || opp.id} category={opp.category} kind={opp.kind} shape={shape} className={className} />
+}
+
+function OpportunityTile({ opp, applicationId, onOpen }: ItemProps) {
+  const meta = [KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
   return (
-    <li className="group relative flex flex-col gap-2 px-4 py-3 hover:bg-surface-sunk/50 sm:flex-row sm:items-center sm:gap-4">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <li className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-separator bg-surface transition-shadow duration-200 hover:shadow-elevation-1">
+      <div aria-hidden="true" onClick={onOpen} className="cursor-pointer">
+        <Art opp={opp} shape="banner" />
+      </div>
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        {opp.organization ? <p className="truncate text-footnote text-ink-tertiary">{opp.organization}</p> : null}
+        <h3 className="mt-1.5">
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 cursor-pointer text-left text-callout font-semibold text-ink hover:underline"
+            className="line-clamp-2 cursor-pointer text-left text-headline text-balance text-ink hover:underline"
           >
             {opp.title}
           </button>
+        </h3>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
+          <span>{meta.join(" · ")}</span>
           <Markers opp={opp} members={false} />
         </div>
-        <p className="mt-0.5 truncate text-footnote text-ink-tertiary">{meta.join(" · ")}</p>
-        {opp.benefits ? <p className="mt-0.5 hidden truncate text-footnote text-ink-secondary md:block">{opp.benefits}</p> : null}
+        {opp.benefits ? <p className="mt-4 line-clamp-2 text-callout text-ink">{opp.benefits}</p> : null}
+        <div className="mt-auto flex items-center gap-2 pt-5">
+          <Countdown variant="text" {...countdownFor(opp)} className="mr-auto" />
+          <RowActions opp={opp} applicationId={applicationId} />
+        </div>
+      </div>
+    </li>
+  )
+}
+
+function OpportunityRow({ opp, applicationId, onOpen }: ItemProps) {
+  const meta = [opp.organization, KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
+  return (
+    <li className="group relative flex flex-col gap-2 px-4 py-3 hover:bg-surface-sunk/50 sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-3.5">
+        <div aria-hidden="true" onClick={onOpen} className="shrink-0 cursor-pointer self-start sm:self-center">
+          <Art opp={opp} shape="square" className="size-11 rounded-md" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <button
+              type="button"
+              onClick={onOpen}
+              className="min-w-0 cursor-pointer text-left text-callout font-semibold text-ink hover:underline"
+            >
+              {opp.title}
+            </button>
+            <Markers opp={opp} members={false} />
+          </div>
+          <p className="mt-0.5 truncate text-footnote text-ink-tertiary">{meta.join(" · ")}</p>
+          {opp.benefits ? <p className="mt-0.5 hidden truncate text-footnote text-ink-secondary md:block">{opp.benefits}</p> : null}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-3 sm:justify-end">
         <Countdown variant="text" {...countdownFor(opp)} className="mr-auto sm:mr-0 sm:w-24 sm:justify-end" />
-        {applicationId ? (
-          <Link
-            to="/applications"
-            className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "w-[104px] text-link")}
-          >
-            <Check /> Tracking
-          </Link>
-        ) : (
-          <Button size="sm" variant="secondary" className="w-[104px]" disabled={pending} onClick={onTrack} icon={<Plus />}>
-            Track
-          </Button>
-        )}
-        {opp.link || opp.source_url ? (
-          <a
-            href={opp.link || opp.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Open the official page for ${opp.title}`}
-            data-tooltip="Official page"
-            className={cn(buttonVariants({ size: "sm", variant: "quiet", iconOnly: true }), "text-ink-secondary")}
-          >
-            <ArrowUpRight />
-          </a>
-        ) : null}
+        <RowActions opp={opp} applicationId={applicationId} />
       </div>
     </li>
   )
@@ -428,9 +539,12 @@ function OpportunityDetail({
     <Dialog open={!!opp} onOpenChange={(open) => !open && onClose()}>
       {shown ? (
         <DialogContent className="max-w-2xl" onClose={onClose}>
-          <DialogHeader>
-            <DialogTitle>{shown.title}</DialogTitle>
-            {shown.organization ? <DialogDescription>{shown.organization}</DialogDescription> : null}
+          <DialogHeader className="flex-row items-start gap-4">
+            <Art opp={shown} shape="square" className="size-14 shrink-0 rounded-md" />
+            <div className="min-w-0 space-y-1.5">
+              <DialogTitle>{shown.title}</DialogTitle>
+              {shown.organization ? <DialogDescription>{shown.organization}</DialogDescription> : null}
+            </div>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <OpportunityMeta opp={shown} />

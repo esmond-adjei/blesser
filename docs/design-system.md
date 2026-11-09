@@ -8,10 +8,10 @@
 |---|---|
 | `design-system/tokens.json` | The source of truth: colours (light and dark), type styles, spacing, radius, shadows, sizes. Copied from the artifact. |
 | `design-system/scripts/build-tokens.mjs` | Generates the two CSS files below. No dependencies. |
-| `design-system/src/tokens.css` | Generated. CSS variables: light on `:root`, dark on `.dark` and `[data-theme="dark"]`. |
+| `design-system/src/tokens.css` | Generated. CSS variables: light on `:root` and `[data-theme="light"]`, dark on `.dark` and `[data-theme="dark"]`. |
 | `design-system/src/theme.css` | Generated. The Tailwind v4 `@theme` blocks, the `type-*` role utilities, the `dark:` variant and a small base layer. |
 | `design-system/src/fonts.css` | Bricolage Grotesque, Figtree and JetBrains Mono from fontsource, bundled with the app (no Google Fonts request). |
-| `design-system/src/components/` | Button, Chip, Countdown, Field (with Input, Textarea, Select), OpportunityCard, ApplicationStatus, EmptyState, Logo. |
+| `design-system/src/components/` | Button, Chip, Countdown, Field (with Input, Textarea, Select), OpportunityCard, OpportunityArt, ApplicationStatus, EmptyState, Logo. |
 | `design-system/assets/logos/` | The Path mark as SVG: `blesser-mark.svg`, `blesser-symbol.svg`, `blesser-symbol-white.svg`. |
 
 ## Changing tokens
@@ -46,9 +46,13 @@ import { Button, Countdown, EmptyState, OpportunityCard, buttonVariants, daysUnt
 <a href={url} className={buttonVariants({ variant: "secondary", size: "sm" })}>Official page</a>
 <Countdown daysLeft={daysUntil("2026-11-21")} date="2026-11-21" />
 <Countdown variant="text" daysLeft={12} />   // no fill, for rows in dense lists
+<OpportunityArt seed={opp.slug} category={opp.category} kind={opp.kind} />                 // 16:7 card header
+<OpportunityArt seed={opp.slug} category={opp.category} kind={opp.kind} shape="square" className="size-11 rounded-md" />
 ```
 
-Dark mode follows a `dark` class (or `data-theme="dark"`) on `<html>`. The member app sets it from `prefers-color-scheme` in `index.html`; do the same, or toggle it yourself.
+`OpportunityArt` draws the Path (three rounded steps climbing to a sun disc) plus one motif on a token-coloured ground. The seed fixes the layout, so an opportunity always gets the same picture; the category sets the ground (startups forest, research forest-soft, students sun-soft) and the kind sets the motif (arc, rings, half disc, stripes or dots). It is a pure SVG with no state, so it renders server-side on the site, and it is `aria-hidden`. `opportunityArt()` returns the same geometry as data.
+
+Dark mode follows a `dark` class (or `data-theme="dark"`) on `<html>`; `data-theme` also works on any element to pin a subtree to one theme. The member app stores a System / Light / Dark choice (`webapp/src/lib/theme.ts`) and always sets `data-theme` to the resolved value, first from an inline script in `index.html` so nothing flashes. The public site stays light.
 
 ## Utilities
 

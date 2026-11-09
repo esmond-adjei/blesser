@@ -12,3 +12,11 @@ export {
 } from "./components/ApplicationStatus"
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState"
 export { Logo, type LogoProps, type LogoVariant } from "./components/Logo"
+export {
+  OpportunityArt,
+  opportunityArt,
+  type ArtElement,
+  type ArtShape,
+  type ArtSpec,
+  type OpportunityArtProps,
+} from "./components/OpportunityArt"

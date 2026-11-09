@@ -1,18 +1,24 @@
 ---
+import { cn } from "@blesser/ui"
 import { SiteCard } from "./SiteCard"
 import type { PublicOpportunity } from "../lib/api"
 import { registerUrl } from "../lib/config"
+import { wholeRows } from "../lib/listing"
 
 interface Props {
   items: PublicOpportunity[]
+  /** Show whole rows only: up to two rows of three, or of four on wide screens. */
+  rows?: boolean
 }
-const { items } = Astro.props
+const { items, rows = false } = Astro.props
+const three = rows ? wholeRows(items.length, 3) : items.length
+const four = rows ? wholeRows(items.length, 4) : items.length
 ---
 
-<ul class="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 lg:grid-cols-3">
+<ul class="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
   {
-    items.map((opp) => (
-      <li class="min-w-0">
+    items.slice(0, Math.max(three, four)).map((opp, i) => (
+      <li class={cn("min-w-0", i >= three && "hidden 2xl:list-item", i >= four && "2xl:hidden")}>
         <SiteCard opp={opp} trackUrl={registerUrl(opp.slug)} />
       </li>
     ))

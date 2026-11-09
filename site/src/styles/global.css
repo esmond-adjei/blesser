@@ -62,7 +62,7 @@
 
 @utility site-container {
   width: 100%;
-  max-width: calc(1184px + 2 * var(--space-6));
+  max-width: calc(1600px + 2 * var(--space-6));
   margin-inline: auto;
   padding-inline: var(--space-4);
 
