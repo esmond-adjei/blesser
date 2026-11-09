@@ -7,11 +7,12 @@ import { Button } from "@blesser/ui"
 import { Field, Input } from "@blesser/ui"
 import { NotificationsPanel } from "../components/settings/NotificationsPanel"
 import { SettingSection, SettingsPanel } from "../components/settings/controls"
+import { PageHeader } from "../components/layout/PageHeader"
 
 export function Settings() {
   return (
     <div className="space-y-8">
-      <h1 className="type-title-2">Settings</h1>
+      <PageHeader title="Settings" />
       <AccountPanel />
       <NotificationsPanel />
     </div>

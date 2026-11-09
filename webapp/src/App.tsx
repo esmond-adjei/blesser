@@ -1,6 +1,6 @@
 import * as React from "react"
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom"
-import { ErrorState } from "./components/feedback/EmptyState"
+import { EmptyState } from "./components/feedback/EmptyState"
 import { ErrorBoundary } from "./components/feedback/ErrorBoundary"
 import { LoadingScreen } from "./components/feedback/LoadingScreen"
 import { buttonVariants } from "@blesser/ui"
@@ -47,7 +47,7 @@ function Home() {
 
 function NotFound() {
   return (
-    <ErrorState
+    <EmptyState
       illustration={notFoundArt}
       title="Page not found"
       description="That link didn't open. Check the address, or head back to the opportunities."

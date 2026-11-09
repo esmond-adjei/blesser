@@ -43,8 +43,8 @@ export function SettingsPanel({ title, description, action, children }: {
     <div className="min-w-0 pb-2">
       <header className="flex flex-wrap items-start justify-between gap-3 pb-1">
         <div className="min-w-0 flex-1 basis-48">
-          <h2 className="text-title-3 text-ink">{title}</h2>
-          <p className="mt-1 max-w-xl text-callout text-ink-secondary">{description}</p>
+          <h2 className="text-headline text-ink">{title}</h2>
+          <p className="mt-0.5 max-w-xl text-footnote text-ink-secondary">{description}</p>
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </header>
@@ -77,10 +77,10 @@ export function SettingSection({ title, description, children }: {
   return (
     <section className="mt-5 min-w-0">
       <header className="mb-2">
-        <h3 className="text-headline text-ink">{title}</h3>
+        <h3 className="text-callout font-semibold text-ink">{title}</h3>
         {description && <p className="mt-1 text-footnote text-ink-secondary">{description}</p>}
       </header>
-      <div className="min-w-0 divide-y divide-separator/60 rounded-lg border border-separator bg-surface px-5 shadow-elevation-1">{children}</div>
+      <div className="min-w-0 divide-y divide-separator/60 rounded-lg border border-separator bg-surface px-4">{children}</div>
     </section>
   )
 }

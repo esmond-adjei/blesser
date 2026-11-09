@@ -15,7 +15,6 @@ import {
 import * as api from "../lib/api"
 import {
   CATEGORIES,
-  CATEGORY_DESCRIPTIONS,
   CATEGORY_LABELS,
   KINDS,
   KIND_LABELS,
@@ -25,6 +24,7 @@ import {
   isCategory,
   isKind,
   useOpportunities,
+  useOpportunity,
   useOpportunityFacets,
   useTodoMutations,
   useTrackOpportunity,
@@ -36,11 +36,9 @@ import { toastError, toastSuccess } from "../lib/toast"
 import type { Opportunity, OpportunityCategory, OpportunityKind } from "../lib/types"
 import {
   Button,
-  Chip,
   Countdown,
   Field,
   Input,
-  OpportunityCard as Card,
   Select,
   Textarea,
   buttonVariants,
@@ -56,6 +54,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
 import { ScanDialog } from "./Scans"
 
 const SORTS = [
@@ -72,6 +71,7 @@ export function Opportunities() {
   const [soonParam, setSoon] = useUrlParam("soon")
   const [closedParam, setClosed] = useUrlParam("closed")
   const [newParam, setNew] = useUrlParam("new")
+  const [openParam, setOpenParam] = useUrlParam("open")
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
   const sort = sortParam === "new" ? "new" : "deadline"
@@ -105,127 +105,130 @@ export function Opportunities() {
   const counts = new Map(facets.data?.categories.map((c) => [c.key, c.count]))
 
   const [detail, setDetail] = React.useState<Opportunity | null>(null)
+  const linked = useOpportunity(openParam && !detail ? openParam : undefined)
+  const shownDetail = detail ?? (openParam ? linked.data ?? null : null)
   const [todoFor, setTodoFor] = React.useState<Opportunity | null>(null)
   const [scanOpen, setScanOpen] = React.useState(false)
   const [shareOpen, setShareOpen] = React.useState(false)
+  const filtered = !!(query || category || kind || soonParam || newParam || closedParam)
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="type-title-2">Opportunities</h1>
-          <p className="text-callout text-ink-secondary max-w-2xl">
-            Grants, accelerators, fellowships, scholarships and more, open to people in Ghana. Found and checked
-            by agents against each opportunity's own page.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => setShareOpen(true)} icon={<Plus />}>
-            Share one
-          </Button>
-          <Button size="sm" variant="brand" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
-            Find more
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="Opportunities"
+        description="Grants, accelerators, fellowships and scholarships open to people in Ghana, checked against each opportunity's own page."
+        actions={
+          <>
+            <Button size="sm" variant="quiet" onClick={() => setShareOpen(true)} icon={<Plus />}>
+              Share one
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
+              Find more
+            </Button>
+          </>
+        }
+      />
 
-      <nav aria-label="Audience" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <CategoryTile
-          active={!category}
-          label="Everything"
-          description={`${facets.data?.total ?? "…"} open now`}
-          onClick={() => setCategory("")}
-        />
-        {CATEGORIES.map((c) => (
-          <CategoryTile
-            key={c}
-            active={category === c}
-            label={CATEGORY_LABELS[c]}
-            description={`${counts.get(c) ?? 0} open · ${CATEGORY_DESCRIPTIONS[c]}`}
-            onClick={() => setCategory(category === c ? "" : c)}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Segmented
+            label="Audience"
+            value={category ?? ""}
+            onChange={(v) => setCategory(v)}
+            options={[
+              { value: "", label: "All", count: facets.data?.total },
+              ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 })),
+            ]}
           />
-        ))}
-      </nav>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-ink-tertiary" />
-          <Input
-            aria-label="Search opportunities"
-            placeholder="Search by name, funder, sector…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            className="w-full pl-10"
-          />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-tertiary" />
+            <Input
+              type="search"
+              aria-label="Search opportunities"
+              placeholder="Search by name, funder, sector…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              className="h-control-sm w-full pl-9 text-callout"
+            />
+          </div>
         </div>
-        <Select
-          aria-label="Kind"
-          className="w-auto min-w-[170px]"
-          value={kind ?? ""}
-          onChange={(e) => setKind(e.target.value)}
-        >
-          <option value="">All kinds</option>
-          {KINDS.map((k) => (
-            <option key={k} value={k}>
-              {KIND_LABELS[k]}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Sort" className="w-auto min-w-[160px]" value={sort} onChange={(e) => setSort(e.target.value)}>
-          {SORTS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </Select>
-        <Chip selected={!!newParam} onClick={() => setNew(newParam ? "" : "1")}>
-          New this week
-        </Chip>
-        <Chip selected={!!soonParam} onClick={() => setSoon(soonParam ? "" : "1")}>
-          Closing in 2 weeks{facets.data ? ` (${facets.data.closing_soon})` : ""}
-        </Chip>
-        <Chip selected={!!closedParam} onClick={() => setClosed(closedParam ? "" : "1")}>
-          Include closed
-        </Chip>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            aria-label="Kind"
+            className="h-control-sm w-auto min-w-[140px] text-footnote"
+            value={kind ?? ""}
+            onChange={(e) => setKind(e.target.value)}
+          >
+            <option value="">All kinds</option>
+            {KINDS.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Sort"
+            className="h-control-sm w-auto min-w-[150px] text-footnote"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+          <FilterToggle pressed={!!newParam} onChange={(on) => setNew(on ? "1" : "")}>
+            New this week
+          </FilterToggle>
+          <FilterToggle pressed={!!soonParam} onChange={(on) => setSoon(on ? "1" : "")}>
+            Closing in 2 weeks
+          </FilterToggle>
+          <FilterToggle pressed={!!closedParam} onChange={(on) => setClosed(on ? "1" : "")}>
+            Include closed
+          </FilterToggle>
+          <span className="ml-auto text-footnote text-ink-tertiary" aria-live="polite">
+            {list.isSuccess ? `${total} ${total === 1 ? "result" : "results"}` : ""}
+          </span>
+        </div>
       </div>
 
       {list.isLoading ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="divide-y divide-separator rounded-lg border border-separator bg-surface">
           {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="h-56 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
+            <div key={i} className="h-[72px] px-4 py-3">
+              <div className="h-4 w-1/2 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
+              <div className="mt-2 h-3 w-1/3 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
+            </div>
           ))}
         </div>
       ) : list.isError ? (
         <ErrorState title="Opportunities didn't load" description="Check your connection and try again." onRetry={() => void list.refetch()} />
       ) : items.length === 0 ? (
         <EmptyState
-          title={query || category || kind || soonParam || newParam ? "Nothing matches these filters" : "No opportunities yet"}
+          title={filtered ? "Nothing matches these filters" : "No opportunities yet"}
           description="Send agents to look for new ones, or share one you know about."
           action={
-            <Button variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
+            <Button size="sm" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
               Find more
             </Button>
           }
         />
       ) : (
         <>
-          <p className="text-callout text-ink-secondary" aria-live="polite">
-            {total} {total === 1 ? "opportunity" : "opportunities"}
-          </p>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
             {items.map((opp) => (
-              <OpportunityCard
+              <OpportunityRow
                 key={opp.id}
                 opp={opp}
                 applicationId={tracked.data?.[opp.id]}
                 onOpen={() => setDetail(opp)}
-                onTodo={() => setTodoFor(opp)}
               />
             ))}
-          </div>
+          </ul>
           {list.hasNextPage ? (
             <div className="flex justify-center">
-              <Button onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
+              <Button size="sm" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
                 {list.isFetchingNextPage ? "Loading…" : "Load more"}
               </Button>
             </div>
@@ -234,9 +237,12 @@ export function Opportunities() {
       )}
 
       <OpportunityDetail
-        opp={detail}
-        applicationId={detail ? tracked.data?.[detail.id] : undefined}
-        onClose={() => setDetail(null)}
+        opp={shownDetail}
+        applicationId={shownDetail ? tracked.data?.[shownDetail.id] : undefined}
+        onClose={() => {
+          setDetail(null)
+          if (openParam) setOpenParam("")
+        }}
         onTodo={setTodoFor}
       />
       <TodoDialog opp={todoFor} onClose={() => setTodoFor(null)} />
@@ -246,54 +252,38 @@ export function Opportunities() {
   )
 }
 
-function CategoryTile({
-  active,
-  label,
-  description,
-  onClick,
-}: {
-  active: boolean
-  label: string
-  description: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "cursor-pointer rounded-lg border p-4 text-left transition-colors duration-160",
-        active ? "border-forest bg-forest-soft" : "border-separator bg-surface hover:bg-surface-sunk",
-      )}
-    >
-      <span className="block text-headline text-ink">{label}</span>
-      <span className="mt-1 line-clamp-2 block text-footnote text-ink-secondary">{description}</span>
-    </button>
-  )
-}
-
-/** "Members only" and "New" markers; info is the brand's tone for discovery context. */
-function DiscoveryChips({ opp }: { opp: Opportunity }) {
-  if (opp.audience !== "members" && !opp.is_new) return null
+function Markers({ opp, members = true }: { opp: Opportunity; members?: boolean }) {
   return (
     <>
-      {opp.audience === "members" ? <Chip tone="info" icon={<Lock />}>Members only</Chip> : null}
-      {opp.is_new ? <Chip tone="sun">New</Chip> : null}
+      {opp.is_new ? (
+        <span className="inline-flex items-center gap-1 text-caption text-sun-ink">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-sun" />
+          New
+        </span>
+      ) : null}
+      {members && opp.audience === "members" ? (
+        <span className="inline-flex items-center gap-1 text-caption text-ink-tertiary">
+          <Lock aria-hidden="true" className="size-3" />
+          Members only
+        </span>
+      ) : null}
     </>
   )
 }
 
 function OpportunityMeta({ opp }: { opp: Opportunity }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
       <Countdown {...countdownFor(opp)} />
-      <Chip tone="forest">{KIND_LABELS[opp.kind] ?? opp.kind}</Chip>
-      <Chip>{CATEGORY_LABELS[opp.category] ?? opp.category}</Chip>
+      <span>{KIND_LABELS[opp.kind] ?? opp.kind}</span>
+      <span>{CATEGORY_LABELS[opp.category] ?? opp.category}</span>
       {opp.location ? (
-        <Chip icon={<MapPin />}>{opp.location}</Chip>
+        <span className="inline-flex items-center gap-1">
+          <MapPin aria-hidden="true" className="size-3.5 text-ink-tertiary" />
+          {opp.location}
+        </span>
       ) : null}
-      <DiscoveryChips opp={opp} />
+      <Markers opp={opp} />
     </div>
   )
 }
@@ -344,7 +334,7 @@ function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean
         target="_blank"
         rel="noopener noreferrer"
         aria-label={compact ? "Add to Google Calendar" : undefined}
-        className={buttonVariants({ size: "sm", variant: compact ? "quiet" : "secondary", iconOnly: compact })}
+        className={buttonVariants({ size: "sm", variant: "quiet", iconOnly: compact })}
         data-tooltip="Add the deadline to Google Calendar"
       >
         <CalendarPlus />
@@ -362,59 +352,61 @@ function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean
   )
 }
 
-function OpportunityCard({
+function OpportunityRow({
   opp,
   applicationId,
   onOpen,
-  onTodo,
 }: {
   opp: Opportunity
   applicationId: string | undefined
   onOpen: () => void
-  onTodo: () => void
 }) {
   const { pending, onTrack } = useTrack(opp, applicationId)
+  const meta = [opp.organization, KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
   return (
-    <Card
-      organization={opp.organization}
-      title={
-        <button type="button" onClick={onOpen} className="cursor-pointer text-left hover:underline">
-          {opp.title}
-        </button>
-      }
-      kind={KIND_LABELS[opp.kind] ?? opp.kind}
-      amount={opp.benefits || undefined}
-      audiences={[CATEGORY_LABELS[opp.category] ?? opp.category]}
-      countdown={countdownFor(opp)}
-      tracked={!!applicationId}
-      onTrack={onTrack}
-      trackDisabled={pending}
-      actions={
-        <>
-          <CalendarButtons opp={opp} compact />
-          <Button size="sm" variant="quiet" aria-label="Add a to-do" data-tooltip="Add a to-do" onClick={onTodo} icon={<ListPlus />} />
-          {opp.link || opp.source_url ? (
-            <a
-              href={opp.link || opp.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open the official page for ${opp.title}`}
-              data-tooltip="Official page"
-              className={buttonVariants({ size: "sm", variant: "quiet", iconOnly: true })}
-            >
-              <ArrowUpRight />
-            </a>
-          ) : null}
-        </>
-      }
-    >
-      {opp.audience === "members" || opp.is_new ? (
-        <div className="-mt-1 flex flex-wrap gap-2">
-          <DiscoveryChips opp={opp} />
+    <li className="group relative flex flex-col gap-2 px-4 py-3 hover:bg-surface-sunk/50 sm:flex-row sm:items-center sm:gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="min-w-0 cursor-pointer text-left text-callout font-semibold text-ink hover:underline"
+          >
+            {opp.title}
+          </button>
+          <Markers opp={opp} members={false} />
         </div>
-      ) : null}
-      {opp.summary ? <p className="line-clamp-3 text-callout text-ink-secondary">{opp.summary}</p> : null}
-    </Card>
+        <p className="mt-0.5 truncate text-footnote text-ink-tertiary">{meta.join(" · ")}</p>
+        {opp.benefits ? <p className="mt-0.5 hidden truncate text-footnote text-ink-secondary md:block">{opp.benefits}</p> : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-3 sm:justify-end">
+        <Countdown variant="text" {...countdownFor(opp)} className="mr-auto sm:mr-0 sm:w-24 sm:justify-end" />
+        {applicationId ? (
+          <Link
+            to="/applications"
+            className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "w-[104px] text-link")}
+          >
+            <Check /> Tracking
+          </Link>
+        ) : (
+          <Button size="sm" variant="secondary" className="w-[104px]" disabled={pending} onClick={onTrack} icon={<Plus />}>
+            Track
+          </Button>
+        )}
+        {opp.link || opp.source_url ? (
+          <a
+            href={opp.link || opp.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open the official page for ${opp.title}`}
+            data-tooltip="Official page"
+            className={cn(buttonVariants({ size: "sm", variant: "quiet", iconOnly: true }), "text-ink-secondary")}
+          >
+            <ArrowUpRight />
+          </a>
+        ) : null}
+      </div>
+    </li>
   )
 }
 

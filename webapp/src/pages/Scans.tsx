@@ -1,14 +1,37 @@
 import * as React from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Ban, ChevronDown, Radar, Sparkles, Trash2 } from "lucide-react"
+import {
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  CircleAlert,
+  CircleDashed,
+  FileText,
+  Info,
+  Loader,
+  MessageSquareText,
+  Plus,
+  Search,
+  Square,
+  Trash2,
+} from "lucide-react"
 import * as api from "../lib/api"
 import { formatAgo } from "../lib/format"
 import { CATEGORIES, CATEGORY_DESCRIPTIONS, CATEGORY_LABELS } from "../lib/opportunities"
+import {
+  clock,
+  describeEvent,
+  elapsedMs,
+  formatDuration,
+  savedOpportunities,
+  scanElapsedMs,
+  taskStats,
+  type LogLine,
+} from "../lib/scanLog"
 import { toastError, toastSuccess } from "../lib/toast"
-import { cn } from "@blesser/ui"
 import type { OpportunityCategory, Scan, ScanTask } from "../lib/types"
-import { Button, Chip, Field, Input, Textarea, buttonVariants, type ChipTone } from "@blesser/ui"
+import { Button, Countdown, Field, Input, cn, daysUntil } from "@blesser/ui"
 import {
   Dialog,
   DialogBody,
@@ -19,41 +42,66 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
 import scanningArt from "@blesser/ui/illustrations/spot-scanning.webp"
 
-const STATUS_CHIP: Record<ScanTask["status"], { tone: ChipTone; label: string }> = {
-  running: { tone: "info", label: "Running" },
-  pending: { tone: "neutral", label: "Waiting" },
-  done: { tone: "forest", label: "Finished" },
-  error: { tone: "critical", label: "Stopped with an error" },
-  cancelled: { tone: "neutral", label: "Stopped" },
+type Status = ScanTask["status"] | Scan["status"]
+
+const STATUS: Record<Status, { label: string; dot: string }> = {
+  running: { label: "Running", dot: "bg-info motion-safe:animate-pulse" },
+  pending: { label: "Waiting", dot: "bg-control-border" },
+  done: { label: "Finished", dot: "bg-positive" },
+  error: { label: "Stopped early", dot: "bg-caution" },
+  cancelled: { label: "Stopped", dot: "bg-ink-tertiary" },
 }
 
-function StatusChip({ status }: { status: ScanTask["status"] }) {
-  const chip = STATUS_CHIP[status]
-  return <Chip tone={chip.tone}>{chip.label}</Chip>
+function StatusLabel({ status, className }: { status: Status; className?: string }) {
+  const s = STATUS[status] ?? STATUS.pending
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-footnote font-medium whitespace-nowrap text-ink-secondary", className)}>
+      <span aria-hidden="true" className={cn("size-1.5 rounded-full", s.dot)} />
+      {s.label}
+    </span>
+  )
+}
+
+function audiences(scan: Scan): string {
+  return scan.categories.map((c) => CATEGORY_LABELS[c] ?? c).join(", ")
 }
 
 function scanTitle(scan: Scan): string {
-  return `${scan.categories.map((c) => CATEGORY_LABELS[c] ?? c).join(", ")} in ${scan.region}`
+  return scan.region ? `${audiences(scan)} in ${scan.region}` : audiences(scan)
+}
+
+/** Re-renders every `ms` while `active`, for elapsed timers. */
+function useTick(active: boolean, ms = 15_000) {
+  const [, setTick] = React.useState(0)
+  React.useEffect(() => {
+    if (!active) return
+    const t = window.setInterval(() => setTick((n) => n + 1), ms)
+    return () => window.clearInterval(t)
+  }, [active, ms])
 }
 
 export function Scans() {
-  const scans = useQuery({ queryKey: ["scans"], queryFn: api.listScans, refetchInterval: 10_000 })
+  const scans = useQuery({
+    queryKey: ["scans"],
+    queryFn: api.listScans,
+    refetchInterval: (q) => (q.state.data?.some((s) => s.status === "running") ? 10_000 : 60_000),
+  })
   const [open, setOpen] = React.useState(false)
+  useTick(!!scans.data?.some((s) => s.status === "running"))
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="type-title-2">Scans</h1>
-          <p className="text-callout text-ink-secondary max-w-2xl">
-            Agents search the web, read each opportunity's own page and add what they verify to the public catalogue.
-          </p>
-        </div>
-        <Button size="sm" variant="primary" onClick={() => setOpen(true)} icon={<Sparkles />}>
-          Start a scan
-        </Button>
-      </header>
+    <div className="space-y-6">
+      <PageHeader
+        title="Scans"
+        description="Agents search the web, read each opportunity's own page and save what they can verify."
+        actions={
+          <Button size="sm" variant="primary" onClick={() => setOpen(true)} icon={<Plus />}>
+            New scan
+          </Button>
+        }
+      />
       {scans.isLoading ? (
         <div className="h-24 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
       ) : scans.isError ? (
@@ -62,33 +110,58 @@ export function Scans() {
         <EmptyState
           illustration={scanningArt}
           title="No scans yet"
-          description="Start one to find new opportunities for startups, researchers or students."
+          description="A scan sends agents to find new opportunities for startups, researchers or students."
           action={
-            <Button onClick={() => setOpen(true)} icon={<Sparkles />}>
-              Start a scan
+            <Button size="sm" onClick={() => setOpen(true)} icon={<Plus />}>
+              New scan
             </Button>
           }
         />
       ) : (
-        <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1">
-          {scans.data.map((scan) => (
-            <li key={scan.id}>
-              <Link to={`/scans/${scan.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-surface-sunk">
-                <Radar className="size-5 shrink-0 text-ink-tertiary" strokeWidth={1.75} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-headline text-ink">{scanTitle(scan)}</span>
-                  <span className="block text-footnote text-ink-secondary">
-                    Started {formatAgo(scan.created_at)} · {scan.opportunities_added} added
-                  </span>
-                </span>
-                <StatusChip status={scan.status} />
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-hidden rounded-lg border border-separator bg-surface">
+          <div
+            aria-hidden="true"
+            className="hidden grid-cols-[minmax(0,1fr)_120px_70px_80px_100px] gap-4 border-b border-separator px-4 py-2 text-caption text-ink-tertiary md:grid"
+          >
+            <span>Scan</span>
+            <span>Status</span>
+            <span className="text-right">Saved</span>
+            <span className="text-right">Duration</span>
+            <span className="text-right">Started</span>
+          </div>
+          <ul className="divide-y divide-separator">
+            {scans.data.map((scan) => (
+              <li key={scan.id}>
+                <ScanRow scan={scan} />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <ScanDialog open={open} onOpenChange={setOpen} />
     </div>
+  )
+}
+
+function ScanRow({ scan }: { scan: Scan }) {
+  const duration = formatDuration(scanElapsedMs(scan))
+  return (
+    <Link
+      to={`/scans/${scan.id}`}
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-surface-sunk focus-visible:-outline-offset-2 md:grid-cols-[minmax(0,1fr)_120px_70px_80px_100px]"
+    >
+      <span className="min-w-0">
+        <span className="block truncate text-callout font-semibold text-ink">{scanTitle(scan)}</span>
+        {scan.focus ? <span className="block truncate text-footnote text-ink-tertiary">Focus: {scan.focus}</span> : null}
+      </span>
+      <StatusLabel status={scan.status} className="justify-self-end md:justify-self-start" />
+      <span className="col-span-2 text-footnote text-ink-tertiary md:hidden">
+        {scan.opportunities_added} saved · {duration === "—" ? "" : `${duration} · `}started {formatAgo(scan.created_at)}
+      </span>
+      <span className="hidden text-right text-callout text-ink tabular-nums md:block">{scan.opportunities_added}</span>
+      <span className="hidden text-right text-footnote text-ink-secondary tabular-nums md:block">{duration}</span>
+      <span className="hidden text-right text-footnote text-ink-secondary md:block">{formatAgo(scan.created_at)}</span>
+    </Link>
   )
 }
 
@@ -109,9 +182,10 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   })
   const toggle = (c: OpportunityCategory) =>
     setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
+  const agents = categories.length
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" onClose={() => onOpenChange(false)}>
+      <DialogContent className="max-w-md" onClose={() => onOpenChange(false)}>
         <form
           className="flex min-h-0 flex-auto flex-col"
           onSubmit={(e) => {
@@ -120,43 +194,54 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           }}
         >
           <DialogHeader>
-            <DialogTitle>Find more opportunities</DialogTitle>
-            <DialogDescription>
-              One agent per audience searches the web and adds what it can verify to the public catalogue.
-            </DialogDescription>
+            <DialogTitle>New scan</DialogTitle>
+            <DialogDescription>Find open opportunities and add the ones that check out to the catalogue.</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <fieldset className="space-y-2">
-              <legend className="mb-1 text-sm font-semibold text-ink">Look for</legend>
-              {CATEGORIES.map((c) => (
-                <label key={c} className="flex items-start gap-2 text-callout">
-                  <input type="checkbox" className="mt-0.5 size-4 accent-forest" checked={categories.includes(c)} onChange={() => toggle(c)} />
-                  <span>
-                    <span className="font-medium text-ink">{CATEGORY_LABELS[c]}</span>
-                    <span className="block text-ink-secondary">{CATEGORY_DESCRIPTIONS[c]}</span>
-                  </span>
-                </label>
-              ))}
+            <fieldset>
+              <legend className="mb-1.5 text-sm leading-5 font-semibold text-ink">Look for</legend>
+              <div className="divide-y divide-separator rounded-sm border border-separator">
+                {CATEGORIES.map((c) => (
+                  <label key={c} className="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-surface-sunk">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 shrink-0 accent-forest"
+                      checked={categories.includes(c)}
+                      onChange={() => toggle(c)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-callout text-ink">{CATEGORY_LABELS[c]}</span>
+                      <span className="block truncate text-footnote text-ink-tertiary">{CATEGORY_DESCRIPTIONS[c]}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </fieldset>
             <Field label="Region">
               <Input value={region} onChange={(e) => setRegion(e.target.value)} maxLength={120} placeholder="Ghana" />
             </Field>
-            <Field label="Focus (optional)">
-              <Textarea
+            <Field label="Focus" hint="Optional. Sectors, fields or kinds to look at first.">
+              <Input
                 value={focus}
                 onChange={(e) => setFocus(e.target.value)}
                 maxLength={2000}
-                rows={3}
-                placeholder="e.g. agritech and climate startups; PhD funding in public health"
+                placeholder="e.g. agritech startups, PhD funding in public health"
               />
             </Field>
+            <p className="flex gap-2 text-footnote text-ink-secondary">
+              <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-ink-tertiary" />
+              <span>
+                {agents ? `${agents} ${agents === 1 ? "agent works" : "agents work"} in parallel, one per audience.` : "Pick at least one audience."}{" "}
+                Scans usually take 15 to 30 minutes and keep running if you leave.
+              </span>
+            </p>
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="quiet" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={start.isPending || !categories.length} icon={<Sparkles />}>
-              Start a scan
+            <Button type="submit" variant="primary" disabled={start.isPending || !categories.length}>
+              {start.isPending ? "Starting…" : "Start scan"}
             </Button>
           </DialogFooter>
         </form>
@@ -169,11 +254,11 @@ export function ScanDetail() {
   const { scanId = "" } = useParams<{ scanId: string }>()
   const navigate = useNavigate()
   const client = useQueryClient()
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
   const scan = useQuery({
     queryKey: ["scan", scanId],
     queryFn: () => api.getScan(scanId),
-    // Live while agents work; still once the scan is over.
-    refetchInterval: (query) => (query.state.data?.status === "running" ? 3000 : false),
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 4000 : false),
   })
   const refresh = (next: Scan) => {
     client.setQueryData(["scan", scanId], next)
@@ -189,116 +274,301 @@ export function ScanDetail() {
     },
     onError: (e) => toastError(e),
   })
+  const running = scan.data?.status === "running"
+  useTick(running)
 
   if (scan.isLoading) return <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
   if (scan.isError || !scan.data)
     return <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
   const data = scan.data
+  const tasks = data.tasks ?? []
+  const duration = scanElapsedMs(data)
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <Link to="/scans" className="text-callout font-semibold text-link hover:underline">
-          Scans
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="type-title-2 min-w-0 flex-1">{scanTitle(data)}</h1>
-          <StatusChip status={data.status} />
-        </div>
-        <p className="text-callout text-ink-secondary">
-          Started {formatAgo(data.created_at)} · {data.opportunities_added} new{" "}
-          {data.opportunities_added === 1 ? "opportunity" : "opportunities"}
-          {data.focus ? ` · Focus: ${data.focus}` : ""}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/opportunities?sort=new" className={buttonVariants({ size: "sm", variant: "secondary" })}>
-            See the newest opportunities
+      <PageHeader
+        back={
+          <Link to="/scans" className="hover:text-ink hover:underline">
+            Scans
           </Link>
-          {data.status === "running" ? (
-            <Button size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Ban />}>
-              Stop
+        }
+        title={scanTitle(data)}
+        description={
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <StatusLabel status={data.status} />
+            <span aria-hidden="true">·</span>
+            <span>Started {formatAgo(data.created_at)}</span>
+            {duration != null ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>
+                  {running ? "Running for" : "Took"} {formatDuration(duration)}
+                </span>
+              </>
+            ) : null}
+            {data.focus ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 truncate">Focus: {data.focus}</span>
+              </>
+            ) : null}
+          </span>
+        }
+        actions={
+          running ? (
+            <Button size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Square />}>
+              Stop scan
             </Button>
           ) : (
-            <Button size="sm" variant="quiet" disabled={remove.isPending} onClick={() => remove.mutate()} icon={<Trash2 />}>
+            <Button size="sm" variant="quiet" onClick={() => setConfirmDelete(true)} icon={<Trash2 />}>
               Delete
             </Button>
-          )}
-        </div>
-      </header>
-      <div className="space-y-3">
-        {(data.tasks ?? []).map((task) => (
-          <TaskCard key={task.id} task={task} />
-        ))}
-      </div>
+          )
+        }
+      />
+      <Outcome scan={data} />
+      <Progress tasks={tasks} />
+      <ActivityLog tasks={tasks} />
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm" onClose={() => setConfirmDelete(false)}>
+          <DialogHeader>
+            <DialogTitle>Delete this scan?</DialogTitle>
+            <DialogDescription>Its activity log goes. The opportunities it saved stay in the catalogue.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-5">
+            <Button variant="quiet" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate()}>
+              Delete scan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
-function taskLabel(task: ScanTask): string {
-  const category = (task.target ?? "").replace(/^category:/, "") as OpportunityCategory
-  return CATEGORY_LABELS[category] ? `Opportunities for ${CATEGORY_LABELS[category].toLowerCase()}` : "Find opportunities"
-}
+const OUTCOME_PREVIEW = 8
 
-function describe(event: ScanTask["log"][number]): string {
-  const input = event.input ?? {}
-  if (event.tool === "search_web") return `Searched: ${String(input.query ?? "")}`
-  if (event.tool === "fetch_page") return `Read ${String(input.url ?? "")}`
-  if (event.tool === "save_opportunity") return `Saved ${String(input.title ?? "an opportunity")}`
-  return event.tool ?? ""
-}
-
-function TaskCard({ task }: { task: ScanTask }) {
-  const [open, setOpen] = React.useState(task.status === "running")
-  const saves = task.log.filter((e) => e.tool === "save_opportunity" && e.ok).length
+function Outcome({ scan }: { scan: Scan }) {
+  const tasks = scan.tasks ?? []
+  const saved = savedOpportunities(tasks)
+  const [all, setAll] = React.useState(false)
+  const running = scan.status === "running"
+  const failures = tasks.reduce((n, t) => n + taskStats(t).failures, 0)
+  const shown = all ? saved : saved.slice(0, OUTCOME_PREVIEW)
+  const count = Math.max(saved.length, scan.opportunities_added)
   return (
-    <section className="rounded-lg border border-separator bg-surface shadow-elevation-1">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left"
-      >
-        <span className="min-w-0 flex-1">
-          <span className={cn("block text-headline text-ink", task.status === "running" && "shimmer-text")}>
-            {taskLabel(task)}
-          </span>
-          <span className="block text-footnote text-ink-secondary">
-            {task.log.length} steps · {saves} saved{task.turns ? ` · ${task.turns} turns` : ""}
-          </span>
-        </span>
-        <StatusChip status={task.status} />
-        <ChevronDown className={cn("size-4 text-ink-tertiary transition-transform", open && "rotate-180")} />
-      </button>
-      {open ? (
-        <div className="space-y-2 border-t border-separator px-5 py-3">
-          {task.error ? <p className="text-sm text-critical">{task.error}</p> : null}
-          {task.log.length === 0 ? (
-            <p className="text-sm text-ink-secondary">{task.status === "pending" ? "Waiting for a worker." : "No steps recorded."}</p>
-          ) : (
-            <ol className="space-y-1.5">
-              {task.log.map((event, i) =>
-                event.kind === "turn" ? (
-                  <li key={i} className="text-sm whitespace-pre-wrap text-ink-secondary italic">
-                    {event.note}
-                  </li>
+    <section aria-labelledby="outcome-heading" className="rounded-lg border border-separator bg-surface">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4 pb-3">
+        <h2 id="outcome-heading" className="text-headline text-ink" aria-live="polite">
+          {count === 0
+            ? running
+              ? "Nothing saved yet"
+              : "No new opportunities"
+            : `${count} ${count === 1 ? "opportunity" : "opportunities"} saved`}
+        </h2>
+        {count ? (
+          <Link to="/opportunities?sort=new" className="text-footnote font-medium text-link hover:underline">
+            See newest in catalogue
+          </Link>
+        ) : null}
+      </div>
+      {saved.length ? (
+        <ul className="divide-y divide-separator border-t border-separator">
+          {shown.map((s) => (
+            <li key={s.opportunityId ?? s.title} className="flex items-center gap-3 px-4 py-2.5">
+              <Check aria-hidden="true" className="size-4 shrink-0 text-positive" />
+              <span className="min-w-0 flex-1">
+                {s.opportunityId ? (
+                  <Link to={`/opportunities?open=${s.opportunityId}`} className="block truncate text-callout text-ink hover:underline">
+                    {s.title}
+                  </Link>
                 ) : (
-                  <li key={i} className="flex gap-2 text-sm">
-                    <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", event.ok ? "bg-positive" : "bg-caution")} />
-                    <span className="min-w-0 break-words text-ink">
-                      {describe(event)}
-                      {!event.ok && event.result_preview ? (
-                        <span className="block text-xs text-ink-tertiary">{event.result_preview.slice(0, 240)}</span>
-                      ) : null}
-                    </span>
-                  </li>
-                ),
-              )}
-            </ol>
-          )}
-          {task.final_text ? (
-            <p className="rounded-sm bg-surface-sunk p-3 text-callout whitespace-pre-wrap text-ink">{task.final_text}</p>
-          ) : null}
+                  <span className="block truncate text-callout text-ink">{s.title}</span>
+                )}
+              </span>
+              {!s.created ? <span className="text-footnote text-ink-tertiary">Updated</span> : null}
+              {s.deadline ? <Countdown variant="text" daysLeft={daysUntil(s.deadline)} date={s.deadline} /> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="border-t border-separator px-4 py-3 text-footnote text-ink-secondary">
+          {running
+            ? "Agents are searching and reading pages. Saved opportunities appear here as they are verified."
+            : "The agents didn't find anything new they could verify. Try a narrower focus or another region."}
+        </p>
+      )}
+      {saved.length > OUTCOME_PREVIEW ? (
+        <div className="border-t border-separator px-4 py-2">
+          <button type="button" className="cursor-pointer text-footnote font-medium text-link hover:underline" onClick={() => setAll((v) => !v)}>
+            {all ? "Show fewer" : `Show all ${saved.length}`}
+          </button>
         </div>
+      ) : null}
+      {failures ? (
+        <p className="flex items-center gap-2 border-t border-separator px-4 py-2.5 text-footnote text-ink-tertiary">
+          <Info aria-hidden="true" className="size-3.5 shrink-0" />
+          {failures} {failures === 1 ? "step" : "steps"} didn't work and the agents moved on. Details are in the activity log.
+        </p>
       ) : null}
     </section>
   )
 }
+
+function taskName(task: ScanTask): string {
+  const category = (task.target ?? "").replace(/^category:/, "") as OpportunityCategory
+  return CATEGORY_LABELS[category] ?? "Agent"
+}
+
+function TaskIcon({ status }: { status: ScanTask["status"] }) {
+  const cls = "size-4 shrink-0"
+  if (status === "running") return <Loader aria-hidden="true" className={cn(cls, "text-info motion-safe:animate-spin motion-safe:[animation-duration:2.4s]")} />
+  if (status === "done") return <Check aria-hidden="true" className={cn(cls, "text-positive")} />
+  if (status === "error") return <CircleAlert aria-hidden="true" className={cn(cls, "text-caution")} />
+  return <CircleDashed aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
+}
+
+function lastAction(task: ScanTask): string | null {
+  for (let i = task.log.length - 1; i >= 0; i--) {
+    if (task.log[i].kind !== "turn") return describeEvent(task.log[i]).text
+  }
+  return null
+}
+
+function Progress({ tasks }: { tasks: ScanTask[] }) {
+  if (!tasks.length) return null
+  return (
+    <section aria-labelledby="progress-heading" className="space-y-2">
+      <h2 id="progress-heading" className="text-caption text-ink-tertiary">
+        Agents
+      </h2>
+      <ol className="divide-y divide-separator rounded-lg border border-separator bg-surface">
+        {tasks.map((task) => {
+          const stats = taskStats(task)
+          const ms = elapsedMs(task.started_at, task.finished_at)
+          const now = task.status === "running" ? lastAction(task) : null
+          const note = task.error || task.final_text
+          return (
+            <li key={task.id} className="flex items-start gap-3 px-4 py-3">
+              <span className="mt-0.5">
+                <TaskIcon status={task.status} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span className="text-callout font-semibold text-ink">{taskName(task)}</span>
+                  <span className="text-footnote text-ink-tertiary">
+                    {task.status === "pending"
+                      ? "Waiting for a free worker"
+                      : `${stats.searches} searches · ${stats.reads} pages read · ${stats.saved} saved`}
+                  </span>
+                </div>
+                {now ? <p className="mt-0.5 truncate text-footnote text-ink-secondary">{now}</p> : null}
+                {!now && note ? <p className="mt-0.5 text-footnote text-ink-tertiary">{note}</p> : null}
+              </div>
+              <span className="shrink-0 text-right text-footnote text-ink-tertiary tabular-nums">
+                {task.status === "pending" ? "" : formatDuration(ms)}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
+function LineIcon({ line }: { line: LogLine }) {
+  const cls = "size-3.5 shrink-0"
+  if (line.failed) return <CircleAlert aria-hidden="true" className={cn(cls, "text-caution")} />
+  if (line.kind === "search") return <Search aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
+  if (line.kind === "read") return <FileText aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
+  if (line.kind === "save" || line.kind === "update") return <Check aria-hidden="true" className={cn(cls, "text-positive")} />
+  if (line.kind === "note") return <MessageSquareText aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
+  return <span aria-hidden="true" className="size-3.5 shrink-0" />
+}
+
+function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
+  const [open, setOpen] = React.useState(false)
+  const [picked, setPicked] = React.useState<string | null>(null)
+  const [notes, setNotes] = React.useState(true)
+  const id = React.useId()
+  const steps = tasks.reduce((n, t) => n + t.log.filter((e) => e.kind !== "turn").length, 0)
+  if (!tasks.length) return null
+  const current = tasks.find((t) => t.id === picked) ?? tasks.find((t) => t.status === "running") ?? tasks[0]
+  const lines = current.log.map(describeEvent).filter((l) => (l.kind === "note" ? notes && l.text : true))
+  return (
+    <section className="rounded-lg border border-separator bg-surface">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-4 py-3 text-left hover:bg-surface-sunk"
+      >
+        <ChevronRight aria-hidden="true" className={cn("size-4 text-ink-tertiary transition-transform duration-160", open && "rotate-90")} />
+        <span className="text-callout font-semibold text-ink">Activity log</span>
+        <span className="text-footnote text-ink-tertiary">{steps} steps</span>
+      </button>
+      <div id={id} hidden={!open} className="border-t border-separator">
+        {open ? (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+              {tasks.length > 1 ? (
+                <Segmented
+                  label="Agent"
+                  value={current.id}
+                  onChange={setPicked}
+                  options={tasks.map((t) => ({ value: t.id, label: taskName(t), count: t.log.filter((e) => e.kind !== "turn").length }))}
+                />
+              ) : (
+                <span />
+              )}
+              <FilterToggle pressed={notes} onChange={setNotes}>
+                Agent notes
+              </FilterToggle>
+            </div>
+            {lines.length === 0 ? (
+              <p className="px-4 pb-4 text-footnote text-ink-secondary">
+                {current.status === "pending" ? "This agent hasn't started yet." : "No steps recorded."}
+              </p>
+            ) : (
+              <ol className="max-h-[32rem] overflow-y-auto overscroll-contain px-4 pb-3 nice-scroll" aria-label={`${taskName(current)} activity`}>
+                {lines.map((line, i) => (
+                  <LogRow key={i} line={line} />
+                ))}
+              </ol>
+            )}
+          </>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function LogRow({ line }: { line: LogLine }) {
+  return (
+    <li className="grid grid-cols-[2.75rem_14px_minmax(0,1fr)] items-start gap-x-2 py-1">
+      <time className="pt-px font-mono text-[11px] leading-[18px] text-ink-tertiary">{clock(line.at)}</time>
+      <span className="pt-0.5">
+        <LineIcon line={line} />
+      </span>
+      <span className={cn("min-w-0 text-footnote break-words", line.kind === "note" ? "text-ink-tertiary italic" : line.kind === "save" || line.kind === "update" ? "text-ink" : "text-ink-secondary")}>
+        {line.opportunityId ? (
+          <Link to={`/opportunities?open=${line.opportunityId}`} className="hover:underline">
+            {line.text}
+          </Link>
+        ) : line.href && !line.failed ? (
+          <a href={line.href} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-0.5 hover:underline">
+            <span className="truncate">{line.text}</span>
+            <ArrowUpRight aria-hidden="true" className="size-3 shrink-0 opacity-60" />
+          </a>
+        ) : (
+          line.text
+        )}
+        {line.reason ? <span className="block text-ink-tertiary not-italic">{line.reason}</span> : null}
+      </span>
+    </li>
+  )
+}
+

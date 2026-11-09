@@ -5,9 +5,9 @@ import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useAppl
 import { toastError, toastSuccess } from "../lib/toast"
 import type { Application, ApplicationStatus as Status, RequirementItem } from "../lib/types"
 import {
+  APPLICATION_STAGES,
   ApplicationStatus,
   Button,
-  Chip,
   Countdown,
   Field,
   Input,
@@ -28,14 +28,31 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { PageHeader, Segmented } from "../components/layout/PageHeader"
 import trackedArt from "@blesser/ui/illustrations/spot-empty-tracked.webp"
 
 const stage = (status: Status): ApplicationStage => (status === "rejected" ? "not-this-time" : status)
 
 function Deadline({ app }: { app: Application }) {
   if (!OPEN_STATUSES.includes(app.status) && app.status !== "submitted") return null
-  if (!app.deadline_date) return app.deadline ? <Countdown label={app.deadline} /> : null
-  return <Countdown daysLeft={daysUntil(app.deadline_date)} date={app.deadline_date} />
+  if (!app.deadline_date) return app.deadline ? <Countdown variant="text" label={app.deadline} /> : null
+  return <Countdown variant="text" daysLeft={daysUntil(app.deadline_date)} date={app.deadline_date} />
+}
+
+/** Five quiet steps; the full stepper lives in the dialog. */
+function StageDots({ status }: { status: Status }) {
+  const index = APPLICATION_STAGES.findIndex((s) => s.id === status)
+  const ended = status === "rejected"
+  return (
+    <span className="hidden items-center gap-1 md:flex" aria-hidden="true">
+      {APPLICATION_STAGES.map((s, i) => (
+        <span
+          key={s.id}
+          className={cn("h-1 w-3 rounded-full", !ended && i <= index ? (status === "accepted" ? "bg-bloom" : "bg-forest") : "bg-separator")}
+        />
+      ))}
+    </span>
+  )
 }
 
 const FILTERS = [
@@ -57,44 +74,34 @@ export function Applications() {
     return a.status === filter
   })
 
-  return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="type-title-2">Applications</h1>
-          <p className="text-callout text-ink-secondary max-w-2xl">
-            Everything you're applying for, from saved to accepted. Saved and preparing applications get deadline
-            reminders 14, 7 and 1 days before.
-          </p>
-        </div>
-        <Button size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
-          Add by hand
-        </Button>
-      </header>
+  const countFor = (value: string) =>
+    value === "all"
+      ? data?.length
+      : value === "active"
+        ? data?.filter((a) => a.status !== "accepted" && a.status !== "rejected").length
+        : data?.filter((a) => a.status === value).length
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
-        {FILTERS.map((f) => {
-          const count =
-            f.value === "all"
-              ? data?.length
-              : f.value === "active"
-                ? data?.filter((a) => a.status !== "accepted" && a.status !== "rejected").length
-                : data?.filter((a) => a.status === f.value).length
-          return (
-            <Chip key={f.value} selected={filter === f.value} onClick={() => setFilter(f.value)}>
-              {f.label}
-              {count ? <span className="tabular-nums opacity-70">{count}</span> : null}
-            </Chip>
-          )
-        })}
-      </div>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Applications"
+        description="Everything you're applying for. Saved and preparing applications get reminders 14, 7 and 1 days before the deadline."
+        actions={
+          <Button size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
+            Add by hand
+          </Button>
+        }
+      />
+
+      <Segmented
+        label="Filter by status"
+        value={filter}
+        onChange={setFilter}
+        options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
+      />
 
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="h-28 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
-          ))}
-        </div>
+        <div className="h-48 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
       ) : isError ? (
         <ErrorState title="Your applications didn't load" description="Try again in a moment." onRetry={() => void refetch()} />
       ) : apps.length === 0 ? (
@@ -103,32 +110,27 @@ export function Applications() {
           title={data?.length ? "Nothing with this status" : "Nothing tracked yet"}
           description="Track an opportunity from the catalogue, or add one by hand."
           action={
-            <Link to="/opportunities" className={buttonVariants({ variant: "primary" })}>
+            <Link to="/opportunities" className={buttonVariants({ size: "sm" })}>
               Browse opportunities
             </Link>
           }
         />
       ) : (
-        <ul className="grid gap-4">
+        <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
           {apps.map((app) => {
             const done = app.requirements.filter((r) => r.done).length
+            const meta = [app.organization, app.kind, app.requirements.length ? `${done} of ${app.requirements.length} ready` : ""].filter(Boolean)
             return (
-              <li key={app.id} className="flex flex-col gap-4 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
-                <div className="flex flex-wrap items-start gap-3">
-                  <button type="button" className="min-w-0 flex-1 basis-60 cursor-pointer text-left" onClick={() => setEditing(app)}>
-                    <span className="block text-title-3 text-ink hover:underline">{app.title}</span>
-                    <span className="mt-0.5 block text-callout text-ink-secondary">
-                      {[app.organization, app.kind].filter(Boolean).join(" · ")}
-                      {app.requirements.length ? ` · ${done} of ${app.requirements.length} ready` : ""}
-                    </span>
-                  </button>
-                  <Deadline app={app} />
-                </div>
-                <div className="flex flex-wrap items-end gap-4">
-                  <ApplicationStatus status={stage(app.status)} className="min-w-0 flex-1 basis-60" />
+              <li key={app.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+                <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => setEditing(app)}>
+                  <span className="block text-callout font-semibold text-ink hover:underline">{app.title}</span>
+                  <span className="mt-0.5 block truncate text-footnote text-ink-tertiary">{meta.join(" · ")}</span>
+                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  <StageDots status={app.status} />
                   <Select
                     aria-label={`Status of ${app.title}`}
-                    className="h-control-sm w-auto min-w-[150px] text-callout"
+                    className="h-control-sm w-[140px] pr-8 text-footnote"
                     value={app.status}
                     onChange={(e) =>
                       update.mutate(
@@ -143,6 +145,9 @@ export function Applications() {
                       </option>
                     ))}
                   </Select>
+                  <span className="ml-auto w-24 text-right sm:ml-0">
+                    <Deadline app={app} />
+                  </span>
                 </div>
               </li>
             )

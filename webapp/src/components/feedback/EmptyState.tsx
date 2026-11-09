@@ -1,7 +1,6 @@
 import * as React from "react"
 import { RefreshCw } from "lucide-react"
-import { Button, EmptyState as BaseEmptyState, cn } from "@blesser/ui"
-import offlineArt from "@blesser/ui/illustrations/spot-offline.webp"
+import { Button, cn } from "@blesser/ui"
 
 type Props = {
   title: string
@@ -12,37 +11,47 @@ type Props = {
   className?: string
 }
 
-/** The shared EmptyState on a surface card. */
-export function EmptyState({ compact, className, ...props }: Props) {
+function Panel({ title, description, action, illustration, compact, className, error }: Props & { error?: boolean }) {
   return (
-    <div className={cn("rounded-lg bg-surface shadow-elevation-1", className)}>
-      <BaseEmptyState {...props} className={cn(compact && "py-5")} />
+    <div
+      role={error ? "alert" : undefined}
+      className={cn(
+        "flex flex-col items-center gap-1 rounded-lg border border-separator bg-surface px-6 text-center",
+        compact ? "py-5" : "py-10",
+        className,
+      )}
+    >
+      {illustration && !compact ? <img src={illustration} alt="" className="mb-2 h-24 w-auto max-w-full opacity-90" /> : null}
+      <h2 className="text-headline text-ink">{title}</h2>
+      <p className="max-w-md text-footnote text-ink-secondary">{description}</p>
+      {action ? <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
     </div>
   )
 }
 
-/** Load-failure panel in EmptyState's layout, with an optional retry. */
-export function ErrorState({ onRetry, action, compact, className, ...props }: Props & { onRetry?: () => void }) {
+export function EmptyState(props: Props) {
+  return <Panel {...props} />
+}
+
+/** Load-failure panel with an optional retry. */
+export function ErrorState({ onRetry, action, ...props }: Props & { onRetry?: () => void }) {
   return (
-    <div className={cn("rounded-lg bg-surface shadow-elevation-1", className)}>
-      <BaseEmptyState
-        illustration={compact ? undefined : offlineArt}
-        {...props}
-        error
-        className={cn(compact && "py-5")}
-        action={
-          onRetry || action ? (
-            <>
-              {onRetry ? (
-                <Button size="sm" onClick={onRetry} icon={<RefreshCw />}>
-                  Try again
-                </Button>
-              ) : null}
-              {action}
-            </>
-          ) : undefined
-        }
-      />
-    </div>
+    <Panel
+      {...props}
+      illustration={undefined}
+      error
+      action={
+        onRetry || action ? (
+          <>
+            {onRetry ? (
+              <Button size="sm" onClick={onRetry} icon={<RefreshCw />}>
+                Try again
+              </Button>
+            ) : null}
+            {action}
+          </>
+        ) : undefined
+      }
+    />
   )
 }

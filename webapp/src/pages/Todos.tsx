@@ -6,8 +6,9 @@ import { useCalendarFeed, useTodoMutations, useTodos } from "../lib/opportunitie
 import { useQueryClient } from "@tanstack/react-query"
 import { toastError, toastSuccess } from "../lib/toast"
 import type { Todo, TodoPriority } from "../lib/types"
-import { Button, Chip, Countdown, Input, Select, buttonVariants, cn } from "@blesser/ui"
+import { Button, Input, Select, buttonVariants, cn } from "@blesser/ui"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { PageHeader } from "../components/layout/PageHeader"
 import todosArt from "@blesser/ui/illustrations/spot-empty-todos.webp"
 
 /** Local yyyy-mm-dd: due dates are calendar days, not instants. */
@@ -73,17 +74,14 @@ export function Todos() {
   const groups = groupTodos(open.data ?? [], today)
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="type-title-2">To-dos</h1>
-        <p className="text-callout text-ink-secondary">
-          Everything you need to do for the opportunities you're chasing. Deadlines of tracked applications and dated
-          to-dos also flow into your calendar.
-        </p>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="To-dos"
+        description="What you need to do for the opportunities you're chasing. Dated to-dos also flow into your calendar."
+      />
 
       <form
-        className="flex flex-wrap items-center gap-2 rounded-lg border border-separator bg-surface p-4 shadow-elevation-1"
+        className="flex flex-wrap items-center gap-2 rounded-lg border border-separator bg-surface p-2"
         onSubmit={(e) => {
           e.preventDefault()
           if (!title.trim()) return
@@ -106,12 +104,12 @@ export function Todos() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={300}
-          className="min-w-[220px] flex-1"
+          className="h-control-sm min-w-[220px] flex-1 border-transparent text-callout"
         />
-        <Input aria-label="Due date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="w-auto" />
+        <Input aria-label="Due date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className="h-control-sm w-auto text-footnote" />
         <Select
           aria-label="Priority"
-          className="w-auto min-w-[120px]"
+          className="h-control-sm w-auto min-w-[110px] text-footnote"
           value={priority}
           onChange={(e) => setPriority(e.target.value as TodoPriority)}
         >
@@ -121,7 +119,7 @@ export function Todos() {
             </option>
           ))}
         </Select>
-        <Button type="submit" variant="primary" disabled={create.isPending || !title.trim()}>
+        <Button type="submit" size="sm" variant="primary" disabled={create.isPending || !title.trim()}>
           Add
         </Button>
       </form>
@@ -140,7 +138,7 @@ export function Todos() {
           title="Nothing to do yet"
           description="Add a to-do above, or add one from any opportunity."
           action={
-            <Link to="/opportunities" className={buttonVariants()}>
+            <Link to="/opportunities" className={buttonVariants({ size: "sm" })}>
               Browse opportunities
             </Link>
           }
@@ -151,11 +149,11 @@ export function Todos() {
             <section key={group.id} aria-labelledby={`todo-group-${group.id}`}>
               <h2
                 id={`todo-group-${group.id}`}
-                className={cn("mb-2 text-headline", group.id === "overdue" ? "text-caution" : "text-ink-secondary")}
+                className={cn("mb-1.5 text-caption", group.id === "overdue" ? "text-caution" : "text-ink-tertiary")}
               >
-                {group.label} · {group.items.length}
+                {group.label} <span className="font-normal tabular-nums">{group.items.length}</span>
               </h2>
-              <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1">
+              <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface">
                 {group.items.map((todo) => (
                   <TodoRow
                     key={todo.id}
@@ -181,7 +179,7 @@ export function Todos() {
           done.data.length === 0 ? (
             <p className="text-callout text-ink-secondary mt-2">Nothing done yet.</p>
           ) : (
-            <ul className="mt-2 divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1">
+            <ul className="mt-2 divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface">
               {done.data.map((todo) => (
                 <TodoRow
                   key={todo.id}
@@ -214,7 +212,7 @@ function TodoRow({
 }) {
   const overdue = !todo.done && todo.due_date !== null && daysBetween(today, todo.due_date) < 0
   return (
-    <li className="group flex items-start gap-3 px-5 py-3">
+    <li className="group flex items-start gap-3 px-4 py-2.5">
       <input
         type="checkbox"
         className="mt-1 size-4 shrink-0 cursor-pointer accent-forest"
@@ -223,19 +221,15 @@ function TodoRow({
         aria-label={todo.done ? `Mark "${todo.title}" not done` : `Mark "${todo.title}" done`}
       />
       <div className="min-w-0 flex-1">
-        <p className={cn("text-body text-ink", todo.done && "text-ink-tertiary line-through")}>
-          {todo.priority === "high" ? <Flag className="mr-1 inline size-3.5 text-sun-ink" aria-label="High priority" /> : null}
+        <p className={cn("text-callout text-ink", todo.done && "text-ink-tertiary line-through")}>
+          {todo.priority === "high" ? <Flag className="mr-1.5 inline size-3.5 align-[-2px] text-sun-ink" aria-label="High priority" /> : null}
           {todo.title}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-footnote text-ink-secondary">
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-footnote text-ink-tertiary">
           {todo.due_date ? (
-            todo.done ? (
-              <Chip>{dueLabel(todo.due_date, today)}</Chip>
-            ) : overdue ? (
-              <Chip tone="caution">{dueLabel(todo.due_date, today)}</Chip>
-            ) : (
-              <Countdown daysLeft={daysBetween(today, todo.due_date)} date={todo.due_date} className="py-0.5" />
-            )
+            <span className={cn("font-medium", overdue ? "text-caution" : todo.done ? "text-ink-tertiary" : "text-ink-secondary")}>
+              {dueLabel(todo.due_date, today)}
+            </span>
           ) : null}
           {todo.application_id && todo.application_label ? (
             <Link to={`/applications/${todo.application_id}`} className="hover:underline">
@@ -277,14 +271,14 @@ function CalendarPanel() {
     }
   }
   return (
-    <section aria-labelledby="calendar-heading" className="space-y-3 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
+    <section aria-labelledby="calendar-heading" className="space-y-3 rounded-lg border border-separator bg-surface p-4">
       <div className="flex items-start gap-3">
-        <CalendarDays className="mt-0.5 size-5 shrink-0 text-link" />
+        <CalendarDays className="mt-0.5 size-4 shrink-0 text-ink-tertiary" />
         <div className="space-y-1">
-          <h2 id="calendar-heading" className="text-headline text-ink">
+          <h2 id="calendar-heading" className="text-callout font-semibold text-ink">
             Sync with your calendar
           </h2>
-          <p className="text-callout text-ink-secondary">
+          <p className="text-footnote text-ink-secondary">
             Subscribe once and your application deadlines and dated to-dos appear in Google Calendar, Apple Calendar or
             Outlook, and stay up to date. The link is private: anyone with it can see your deadlines.
           </p>
@@ -303,7 +297,7 @@ function CalendarPanel() {
             <Button size="sm" onClick={() => void copy(feed.data.url)} icon={<Copy />}>
               Copy
             </Button>
-            <a href={feed.data.webcal_url} className={buttonVariants({ size: "sm", variant: "brand" })}>
+            <a href={feed.data.webcal_url} className={buttonVariants({ size: "sm", variant: "secondary" })}>
               Open in calendar app
             </a>
           </div>

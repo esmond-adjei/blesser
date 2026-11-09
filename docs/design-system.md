@@ -45,6 +45,7 @@ import { Button, Countdown, EmptyState, OpportunityCard, buttonVariants, daysUnt
 <Button variant="primary" icon={<Plus />}>Track</Button>
 <a href={url} className={buttonVariants({ variant: "secondary", size: "sm" })}>Official page</a>
 <Countdown daysLeft={daysUntil("2026-11-21")} date="2026-11-21" />
+<Countdown variant="text" daysLeft={12} />   // no fill, for rows in dense lists
 ```
 
 Dark mode follows a `dark` class (or `data-theme="dark"`) on `<html>`. The member app sets it from `prefers-color-scheme` in `index.html`; do the same, or toggle it yourself.
@@ -60,5 +61,7 @@ Dark mode follows a `dark` class (or `data-theme="dark"`) on `<html>`. The membe
 ## Rules worth repeating
 
 - One sun (`primary`) button per view. Forest (`brand`) when the page already has one.
-- Deadlines always show as a `Countdown`; never red. Rejections read "Not this time".
+- Deadlines always show as a `Countdown`; never red. Use the default pill on cards and detail pages and `variant="text"` in lists and tables, where urgency shows only in the text colour. Rejections read "Not this time".
+- A pressed `Chip` is a soft forest tint with a forest outline, not a solid fill.
+- In the member app, keep colour for meaning: page titles are 20px, lists are bordered rows without shadows, and status is a small dot plus a word rather than a filled badge.
 - Empty lists use `EmptyState`. Pass `illustration` (an image src, e.g. `/illustrations/…` in the app's `public/`) to replace the sunrise.

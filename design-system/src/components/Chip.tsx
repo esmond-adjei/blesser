@@ -19,7 +19,7 @@ export const chipVariants = cva(
       },
       pressable: {
         false: "h-6",
-        true: "h-8 cursor-pointer border-0 px-3 transition-colors duration-160 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-pressed:bg-forest aria-pressed:text-on-forest",
+        true: "h-8 cursor-pointer border-0 px-3 transition-colors duration-160 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus aria-pressed:bg-forest-soft aria-pressed:text-link aria-pressed:shadow-[inset_0_0_0_1px_var(--forest)]",
       },
     },
     defaultVariants: { tone: "neutral", pressable: false },

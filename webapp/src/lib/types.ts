@@ -101,6 +101,8 @@ export interface Scan {
   status: "running" | "done" | "cancelled"
   created_at: string
   opportunities_added: number
+  /** Not sent by every API version; the UI falls back to task timestamps. */
+  finished_at?: string | null
   tasks?: ScanTask[]
 }
 
