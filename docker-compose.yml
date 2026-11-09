@@ -38,6 +38,10 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-blesser}:${POSTGRES_PASSWORD:-blesser}@db:5432/${POSTGRES_DB:-blesser}}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      UPLOAD_DIR: /app/uploads
+      SITE_URL: ${SITE_URL:-http://localhost:8082}
+    volumes:
+      - applicant_uploads:/app/uploads
     ports:
       # Loopback only by default: browsers reach the api through the webapp's
       # nginx (/api). Set API_BIND=0.0.0.0 for split-origin deploys behind TLS.
@@ -63,6 +67,9 @@ services:
         required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-blesser}:${POSTGRES_PASSWORD:-blesser}@db:5432/${POSTGRES_DB:-blesser}}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - applicant_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -111,5 +118,7 @@ services:
       - site
 
 volumes:
+  applicant_uploads:
+    name: blesser_applicant_uploads
   pgdata:
     name: blesser_pgdata

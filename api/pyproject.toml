@@ -25,6 +25,9 @@ dependencies = [
     "cryptography>=42",
     # Web Push (VAPID) for notifications; imported lazily by the worker.
     "pywebpush>=2.0",
+    "python-multipart>=0.0.33",
+    "python-magic>=0.4.27",
+    "olefile>=0.47",
 ]
 
 [project.scripts]

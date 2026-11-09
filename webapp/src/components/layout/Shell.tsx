@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
-import { Bell, ClipboardList, ListTodo, Radar, Sparkles } from "lucide-react"
+import { Backpack, Bell, ClipboardList, ListTodo, Radar, Sparkles } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as api from "../../lib/api"
 import { browserTimezone } from "../../lib/push"
@@ -14,6 +14,7 @@ const NAV = [
   { to: "/opportunities", label: "Opportunities", icon: Sparkles },
   { to: "/applications", label: "Applications", icon: ClipboardList },
   { to: "/todos", label: "To-dos", icon: ListTodo },
+  { to: "/kit", label: "Apply kit", icon: Backpack },
   { to: "/scans", label: "Scans", icon: Radar },
 ]
 
@@ -21,6 +22,7 @@ const TITLES: Record<string, string> = {
   "/opportunities": "Opportunities",
   "/applications": "Applications",
   "/todos": "To-dos",
+  "/kit": "Apply kit",
   "/scans": "Scans",
   "/settings": "Settings",
 }

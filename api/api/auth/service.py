@@ -222,6 +222,11 @@ async def delete_account(session, user_id: str, password: str) -> dict:
             raise AuthError("Type your account email exactly to confirm.")
     elif not auth_security.check_password(password, user.password_hash):
         raise AuthError("Password is incorrect.")
+    from api.applicant_kit.service import lock_member
+    from api.applicant_kit.storage import get_storage
+
+    await lock_member(session, user_id)
+    await get_storage().delete_member(user_id)
     await session.execute(
         delete(auth_models.RefreshToken).where(
             auth_models.RefreshToken.user_id == user.id

@@ -25,6 +25,13 @@ class BodySizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
         limit = self.default_limit
+        if (
+            scope.get("method") == "POST"
+            and scope.get("path", "").rstrip("/") == "/api/app/documents"
+        ):
+            from api.applicant_kit.storage import UPLOAD_REQUEST_BYTES
+
+            limit = UPLOAD_REQUEST_BYTES
         declared = _content_length(scope)
         if declared is not None and declared > limit:
             await _reject(send, limit)

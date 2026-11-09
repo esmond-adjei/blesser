@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from api import __version__
 from api.admin.routes import router as admin_router
 from api.app.routes import router as member_router
+from api.applicant_kit.routes import router as kit_router
 from api.banner import print_banner
 from api.core.body_limit import BodySizeLimitMiddleware
 from api.core.config import log_config_warnings, settings
@@ -81,6 +82,7 @@ async def ready():
 
 
 app.include_router(member_router, prefix="/api/app")
+app.include_router(kit_router, prefix="/api/app")
 app.include_router(member_router, prefix="/api", include_in_schema=False)
 
 app.include_router(public_router, prefix="/api/public")

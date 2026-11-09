@@ -14,6 +14,12 @@ const Applications = React.lazy(() => import("./pages/Applications").then((m) =>
 const Todos = React.lazy(() => import("./pages/Todos").then((m) => ({ default: m.Todos })))
 const Scans = React.lazy(() => import("./pages/Scans").then((m) => ({ default: m.Scans })))
 const ScanDetail = React.lazy(() => import("./pages/Scans").then((m) => ({ default: m.ScanDetail })))
+const KitLayout = React.lazy(() => import("./pages/kit/KitLayout").then((m) => ({ default: m.KitLayout })))
+const KitProfile = React.lazy(() => import("./pages/kit/ProfileTab").then((m) => ({ default: m.ProfileTab })))
+const KitProjects = React.lazy(() => import("./pages/kit/ProjectsTab").then((m) => ({ default: m.ProjectsTab })))
+const KitProject = React.lazy(() => import("./pages/kit/ProjectPage").then((m) => ({ default: m.ProjectPage })))
+const KitDocuments = React.lazy(() => import("./pages/kit/DocumentsTab").then((m) => ({ default: m.DocumentsTab })))
+const KitAnswers = React.lazy(() => import("./pages/kit/AnswersTab").then((m) => ({ default: m.AnswersTab })))
 const Settings = React.lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })))
 const Login = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.Login })))
 const Register = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.Register })))
@@ -67,6 +73,14 @@ export default function App() {
               <Route path="opportunities" element={<Opportunities />} />
               <Route path="applications" element={<Applications />} />
               <Route path="todos" element={<Todos />} />
+              <Route path="kit" element={<KitLayout />}>
+                <Route index element={<Navigate to="profile" replace />} />
+                <Route path="profile" element={<KitProfile />} />
+                <Route path="projects" element={<KitProjects />} />
+                <Route path="projects/:projectId" element={<KitProject />} />
+                <Route path="documents" element={<KitDocuments />} />
+                <Route path="answers" element={<KitAnswers />} />
+              </Route>
               <Route path="scans" element={<Scans />} />
               <Route path="scans/:scanId" element={<ScanDetail />} />
               <Route path="settings" element={<Settings />} />

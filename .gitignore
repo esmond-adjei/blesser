@@ -4,6 +4,7 @@ __pycache__/
 *.db
 *.db-journal
 cv_storage/
+api/uploads/
 .env
 .pytest_cache/
 .ruff_cache/

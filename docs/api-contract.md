@@ -87,6 +87,51 @@ Changes:
 - `GET /api/opportunities/pending` and `PATCH /api/opportunities/{id}/status` are removed (moved to admin).
 - Register accepts optional `track` (an opportunity slug); after the account is created the opportunity is tracked.
 
+### Applicant kit
+
+These routes exist only under `/api/app`, require a member token, and never expose another member's kit. Object and linked-ID ownership failures return 404. Admin tokens are rejected. [Applicant kit storage and retention](applicant-kit.md) documents field limits, completeness, encryption, and file storage.
+
+| Method, path | Body or query | Returns |
+|---|---|---|
+| `GET /profile` | `reveal=1` optional | `Profile`; creates the empty profile on first read with the account email |
+| `PUT /profile` | `Profile` writable fields, full replacement; `reveal=1` optional | `Profile`; omitted fields reset to their empty defaults |
+| `GET /projects` | | `Project[]` |
+| `POST /projects` | `Project` writable fields; name required | `201 Project` |
+| `GET /projects/{id}` | | `Project` |
+| `PUT /projects/{id}` | `Project` writable fields, full replacement | `Project` |
+| `DELETE /projects/{id}` | | `204`; documents and saved answers remain, unlinked |
+| `GET /documents` | `kind`, `project_id` optional | `Document[]` |
+| `POST /documents` | Multipart `file`, `kind`, `title`, repeated `project_ids[]`, optional `is_default` | `201 Document`; repeated `project_ids` also accepted |
+| `PATCH /documents/{id}` | `{title?, kind?, project_ids?, is_default?}`; no null values | `Document` |
+| `DELETE /documents/{id}` | | `204`; removes the file and project links |
+| `GET /documents/{id}/download` | | Owner-only attachment with `nosniff` and private, no-store caching |
+| `GET /documents/usage` | | `{used_bytes: number, limit_bytes: number}` |
+| `GET /answers` | `q`, `project_id` optional | `Answer[]`; literal substring search of question and answer, newest first |
+| `POST /answers` | `{question, answer, tags?, project_id?}` | `201 Answer` |
+| `PUT /answers/{id}` | Same fields, full replacement | `Answer` |
+| `DELETE /answers/{id}` | | `204` |
+
+`Profile` and `Project` use the field shapes in [the binding plan, section 2](plans/sharing-and-autofill.md#2-applicant-kit). `completeness`, `created_at`, `updated_at`, `id`, and `word_count` are server-owned where present. Replacement bodies may include those response fields, but the API ignores them. Unknown fields are rejected. Dates use ISO `YYYY-MM-DD`; timestamps use ISO strings.
+
+`Profile.sensitive` contains `{national_id, passport_number, passport_expiry}`. All three values are encrypted at rest. Reads mask all but the final four characters of nonempty values unless `reveal=1`. Clients must fetch revealed values before writing a populated sensitive object back; masked placeholders are rejected. PUT defaults to a masked response too.
+
+```ts
+type Document = {
+  id: string; kind: "cv" | "cover_letter" | "pitch_deck" | "transcript" |
+    "certificate" | "budget" | "financials" | "id_document" | "photo" | "logo" | "other";
+  title: string; filename: string; content_type: string; size_bytes: number;
+  project_ids: string[]; is_default: boolean; created_at: string;
+};
+type Answer = {
+  id: string; question: string; answer: string; tags: string[];
+  project_id: string | null; word_count: number; updated_at: string;
+};
+```
+
+Uploads accept at most 15 MiB per file and 250 MiB per member. Content inspection allows PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, CSV, PNG, JPG, and WEBP. The multipart envelope has a 16 MiB ceiling. File or quota overflow returns 413; unsupported content returns 415. Uploads allow 20 calls per hour and 100 per day per member, returning 429 with `Retry-After` when exceeded. One document per kind can be the default; choosing another clears the old default.
+
+Account deletion removes all kit records and files. No kit content is available through admin routes.
+
 ## `/api/admin` (staff token, `aud = admin`)
 
 | Method, path | Role | Body / query | Returns |

@@ -19,6 +19,7 @@ from api.core.exceptions import RateLimitError
 
 # bucket -> [(max_calls, window_seconds), ...]; every window must allow.
 LIMITS: dict[str, list[tuple[int, int]]] = {
+    "kit_upload": [(20, 3600), (100, 86400)],
     "public_submit": [(5, 3600)],
     "public_report": [(10, 3600)],
     # Agent scans spend model tokens and search calls.
@@ -34,6 +35,7 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
 }
 
 _LABEL = {
+    "kit_upload": "document uploads",
     "public_submit": "submissions",
     "public_report": "reports",
     "scan": "scans",

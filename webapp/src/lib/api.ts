@@ -12,6 +12,7 @@ import type {
   Paged,
   Scan,
   ScanRequest,
+  ShareKit,
   Todo,
   TodoCreate,
   TodoUpdate,
@@ -122,6 +123,11 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return JSON.parse(text) as T
 }
 
+export { req as request, parseDetail }
+
+/** One token refresh for transports outside fetch (XHR uploads); the provider single-flights it. */
+export const refreshAccessToken = async (): Promise<string | null> => (refreshHandler ? refreshHandler() : null)
+
 const get = <T>(path: string): Promise<T> => req<T>(path)
 const post = <T>(path: string, body?: unknown): Promise<T> =>
   req<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) })
@@ -182,6 +188,7 @@ export const opportunityFacets = () => get<OpportunityFacets>("/api/app/opportun
 export const trackedOpportunities = () => get<Record<string, string>>("/api/app/opportunities/tracked")
 export const trackOpportunity = (id: string) => post<Application>(`/api/app/opportunities/${encodeURIComponent(id)}/track`)
 export const submitOpportunity = (body: OpportunitySubmit) => post<Opportunity>("/api/app/opportunities", body)
+export const shareOpportunity = (id: string) => post<ShareKit>(`/api/app/opportunities/${encodeURIComponent(id)}/share`)
 /** Fetches one opportunity's .ics with the member token and hands it to the browser as a download. */
 export async function downloadOpportunityIcs(id: string): Promise<void> {
   const path = `/api/app/opportunities/${encodeURIComponent(id)}/calendar.ics`

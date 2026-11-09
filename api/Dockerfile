@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # curl powers the compose HEALTHCHECK against /ready.
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv

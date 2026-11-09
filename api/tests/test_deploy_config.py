@@ -22,3 +22,12 @@ def test_api_and_worker_share_one_image():
     services = _compose()["services"]
     assert services["api"]["build"] == services["worker"]["build"]
     assert services["worker"]["command"][:3] == ["python", "-m", "api.worker"]
+
+
+def test_api_and_worker_share_private_document_volume():
+    config = _compose()
+    for name in ("api", "worker"):
+        service = config["services"][name]
+        assert service["environment"]["UPLOAD_DIR"] == "/app/uploads"
+        assert "applicant_uploads:/app/uploads" in service["volumes"]
+    assert config["volumes"]["applicant_uploads"]["name"] == "blesser_applicant_uploads"

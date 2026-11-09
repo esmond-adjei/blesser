@@ -1,5 +1,7 @@
 import logging
+from pathlib import Path
 
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 log = logging.getLogger(__name__)
@@ -116,6 +118,8 @@ class Settings(BaseSettings):
     max_request_bytes: int = 1024 * 1024
     # Per-account throttles (core/ratelimit.py).
     rate_limits_enabled: bool = True
+    app_env: str = "development"
+    upload_dir: str = str(Path(__file__).resolve().parents[2] / "uploads")
 
     # --- Email (core/mailer.py) ---
     # "console" logs messages (dev/tests); "smtp" relays through any provider.
@@ -128,6 +132,8 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     # Public URL of the web app, for links in emails and calendars.
     app_base_url: str = "http://localhost:5173"
+    # Public site origin, for share links and share images.
+    site_url: str = "http://localhost:4321"
     # Public origin of the API for calendar feed links; empty = APP_BASE_URL
     # (right when the web app proxies /api).
     public_api_url: str = ""
@@ -159,6 +165,21 @@ class Settings(BaseSettings):
     # Google sign-in shows when both are set. Redirect URI: {APP_BASE_URL}/auth/callback/google
     oauth_google_client_id: str = ""
     oauth_google_client_secret: str = ""
+
+    @field_validator("upload_dir", mode="before")
+    @classmethod
+    def resolve_upload_dir(cls, value):
+        root = Path(__file__).resolve().parents[2]
+        path = Path(value) if value else Path("uploads")
+        return str(path if path.is_absolute() else root / path)
+
+    @model_validator(mode="after")
+    def require_production_secrets(self):
+        if self.app_env.lower() in ("production", "prod") and (
+            not self.auth_secret or not self.secrets_key
+        ):
+            raise ValueError("AUTH_SECRET and SECRETS_KEY are required in production")
+        return self
 
     def resolve_llm_api_key(self) -> str:
         if self.llm_api_key:
