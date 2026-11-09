@@ -230,7 +230,21 @@ Nothing is stored about the form except a usage counter, plus `matched_opportuni
 - New token audience `ext`. Access tokens as for `app`; refresh tokens last 90 days, rotate on use, and are revocable.
 - Connect flow: the extension opens `{APP_URL}/connect/extension?state=...`; a signed-in member clicks **Allow**; the app calls `POST /api/app/extension/connect` and hands the tokens to the extension with `chrome.runtime.sendMessage(EXTENSION_ID, ...)` (`externally_connectable` limited to the app origin). No password ever enters the extension.
 - `GET /api/app/extension/sessions` and `DELETE /api/app/extension/sessions/{id}` back a **Connected browsers** list in Settings → Account and security.
-- `/api/app/autofill/*`, `/api/app/profile`, `/api/app/projects`, `/api/app/documents` (read and download) and `/api/app/applications` (read, and mark applied) accept `ext` tokens; everything else rejects them.
+- `/api/app/autofill/*`, `/api/app/profile`, `/api/app/projects`, `/api/app/documents` (read and download) and `/api/app/applications` (read, and `PATCH /applications/{id}` to mark applied) accept `ext` tokens; everything else rejects them.
+
+```ts
+// POST /api/app/extension/connect        (app token) <- { name: string }  e.g. "Chrome on Linux"
+//   -> 201 { access_token: string; refresh_token: string; session: ExtensionSession }
+// POST /api/app/extension/refresh        (no auth)  <- { refresh_token } -> { access_token, refresh_token }  (rotates)
+// POST /api/app/extension/logout         (ext token) <- { refresh_token } -> 204
+// GET  /api/app/extension/me             (ext token) -> { user: { id, email, display_name }, projects: { id, name, tagline }[],
+//                                                         drafting: { enabled: boolean; remaining_today: number } }
+// GET  /api/app/extension/sessions       (app token) -> ExtensionSession[]
+// DELETE /api/app/extension/sessions/{id} (app token) -> 204; that session's tokens stop working at once
+type ExtensionSession = { id: string; name: string; created_at: string; last_used_at: string | null }
+```
+
+`FillRequest` also accepts `allow_drafting: boolean` (default true); when false, step 4 is skipped.
 
 ---
 
