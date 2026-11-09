@@ -11,8 +11,6 @@ Blesser gathers opportunities into one public catalogue and helps people act on 
 3. **Sync** deadlines and dated to-dos to Google Calendar, Apple Calendar or Outlook, through a private subscription link, an `.ics` download or a Google Calendar link.
 4. **Find more** by starting a scan and watching the agents work, or share an opportunity they know about.
 
-Blesser started as a fork of [Graduator](https://github.com/esmond-adjei/graduator) (`b6747b4`) and keeps its agent loop, Postgres-backed task queue, accounts and notifications; everything specific to graduate-school research was removed.
-
 ## How it works
 
 Two processes share one Postgres database:
