@@ -16,10 +16,10 @@ export function EmptyState({ title, description, action, illustration, error, cl
   return (
     <div
       role={error ? "alert" : undefined}
-      className={cn("mx-auto flex max-w-[420px] flex-col items-center gap-3 px-6 py-8 text-center", className)}
+      className={cn("mx-auto flex max-w-xl items-center px-6 py-8 text-center", className)}
     >
       {illustration ? (
-        <img src={illustration} alt="" className="mb-1 h-32 w-auto max-w-full" />
+        <img src={illustration} alt="" className="mb-1 h-56 w-auto max-w-full" />
       ) : error ? null : (
         <span aria-hidden="true" className="relative mb-1 block h-12 w-24">
           <span className="absolute inset-0 overflow-hidden">
@@ -28,9 +28,11 @@ export function EmptyState({ title, description, action, illustration, error, cl
           <span className="absolute -inset-x-4 bottom-0 h-0.5 bg-forest" />
         </span>
       )}
-      <h2 className="m-0 type-title-2 text-ink">{title}</h2>
-      {description ? <p className="m-0 text-body text-ink-secondary">{description}</p> : null}
-      {action ? <div className="mt-1 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
+      <div className="flex flex-col items-center gap-1">
+        <h2 className="m-0 type-title-2 text-ink">{title}</h2>
+        {description ? <p className="m-0 text-body text-ink-secondary">{description}</p> : null}
+        {action ? <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
+      </div>
     </div>
   )
 }
