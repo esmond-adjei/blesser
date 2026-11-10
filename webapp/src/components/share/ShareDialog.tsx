@@ -39,7 +39,7 @@ export function ShareDialog({ opp, onClose }: { opp: Opportunity | null; onClose
   return (
     <Dialog open={!!opp} onOpenChange={(open) => !open && onClose()}>
       {shown ? (
-        <DialogContent className="max-w-3xl" onClose={onClose}>
+        <DialogContent className="max-w-5xl" onClose={onClose}>
           <ShareBody opp={shown} onClose={onClose} />
         </DialogContent>
       ) : null}
