@@ -74,15 +74,18 @@ jobs:
         run: |
           npm run --workspace webapp lint
           npm run --workspace admin lint
+          npm run --workspace blesser-extension lint
 
       - name: Unit tests
         run: |
           npm run --workspace webapp test
           npm run --workspace admin test
           npm run --workspace site test
+          npm run --workspace blesser-extension test
 
       - name: Production builds
         run: |
           npm run --workspace webapp build
           npm run --workspace admin build
           npm run --workspace site build
+          npm run --workspace blesser-extension build

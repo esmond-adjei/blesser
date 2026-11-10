@@ -28,6 +28,7 @@ const ResetPassword = React.lazy(() => import("./pages/Auth").then((m) => ({ def
 const OAuthCallback = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.OAuthCallback })))
 const VerifyEmail = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.VerifyEmail })))
 const UnsubscribeEmail = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.UnsubscribeEmail })))
+const ConnectExtension = React.lazy(() => import("./pages/ConnectExtension").then((m) => ({ default: m.ConnectExtension })))
 const Privacy = React.lazy(() => import("./pages/Legal").then((m) => ({ default: m.Privacy })))
 const Terms = React.lazy(() => import("./pages/Legal").then((m) => ({ default: m.Terms })))
 
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="verify-email" element={<VerifyEmail />} />
             <Route path="notifications/unsubscribe" element={<UnsubscribeEmail />} />
             <Route path="auth/callback/:provider" element={<OAuthCallback />} />
+            <Route path="connect/extension" element={<ConnectExtension />} />
             <Route path="privacy" element={<Privacy />} />
             <Route path="terms" element={<Terms />} />
           </Routes>

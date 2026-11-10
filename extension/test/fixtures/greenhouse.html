@@ -1,0 +1,64 @@
+<!doctype html>
+<html><body>
+<div id="application">
+  <form id="application_form" action="/embed/job_app" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="authenticity_token" value="abc">
+    <h2 class="heading">Submit your application</h2>
+    <div class="field">
+      <label for="first_name">First Name <span class="asterisk">*</span></label>
+      <input type="text" id="first_name" name="job_application[first_name]" maxlength="255" aria-required="true" autocomplete="given-name">
+    </div>
+    <div class="field">
+      <label for="last_name">Last Name <span class="asterisk">*</span></label>
+      <input type="text" id="last_name" name="job_application[last_name]" maxlength="255" aria-required="true">
+    </div>
+    <div class="field">
+      <label for="email">Email <span class="asterisk">*</span></label>
+      <input type="text" id="email" name="job_application[email]" aria-required="true">
+    </div>
+    <div class="field">
+      <label for="phone">Phone</label>
+      <input type="text" id="phone" name="job_application[phone]">
+    </div>
+    <div class="field" id="resume_fieldset">
+      <label id="resume-label">Resume/CV <span class="asterisk">*</span></label>
+      <div class="attach-or-paste">
+        <button type="button" class="unstyled-button">Attach</button>
+        <input type="file" id="resume" name="job_application[resume]" accept=".pdf,.doc,.docx,.txt,.rtf" style="display:none" aria-labelledby="resume-label">
+      </div>
+      <p class="help">(File types: pdf, doc, docx, txt, rtf)</p>
+    </div>
+    <h3 class="heading">Additional questions</h3>
+    <div class="field">
+      <label for="job_application_answers_attributes_0_text_value">LinkedIn Profile</label>
+      <input type="text" id="job_application_answers_attributes_0_text_value" name="job_application[answers_attributes][0][text_value]">
+    </div>
+    <div class="field">
+      <label for="job_application_answers_attributes_1_boolean_value">Are you legally authorized to work in Ghana? <span class="asterisk">*</span></label>
+      <select id="job_application_answers_attributes_1_boolean_value" name="job_application[answers_attributes][1][boolean_value]" aria-required="true">
+        <option value="">--</option>
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="job_application_answers_attributes_2_text_value">Why do you want to work with us? (300 words max)</label>
+      <textarea id="job_application_answers_attributes_2_text_value" name="job_application[answers_attributes][2][text_value]" rows="5"></textarea>
+    </div>
+    <div class="field">
+      <fieldset>
+        <legend>Which programmes interest you? <span class="asterisk">*</span></legend>
+        <label><input type="checkbox" name="job_application[answers_attributes][3][answer_selected_options_attributes][][question_option_id]" value="101"> Fellowship</label>
+        <label><input type="checkbox" name="job_application[answers_attributes][3][answer_selected_options_attributes][][question_option_id]" value="102"> Accelerator</label>
+        <label><input type="checkbox" name="job_application[answers_attributes][3][answer_selected_options_attributes][][question_option_id]" value="103"> Grants</label>
+      </fieldset>
+    </div>
+    <div class="field">
+      <label for="react-select-gender-input">Gender</label>
+      <div class="select__control"><input id="react-select-gender-input" role="combobox" aria-autocomplete="list" aria-expanded="false" type="text" value=""></div>
+    </div>
+    <input type="text" name="job_application[website_hp]" style="display:none" tabindex="-1">
+    <input type="submit" value="Submit Application" id="submit_app">
+  </form>
+</div>
+</body></html>

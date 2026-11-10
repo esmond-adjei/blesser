@@ -1,10 +1,10 @@
 # Applicant kit
 
-The applicant kit stores a member's profile, projects, private documents, and reusable answers. Phase 2 has no model calls or autofill routes. The [API contract](api-contract.md#applicant-kit) describes the member routes.
+The applicant kit stores a member's profile, projects, private documents, and reusable answers. Autofill uses selected kit facts to suggest form values and draft answers for review. The [API contract](api-contract.md#applicant-kit) describes the routes.
 
 ## Ownership
 
-Routes exist only under `/api/app` and require an `app` access token. Every object lookup and linked ID checks the member's ownership. Another member receives 404 for reads, writes, downloads, and links to an object they do not own. Admin tokens are rejected. There are no kit routes under `/api/admin`, `/api/public`, or the legacy `/api` prefix.
+Routes exist only under `/api/app`. An `app` access token allows kit reads and writes. A session-bound `ext` token allows profile and project reads, document lists, usage, downloads, and autofill. The answer library and all kit writes require `app`. Every object lookup and linked ID checks the member's ownership. Another member receives 404 for reads, writes, downloads, and links to an object they do not own. Admin tokens are rejected. There are no kit routes under `/api/admin`, `/api/public`, or the legacy `/api` prefix.
 
 Profiles, projects, documents, and answers belong to a user through cascading foreign keys. Deleting a project unlinks its documents and clears the project reference on saved answers. The documents and answers remain in the member's library. Deleting a logo document clears the project's logo reference.
 
@@ -65,7 +65,29 @@ Profile fields are given name, family name, email, phone, country of residence, 
 
 Project fields are name, tagline, website, sector, country, problem, solution, target customers, business model, traction, team, and use of funds. A project with only a name has a score of 8.
 
-Answer word count is the number of whitespace-separated words. Search is a case-insensitive literal substring match over questions and answers. `%` and `_` in search text are literals. Phase 2 does not use `pg_trgm` or similarity matching.
+Answer word count is the number of whitespace-separated words. Library search remains a case-insensitive literal substring match over questions and answers. `%` and `_` are literals. Autofill separately uses normalized-question `pg_trgm` similarity, with a minimum score of 0.65 and a GIN index.
+
+## Autofill
+
+`POST /api/app/autofill/fill` accepts page and field descriptors, a profile toggle, an optional owned project ID, and `allow_drafting`, which defaults to true. The [autofill API contract](api-contract.md#autofill) lists the request, response, limits, and errors.
+
+The matcher checks autocomplete tokens, input types, and English synonyms over labels, names, IDs, placeholders, and sections. `api/autofill/vocabulary.py` groups synonyms by language so other languages can be added. Helpers join or split names, format phones and dates, match country names and ISO codes, and normalize option labels and yes/no values. Ambiguous options and repeatable records without a clear index remain unfilled.
+
+File inputs use the default document of the detected kind and respect `accept`. Only unlinked profile documents and documents linked to the selected project qualify. Saved answers match global questions or questions for the selected project. Oversized facts and answers are skipped instead of truncated.
+
+Remaining free-text questions go to the configured provider from `api/agent/llm/factory.py` in one batched call. The rules require JSON, restrict answers to supplied facts, prohibit invented numbers, names, and dates, and request null when facts are insufficient. The API discards unknown keys, non-string values, truncated output, tool calls, values beyond either limit, and sensitive values. Accepted drafts have low confidence and a review note. Members review and submit their own forms.
+
+Sensitive values fill only fields identified as that exact national-ID, passport-number, or passport-expiry field. They never enter model context. Copies detected in other facts and question metadata are removed too. Extension profile reads return empty sensitive fields even with `reveal=1`. Passwords, payment fields, consent, declarations, and signatures are never filled.
+
+`AUTOFILL_DRAFTS_PER_DAY=60` limits attempts per member per UTC day. Zero disables drafting. The database reserves allowance before a model call and serializes concurrent requests. Failed calls and rejected answers still count. The response reports accepted drafts for the request and unused daily attempts. `allow_drafting=false` consumes no allowance. Autofill allows 20 requests per minute and 200 per hour per member through the existing in-process limiter.
+
+The response matches the page URL against opportunity links and source URLs in the member's application tracker. Scheme, `www`, trailing slashes, fragments, and common tracking noise are ignored. Meaningful query parameters remain significant. The returned ID identifies the catalogue opportunity. Form descriptors and answers are never persisted. Only the daily usage counter is stored.
+
+Browser connections use `ext` access tokens and rotating 90-day refresh tokens tied to `auth_extension_sessions`. Session checks run on every request. Logout, revocation from Connected browsers, refresh-token reuse, and password reset invalidate that session's access and refresh tokens. The [extension auth contract](api-contract.md#extension-authentication) lists the routes and audience boundaries.
+
+Run `uv run python -m scripts.measure_autofill` from `api/` to measure deterministic coverage over synthetic Google Forms, Greenhouse, Lever, Workable, Submittable, grant, and Siwa fixtures. The baseline makes no model calls. Add `--real-draft` to check the configured Ollama endpoint and measure one batched Siwa drafting call with provider-reported token use. The script makes no database writes.
+
+Migration `0005_autofill` enables `pg_trgm`, backfills normalized questions, adds their trigram index, and adds browser sessions and daily draft usage. Refresh grants gain a browser-session reference and a used timestamp for replay detection. Downgrade removes these additions but leaves the shared `pg_trgm` extension installed.
 
 ## Retention and deletion
 

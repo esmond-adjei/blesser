@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kumasi Founders Fund: application</title>
+<style>
+  body { font: 15px/1.5 Georgia, serif; background: #f6f4ef; color: #222; margin: 0; }
+  main { max-width: 680px; margin: 24px auto; background: #fff; padding: 24px 32px; border: 1px solid #ddd; }
+  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 17px; margin: 24px 0 8px; border-bottom: 1px solid #eee; }
+  .row { margin: 12px 0; } label { display: block; font-weight: bold; font-size: 14px; }
+  input[type=text], input[type=email], input[type=tel], input[type=url], input[type=number], select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #bbb; font: inherit; }
+  textarea { min-height: 70px; } .hint { color: #666; font-size: 13px; } fieldset { border: 0; padding: 0; margin: 12px 0; } legend { font-weight: bold; font-size: 14px; }
+  .choice { display: inline-block; margin-right: 16px; font-weight: normal; } iframe { width: 100%; height: 150px; border: 1px dashed #bbb; }
+  button { padding: 8px 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Kumasi Founders Fund 2026</h1>
+  <p class="hint">Grants of up to $25,000 for early-stage ventures in Ghana. Fields marked * are required.</p>
+  <form id="apply" action="/submitted" method="post" onsubmit="document.title = 'SUBMITTED'; return false;">
+    <h2>About you</h2>
+    <div class="row"><label for="first">First name *</label><input id="first" name="first_name" type="text" required></div>
+    <div class="row"><label for="last">Last name *</label><input id="last" name="last_name" type="text" required></div>
+    <div class="row"><label for="email">Email address *</label><input id="email" name="email" type="email" required></div>
+    <div class="row"><label for="phone">Phone</label><input id="phone" name="phone" type="tel"></div>
+    <div class="row"><label for="pronouns">Pronouns</label><input id="pronouns" name="pronouns" type="text"></div>
+    <h2>Your venture</h2>
+    <div class="row"><label for="venture">Startup name *</label><input id="venture" name="startup_name" type="text" required></div>
+    <div class="row"><label for="site">Company website</label><input id="site" name="website" type="url"></div>
+    <div class="row"><label for="stage">Stage</label>
+      <select id="stage" name="stage"><option value="">Choose one</option><option>Idea</option><option>Prototype</option><option>Early revenue</option><option>Growth</option></select></div>
+    <div class="row"><label for="country">Country of operation</label>
+      <select id="country" name="country"><option value="">Choose one</option><option value="GH">Ghana</option><option value="NG">Nigeria</option><option value="KE">Kenya</option></select></div>
+    <div class="row"><label for="problem">What problem are you solving? *</label>
+      <textarea id="problem" name="problem" required></textarea><div class="hint">Maximum 120 words.</div></div>
+    <div class="row"><label for="traction">Describe your traction so far</label>
+      <textarea id="traction" name="traction"></textarea><div class="hint">Up to 80 words.</div></div>
+    <div class="row"><label for="mentor">What support would help your team most in the next six months?</label>
+      <textarea id="mentor" name="support"></textarea><div class="hint">Up to 60 words.</div></div>
+    <div class="row"><label for="amount">Amount requested (USD)</label><input id="amount" name="amount" type="number"></div>
+    <fieldset><legend>Is your venture women-led?</legend>
+      <label class="choice"><input type="radio" name="women_led" value="yes"> Yes</label>
+      <label class="choice"><input type="radio" name="women_led" value="no"> No</label></fieldset>
+    <h2>Documents</h2>
+    <div class="row"><label for="cv">Founder CV *</label><input id="cv" name="cv" type="file" accept=".pdf,.doc,.docx" required></div>
+    <h2>Referee (in a frame)</h2>
+    <iframe src="/referee.html" title="Referee"></iframe>
+    <h2>Payment for the application fee</h2>
+    <div class="row"><label for="card">Card number</label><input id="card" name="card" type="text" autocomplete="cc-number"></div>
+    <div class="row"><label><input type="checkbox" name="terms" required> I confirm the information is accurate</label></div>
+    <button type="submit">Submit application</button>
+  </form>
+</main>
+</body>
+</html>

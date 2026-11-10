@@ -301,3 +301,20 @@ export const sendTestEmail = () =>
 export const unsubscribeNotificationEmail = (token: string) =>
   post<{ status: string; kind: string; label: string }>("/api/app/notifications/unsubscribe", { token })
 
+
+// --- Browser extension ----------------------------------------------------------------
+
+export interface ExtensionSession {
+  id: string
+  name: string
+  created_at: string
+  last_used_at: string | null
+}
+export interface ExtensionGrant {
+  access_token: string
+  refresh_token: string
+  session: ExtensionSession
+}
+export const connectExtension = (name: string) => post<ExtensionGrant>("/api/app/extension/connect", { name })
+export const listExtensionSessions = () => get<ExtensionSession[]>("/api/app/extension/sessions")
+export const revokeExtensionSession = (id: string) => del<void>(`/api/app/extension/sessions/${encodeURIComponent(id)}`)

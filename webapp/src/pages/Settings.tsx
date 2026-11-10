@@ -2,6 +2,7 @@ import * as React from "react"
 import { Navigate, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { Bell, CalendarDays, Copy, Palette, RefreshCw, ShieldCheck, UserRound } from "lucide-react"
+import { ConnectedBrowsers } from "../components/settings/ConnectedBrowsers"
 import { Button, Field, Input, Select, buttonVariants, cn } from "@blesser/ui"
 import * as api from "../lib/api"
 import { useAuth } from "../lib/auth"
@@ -18,7 +19,7 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, Dia
 
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: UserRound, description: "How you appear in Blesser and in the emails it sends." },
-  { id: "account", label: "Account and security", icon: ShieldCheck, description: "Your sign-in email, password and account." },
+  { id: "account", label: "Account and security", icon: ShieldCheck, description: "Your sign-in email, password, connected browsers and account." },
   { id: "notifications", label: "Notifications", icon: Bell, description: "What you hear about, where it reaches you and when it waits." },
   { id: "calendar", label: "Calendar", icon: CalendarDays, description: "Your application deadlines and dated to-dos in your own calendar app." },
   { id: "appearance", label: "Appearance", icon: Palette, description: "How Blesser looks on this device." },
@@ -198,6 +199,8 @@ function AccountSection() {
           }
         />
       </SettingsGroup>
+
+      <ConnectedBrowsers />
 
       <SettingsGroup title="Danger zone" danger>
         <SettingRow

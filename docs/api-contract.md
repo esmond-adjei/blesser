@@ -89,7 +89,7 @@ Changes:
 
 ### Applicant kit
 
-These routes exist only under `/api/app`, require a member token, and never expose another member's kit. Object and linked-ID ownership failures return 404. Admin tokens are rejected. [Applicant kit storage and retention](applicant-kit.md) documents field limits, completeness, encryption, and file storage.
+These routes exist only under `/api/app` and never expose another member's kit. Extension tokens can read profiles, projects, document lists, storage usage, and downloads. Kit writes and the answer library require an `app` token. Object and linked-ID ownership failures return 404. Admin tokens are rejected. [Applicant kit storage and retention](applicant-kit.md) documents field limits, completeness, encryption, and file storage.
 
 | Method, path | Body or query | Returns |
 |---|---|---|
@@ -131,6 +131,73 @@ type Answer = {
 Uploads accept at most 15 MiB per file and 250 MiB per member. Content inspection allows PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, CSV, PNG, JPG, and WEBP. The multipart envelope has a 16 MiB ceiling. File or quota overflow returns 413; unsupported content returns 415. Uploads allow 20 calls per hour and 100 per day per member, returning 429 with `Retry-After` when exceeded. One document per kind can be the default; choosing another clears the old default.
 
 Account deletion removes all kit records and files. No kit content is available through admin routes.
+
+### Autofill
+
+`POST /api/app/autofill/fill` accepts an `app` or `ext` token and returns suggestions for review. It never submits a form.
+
+```ts
+type FillRequest = {
+	page: { url: string; title: string; host: string };
+	use: { profile: boolean; project_id: string | null };
+	allow_drafting?: boolean; // defaults to true
+	fields: {
+		key: string;
+		tag: "input" | "textarea" | "select" | "contenteditable";
+		type: string;
+		name: string; id: string; autocomplete: string; label: string;
+		placeholder: string; help_text: string; section: string;
+		options: { value: string; label: string }[];
+		required: boolean; max_length: number | null; word_limit: number | null;
+		accept: string;
+	}[];
+};
+type FillResponse = {
+	fills: {
+		key: string; value: string | string[] | null; document_id: string | null;
+		source: "profile" | "project" | "answer" | "document" | "drafted";
+		confidence: "high" | "medium" | "low"; note: string;
+	}[];
+	unfilled: { key: string; reason: string }[];
+	matched_opportunity_id: string | null;
+	usage: { drafted_fields: number; remaining_today: number };
+};
+```
+
+Matching tries profile and project facts, compatible default documents, saved answers, then one batched model call for remaining free-text questions. Saved answers use normalized-question `pg_trgm` similarity of at least 0.65. Global answers and answers for the selected project qualify. Returned values must fit both limits. Ambiguous options, incompatible documents, unsupported questions, and invalid model values remain unfilled. Unknown model keys are ignored.
+
+Draft context contains only the selected profile and project facts. Sensitive identifiers and passport expiry are excluded, including copies detected in other facts or question metadata. Only exact deterministic matches can return sensitive values. Extension profile reads return empty sensitive fields even with `reveal=1`. Password, payment, consent, declaration, and signature fields remain unfilled. Drafts have low confidence and a review note.
+
+`AUTOFILL_DRAFTS_PER_DAY` defaults to 60 attempts per member per UTC day. Database row locks reserve attempts before the model call, including failures and rejected output. `usage.drafted_fields` counts accepted drafts in this response. `remaining_today` counts unused attempts. Zero disables drafting. `allow_drafting=false` skips model calls and preserves allowance. The route allows 20 calls per minute and 200 per hour per member through the in-process limiter. Excess calls return 429 with `Retry-After`.
+
+Requests allow at most 300 fields, unique nonempty keys of at most 200 characters, and 500 options per field. Strings are trimmed. Labels and help text allow 4,000 characters, most other descriptors allow 500, input types allow 50, and page URLs allow 2,048. Invalid bodies return 422. The ordinary request-body ceiling applies, with overflow returning 413. An unowned project returns 404.
+
+`matched_opportunity_id` is the catalogue opportunity ID from a tracked application whose opportunity `link` or `source_url` matches `page.url`. Matching ignores HTTP versus HTTPS, `www`, fragments, trailing slashes, and common tracking parameters. Other query parameters remain significant. Form descriptors and generated answers are never stored. Responses use private, no-store caching.
+
+### Extension authentication
+
+These paths use `/api/app`. Extension access tokens have audience `ext`, the same lifetime as member tokens, and a browser-session ID. Refresh tokens last 90 days, rotate on use, and are stored as hashes.
+
+| Method, path | Auth | Body | Returns |
+|---|---|---|---|
+| `POST /extension/connect` | `app` | `{name: string}` | `201 {access_token, refresh_token, session: ExtensionSession}` |
+| `POST /extension/refresh` | None | `{refresh_token: string}` | `{access_token, refresh_token}` |
+| `POST /extension/logout` | `ext` | `{refresh_token: string}` | `204`; revokes the current browser session |
+| `GET /extension/me` | `ext` | | `{user: {id, email, display_name}, projects: {id, name, tagline}[], drafting: {enabled, remaining_today}}` |
+| `GET /extension/sessions` | `app` | | Active `ExtensionSession[]` |
+| `DELETE /extension/sessions/{id}` | `app` | | `204`; owned session only, otherwise 404 |
+
+```ts
+type ExtensionSession = {
+	id: string; name: string; created_at: string; last_used_at: string | null;
+};
+```
+
+Names are whitespace-trimmed and must contain 1 through 200 characters. Refresh bodies allow 1 through 512 characters. Connect allows 10 calls per hour per member. Refresh allows 120 calls per minute per IP. Throttle failures return 429 with `Retry-After`. Responses use private, no-store caching.
+
+Every extension request checks session ownership, revocation, and account status in the database. Last-used timestamps update at most once every five minutes, with refresh also updating them. Revocation and logout immediately reject that session's access and refresh tokens. Reusing a rotated refresh token revokes the entire browser session, including the newer pair. Other sessions remain active. Password reset revokes browser sessions. Account deletion cascades them.
+
+The extension audience is accepted only for `POST /autofill/fill`, `GET /profile`, project list and detail reads, document list, usage and download reads, application list and detail reads, `PATCH /applications/{id}`, and the two extension-only routes above. The patch body must contain exactly `{status: "submitted"}`. Other application patches return 403. All other member routes reject `ext` with 401, including kit writes, scans, answers, settings, connect, and session management. Legacy member routes and admin routes also reject extension tokens.
 
 ## `/api/admin` (staff token, `aud = admin`)
 

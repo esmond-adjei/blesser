@@ -5,7 +5,8 @@
     "design-system",
     "webapp",
     "admin",
-    "site"
+    "site",
+    "extension"
   ],
   "scripts": {
     "tokens": "npm run --workspace @blesser/ui tokens"

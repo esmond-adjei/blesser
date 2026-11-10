@@ -1,0 +1,54 @@
+<!doctype html>
+<html><body>
+<main>
+  <form data-ui="application-form">
+    <section data-ui="personal-information">
+      <h3>Personal information</h3>
+      <div data-ui="firstname">
+        <label for="firstname"><span>First name</span><span aria-hidden="true">*</span></label>
+        <input id="firstname" name="firstname" type="text" required>
+      </div>
+      <div data-ui="lastname">
+        <label for="lastname"><span>Last name</span><span aria-hidden="true">*</span></label>
+        <input id="lastname" name="lastname" type="text" required>
+      </div>
+      <div data-ui="phone">
+        <input name="phone" type="tel" aria-label="Phone" placeholder="Phone">
+      </div>
+      <div data-ui="dob">
+        <label for="dob">Date of birth</label>
+        <input id="dob" name="dob" type="date">
+      </div>
+    </section>
+    <section data-ui="profile">
+      <h3>Profile</h3>
+      <div data-ui="summary">
+        <label for="summary">Summary</label>
+        <textarea id="summary" name="summary" maxlength="500"></textarea>
+        <span class="hint">Max 500 characters</span>
+      </div>
+      <div data-ui="country">
+        <label for="country">Country</label>
+        <select id="country" name="country">
+          <option value="" disabled selected>Select...</option>
+          <option value="GH">Ghana</option>
+          <option value="KE">Kenya</option>
+          <option value="NG">Nigeria</option>
+        </select>
+      </div>
+      <div data-ui="cover-letter">
+        <label for="cover">Cover letter</label>
+        <input id="cover" name="cover_letter" type="file" accept="application/pdf">
+      </div>
+      <div data-ui="gdpr">
+        <label><input type="checkbox" name="gdpr" value="true" required> I agree to the processing of my data</label>
+      </div>
+      <div data-ui="password-check">
+        <label for="pw">Create a password to track your application</label>
+        <input id="pw" name="pw" type="password">
+      </div>
+    </section>
+    <button type="submit" data-ui="submit">Submit application</button>
+  </form>
+</main>
+</body></html>

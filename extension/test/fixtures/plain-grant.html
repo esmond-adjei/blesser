@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><style>.hp { display: none; }</style></head><body>
+<h1>Community Innovation Grant 2026</h1>
+<form action="/apply" method="post">
+  <h2>Applicant</h2>
+  <table>
+    <tr><td><p>Applicant name</p></td><td><input name="applicant_name" type="text"></td></tr>
+    <tr><td><p>Date of birth (DD/MM/YYYY)</p></td><td><input name="dob" type="date"></td></tr>
+    <tr><td><p>Phone number</p></td><td><input name="tel" type="tel"></td></tr>
+  </table>
+  <h2>Your project</h2>
+  <p>Project title</p>
+  <input name="title" type="text">
+  <p>What will the grant pay for? (up to 100 words)</p>
+  <textarea name="use_of_funds"></textarea>
+  <fieldset>
+    <legend>Is the project led by women?</legend>
+    <input type="radio" id="wl-yes" name="women_led" value="yes"><label for="wl-yes">Yes</label>
+    <input type="radio" id="wl-no" name="women_led" value="no"><label for="wl-no">No</label>
+  </fieldset>
+  <div class="hp"><label for="website">Leave this empty</label><input id="website" name="website" type="text"></div>
+  <p>Account password</p>
+  <input name="account_password" type="password">
+  <input type="submit" value="Send application">
+</form>
+</body></html>

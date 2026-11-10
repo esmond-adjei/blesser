@@ -19,3 +19,5 @@ progress.html
 admin/dist/
 site/dist/
 site/.astro/
+extension/dist/
+extension/dist-e2e/

@@ -6,13 +6,14 @@ API := cd api && $(UV)
 WEB := npm run --workspace webapp
 ADMIN := npm run --workspace admin
 SITE := npm run --workspace site
+EXT := npm run --workspace blesser-extension
 COMPOSE := docker compose
 
 # Scratch test database (conftest.py default; override to match local Postgres).
 TEST_DATABASE_URL ?= postgresql+asyncpg://blesser:blesser@localhost:5432/blesser_test
 
 .PHONY: help install db db-down api worker web admin site up up-backend migrate revision lint format typecheck test \
-	test-web tokens backup backup-verify vapid-keys build verify clean
+	test-web tokens extension backup backup-verify vapid-keys build verify clean
 
 help: ## List targets with one-line descriptions.
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -59,6 +60,7 @@ lint: ## Ruff and oxlint. Must pass.
 	$(API) ruff check .
 	$(WEB) lint
 	$(ADMIN) lint
+	$(EXT) lint
 
 format: ## Apply ruff format to the backend.
 	$(API) ruff format .
@@ -73,6 +75,7 @@ test-web: ## Front-end unit tests.
 	$(WEB) test
 	$(ADMIN) test
 	$(SITE) test
+	$(EXT) test
 
 tokens: ## Regenerate the design system CSS from design-system/tokens.json.
 	npm run tokens
@@ -86,15 +89,19 @@ backup-verify: ## Restore the newest dump into a scratch DB and check it, then d
 vapid-keys: ## Print a VAPID key pair for browser push (docs/notifications.md).
 	@cd api && $(UV) python -m scripts.vapid_keys
 
-build: ## Type-checked production builds of the member app, admin console and site.
+build: ## Type-checked production builds of the member app, admin console, site and extension.
 	$(WEB) build
 	$(ADMIN) build
 	$(SITE) build
+	$(EXT) build
+
+extension: ## Build the browser extension into extension/dist (load it unpacked; docs/extension.md).
+	$(EXT) build
 
 verify: lint test test-web build ## All gates in one command.
 	@echo "verify: lint, tests and build all passed"
 
 clean: ## Remove build output and caches (never touches Postgres volumes).
-	rm -rf webapp/dist admin/dist site/dist site/.astro node_modules/.vite
+	rm -rf webapp/dist admin/dist site/dist site/.astro extension/dist extension/dist-e2e node_modules/.vite
 	find api -name __pycache__ -type d -prune -exec rm -rf {} +
 	rm -rf api/.pytest_cache api/.ruff_cache
