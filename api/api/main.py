@@ -14,6 +14,7 @@ from api.banner import print_banner
 from api.core.body_limit import BodySizeLimitMiddleware
 from api.core.config import log_config_warnings, settings
 from api.core.db import init_db
+from api.core.errors import UnhandledErrorMiddleware
 from api.core.exceptions import AuthError, DomainError, RateLimitError
 from api.extension_auth.policy import enforce_extension_boundary
 from api.extension_auth.routes import router as extension_router
@@ -35,6 +36,9 @@ app = FastAPI(
     description="Opportunities for startups, researchers and students, found and checked by agents",
 )
 
+# Inside CORS: an unhandled error otherwise reaches the browser without CORS headers,
+# which it reports as a CORS block and hides the 500.
+app.add_middleware(UnhandledErrorMiddleware)
 # Before CORS, so CORS stays outermost and a 413 still carries its headers.
 app.add_middleware(BodySizeLimitMiddleware, default_limit=settings.max_request_bytes)
 app.add_middleware(

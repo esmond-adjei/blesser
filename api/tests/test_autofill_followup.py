@@ -204,3 +204,26 @@ def test_date_follows_placeholder_format(placeholder, expected):
 
     field = FormField(key="f", label="Date of birth", placeholder=placeholder)
     assert format_date("1997-04-09", field) == expected
+
+
+def test_unhandled_errors_keep_cors_headers():
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+
+    @app.get("/__boom_for_test")
+    async def boom():
+        raise RuntimeError("boom")
+
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get(
+            "/__boom_for_test", headers={"Origin": "chrome-extension://abc"}
+        )
+        assert response.status_code == 500
+        assert response.headers["access-control-allow-origin"] == "*"
+        assert response.json()["detail"].startswith("Something went wrong")
+    finally:
+        app.router.routes[:] = [
+            r for r in app.router.routes if getattr(r, "path", "") != "/__boom_for_test"
+        ]
