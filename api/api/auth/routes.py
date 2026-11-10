@@ -18,12 +18,14 @@ from api.auth import service as auth_service
 from api.core import mailer
 from api.core.db import get_session
 from api.core.exceptions import AuthError
+from api.extension_auth.policy import extension_allowed
 
 router = APIRouter(tags=["auth"])
 _bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> auth_schemas.UserOut:
@@ -31,7 +33,17 @@ async def get_current_user(
     tokens 401; unknown users 401 (their grants die with them)."""
     if credentials is None or not credentials.credentials:
         raise AuthError("Sign in required.")
-    return await _user_for_token(session, credentials.credentials)
+    token = credentials.credentials
+    claims = auth_security.parse_access_claims(token, "ext")
+    if claims:
+        from api.extension_auth.service import user_for_claims
+
+        if not extension_allowed(request):
+            raise AuthError("Extension tokens cannot access this route.")
+        user = await user_for_claims(session, claims)
+        request.state.extension_session_id = claims["sid"]
+        return auth_schemas.UserOut(**user)
+    return await _user_for_token(session, token)
 
 
 async def _user_for_token(session: AsyncSession, token: str) -> auth_schemas.UserOut:

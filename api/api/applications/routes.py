@@ -1,12 +1,13 @@
 """Application tracker routes."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.applications import schemas, service
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
 from api.core.db import get_session
+from api.core.exceptions import ForbiddenError
 
 router = APIRouter(tags=["applications"])
 
@@ -40,11 +41,16 @@ async def create_application(
 
 @router.patch("/applications/{application_id}", response_model=schemas.ApplicationOut)
 async def update_application(
+    request: Request,
     application_id: str,
     req: schemas.ApplicationUpdate,
     session: AsyncSession = Depends(get_session),
     current: auth_schemas.UserOut = Depends(get_current_user),
 ):
+    if getattr(request.state, "extension_session_id", None) and req.model_dump(
+        exclude_unset=True
+    ) != {"status": "submitted"}:
+        raise ForbiddenError("Extensions can only mark an application as submitted.")
     return await service.update_application(session, current.id, application_id, req)
 
 

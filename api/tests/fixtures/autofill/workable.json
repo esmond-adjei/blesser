@@ -1,0 +1,133 @@
+{
+  "name": "workable",
+  "page": {
+    "url": "https://forms.example.com/workable",
+    "title": "Workable",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "w-first",
+      "label": "First name",
+      "expected": {
+        "source": "profile",
+        "value": "Ama"
+      }
+    },
+    {
+      "key": "w-last",
+      "label": "Surname",
+      "expected": {
+        "source": "profile",
+        "value": "Mensah"
+      }
+    },
+    {
+      "key": "w-mail",
+      "label": "E-mail address",
+      "type": "email",
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "w-phone",
+      "label": "Mobile number",
+      "type": "tel",
+      "autocomplete": "tel-national",
+      "expected": {
+        "source": "profile",
+        "value": "020 123 4567"
+      }
+    },
+    {
+      "key": "w-country",
+      "label": "Country",
+      "tag": "select",
+      "options": [
+        {
+          "label": "Ghana",
+          "value": "GH"
+        },
+        {
+          "label": "United Kingdom",
+          "value": "GB"
+        }
+      ],
+      "expected": {
+        "source": "profile",
+        "value": "GH"
+      }
+    },
+    {
+      "key": "w-address",
+      "label": "Street address",
+      "autocomplete": "address-line1",
+      "expected": {
+        "source": "profile",
+        "value": "12 Garden Road"
+      }
+    },
+    {
+      "key": "w-post",
+      "label": "Postal code",
+      "expected": {
+        "source": "profile",
+        "value": "GA-123-4567"
+      }
+    },
+    {
+      "key": "w-skills",
+      "label": "Technical skills",
+      "type": "checkbox",
+      "options": [
+        {
+          "label": "Python",
+          "value": "Python"
+        },
+        {
+          "label": "Research",
+          "value": "Research"
+        },
+        {
+          "label": "Java",
+          "value": "Java"
+        }
+      ],
+      "expected": {
+        "source": "profile",
+        "value": [
+          "Python",
+          "Research"
+        ]
+      }
+    },
+    {
+      "key": "w-cv",
+      "label": "Resume",
+      "type": "file",
+      "accept": ".pdf",
+      "expected": {
+        "source": "document",
+        "document_id": "cv-file"
+      }
+    },
+    {
+      "key": "w-draft",
+      "label": "Describe what you can contribute based on your background.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "w-salary",
+      "label": "Expected salary",
+      "type": "number",
+      "expected": null
+    }
+  ]
+}

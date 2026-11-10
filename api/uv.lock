@@ -363,6 +363,8 @@ dependencies = [
     { name = "lxml" },
     { name = "olefile" },
     { name = "openai" },
+    { name = "phonenumbers" },
+    { name = "pycountry" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -402,6 +404,8 @@ requires-dist = [
     { name = "lxml", specifier = ">=5" },
     { name = "olefile", specifier = ">=0.47" },
     { name = "openai", specifier = ">=1.40" },
+    { name = "phonenumbers", specifier = ">=8.13" },
+    { name = "pycountry", specifier = ">=24.6" },
     { name = "pydantic", specifier = ">=2.9.2" },
     { name = "pydantic-settings", specifier = ">=2.5.2" },
     { name = "pyjwt", specifier = ">=2.15.1" },
@@ -1712,6 +1716,15 @@ wheels = [
 ]
 
 [[package]]
+name = "phonenumbers"
+version = "9.0.43"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/d5/b3ad857b2cdd09c806436b48d2c9afcdde2673475b1a894f74da0db32e75/phonenumbers-9.0.43.tar.gz", hash = "sha256:d4e508ab800c3e5ce219b14be339deb3d55a0ab81af82fea44749fcabd01e908", size = 2314544, upload-time = "2026-11-06T11:43:26.829Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/4c/b33a2189464f0f67215e9c8401cb2931ad3ab3f7c8060929f84fe4970544/phonenumbers-9.0.43-py2.py3-none-any.whl", hash = "sha256:349bc799f15e010e35bd2c7d28149950ae74479cb1e11fb054ed9a95ecb4b437", size = 2596726, upload-time = "2026-11-06T11:43:23.63Z" },
+]
+
+[[package]]
 name = "pluggy"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1857,6 +1870,15 @@ dependencies = [
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/46/8843d8e00eb4fcece8e12c109ecf5b17a3d4cc9355dab23c2585cb51ed3c/py_vapid-1.9.6-py2.py3-none-any.whl", hash = "sha256:06d775951016f63f0d0d6dd8babd333fc2f831f0769fd5db2e1ec8cfbbccc70f", size = 19428, upload-time = "2026-10-14T19:13:04.404Z" },
+]
+
+[[package]]
+name = "pycountry"
+version = "26.2.16"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/1d/061b9e7a48b85cfd69f33c33d2ef784a531c359399ad764243399673c8f5/pycountry-26.2.16.tar.gz", hash = "sha256:5b6027d453fcd6060112b951dd010f01f168b51b4bf8a1f1fc8c95c8d94a0801", size = 7711342, upload-time = "2026-02-17T03:42:52.367Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/42/7703bd45b62fecd44cd7d3495423097e2f7d28bc2e99e7c1af68892ab157/pycountry-26.2.16-py3-none-any.whl", hash = "sha256:115c4baf7cceaa30f59a4694d79483c9167dbce7a9de4d3d571c5f3ea77c305a", size = 8044600, upload-time = "2026-02-17T03:42:49.777Z" },
 ]
 
 [[package]]

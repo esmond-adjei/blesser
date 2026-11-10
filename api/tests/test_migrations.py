@@ -77,6 +77,8 @@ EXPECTED_TABLES = sorted(
         "applicant_documents",
         "applicant_document_projects",
         "applicant_answers",
+        "auth_extension_sessions",
+        "autofill_daily_usage",
         "sources",
         "crawl_candidates",
         "page_cache",
@@ -147,6 +149,53 @@ def test_downgrade_upgrade_cycle():
         assert _tables(url) == ["alembic_version"]
         command.upgrade(cfg, "head")
         assert _tables(url) == EXPECTED_TABLES
+
+
+def test_autofill_migration_backfills_normalized_answers_and_preserves_content():
+    with _scratch_db() as url:
+        cfg = _cfg(url)
+        command.upgrade(cfg, "0004_applicant_kit")
+        _run(
+            _fetch(
+                url,
+                "INSERT INTO users (id, email, password_hash, role) VALUES ('member', 'migration@example.com', '!oauth', 'member')",
+            )
+        )
+        _run(
+            _fetch(
+                url,
+                "INSERT INTO applicant_answers (id, user_id, question, answer, tags, word_count) VALUES ('answer', 'member', 'Describe your résumé (maximum 50 words)?', 'Original answer.', '[]', 2)",
+            )
+        )
+        command.upgrade(cfg, "head")
+        row = _run(
+            _fetch(
+                url,
+                "SELECT question, normalized_question, answer FROM applicant_answers WHERE id = 'answer'",
+            )
+        )[0]
+        assert dict(row) == {
+            "question": "Describe your résumé (maximum 50 words)?",
+            "normalized_question": "describe your resume",
+            "answer": "Original answer.",
+        }
+        assert (
+            _run(
+                _fetch(
+                    url,
+                    "SELECT similarity(normalized_question, 'describe your resume') AS score FROM applicant_answers",
+                )
+            )[0]["score"]
+            == 1.0
+        )
+        command.downgrade(cfg, "0004_applicant_kit")
+        assert (
+            _run(
+                _fetch(url, "SELECT answer FROM applicant_answers WHERE id = 'answer'")
+            )[0]["answer"]
+            == "Original answer."
+        )
+        command.upgrade(cfg, "head")
 
 
 def test_editorial_migration_preserves_data_and_reverses_states():

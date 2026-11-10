@@ -1,0 +1,124 @@
+{
+  "name": "greenhouse",
+  "page": {
+    "url": "https://forms.example.com/greenhouse",
+    "title": "Greenhouse",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "gh-first",
+      "label": "First Name",
+      "name": "first_name",
+      "autocomplete": "given-name",
+      "expected": {
+        "source": "profile",
+        "value": "Ama"
+      }
+    },
+    {
+      "key": "gh-last",
+      "label": "Last Name",
+      "name": "last_name",
+      "expected": {
+        "source": "profile",
+        "value": "Mensah"
+      }
+    },
+    {
+      "key": "gh-email",
+      "label": "Email",
+      "type": "email",
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "gh-phone",
+      "label": "Phone",
+      "type": "tel",
+      "expected": {
+        "source": "profile",
+        "value": "+233201234567"
+      }
+    },
+    {
+      "key": "gh-location",
+      "label": "City",
+      "name": "job_application[location]",
+      "expected": {
+        "source": "profile",
+        "value": "Accra"
+      }
+    },
+    {
+      "key": "gh-linkedin",
+      "label": "LinkedIn Profile",
+      "expected": {
+        "source": "profile",
+        "value": "https://linkedin.com/in/ama-example"
+      }
+    },
+    {
+      "key": "gh-site",
+      "label": "Website",
+      "expected": {
+        "source": "profile",
+        "value": "https://ama.example.com"
+      }
+    },
+    {
+      "key": "gh-resume",
+      "label": "Resume/CV",
+      "type": "file",
+      "accept": ".pdf,.doc,.docx",
+      "expected": {
+        "source": "document",
+        "document_id": "cv-file"
+      }
+    },
+    {
+      "key": "gh-cover",
+      "label": "Cover Letter",
+      "type": "file",
+      "accept": ".docx,application/pdf",
+      "expected": {
+        "source": "document",
+        "document_id": "cover_letter-file"
+      }
+    },
+    {
+      "key": "gh-draft",
+      "label": "Explain what connects your background to this role.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "gh-visa",
+      "label": "Will you require visa sponsorship?",
+      "type": "radio",
+      "options": [
+        {
+          "label": "Yes",
+          "value": "y"
+        },
+        {
+          "label": "No",
+          "value": "n"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "gh-pass",
+      "label": "Password",
+      "type": "password",
+      "expected": null
+    }
+  ]
+}

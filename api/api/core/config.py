@@ -120,6 +120,9 @@ class Settings(BaseSettings):
     rate_limits_enabled: bool = True
     app_env: str = "development"
     upload_dir: str = str(Path(__file__).resolve().parents[2] / "uploads")
+    autofill_drafts_per_day: int = 60
+    # Under the extension's 75s request timeout, so a slow model leaves fields unfilled.
+    autofill_draft_timeout_seconds: float = 45.0
 
     # --- Email (core/mailer.py) ---
     # "console" logs messages (dev/tests); "smtp" relays through any provider.

@@ -19,6 +19,9 @@ from api.core.exceptions import RateLimitError
 
 # bucket -> [(max_calls, window_seconds), ...]; every window must allow.
 LIMITS: dict[str, list[tuple[int, int]]] = {
+    "autofill": [(20, 60), (200, 3600)],
+    "extension_connect": [(10, 3600)],
+    "extension_refresh": [(120, 60)],
     "kit_upload": [(20, 3600), (100, 86400)],
     "public_submit": [(5, 3600)],
     "public_report": [(10, 3600)],
@@ -35,6 +38,9 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
 }
 
 _LABEL = {
+    "autofill": "autofill requests",
+    "extension_connect": "browser connections",
+    "extension_refresh": "browser refresh requests",
     "kit_upload": "document uploads",
     "public_submit": "submissions",
     "public_report": "reports",

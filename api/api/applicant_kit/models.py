@@ -88,6 +88,16 @@ class DocumentProject(Base):
 
 class Answer(Base):
     __tablename__ = "applicant_answers"
+    __table_args__ = (
+        Index(
+            "ix_applicant_answers_normalized_question",
+            "normalized_question",
+            postgresql_using="gin",
+            postgresql_ops={"normalized_question": "gin_trgm_ops"},
+        ),
+    )
+
+    normalized_question: Mapped[str] = mapped_column(Text, default="")
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(

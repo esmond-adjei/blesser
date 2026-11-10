@@ -5,6 +5,7 @@ from sqlalchemy import delete, func, or_, select, update
 from api.applicant_kit import models, schemas
 from api.applicant_kit.storage import MEMBER_LIMIT_BYTES, get_storage
 from api.auth.models import User
+from api.autofill.normalization import normalize_question
 from api.core.db import like_pattern
 from api.core.exceptions import NotFoundError
 from api.core.ids import new_id
@@ -385,6 +386,7 @@ async def save_answer(session, user_id, req, answer_id=None):
     for key, value in req.model_dump().items():
         setattr(row, key, value)
     row.word_count = len(req.answer.split())
+    row.normalized_question = normalize_question(req.question)
     row.updated_at = utcnow_naive()
     session.add(row)
     await session.commit()

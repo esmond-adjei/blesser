@@ -46,7 +46,8 @@ async def _consume(session, raw: str, purpose: str) -> auth_models.EmailToken:
     row = (
         await session.execute(
             select(auth_models.EmailToken).where(
-                auth_models.EmailToken.token_hash == auth_security.hash_token(raw or ""),
+                auth_models.EmailToken.token_hash
+                == auth_security.hash_token(raw or ""),
                 auth_models.EmailToken.purpose == purpose,
             )
         )
@@ -79,7 +80,9 @@ async def request_password_reset(session, email: str) -> mailer.Mail | None:
         to=user.email,
         subject="Reset your Blesser password",
         heading="Reset your password",
-        paragraphs=["Someone (hopefully you) asked to reset the password for this Blesser account."],
+        paragraphs=[
+            "Someone (hopefully you) asked to reset the password for this Blesser account."
+        ],
         action=("Choose a new password", link),
         note=(
             f"The link works once and expires in {settings.password_reset_minutes} minutes. "
@@ -108,6 +111,15 @@ async def reset_password(session, raw_token: str, new_password: str) -> None:
         )
         .values(used_at=utcnow_naive())
     )
+    from api.extension_auth.models import ExtensionSession
+
+    await session.execute(
+        update(ExtensionSession)
+        .where(
+            ExtensionSession.user_id == user.id, ExtensionSession.revoked_at.is_(None)
+        )
+        .values(revoked_at=utcnow_naive())
+    )
     await session.execute(
         delete(auth_models.RefreshToken).where(
             auth_models.RefreshToken.user_id == user.id
@@ -125,7 +137,9 @@ async def verification_mail(session, user: auth_models.User) -> mailer.Mail:
         to=user.email,
         subject="Confirm your email for Blesser",
         heading="Confirm your email",
-        paragraphs=["Confirm this address to unlock account features like data export and email notifications."],
+        paragraphs=[
+            "Confirm this address to unlock account features like data export and email notifications."
+        ],
         action=("Confirm email", _link("/verify-email", raw)),
         note=f"The link expires in {settings.email_verify_hours} hours. If you didn't create a Blesser account, ignore this email.",
     )

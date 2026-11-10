@@ -1,0 +1,259 @@
+{
+  "name": "siwa",
+  "page": {
+    "url": "https://forms.example.com/siwa",
+    "title": "Siwa",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "si-name",
+      "label": "Startup name",
+      "expected": {
+        "source": "project",
+        "value": "Siwa"
+      }
+    },
+    {
+      "key": "si-tagline",
+      "label": "One-line pitch",
+      "expected": {
+        "source": "project",
+        "value": "Tools for local shops"
+      }
+    },
+    {
+      "key": "si-website",
+      "label": "Company website",
+      "expected": {
+        "source": "project",
+        "value": "https://siwa.example.com"
+      }
+    },
+    {
+      "key": "si-industry",
+      "label": "Sector",
+      "expected": {
+        "source": "project",
+        "value": "Software"
+      }
+    },
+    {
+      "key": "si-city",
+      "label": "City",
+      "section": "Startup",
+      "expected": {
+        "source": "project",
+        "value": "Accra"
+      }
+    },
+    {
+      "key": "si-legal",
+      "label": "Legal structure",
+      "expected": {
+        "source": "project",
+        "value": "Private limited company"
+      }
+    },
+    {
+      "key": "si-problem",
+      "label": "Problem statement",
+      "tag": "textarea",
+      "expected": {
+        "source": "project",
+        "value": "Small shops lose time tracking sales on paper."
+      }
+    },
+    {
+      "key": "si-solution",
+      "label": "Describe your solution",
+      "tag": "textarea",
+      "expected": {
+        "source": "project",
+        "value": "Siwa helps shop owners record sales and manage stock."
+      }
+    },
+    {
+      "key": "si-customers",
+      "label": "Target customers",
+      "tag": "textarea",
+      "expected": {
+        "source": "project",
+        "value": "Independent shop owners in Ghana."
+      }
+    },
+    {
+      "key": "si-market",
+      "label": "Market size",
+      "expected": {
+        "source": "project",
+        "value": "Not yet measured."
+      }
+    },
+    {
+      "key": "si-model",
+      "label": "Business model",
+      "expected": {
+        "source": "project",
+        "value": "Monthly subscriptions paid by shop owners."
+      }
+    },
+    {
+      "key": "si-competition",
+      "label": "Competitive advantage",
+      "expected": {
+        "source": "project",
+        "value": "Paper ledgers and general spreadsheets."
+      }
+    },
+    {
+      "key": "si-traction",
+      "label": "Traction",
+      "expected": {
+        "source": "project",
+        "value": "A working prototype tested with shop owners."
+      }
+    },
+    {
+      "key": "si-impact",
+      "label": "Impact metrics",
+      "expected": {
+        "source": "project",
+        "value": "Shop owners can track sales and stock in one place."
+      }
+    },
+    {
+      "key": "si-now",
+      "label": "Why now?",
+      "expected": {
+        "source": "project",
+        "value": "More shop owners now use smartphones."
+      }
+    },
+    {
+      "key": "si-team",
+      "label": "Team size",
+      "type": "number",
+      "expected": {
+        "source": "project",
+        "value": "2"
+      }
+    },
+    {
+      "key": "si-youth",
+      "label": "Youth-led",
+      "type": "radio",
+      "options": [
+        {
+          "label": "Yes",
+          "value": "true"
+        },
+        {
+          "label": "No",
+          "value": "false"
+        }
+      ],
+      "expected": {
+        "source": "project",
+        "value": "true"
+      }
+    },
+    {
+      "key": "si-revenue",
+      "label": "Revenue last 12 months",
+      "type": "number",
+      "expected": {
+        "source": "project",
+        "value": "0"
+      }
+    },
+    {
+      "key": "si-raised",
+      "label": "Funding raised",
+      "type": "number",
+      "expected": {
+        "source": "project",
+        "value": "0"
+      }
+    },
+    {
+      "key": "si-founder",
+      "label": "Founder name",
+      "expected": {
+        "source": "project",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "si-demo",
+      "label": "Product demo URL",
+      "expected": {
+        "source": "project",
+        "value": "https://siwa.example.com/demo"
+      }
+    },
+    {
+      "key": "si-id",
+      "label": "National ID number",
+      "expected": {
+        "source": "profile",
+        "value": "GHA-123456789-1"
+      }
+    },
+    {
+      "key": "si-passport",
+      "label": "Passport number",
+      "expected": {
+        "source": "profile",
+        "value": "P01234567"
+      }
+    },
+    {
+      "key": "si-expiry",
+      "label": "Passport expiry date",
+      "type": "date",
+      "expected": {
+        "source": "profile",
+        "value": "2032-06-30"
+      }
+    },
+    {
+      "key": "si-logo",
+      "label": "Company logo",
+      "type": "file",
+      "accept": "image/*",
+      "expected": {
+        "source": "document",
+        "document_id": "logo-file"
+      }
+    },
+    {
+      "key": "si-draft",
+      "label": "Explain how your personal background shaped your approach.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "si-declaration",
+      "label": "I certify the information is correct",
+      "type": "checkbox",
+      "expected": null
+    },
+    {
+      "key": "si-missing",
+      "label": "Audited profit in 2023",
+      "type": "number",
+      "expected": null
+    },
+    {
+      "key": "si-novel",
+      "label": "Explain your plans for a factory in Brazil.",
+      "tag": "textarea",
+      "expected": null
+    }
+  ]
+}

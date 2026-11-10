@@ -28,6 +28,8 @@ dependencies = [
     "python-multipart>=0.0.33",
     "python-magic>=0.4.27",
     "olefile>=0.47",
+    "phonenumbers>=8.13",
+    "pycountry>=24.6",
 ]
 
 [project.scripts]

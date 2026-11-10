@@ -44,6 +44,12 @@ class RefreshToken(Base):
     __tablename__ = "auth_refresh_tokens"
 
     audience: Mapped[str] = mapped_column(String, default="app")
+    extension_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("auth_extension_sessions.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(

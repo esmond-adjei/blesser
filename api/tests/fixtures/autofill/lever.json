@@ -1,0 +1,106 @@
+{
+  "name": "lever",
+  "page": {
+    "url": "https://forms.example.com/lever",
+    "title": "Lever",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "l-name",
+      "label": "Full name",
+      "name": "name",
+      "autocomplete": "name",
+      "expected": {
+        "source": "profile",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "l-email",
+      "label": "Email",
+      "name": "email",
+      "type": "email",
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "l-phone",
+      "label": "Phone",
+      "name": "phone",
+      "type": "tel",
+      "expected": {
+        "source": "profile",
+        "value": "+233201234567"
+      }
+    },
+    {
+      "key": "l-link",
+      "label": "LinkedIn URL",
+      "expected": {
+        "source": "profile",
+        "value": "https://linkedin.com/in/ama-example"
+      }
+    },
+    {
+      "key": "l-github",
+      "label": "GitHub URL",
+      "expected": {
+        "source": "profile",
+        "value": "https://github.com/ama-example"
+      }
+    },
+    {
+      "key": "l-school",
+      "label": "University",
+      "section": "Education",
+      "expected": {
+        "source": "profile",
+        "value": "University of Ghana"
+      }
+    },
+    {
+      "key": "l-degree",
+      "label": "Degree",
+      "section": "Education",
+      "expected": {
+        "source": "profile",
+        "value": "BSc"
+      }
+    },
+    {
+      "key": "l-cv",
+      "label": "Attach resume",
+      "type": "file",
+      "accept": "application/pdf",
+      "expected": {
+        "source": "document",
+        "document_id": "cv-file"
+      }
+    },
+    {
+      "key": "l-draft",
+      "label": "Tell us how your experience informs your approach to work.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "l-consent",
+      "label": "Consent to processing personal data",
+      "type": "checkbox",
+      "expected": null
+    },
+    {
+      "key": "l-start",
+      "label": "Earliest available start date",
+      "type": "date",
+      "expected": null
+    }
+  ]
+}

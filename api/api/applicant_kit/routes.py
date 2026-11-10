@@ -25,8 +25,18 @@ Member = Annotated[UserOut, Depends(get_current_user)]
 
 
 @router.get("/profile", response_model=schemas.ProfileOut)
-async def get_profile(session: Session, current: Member, reveal: bool = False):
-    return await service.profile(session, current.id, reveal=reveal)
+async def get_profile(
+    request: Request, session: Session, current: Member, reveal: bool = False
+):
+    extension = bool(getattr(request.state, "extension_session_id", None))
+    result = await service.profile(session, current.id, reveal=reveal and not extension)
+    if extension:
+        result["sensitive"] = {
+            "national_id": "",
+            "passport_number": "",
+            "passport_expiry": None,
+        }
+    return result
 
 
 @router.put("/profile", response_model=schemas.ProfileOut)

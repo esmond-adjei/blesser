@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
@@ -9,11 +9,14 @@ from api import __version__
 from api.admin.routes import router as admin_router
 from api.app.routes import router as member_router
 from api.applicant_kit.routes import router as kit_router
+from api.autofill.routes import router as autofill_router
 from api.banner import print_banner
 from api.core.body_limit import BodySizeLimitMiddleware
 from api.core.config import log_config_warnings, settings
 from api.core.db import init_db
 from api.core.exceptions import AuthError, DomainError, RateLimitError
+from api.extension_auth.policy import enforce_extension_boundary
+from api.extension_auth.routes import router as extension_router
 from api.public.routes import router as public_router
 
 
@@ -39,6 +42,7 @@ app.add_middleware(
     allow_origins=settings.resolve_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -81,8 +85,12 @@ async def ready():
     return {"ready": True}
 
 
-app.include_router(member_router, prefix="/api/app")
-app.include_router(kit_router, prefix="/api/app")
+for router in (member_router, kit_router, autofill_router, extension_router):
+    app.include_router(
+        router,
+        prefix="/api/app",
+        dependencies=[Depends(enforce_extension_boundary)],
+    )
 app.include_router(member_router, prefix="/api", include_in_schema=False)
 
 app.include_router(public_router, prefix="/api/public")

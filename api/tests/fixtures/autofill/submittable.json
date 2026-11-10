@@ -1,0 +1,92 @@
+{
+  "name": "submittable",
+  "page": {
+    "url": "https://forms.example.com/submittable",
+    "title": "Submittable",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "s-name",
+      "label": "Applicant name",
+      "expected": {
+        "source": "profile",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "s-pronouns",
+      "label": "Pronouns",
+      "expected": {
+        "source": "profile",
+        "value": "she/her"
+      }
+    },
+    {
+      "key": "s-headline",
+      "label": "Professional title",
+      "expected": {
+        "source": "profile",
+        "value": "Software engineer"
+      }
+    },
+    {
+      "key": "s-bio",
+      "label": "Brief biography",
+      "tag": "contenteditable",
+      "max_length": 300,
+      "expected": {
+        "source": "profile",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "s-dob",
+      "label": "Birth date",
+      "type": "date",
+      "expected": {
+        "source": "profile",
+        "value": "1997-04-09"
+      }
+    },
+    {
+      "key": "s-transcript",
+      "label": "Academic transcript",
+      "type": "file",
+      "accept": ".pdf",
+      "expected": {
+        "source": "document",
+        "document_id": "transcript-file"
+      }
+    },
+    {
+      "key": "s-reference",
+      "label": "Reference email",
+      "expected": {
+        "source": "profile",
+        "value": "kojo@example.com"
+      }
+    },
+    {
+      "key": "s-draft",
+      "label": "Explain how your background relates to this fellowship.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "s-private",
+      "label": "Describe the contents of your passport.",
+      "tag": "textarea",
+      "expected": null
+    },
+    {
+      "key": "s-sign",
+      "label": "Signature",
+      "expected": null
+    }
+  ]
+}

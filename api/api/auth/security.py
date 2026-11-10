@@ -39,10 +39,18 @@ def check_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def issue_access_token(user_id: str, audience: str = "app") -> str:
+def issue_access_token(
+    user_id: str, audience: str = "app", *, session_id: str | None = None
+) -> str:
     expiry = utcnow_naive() + timedelta(minutes=settings.auth_access_minutes)
     return jwt.encode(
-        {"sub": user_id, "exp": expiry, "iat": utcnow_naive(), "aud": audience},
+        {
+            "sub": user_id,
+            "exp": expiry,
+            "iat": utcnow_naive(),
+            "aud": audience,
+            **({"sid": session_id} if session_id else {}),
+        },
         _SIGNING_KEY,
         algorithm="HS256",
     )
@@ -50,6 +58,11 @@ def issue_access_token(user_id: str, audience: str = "app") -> str:
 
 def parse_access_token(token: str, audience: str = "app") -> str | None:
     """User id for a valid token, else None (expired, forged, or garbage)."""
+    payload = parse_access_claims(token, audience)
+    return payload["sub"] if payload else None
+
+
+def parse_access_claims(token: str, audience: str = "app") -> dict | None:
     try:
         payload = jwt.decode(
             token,
@@ -64,7 +77,7 @@ def parse_access_token(token: str, audience: str = "app") -> str | None:
     if payload.get("typ") is not None:
         return None
     sub = payload.get("sub")
-    return sub if isinstance(sub, str) and sub else None
+    return payload if isinstance(sub, str) and sub else None
 
 
 def signed_token(typ: str, claims: dict, ttl: timedelta) -> str:
@@ -92,7 +105,7 @@ def new_refresh_token(audience: str = "app") -> tuple[str, str, datetime]:
     expiry = utcnow_naive() + (
         timedelta(hours=12)
         if audience == "admin"
-        else timedelta(days=settings.auth_refresh_days)
+        else timedelta(days=90 if audience == "ext" else settings.auth_refresh_days)
     )
     return raw, digest, expiry
 

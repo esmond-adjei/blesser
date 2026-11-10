@@ -1,0 +1,114 @@
+{
+  "name": "google_forms",
+  "page": {
+    "url": "https://forms.example.com/google_forms",
+    "title": "Google Forms",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "g-name",
+      "label": "Full name",
+      "id": "entry.102391",
+      "required": true,
+      "expected": {
+        "source": "profile",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "g-mail",
+      "label": "Email address",
+      "type": "email",
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "g-given",
+      "label": "First name",
+      "expected": {
+        "source": "profile",
+        "value": "Ama"
+      }
+    },
+    {
+      "key": "g-country",
+      "label": "Country of residence",
+      "tag": "select",
+      "options": [
+        {
+          "label": "Ghana",
+          "value": "GH"
+        },
+        {
+          "label": "Nigeria",
+          "value": "NG"
+        }
+      ],
+      "expected": {
+        "source": "profile",
+        "value": "GH"
+      }
+    },
+    {
+      "key": "g-city",
+      "label": "City",
+      "expected": {
+        "source": "profile",
+        "value": "Accra"
+      }
+    },
+    {
+      "key": "g-dob",
+      "label": "Date of birth",
+      "placeholder": "DD/MM/YYYY",
+      "expected": {
+        "source": "profile",
+        "value": "09/04/1997"
+      }
+    },
+    {
+      "key": "g-bio",
+      "label": "Short bio",
+      "tag": "textarea",
+      "max_length": 300,
+      "expected": {
+        "source": "profile",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "g-cv",
+      "label": "Upload your CV",
+      "type": "file",
+      "accept": ".pdf",
+      "expected": {
+        "source": "document",
+        "document_id": "cv-file"
+      }
+    },
+    {
+      "key": "g-draft",
+      "label": "Explain how your background supports this application.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "g-consent",
+      "label": "I agree to the privacy policy",
+      "type": "checkbox",
+      "expected": null
+    },
+    {
+      "key": "g-missing",
+      "label": "Scholarship reference code",
+      "expected": null
+    }
+  ]
+}

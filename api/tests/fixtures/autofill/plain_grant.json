@@ -1,0 +1,168 @@
+{
+  "name": "plain_grant",
+  "page": {
+    "url": "https://forms.example.com/plain_grant",
+    "title": "Plain Grant",
+    "host": "forms.example.com"
+  },
+  "fields": [
+    {
+      "key": "p-name",
+      "label": "Project name",
+      "expected": {
+        "source": "project",
+        "value": "Siwa"
+      }
+    },
+    {
+      "key": "p-person",
+      "label": "Your name",
+      "expected": {
+        "source": "profile",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "p-stage",
+      "label": "Business stage",
+      "tag": "select",
+      "options": [
+        {
+          "label": "Idea",
+          "value": "idea"
+        },
+        {
+          "label": "Prototype",
+          "value": "mvp"
+        },
+        {
+          "label": "Growth",
+          "value": "growth"
+        }
+      ],
+      "expected": {
+        "source": "project",
+        "value": "mvp"
+      }
+    },
+    {
+      "key": "p-country",
+      "label": "Country",
+      "section": "Business",
+      "expected": {
+        "source": "project",
+        "value": "Ghana"
+      }
+    },
+    {
+      "key": "p-founded",
+      "label": "Date established",
+      "placeholder": "MM/DD/YYYY",
+      "expected": {
+        "source": "project",
+        "value": "02/15/2024"
+      }
+    },
+    {
+      "key": "p-reg",
+      "label": "Company registration number",
+      "expected": {
+        "source": "project",
+        "value": "CS123456"
+      }
+    },
+    {
+      "key": "p-women",
+      "label": "Is your startup women-led?",
+      "type": "radio",
+      "options": [
+        {
+          "label": "Yes",
+          "value": "yes"
+        },
+        {
+          "label": "No",
+          "value": "no"
+        }
+      ],
+      "expected": {
+        "source": "project",
+        "value": "yes"
+      }
+    },
+    {
+      "key": "p-amount",
+      "label": "Funding requested",
+      "type": "number",
+      "expected": {
+        "source": "project",
+        "value": "25000"
+      }
+    },
+    {
+      "key": "p-currency",
+      "label": "Currency",
+      "expected": {
+        "source": "project",
+        "value": "GHS"
+      }
+    },
+    {
+      "key": "p-funds",
+      "label": "Use of funds",
+      "tag": "textarea",
+      "word_limit": 100,
+      "expected": {
+        "source": "project",
+        "value": "Improve the prototype and test it with more shop owners."
+      }
+    },
+    {
+      "key": "p-deck",
+      "label": "Upload pitch deck",
+      "type": "file",
+      "accept": ".pdf",
+      "expected": {
+        "source": "document",
+        "document_id": "pitch_deck-file"
+      }
+    },
+    {
+      "key": "p-budget",
+      "label": "Project budget",
+      "type": "file",
+      "accept": ".xlsx",
+      "expected": {
+        "source": "document",
+        "document_id": "budget-file"
+      }
+    },
+    {
+      "key": "p-draft",
+      "label": "Outline how your background supports this venture.",
+      "tag": "textarea",
+      "word_limit": 30,
+      "expected": {
+        "source": "drafted",
+        "value": "I build tools for small businesses in Ghana."
+      }
+    },
+    {
+      "key": "p-bank",
+      "label": "Bank account number",
+      "expected": null
+    },
+    {
+      "key": "p-country-options",
+      "label": "Country",
+      "tag": "select",
+      "options": [
+        {
+          "label": "Kenya",
+          "value": "KE"
+        }
+      ],
+      "expected": null
+    }
+  ]
+}

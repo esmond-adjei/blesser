@@ -1,0 +1,195 @@
+{
+  "profile": {
+    "given_name": "Ama",
+    "family_name": "Mensah",
+    "preferred_name": "Ama",
+    "pronouns": "she/her",
+    "date_of_birth": "1997-04-09",
+    "gender": "Female",
+    "nationality": "Ghanaian",
+    "country_of_residence": "Ghana",
+    "city": "Accra",
+    "address_line1": "12 Garden Road",
+    "address_line2": "Unit 4",
+    "postal_code": "GA-123-4567",
+    "email": "ama@example.com",
+    "phone": "+233201234567",
+    "linkedin_url": "https://linkedin.com/in/ama-example",
+    "website_url": "https://ama.example.com",
+    "github_url": "https://github.com/ama-example",
+    "other_links": [
+      {
+        "label": "Portfolio",
+        "url": "https://portfolio.example.com"
+      }
+    ],
+    "headline": "Software engineer",
+    "short_bio": "I build tools for small businesses in Ghana.",
+    "long_bio": "I am a software engineer in Accra building tools that help small businesses manage their work.",
+    "education": [
+      {
+        "institution": "University of Ghana",
+        "qualification": "BSc",
+        "field": "Computer Science",
+        "start": "2015-09-01",
+        "end": "2019-06-30",
+        "grade": "3.8",
+        "country": "Ghana"
+      }
+    ],
+    "experience": [
+      {
+        "organization": "Example Labs",
+        "role": "Software engineer",
+        "start": "2020-01-01",
+        "end": null,
+        "current": true,
+        "location": "Accra",
+        "summary": "Built tools for small businesses."
+      }
+    ],
+    "skills": [
+      "Python",
+      "Research"
+    ],
+    "languages": [
+      {
+        "language": "English",
+        "level": "fluent"
+      }
+    ],
+    "awards": [
+      {
+        "title": "Student prize",
+        "issuer": "Example University",
+        "year": 2019
+      }
+    ],
+    "publications": [
+      {
+        "title": "Tools for small businesses",
+        "venue": "Example Journal",
+        "year": 2021,
+        "url": "https://example.com/paper"
+      }
+    ],
+    "references": [
+      {
+        "name": "Kojo Boateng",
+        "title": "Engineering lead",
+        "organization": "Example Labs",
+        "email": "kojo@example.com",
+        "phone": "+233241234567",
+        "relationship": "Former manager"
+      }
+    ],
+    "sensitive": {
+      "national_id": "GHA-123456789-1",
+      "passport_number": "P01234567",
+      "passport_expiry": "2032-06-30"
+    }
+  },
+  "project": {
+    "name": "Siwa",
+    "tagline": "Tools for local shops",
+    "website_url": "https://siwa.example.com",
+    "stage": "prototype",
+    "sector": "Software",
+    "country": "Ghana",
+    "city": "Accra",
+    "founded_on": "2024-02-15",
+    "legal_status": "Private limited company",
+    "registration_number": "CS123456",
+    "problem": "Small shops lose time tracking sales on paper.",
+    "solution": "Siwa helps shop owners record sales and manage stock.",
+    "target_customers": "Independent shop owners in Ghana.",
+    "market_size": "Not yet measured.",
+    "business_model": "Monthly subscriptions paid by shop owners.",
+    "competition": "Paper ledgers and general spreadsheets.",
+    "traction": "A working prototype tested with shop owners.",
+    "impact": "Shop owners can track sales and stock in one place.",
+    "why_now": "More shop owners now use smartphones.",
+    "team": [
+      {
+        "name": "Ama Mensah",
+        "role": "Founder",
+        "bio": "Software engineer based in Accra.",
+        "email": "ama@example.com",
+        "linkedin_url": "https://linkedin.com/in/ama-example",
+        "is_founder": true,
+        "gender": "Female"
+      }
+    ],
+    "team_size": 2,
+    "women_led": true,
+    "youth_led": true,
+    "revenue_last_12_months": "0",
+    "funding_raised": "0",
+    "amount_sought": "25000",
+    "currency": "GHS",
+    "use_of_funds": "Improve the prototype and test it with more shop owners.",
+    "document_ids": [],
+    "custom_fields": [
+      {
+        "label": "Product demo URL",
+        "value": "https://siwa.example.com/demo"
+      }
+    ]
+  },
+  "documents": [
+    {
+      "id": "cv-file",
+      "kind": "cv",
+      "title": "cv",
+      "filename": "cv.pdf",
+      "content_type": "application/pdf",
+      "is_default": true,
+      "project_ids": []
+    },
+    {
+      "id": "cover_letter-file",
+      "kind": "cover_letter",
+      "title": "cover_letter",
+      "filename": "cover_letter.docx",
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "is_default": true,
+      "project_ids": []
+    },
+    {
+      "id": "pitch_deck-file",
+      "kind": "pitch_deck",
+      "title": "pitch_deck",
+      "filename": "pitch_deck.pdf",
+      "content_type": "application/pdf",
+      "is_default": true,
+      "project_ids": []
+    },
+    {
+      "id": "transcript-file",
+      "kind": "transcript",
+      "title": "transcript",
+      "filename": "transcript.pdf",
+      "content_type": "application/pdf",
+      "is_default": true,
+      "project_ids": []
+    },
+    {
+      "id": "budget-file",
+      "kind": "budget",
+      "title": "budget",
+      "filename": "budget.xlsx",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "is_default": true,
+      "project_ids": []
+    },
+    {
+      "id": "logo-file",
+      "kind": "logo",
+      "title": "logo",
+      "filename": "logo.png",
+      "content_type": "image/png",
+      "is_default": true,
+      "project_ids": []
+    }
+  ]
+}
