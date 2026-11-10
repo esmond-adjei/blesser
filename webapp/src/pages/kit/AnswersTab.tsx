@@ -1,3 +1,4 @@
+import { Select as NativeSelect } from "@blesser/ui"
 import * as React from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus, Search, Trash2 } from "lucide-react"
@@ -81,7 +82,7 @@ function AnswersBody() {
           <Button size="sm" variant="secondary" icon={<Plus />} onClick={startNew} className="max-sm:hidden">New</Button>
         </div>
         {projectList.length ? (
-          <select
+          <NativeSelect
             aria-label="Filter by project"
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
@@ -89,7 +90,7 @@ function AnswersBody() {
           >
             <option value="">All projects</option>
             {projectList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </NativeSelect>
         ) : null}
         {list.length === 0 ? (
           <p className="rounded-lg border border-separator bg-surface px-4 py-6 text-center text-footnote text-ink-secondary">No answers match.</p>

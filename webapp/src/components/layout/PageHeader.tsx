@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cn } from "@blesser/ui"
+import { RadioGroup, Toggle } from "radix-ui"
 
 export function PageHeader({
   title,
@@ -40,52 +41,28 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void
   className?: string
 }) {
-  const refs = React.useRef<(HTMLButtonElement | null)[]>([])
-  const move = (from: number, step: number) => {
-    const next = (from + step + options.length) % options.length
-    refs.current[next]?.focus()
-    onChange(options[next].value)
-  }
   return (
-    <div
-      role="radiogroup"
+    <RadioGroup.Root
       aria-label={label}
+      value={value}
+      onValueChange={(next) => {
+        const option = options.find((item) => item.value === next)
+        if (option) onChange(option.value)
+      }}
       className={cn("nice-scroll flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-md bg-surface-sunk p-0.5", className)}
     >
-      {options.map((o, i) => {
-        const selected = o.value === value
-        return (
-          <button
-            key={o.value}
-            ref={(el) => {
-              refs.current[i] = el
-            }}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
-            onClick={() => onChange(o.value)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                e.preventDefault()
-                move(i, 1)
-              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                e.preventDefault()
-                move(i, -1)
-              }
-            }}
-            className={cn(
-              "flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 [&_svg]:size-3.5 text-footnote font-medium whitespace-nowrap transition-colors duration-160",
-              selected ? "bg-surface text-ink shadow-elevation-1" : "text-ink-secondary hover:text-ink",
-            )}
-          >
-            {o.icon}
-            {o.icon ? <span className="max-sm:sr-only">{o.label}</span> : o.label}
-            {o.count != null ? <span className="text-ink-tertiary tabular-nums">{o.count}</span> : null}
-          </button>
-        )
-      })}
-    </div>
+      {options.map((o) => (
+        <RadioGroup.Item
+          key={o.value}
+          value={o.value}
+          className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 text-footnote font-medium whitespace-nowrap text-ink-secondary transition-colors duration-160 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus data-[state=checked]:bg-surface data-[state=checked]:text-ink data-[state=checked]:shadow-elevation-1 [&_svg]:size-3.5"
+        >
+          {o.icon}
+          {o.icon ? <span className="max-sm:sr-only">{o.label}</span> : o.label}
+          {o.count != null ? <span className="text-ink-tertiary tabular-nums">{o.count}</span> : null}
+        </RadioGroup.Item>
+      ))}
+    </RadioGroup.Root>
   )
 }
 
@@ -100,10 +77,9 @@ export function FilterToggle({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={() => onChange(!pressed)}
+    <Toggle.Root
+      pressed={pressed}
+      onPressedChange={onChange}
       className={cn(
         "flex h-control-sm shrink-0 cursor-pointer items-center gap-2 rounded-sm border px-2.5 text-footnote font-medium whitespace-nowrap transition-colors duration-160",
         pressed ? "border-forest/50 bg-forest-soft text-link" : "border-separator bg-surface text-ink-secondary hover:text-ink",
@@ -123,6 +99,6 @@ export function FilterToggle({
         ) : null}
       </span>
       {children}
-    </button>
+    </Toggle.Root>
   )
 }

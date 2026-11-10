@@ -1,5 +1,7 @@
 import * as React from "react"
 import { Check } from "lucide-react"
+import { Switch as SwitchPrimitive } from "radix-ui"
+import { Checkbox } from "../ui/checkbox"
 import { cn } from "@blesser/ui"
 import { AutosaveContext, type Track } from "../../lib/autosave"
 import { toastError } from "../../lib/toast"
@@ -14,24 +16,13 @@ export function Switch({
   title?: string
   disabled?: boolean
 }) {
+  if (mixed) {
+    return <Checkbox checked="indeterminate" aria-label={label} data-tooltip={title} disabled={disabled} onCheckedChange={() => onChange(true)} />
+  }
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={mixed ? "mixed" : checked}
-      aria-label={label}
-      data-tooltip={title}
-      disabled={disabled}
-      onClick={() => onChange(mixed ? true : !checked)}
-      className={cn(
-        "relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-160 disabled:cursor-wait disabled:opacity-50",
-        mixed ? "bg-forest/45" : checked ? "bg-forest" : "bg-control-border",
-      )}
-    >
-      <span className={cn("absolute top-0.5 flex size-4 items-center justify-center rounded-full bg-surface shadow-elevation-1 transition-all", mixed ? "left-[10px]" : checked ? "left-[18px]" : "left-0.5")}>
-        {mixed && <span className="h-0.5 w-2 rounded-full bg-forest" />}
-      </span>
-    </button>
+    <SwitchPrimitive.Root checked={checked} onCheckedChange={onChange} aria-label={label} data-tooltip={title} disabled={disabled} className="relative h-5 w-9 shrink-0 cursor-pointer rounded-full bg-control-border outline-none transition-colors data-[state=checked]:bg-forest focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-wait disabled:opacity-50">
+      <SwitchPrimitive.Thumb className="block size-4 translate-x-0.5 rounded-full bg-surface shadow-elevation-1 transition-transform data-[state=checked]:translate-x-[18px]" />
+    </SwitchPrimitive.Root>
   )
 }
 

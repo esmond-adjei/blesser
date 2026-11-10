@@ -1,3 +1,4 @@
+import { Select as NativeSelect } from "@blesser/ui"
 import * as React from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { CloudUpload, Download, FileImage, FileSpreadsheet, FileText, Pencil, RotateCcw, Star, Trash2, X } from "lucide-react"
@@ -155,7 +156,7 @@ function DocumentsBody() {
               Your files <span className="font-normal text-ink-tertiary tabular-nums">{docs.length}</span>
             </h3>
             {kindsPresent.length > 1 ? (
-              <select
+              <NativeSelect
                 aria-label="Show kind"
                 value={kind}
                 onChange={(e) => setKind(e.target.value)}
@@ -163,7 +164,7 @@ function DocumentsBody() {
               >
                 <option value="">All kinds</option>
                 {kindsPresent.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-              </select>
+              </NativeSelect>
             ) : null}
           </div>
           <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface">

@@ -1,3 +1,4 @@
+import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
@@ -763,7 +764,7 @@ function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
               <Input type="date" value={form.deadline} disabled={form.rolling} onChange={(e) => set("deadline", e.target.value)} />
             </Field>
             <label className="flex items-center gap-2 self-end pb-2 text-callout">
-              <input type="checkbox" className="size-4 accent-forest" checked={form.rolling} onChange={(e) => set("rolling", e.target.checked)} />
+              <Checkbox checked={form.rolling} onCheckedChange={(value) => set("rolling", value === true)} />
               Rolling / always open
             </label>
             <Field label="Summary" className="sm:col-span-2">

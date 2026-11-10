@@ -1,3 +1,4 @@
+import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
@@ -213,12 +214,11 @@ export function Register() {
           />
         </Field>
         <label className="flex items-start gap-2 text-footnote text-ink-secondary">
-          <input
-            type="checkbox"
+          <Checkbox
             required
-            className="mt-0.5 size-4 accent-forest"
+            className="mt-0.5"
             checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
+            onCheckedChange={(value) => setAgreed(value === true)}
           />
           <span>
             I agree to the{" "}

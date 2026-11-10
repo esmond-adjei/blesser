@@ -1,9 +1,12 @@
+import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription } from "../ui/alert-dialog"
+import { Checkbox } from "../ui/checkbox"
+import { Select as NativeSelect } from "@blesser/ui"
 import * as React from "react"
 import { Eye, EyeOff, Plus, Trash2, X } from "lucide-react"
 import { Button, Field, Textarea, cn } from "@blesser/ui"
 import { completenessLabel } from "../../lib/kit"
 import { SettingsGroup } from "../settings/controls"
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog"
+import { DialogBody, DialogHeader } from "../ui/dialog"
 
 export function CompletenessMeter({ value, hint, className }: { value: number; hint?: string | null; className?: string }) {
   const n = Math.round(Math.min(100, Math.max(0, value || 0)))
@@ -88,7 +91,7 @@ export function SelectField({ label, value, onChange, options, hint, placeholder
 }) {
   return (
     <Field label={label} hint={hint}>
-      <select
+      <NativeSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="select-chevron h-control-md w-full min-w-0 cursor-pointer appearance-none rounded-sm border border-control-border bg-surface px-3.5 pr-10 text-body text-ink focus-visible:border-focus focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
@@ -97,7 +100,7 @@ export function SelectField({ label, value, onChange, options, hint, placeholder
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
-      </select>
+      </NativeSelect>
     </Field>
   )
 }
@@ -105,7 +108,7 @@ export function SelectField({ label, value, onChange, options, hint, placeholder
 export function CheckField({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
   return (
     <label className="flex cursor-pointer items-start gap-2.5 self-end py-1">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 shrink-0 cursor-pointer accent-forest" />
+      <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} className="mt-0.5" />
       <span className="min-w-0">
         <span className="block text-callout font-medium text-ink">{label}</span>
         {hint ? <span className="block text-footnote text-ink-secondary">{hint}</span> : null}
@@ -279,11 +282,11 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirm,
   const [busy, setBusy] = React.useState(false)
   const close = React.useCallback(() => onOpenChange(false), [onOpenChange])
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={close} className="max-w-md">
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <AlertDialogTitle className="type-title-3">{title}</AlertDialogTitle>
+          <AlertDialogDescription className="text-callout text-ink-secondary">{description}</AlertDialogDescription>
         </DialogHeader>
         <DialogBody>
           <div className="flex justify-end gap-2">
@@ -292,7 +295,6 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirm,
               size="sm"
               variant="danger"
               disabled={busy}
-              autoFocus
               onClick={async () => {
                 setBusy(true)
                 try {
@@ -307,8 +309,8 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirm,
             </Button>
           </div>
         </DialogBody>
-      </DialogContent>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 

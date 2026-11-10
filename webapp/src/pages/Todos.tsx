@@ -1,3 +1,4 @@
+import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link } from "react-router-dom"
 import { CalendarDays, Copy, Flag, RefreshCw, Trash2 } from "lucide-react"
@@ -213,11 +214,10 @@ function TodoRow({
   const overdue = !todo.done && todo.due_date !== null && daysBetween(today, todo.due_date) < 0
   return (
     <li className="group flex items-start gap-3 px-4 py-2.5">
-      <input
-        type="checkbox"
-        className="mt-1 size-4 shrink-0 cursor-pointer accent-forest"
+      <Checkbox
+        className="mt-1"
         checked={todo.done}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         aria-label={todo.done ? `Mark "${todo.title}" not done` : `Mark "${todo.title}" done`}
       />
       <div className="min-w-0 flex-1">

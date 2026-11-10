@@ -1,3 +1,5 @@
+import { Checkbox } from "../components/ui/checkbox"
+import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription } from "../components/ui/alert-dialog"
 import * as React from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -203,11 +205,10 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
               <div className="divide-y divide-separator rounded-sm border border-separator">
                 {CATEGORIES.map((c) => (
                   <label key={c} className="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-surface-sunk">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 size-4 shrink-0 accent-forest"
+                    <Checkbox
+                      className="mt-0.5"
                       checked={categories.includes(c)}
-                      onChange={() => toggle(c)}
+                      onCheckedChange={() => toggle(c)}
                     />
                     <span className="min-w-0">
                       <span className="block text-callout text-ink">{CATEGORY_LABELS[c]}</span>
@@ -328,11 +329,11 @@ export function ScanDetail() {
       <Outcome scan={data} />
       <Progress tasks={tasks} />
       <ActivityLog tasks={tasks} />
-      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <DialogContent className="max-w-sm" onClose={() => setConfirmDelete(false)}>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete this scan?</DialogTitle>
-            <DialogDescription>Its activity log goes. The opportunities it saved stay in the catalogue.</DialogDescription>
+            <AlertDialogTitle className="type-title-3">Delete this scan?</AlertDialogTitle>
+            <AlertDialogDescription className="text-callout text-ink-secondary">Its activity log goes. The opportunities it saved stay in the catalogue.</AlertDialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-5">
             <Button variant="quiet" onClick={() => setConfirmDelete(false)}>
@@ -342,8 +343,8 @@ export function ScanDetail() {
               Delete scan
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

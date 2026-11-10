@@ -1,3 +1,4 @@
+import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link } from "react-router-dom"
 import { ArrowUpRight, Plus, Trash2 } from "lucide-react"
@@ -204,12 +205,10 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
               <ul className="space-y-1.5">
                 {requirements.map((r, i) => (
                   <li key={`${r.label}-${i}`} className="flex items-center gap-2 text-callout">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-forest"
+                    <Checkbox
                       checked={r.done}
                       aria-label={r.label}
-                      onChange={() => {
+                      onCheckedChange={() => {
                         const next = requirements.map((x, j) => (j === i ? { ...x, done: !x.done } : x))
                         setRequirements(next)
                         save({ requirements: next })

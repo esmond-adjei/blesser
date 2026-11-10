@@ -1,3 +1,4 @@
+import { Textarea } from "@blesser/ui"
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Copy, Download, Link2, Lock, Share2 } from "lucide-react"
@@ -189,7 +190,7 @@ function Kit({ opp, kit }: { opp: Opportunity; kit: ShareKit | undefined }) {
                 Copy
               </Button>
             </div>
-            <textarea
+            <Textarea
               id={`share-${c.key}`}
               readOnly
               rows={c.rows}

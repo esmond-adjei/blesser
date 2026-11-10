@@ -9,6 +9,7 @@ import { Logo, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { AccountMenu } from "./AccountMenu"
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 
 const NAV = [
   { to: "/opportunities", label: "Opportunities", icon: Sparkles },
@@ -110,7 +111,6 @@ export function Shell() {
 
 function NotificationBell({ align = "right" }: { align?: "left" | "right" }) {
   const [open, setOpen] = React.useState(false)
-  const ref = React.useRef<HTMLDivElement | null>(null)
   const client = useQueryClient()
   const navigate = useNavigate()
   const inbox = useQuery({ queryKey: ["notifications"], queryFn: api.listNotifications, refetchInterval: 60_000 })
@@ -127,36 +127,22 @@ function NotificationBell({ align = "right" }: { align?: "left" | "right" }) {
     void api.updateNotificationPreferences({ timezone: browserTimezone() }).catch(() => undefined)
   }, [loaded, timezone])
 
-  React.useEffect(() => {
-    if (!open) return
-    const onDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false)
-    document.addEventListener("pointerdown", onDown)
-    document.addEventListener("keydown", onKey)
-    return () => {
-      document.removeEventListener("pointerdown", onDown)
-      document.removeEventListener("keydown", onKey)
-    }
-  }, [open])
-
   const unread = inbox.data?.unread ?? 0
   const items = inbox.data?.items ?? []
   return (
-    <div ref={ref} className="relative">
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
       <button
         type="button"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
         className="relative flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-tertiary hover:bg-surface-sunk hover:text-ink"
       >
         <Bell className="size-[18px]" strokeWidth={1.75} />
         {unread ? <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-bloom ring-2 ring-canvas" /> : null}
       </button>
-      {open ? (
-        <div className={cn("absolute z-30 mt-1 w-80", align === "left" ? "left-0" : "right-0", "max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-separator bg-surface-raised shadow-elevation-2")}>
+      </PopoverTrigger>
+        <PopoverContent align={align === "left" ? "start" : "end"} className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden">
           <div className="flex items-center justify-between border-b border-separator px-3 py-2">
             <span className="text-headline text-ink">Notifications</span>
             {unread ? (
@@ -193,8 +179,7 @@ function NotificationBell({ align = "right" }: { align?: "left" | "right" }) {
               ))
             )}
           </ul>
-        </div>
-      ) : null}
-    </div>
+        </PopoverContent>
+    </Popover>
   )
 }

@@ -1,3 +1,4 @@
+import { Checkbox } from "../../components/ui/checkbox"
 import * as React from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
@@ -213,11 +214,10 @@ function ProjectForm({ initial }: { initial: Project }) {
                   const on = p.document_ids.includes(d.id)
                   return (
                     <label key={d.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-surface-sunk/60 sm:px-5">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={on}
-                        onChange={() => set({ document_ids: on ? p.document_ids.filter((x) => x !== d.id) : [...p.document_ids, d.id] })}
-                        className="size-4 shrink-0 cursor-pointer accent-forest"
+                        onCheckedChange={() => set({ document_ids: on ? p.document_ids.filter((x) => x !== d.id) : [...p.document_ids, d.id] })}
+                        className="shrink-0"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-callout text-ink">{d.title}</span>
