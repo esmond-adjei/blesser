@@ -64,7 +64,10 @@ function isVisible(el: Element, layout: boolean): boolean {
 
 function referenced(el: Element, attr: string): Element[] {
   const ids = (el.getAttribute(attr) ?? "").split(/\s+/).filter(Boolean)
-  return ids.map((id) => el.ownerDocument.getElementById(id)).filter((n): n is HTMLElement => !!n)
+  const found = ids.map((id) => el.ownerDocument.getElementById(id)).filter((n): n is HTMLElement => !!n)
+  // Builders such as Microsoft Forms also point at aria-hidden type hints ("Single line text."); keep the real parts.
+  const shown = found.filter((n) => n.getAttribute("aria-hidden") !== "true")
+  return shown.length ? shown : found
 }
 
 function ownLabelText(el: Element): string {
@@ -110,7 +113,9 @@ function gather(doc: Document, layout: boolean): Group[] {
       const input = el as HTMLInputElement
       if (SKIP_TYPES.has(type) || input.disabled || (input.readOnly && type !== "file")) continue
       if (!isVisible(el, layout)) continue
-      if (role === "combobox" || input.getAttribute("aria-autocomplete") === "list") {
+      // A combobox that opens a dialog (date pickers) is typed into, not chosen from.
+      const typedPicker = role === "combobox" && input.getAttribute("aria-haspopup") === "dialog"
+      if (!typedPicker && (role === "combobox" || input.getAttribute("aria-autocomplete") === "list")) {
         groups.push({ kind: "aria-combobox", controls: [el], root: el })
         continue
       }

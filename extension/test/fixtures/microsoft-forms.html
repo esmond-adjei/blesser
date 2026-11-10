@@ -1,0 +1,21 @@
+<!doctype html>
+<html><body>
+<form>
+  <div data-automation-id="questionItem">
+    <span id="QuestionId_name"><span aria-hidden="true">1.</span><span class="text-format-content">Full name (as shown on official identification)</span></span>
+    <span id="QuestionInfo_name"><span aria-hidden="true">Single line text. </span></span>
+    <input type="text" aria-label="Single line text" aria-labelledby="QuestionId_name QuestionInfo_name" placeholder="Enter your answer">
+  </div>
+  <div data-automation-id="questionItem">
+    <span id="QuestionId_dob"><span aria-hidden="true">2.</span><span class="text-format-content">Date of birth</span></span>
+    <span id="QuestionInfo_dob" aria-hidden="true">Date.</span>
+    <input type="text" role="combobox" aria-haspopup="dialog" aria-expanded="false" aria-label="Date picker" aria-labelledby="QuestionId_dob QuestionInfo_dob" placeholder="Please input date (M/d/yyyy)">
+  </div>
+  <div data-automation-id="questionItem" role="radiogroup" aria-labelledby="QuestionId_gender QuestionInfo_gender">
+    <span id="QuestionId_gender"><span aria-hidden="true">4.</span><span class="text-format-content">Gender</span></span>
+    <span id="QuestionInfo_gender"><span aria-hidden="true">Single choice. </span></span>
+    <label><input type="radio" name="r1" value="Woman" aria-labelledby="opt1"><span id="opt1">Woman</span></label>
+    <label><input type="radio" name="r1" value="Man" aria-labelledby="opt2"><span id="opt2">Man</span></label>
+  </div>
+</form>
+</body></html>

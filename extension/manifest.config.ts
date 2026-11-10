@@ -30,7 +30,9 @@ export function buildManifest(env: BuildEnv, version: string) {
     side_panel: { default_path: "sidepanel.html" },
     options_page: "options.html",
     background: { service_worker: "background.js", type: "module" },
-    permissions: ["activeTab", "scripting", "storage", "sidePanel"],
+    permissions: ["activeTab", "scripting", "storage", "sidePanel", "contextMenus"],
+    optional_host_permissions: ["https://*/*", "http://*/*"],
+    commands: { "fill-page": { suggested_key: { default: "Alt+Shift+F" }, description: "Fill this page with Blesser" } },
     // Test builds only: stands in for the toolbar click that grants activeTab, which automation can't press.
     ...(env.testHosts.length ? { host_permissions: env.testHosts } : {}),
     externally_connectable: { matches: env.appOrigins.map((o) => `${o}/*`) },

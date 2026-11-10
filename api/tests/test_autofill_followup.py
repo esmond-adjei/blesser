@@ -186,3 +186,21 @@ def test_common_label_suffixes_do_not_change_intent(label, value, suffix):
     assert result is not None
     assert result.value == value
     assert "P1234567" not in result.note
+
+
+@pytest.mark.parametrize(
+    "placeholder,expected",
+    [
+        ("Please input date (M/d/yyyy)", "4/9/1997"),
+        ("DD/MM/YYYY", "09/04/1997"),
+        ("dd.mm.yy", "09.04.97"),
+        ("yyyy-mm-dd", "1997-04-09"),
+        ("", "1997-04-09"),
+    ],
+)
+def test_date_follows_placeholder_format(placeholder, expected):
+    from api.autofill.matcher import format_date
+    from api.autofill.schemas import FormField
+
+    field = FormField(key="f", label="Date of birth", placeholder=placeholder)
+    assert format_date("1997-04-09", field) == expected

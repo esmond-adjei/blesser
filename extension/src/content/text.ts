@@ -9,8 +9,11 @@ export function normalize(text: string): string {
 
 export const REQUIRED_MARK = /\s*(?:\*|✱|\(required\)|\(obligatoire\))\s*$/i
 
+// Form builders (Microsoft Forms, numbered PDFs turned forms) prefix question numbers.
+const QUESTION_NUMBER = /^(?:q(?:uestion)?\s*)?\d{1,3}\s*[.):]\s+/i
+
 export function cleanLabel(text: string): string {
-  let out = squash(text)
+  let out = squash(text).replace(QUESTION_NUMBER, "")
   while (REQUIRED_MARK.test(out)) out = out.replace(REQUIRED_MARK, "")
   return out.replace(/[:\s]+$/, "")
 }
@@ -25,6 +28,8 @@ export function textOf(root: Node, exclude: (el: Element) => boolean = () => fal
     }
     if (node.nodeType !== 1) return
     const el = node as Element
+    // Like the accessible name: aria-hidden parts are skipped unless the label points at them directly.
+    if (el !== root && el.getAttribute("aria-hidden") === "true") return
     if (SKIP_TEXT.has(el.tagName.toUpperCase()) || el.hasAttribute("hidden") || exclude(el)) return
     const block = isBlock(el)
     if (block) parts.push(" ")

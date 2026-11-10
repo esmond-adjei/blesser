@@ -67,8 +67,27 @@ function fillText(el: TextControl, field: CollectedField, value: string): string
   if (field.type === "number" && Number.isNaN(Number(next.replace(/[, ]/g, "")))) return "Needs a number"
   if (field.type === "number") next = next.replace(/[, ]/g, "")
   if (field.max_length && next.length > field.max_length) next = next.slice(0, field.max_length)
+  if (isTypedPicker(el) && insertTyped(el as HTMLInputElement, next)) return null
   commit(el, () => setNative(el, "value", next))
   return el.value === next || field.type === "number" ? null : "The page didn't accept the value"
+}
+
+const isTypedPicker = (el: Element) => el.getAttribute("role") === "combobox" && el.getAttribute("aria-haspopup") === "dialog"
+
+/** Date pickers (Fluent UI, Microsoft Forms) drop values set through the setter; browser text insertion sticks. */
+function insertTyped(el: HTMLInputElement, value: string): boolean {
+  el.focus({ preventScroll: true })
+  el.select()
+  let inserted = false
+  try {
+    inserted = typeof el.ownerDocument.execCommand === "function" && el.ownerDocument.execCommand("insertText", false, value)
+  } catch {
+    inserted = false
+  }
+  const ok = inserted && el.value === value
+  // Blurring in the same task validates the picker's stale state and clears the field.
+  setTimeout(() => el.blur(), 50)
+  return ok
 }
 
 function fillSelect(el: HTMLSelectElement, value: string | string[]): string | null {

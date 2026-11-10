@@ -2,7 +2,8 @@ import type { CollectedField, FillInstruction, FillOutcome, PageMessage, PanelMe
 import { Actions } from "./actions"
 import { Api, SignedOut } from "./api"
 import { acceptConnect, connectUrl, newState } from "./connect"
-import { runFill, type Scripting } from "./fill"
+import { runFill, type Scripting, NO_ACCESS } from "./fill"
+import { FILL_REQUEST } from "../shared/ui"
 import { Store, type Area } from "./store"
 
 const store = new Store(chrome.storage.local as unknown as Area, chrome.storage.session as unknown as Area)
@@ -37,7 +38,7 @@ const scripting: Scripting = {
 }
 const actions = new Actions(api, store, scripting)
 
-const NO_ACCESS = /cannot access|cannot be scripted|must request permission|no tab with id|frame with id/i
+const NO_ACCESS_ERROR = /cannot access|cannot be scripted|must request permission|no tab with id|frame with id/i
 
 async function tabInfo(tabId: number) {
   const tab = await chrome.tabs.get(tabId)
@@ -47,7 +48,7 @@ async function tabInfo(tabId: number) {
 /** Chrome's own errors when activeTab doesn't cover the tab, in words a member can act on. */
 function explain(err: unknown): never {
   const text = err instanceof Error ? err.message : String(err)
-  if (NO_ACCESS.test(text)) throw new Error("Chrome hasn't let Blesser into this page. Press the Blesser icon in the toolbar while on this page, then try again.")
+  if (NO_ACCESS_ERROR.test(text)) throw new Error(NO_ACCESS)
   throw err instanceof Error ? err : new Error(text)
 }
 
@@ -146,3 +147,20 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 })
 
 chrome.tabs.onRemoved.addListener((tabId) => void store.dropReview(tabId))
+
+// Shortcut and context menu grant activeTab on the page, which the side panel's own button can't.
+function fillFromGesture(tabId: number | undefined) {
+  if (tabId === undefined) return
+  void chrome.sidePanel.open({ tabId }).catch(() => {})
+  void chrome.storage.session.set({ [FILL_REQUEST]: { tabId, at: Date.now() } })
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({ id: "blesser-fill", title: "Fill with Blesser", contexts: ["page", "editable", "frame"] }, () => void chrome.runtime.lastError)
+})
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "blesser-fill") fillFromGesture(tab?.id)
+})
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command === "fill-page") fillFromGesture(tab?.id)
+})

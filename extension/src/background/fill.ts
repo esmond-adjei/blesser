@@ -21,7 +21,12 @@ export interface TabInfo {
 const MAX_FIELDS = 300
 const cut = (text: string, max: number) => (text.length > max ? text.slice(0, max) : text)
 
+export const NO_ACCESS =
+  "Chrome hasn't let Blesser into this page yet. Press the Blesser icon in the toolbar or Alt+Shift+F on the page, or right-click the form and choose Fill with Blesser."
+
 export function blockedReason(url: string): string | null {
+  // Chrome hides the address of tabs the extension hasn't been granted.
+  if (!url) return NO_ACCESS
   let parsed: URL
   try {
     parsed = new URL(url)

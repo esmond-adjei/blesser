@@ -5,6 +5,13 @@ import { byLabel, loadFixture } from "./helpers"
 const collect = (name: string) => collectFields(loadFixture(name)).fields
 
 describe("collectFields", () => {
+  it("reads Microsoft Forms labels without question numbers or hidden type hints", () => {
+    const fields = collect("microsoft-forms.html")
+    expect(fields.map((f) => f.label)).toEqual(["Full name (as shown on official identification)", "Date of birth", "Gender"])
+    expect(byLabel(fields, "Date of birth")).toMatchObject({ tag: "input", type: "text", placeholder: "Please input date (M/d/yyyy)" })
+    expect(byLabel(fields, "Gender").options.map((o) => o.label)).toEqual(["Woman", "Man"])
+  })
+
   it("reads Google Forms questions, descriptions and custom widgets", () => {
     const fields = collect("google-forms.html")
     const name = byLabel(fields, "Full name")

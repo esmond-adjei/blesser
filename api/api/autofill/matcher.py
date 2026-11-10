@@ -478,17 +478,18 @@ def format_date(value: str, field: FormField) -> str | None:
     if field.type.lower() == "month":
         return parsed.strftime("%Y-%m")
     hints = f"{field.placeholder} {field.help_text} {field.label}".lower()
-    pattern = re.search(
-        r"(?:yyyy|yy|dd|mm)[/.-](?:yyyy|yy|dd|mm)[/.-](?:yyyy|yy|dd|mm)", hints
-    )
+    token = r"(?:yyyy|yy|mm|m|dd|d)"
+    pattern = re.search(rf"\b{token}([/.-]){token}\1{token}\b", hints)
     if pattern:
-        return parsed.strftime(
-            pattern[0]
-            .replace("yyyy", "%Y")
-            .replace("yy", "%y")
-            .replace("mm", "%m")
-            .replace("dd", "%d")
-        )
+        parts = {
+            "yyyy": f"{parsed.year}",
+            "yy": f"{parsed.year % 100:02}",
+            "mm": f"{parsed.month:02}",
+            "m": f"{parsed.month}",
+            "dd": f"{parsed.day:02}",
+            "d": f"{parsed.day}",
+        }
+        return pattern[1].join(parts[p] for p in pattern[0].split(pattern[1]))
     return parsed.isoformat()
 
 

@@ -175,6 +175,7 @@ describe("runFill", () => {
   it("refuses browser pages and pages without fields", async () => {
     expect(blockedReason("chrome://extensions")).toMatch(/browser pages/)
     expect(blockedReason("https://chromewebstore.google.com/detail/x")).toMatch(/store/)
+    expect(blockedReason("")).toMatch(/hasn.t let Blesser into this page.*Alt\+Shift\+F/)
     const store = await signedIn()
     const scripting: Scripting = { collect: async () => [{ frameId: 0, result: [] }], fill: async () => [], write: async () => ({ ok: true, reason: "", value: null }) }
     await expect(runFill(new Api(store), scripting, { id: 1, url: "https://example.org", title: "" }, { fillAs: "me", allowDrafting: true })).rejects.toThrow(/No form fields/)

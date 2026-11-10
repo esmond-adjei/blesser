@@ -1,5 +1,7 @@
 import type { PanelMessage, Reply } from "./types"
 
+export const FILL_REQUEST = "fillRequest"
+
 export async function send<T>(message: PanelMessage): Promise<T> {
   const reply = (await chrome.runtime.sendMessage(message)) as Reply<T> | undefined
   if (!reply) throw new Error("The Blesser extension didn't answer. Try again.")

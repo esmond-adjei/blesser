@@ -3,7 +3,7 @@ import { ArrowUpRight, Check, Flag, Footprints, LogOut, Settings as SettingsIcon
 import { Button, Logo, Select, cn } from "@blesser/ui"
 import { counts } from "../shared/review"
 import type { Prefs, Review, Status } from "../shared/types"
-import { send } from "../shared/ui"
+import { FILL_REQUEST, send } from "../shared/ui"
 import { ReportDialog } from "./ReportDialog"
 import { ReviewList } from "./ReviewList"
 import { usePanelTab } from "./usePanelTab"
@@ -156,6 +156,31 @@ export function Panel() {
     }
   }
 
+  const fillRef = React.useRef(fill)
+  React.useEffect(() => {
+    fillRef.current = fill
+  })
+
+  React.useEffect(() => {
+    if (!tabId || !status?.me) return
+    const take = (request: unknown) => {
+      const r = request as { tabId?: number; at?: number } | undefined
+      if (r?.tabId !== tabId || !r.at || Date.now() - r.at > 15_000) return
+      void chrome.storage.session.remove(FILL_REQUEST)
+      void fillRef.current()
+    }
+    void chrome.storage.session.get(FILL_REQUEST).then((stored) => take(stored[FILL_REQUEST]))
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === "session" && changes[FILL_REQUEST]?.newValue) take(changes[FILL_REQUEST].newValue)
+    }
+    chrome.storage.onChanged.addListener(onChanged)
+    return () => chrome.storage.onChanged.removeListener(onChanged)
+  }, [tabId, status?.me])
+
+  const allowEverywhere = async () => {
+    if (await chrome.permissions.request({ origins: ["https://*/*", "http://*/*"] })) void fill()
+  }
+
   const appUrl = status?.settings.appUrl ?? ""
   const me = status?.me
   const moved = review?.moved ?? null
@@ -253,6 +278,16 @@ export function Panel() {
             </div>
 
             {error ? <p role="alert" className="rounded-md bg-critical-soft px-3 py-2 text-footnote text-critical">{error}</p> : null}
+            {error?.startsWith("Chrome hasn't let Blesser") ? (
+              <div className="space-y-1.5 rounded-md border border-separator px-3 py-2.5">
+                <p className="text-footnote text-ink-secondary">
+                  Or let Blesser read form pages on any site. It still only fills when you ask, and you can turn this off in Chrome's extension settings.
+                </p>
+                <Button variant="secondary" className="w-full" onClick={() => void allowEverywhere()}>
+                  Allow on all sites
+                </Button>
+              </div>
+            ) : null}
 
             {review && tabId ? (
               <section aria-label="Results" className="space-y-3">

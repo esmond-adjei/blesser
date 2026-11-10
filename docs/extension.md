@@ -115,7 +115,7 @@ Filling writes through the native value setter and fires `focus`, `input`, `chan
 
 - Never submits a form and never clicks buttons or links. The only synthetic click is on a radio or checkbox input being set, which is how the browser selects it and how React registers it.
 - Never collects or fills password, one-time code or payment fields (card, CVV, IBAN, account and routing numbers, `cc-*` autocomplete).
-- Never reads a page until the member presses Fill. Permissions are `activeTab`, `scripting`, `storage` and `sidePanel`; there are no host permissions, and `tabs.onUpdated` is used without the `tabs` permission (it only needs to know a load started).
+- Never reads a page until the member presses Fill. Permissions are `activeTab`, `scripting`, `storage`, `sidePanel` and `contextMenus`; host access is optional (`https://*/*`, `http://*/*`) and only requested when the member presses **Allow on all sites**, and `tabs.onUpdated` is used without the `tabs` permission (it only needs to know a load started).
 - Never sends values in a problem report: field descriptors and the member's note only.
 - Never operates custom ARIA widgets (Google Forms choices, react-select): they appear under "need you" with the suggested answer.
 - Never stores what it filled. The API keeps a usage counter, and the corrections the member chose to send (edits, "Wrong field", "Remember this correction"), which the member can delete in the Apply kit.
@@ -155,7 +155,7 @@ The extension reaches the API through a small proxy in the run that records feed
 - Cross-origin frames: `activeTab` covers the tab's own origin, so embedded forms from another origin are skipped.
 - CAPTCHA, fully custom widgets that ignore input events, and ARIA-only choice widgets (left for the member).
 - One question per screen flows (Typeform style) and multi-page forms: the panel notices each new step, but the member presses **Fill this step**.
-- `activeTab` covers the tab where the toolbar button was pressed, and survives navigation within that site. After switching to another tab or another site, Chrome refuses access and the panel asks the member to press the Blesser button on that page.
+- `activeTab` covers the tab where the toolbar button was pressed, and survives navigation within that site. After switching to another tab or another site, Chrome hides the page from the extension. Three ways back in, each granting that page: the toolbar button, the **Alt+Shift+F** shortcut (Fill this page with Blesser), or right-click → **Fill with Blesser**. The panel also offers **Allow on all sites**, an opt-in host permission that removes the per-page step; members can revoke it in Chrome's extension settings.
 - `externally_connectable` origins are set at build time.
 - Drafting waits on the model; the extension gives up after 75 seconds with a message suggesting drafting off.
 - Firefox is Phase 5.
@@ -166,7 +166,7 @@ The extension reaches the API through a small proxy in the run that records feed
 - [ ] Bump `version` in `extension/package.json`; zip the contents of `extension/dist`.
 - [ ] API `CORS_ORIGINS` includes `chrome-extension://<store id>` (and the Edge id).
 - [ ] Privacy policy URL covering the Apply kit and the extension (the site's privacy page section from the plan).
-- [ ] Permission justifications: `activeTab` (read and fill the form the member asked to fill), `scripting` (inject the filler on demand), `storage` (sign-in tokens and settings), `sidePanel` (the review panel that stays open beside the form).
+- [ ] Permission justifications: `activeTab` (read and fill the form the member asked to fill), `scripting` (inject the filler on demand), `storage` (sign-in tokens and settings), `sidePanel` (the review panel that stays open beside the form), `contextMenus` (right-click Fill with Blesser, which grants the page like the toolbar button), optional host access (only if the member chooses Allow on all sites).
 - [ ] Data disclosure: personal info, documents and form field descriptions are sent to Blesser to produce answers; corrections the member saves are stored for that member only; problem reports carry field descriptions and a note, never values; not sold, not used for ads, not shared beyond the configured model for drafting.
 - [ ] Single purpose statement: fill application forms from the member's Blesser Apply kit.
 - [ ] Screenshots (1280x800) of the side panel review list beside a filled form; 128 px icon (`public/icons/128.png`); store name (working: "Blesser: Apply with your kit").
