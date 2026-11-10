@@ -1,11 +1,15 @@
+import asyncio
+import json
+
 import pytest
 
+from api.autofill import service
 from api.autofill.feedback import page_host
 from api.autofill.matcher import deterministic
 from api.autofill.schemas import FormField, Page
 from api.core.exceptions import UnprocessableError
 from tests.test_applicant_kit import kit as kit_fixture
-from tests.test_autofill_api import request
+from tests.test_autofill_api import FakeProvider, request
 from tests.test_autofill_feedback import feedback_body
 from tests.test_extension_auth import connect, extension
 
@@ -124,6 +128,26 @@ def test_parenthetical_record_qualifiers_are_retained():
         {},
     )
     assert result.value == "Nigeria"
+
+
+def test_choice_fallback_uses_cleaned_question_without_sensitive_context(monkeypatch):
+    provider = FakeProvider('{"g":"m"}')
+    monkeypatch.setattr(service, "get_provider", lambda: provider)
+    target = FormField(
+        key="g",
+        label="Gender (as on your passport)",
+        type="radio",
+        options=[{"label": "Man", "value": "m"}],
+    )
+    profile = {"gender": "I identify as a man"}
+    result = asyncio.run(
+        service.draft([target], profile, {}, {"passport_number": "P1234567"})
+    )
+    assert [(item.value, item.rule) for item in result] == [("m", "model:choice")]
+    payload = json.loads(provider.calls[0]["messages"][0]["content"])
+    assert payload["fields"][0]["question"] == "Gender"
+    assert "passport" not in json.dumps(payload).lower()
+    assert "P1234567" not in json.dumps(payload)
 
 
 @pytest.mark.parametrize(

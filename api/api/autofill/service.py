@@ -27,7 +27,7 @@ from api.autofill.matcher import (
     within_limits,
 )
 from api.autofill.models import DailyUsage
-from api.autofill.normalization import normalize, normalize_question
+from api.autofill.normalization import intent_label, normalize, normalize_question
 from api.autofill.schemas import Fill, FillResponse, Unfilled, Usage
 from api.core.config import settings
 from api.opportunities.models import Opportunity
@@ -240,7 +240,7 @@ async def draft(fields, profile, project, sensitive):
             safe_facts(
                 {
                     "key": field.key,
-                    "question": field.label or field.placeholder,
+                    "question": intent_label(field.label) or field.placeholder,
                     "help_text": field.help_text,
                     "section": field.section,
                     "word_limit": field.word_limit,
