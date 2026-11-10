@@ -87,7 +87,9 @@
       "national_id": "GHA-123456789-1",
       "passport_number": "P01234567",
       "passport_expiry": "2032-06-30"
-    }
+    },
+    "country_of_birth": "",
+    "place_of_birth": ""
   },
   "project": {
     "name": "Siwa",

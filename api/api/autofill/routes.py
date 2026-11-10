@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.applicant_kit.routes import private_response
 from api.auth.routes import get_current_user
 from api.auth.schemas import UserOut
-from api.autofill import schemas, service
+from api.autofill import feedback, schemas, service
 from api.core.db import get_session
 from api.core.ratelimit import rate_limit
+from api.extension_auth.routes import Extension
 
 router = APIRouter(
     prefix="/autofill", tags=["autofill"], dependencies=[Depends(private_response)]
@@ -26,3 +27,42 @@ async def fill(
     current: Annotated[UserOut, Depends(get_current_user)],
 ):
     return await service.fill(session, current.id, req)
+
+
+@router.post(
+    "/feedback", status_code=204, dependencies=[Depends(rate_limit("autofill"))]
+)
+async def remember(
+    req: schemas.FillFeedback,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current: Extension,
+):
+    await feedback.remember(session, current.id, req)
+
+
+@router.get("/corrections", response_model=list[schemas.Correction])
+async def corrections(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current: Annotated[UserOut, Depends(get_current_user)],
+):
+    return await feedback.corrections(session, current.id)
+
+
+@router.delete("/corrections/{correction_id}", status_code=204)
+async def forget(
+    correction_id: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current: Annotated[UserOut, Depends(get_current_user)],
+):
+    await feedback.forget(session, current.id, correction_id)
+
+
+@router.post(
+    "/reports", status_code=204, dependencies=[Depends(rate_limit("autofill"))]
+)
+async def report(
+    req: schemas.FormReport,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current: Extension,
+):
+    await feedback.report(session, current.id, req)

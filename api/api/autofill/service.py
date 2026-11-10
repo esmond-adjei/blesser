@@ -12,6 +12,7 @@ from api.applicant_kit import models as kit
 from api.applicant_kit import schemas as kit_schemas
 from api.applicant_kit import service as kit_service
 from api.applications.models import Application
+from api.autofill import feedback
 from api.autofill.matcher import (
     SENSITIVE_TEXT,
     blocked,
@@ -19,6 +20,9 @@ from api.autofill.matcher import (
     deterministic,
     document_match,
     free_text,
+    identify,
+    render,
+    sensitive_descriptor,
     sensitive_field,
     within_limits,
 )
@@ -36,6 +40,8 @@ Never invent facts, numbers, names, dates, qualifications, eligibility, promises
 Do not infer personal demographics or private identifiers. Never output IDs or passport details.
 Return null if the facts do not cover a question. Respect each field's word_limit and max_length.
 Return ONLY a JSON object mapping the supplied field keys to a string or null. No other keys, markdown or commentary.
+For fields with task choose_one_option_or_null, use ONLY that field's facts to choose exactly one supplied option value or null.
+Never invent an option or derive demographics, consent, eligibility or private identifiers to choose an option.
 These are drafts for the member to review. Do not claim a submission or take any action."""
 
 
@@ -171,6 +177,7 @@ async def answer_matches(session, user_id, fields, project_id, sensitive):
                 key=key,
                 value=answer,
                 source="answer",
+                rule="answer:similarity",
                 confidence="high" if score >= 0.9 else "medium",
                 note="Saved answer matching this question",
             )
@@ -228,7 +235,7 @@ async def draft(fields, profile, project, sensitive):
     if not any(context.values()):
         return []
     payload = {
-        "facts": context,
+        "facts": context if any(not field.options for field in fields) else {},
         "fields": [
             safe_facts(
                 {
@@ -238,6 +245,7 @@ async def draft(fields, profile, project, sensitive):
                     "section": field.section,
                     "word_limit": field.word_limit,
                     "max_length": field.max_length,
+                    **choice_payload(field, profile, project, sensitive),
                 },
                 sensitive,
             )
@@ -269,19 +277,56 @@ async def draft(fields, profile, project, sensitive):
         value = output.get(field.key)
         if not isinstance(value, str) or not value.strip():
             continue
-        value = value.strip()
+        if field.options:
+            if value not in {option.value for option in field.options}:
+                continue
+        else:
+            value = value.strip()
         if not within_limits(value, field) or contains_sensitive(value, sensitive):
             continue
         fills.append(
             Fill(
                 key=field.key,
-                value=value,
+                value=[value]
+                if field.options and field.type.lower() == "checkbox"
+                else value,
                 source="drafted",
+                rule="model:choice" if field.options else "model:draft",
                 confidence="low",
                 note="Drafted by Blesser, review before submitting",
             )
         )
     return fills
+
+
+def choice_fact(field, profile, project, sensitive):
+    if (
+        not field.options
+        or blocked(field)
+        or SENSITIVE_TEXT.search(sensitive_descriptor(field))
+    ):
+        return None
+    match = identify(field, profile, project, sensitive)
+    if (
+        match is None
+        or match.value in (None, "", [])
+        or contains_sensitive(match.value, sensitive)
+    ):
+        return None
+    if not safe_facts(render(match.value), sensitive):
+        return None
+    return match
+
+
+def choice_payload(field, profile, project, sensitive):
+    if not field.options:
+        return {}
+    match = choice_fact(field, profile, project, sensitive)
+    return {
+        "task": "choose_one_option_or_null",
+        "facts": {match.path: match.value} if match else {},
+        "options": [option.model_dump() for option in field.options],
+    }
 
 
 async def fill(session, user_id, req):
@@ -305,7 +350,22 @@ async def fill(session, user_id, req):
     ]
     fills = {}
     pending = []
+    remembered = {
+        (row.label_key, row.field_type): row
+        for row in await feedback.corrections(
+            session, user_id, feedback.url_host(req.page.url)
+        )
+    }
+    suppressed = set()
     for field in req.fields:
+        correction = remembered.get(feedback.correction_key(field))
+        if correction:
+            match = feedback.apply_correction(correction, field, sensitive)
+            if match:
+                fills[field.key] = match
+            else:
+                suppressed.add(field.key)
+            continue
         match = deterministic(
             field, profile, project, sensitive if req.use.profile else {}
         ) or document_match(field, docs)
@@ -326,7 +386,12 @@ async def fill(session, user_id, req):
             session, user_id, text_fields, req.use.project_id, sensitive
         )
     )
-    draft_fields = [field for field in text_fields if field.key not in fills]
+    draft_fields = [
+        field
+        for field in pending
+        if field.key not in fills
+        and (free_text(field) or choice_fact(field, profile, project, sensitive))
+    ]
     has_context = any(draft_context(profile, project, sensitive).values())
     if req.allow_drafting and draft_fields and has_context:
         count = await reserve_drafts(session, user_id, len(draft_fields))
@@ -347,6 +412,8 @@ async def fill(session, user_id, req):
         reason = "No matching saved fact, document or answer"
         if blocked(field):
             reason = "This field is never autofilled"
+        elif field.key in suppressed:
+            reason = "Your correction leaves this field for you"
         elif free_text(field):
             if not req.allow_drafting:
                 reason = "No saved match; drafting disabled for this request"

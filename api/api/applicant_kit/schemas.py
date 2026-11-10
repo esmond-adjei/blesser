@@ -166,6 +166,8 @@ class ProfileIn(Input):
     date_of_birth: date | None = None
     gender: Short = ""
     nationality: Short = ""
+    country_of_birth: Short = ""
+    place_of_birth: Short = ""
     country_of_residence: Short = ""
     city: Short = ""
     address_line1: Line = ""

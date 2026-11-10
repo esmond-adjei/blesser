@@ -24,13 +24,13 @@ export function buildManifest(env: BuildEnv, version: string) {
     minimum_chrome_version: "116",
     icons: { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" },
     action: {
-      default_title: "Fill with Blesser",
-      default_popup: "popup.html",
+      default_title: "Open Blesser",
       default_icon: { 16: "icons/16.png", 32: "icons/32.png" },
     },
+    side_panel: { default_path: "sidepanel.html" },
     options_page: "options.html",
     background: { service_worker: "background.js", type: "module" },
-    permissions: ["activeTab", "scripting", "storage"],
+    permissions: ["activeTab", "scripting", "storage", "sidePanel"],
     // Test builds only: stands in for the toolbar click that grants activeTab, which automation can't press.
     ...(env.testHosts.length ? { host_permissions: env.testHosts } : {}),
     externally_connectable: { matches: env.appOrigins.map((o) => `${o}/*`) },

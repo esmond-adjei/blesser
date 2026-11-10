@@ -1,13 +1,14 @@
 import calendar
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import PurePath
 
 import phonenumbers
-import pycountry
 
-from api.autofill.normalization import normalize
+from api.autofill import concepts
+from api.autofill.intent import parse_intent
+from api.autofill.normalization import intent_label, normalize
 from api.autofill.schemas import Fill, FormField
 from api.autofill.vocabulary import AUTOCOMPLETE, DOCUMENT_KINDS, SENSITIVE, SYNONYMS
 
@@ -45,7 +46,7 @@ DATE_PATHS = {
     "experience.start",
     "experience.end",
 }
-COUNTRY_PATHS = {"nationality", "country_of_residence", "country", "education.country"}
+COUNTRY_PATHS = concepts.COUNTRY_PATHS
 GROUP_CONTEXT = {
     "education": ("education", "academic", "school", "university"),
     "experience": ("experience", "employment", "work history"),
@@ -62,6 +63,8 @@ class Match:
     source: str
     path: str
     value: object
+    rule: str = ""
+    confidence: str = "high"
 
 
 def descriptor(field: FormField) -> str:
@@ -75,6 +78,10 @@ def descriptor(field: FormField) -> str:
             field.section,
         )
     )
+
+
+def sensitive_descriptor(field: FormField) -> str:
+    return descriptor(field.model_copy(update={"label": intent_label(field.label)}))
 
 
 def phrase(text: str, words: str) -> bool:
@@ -166,6 +173,75 @@ def _profile_value(profile, path, field):
     return _nested_value(profile, path, field)
 
 
+def infer(profile, path):
+    if path in {"country_of_birth", "citizenship"}:
+        item = concepts.country(profile.get("nationality", ""))
+        return (item["name"], "nationality") if item else (None, "")
+    if path == "nationality":
+        item = concepts.country(profile.get("country_of_birth", ""))
+        return (item["demonyms"][0], "country_of_birth") if item else (None, "")
+    if path == "age":
+        try:
+            birth = date.fromisoformat(profile.get("date_of_birth", ""))
+        except (ValueError, TypeError):
+            return None, ""
+        today = datetime.now(UTC).date()
+        if birth > today:
+            return None, ""
+        return today.year - birth.year - (
+            (today.month, today.day) < (birth.month, birth.day)
+        ), "date_of_birth"
+    if path in {"current_role", "current_employer"}:
+        rows = [row for row in profile.get("experience", []) if row.get("current")]
+        key = "role" if path == "current_role" else "organization"
+        values = {row[key] for row in rows if row.get(key)}
+        return (
+            (next(iter(values)), "experience.current")
+            if len(values) == 1
+            else (None, "")
+        )
+    if path == "highest_qualification":
+        rows = [
+            row["qualification"]
+            for row in profile.get("education", [])
+            if row.get("qualification")
+        ]
+        ranks = [
+            (concepts.DEGREE_RANK.get(concepts.canonical(value, "degree")), value)
+            for value in rows
+        ]
+        if ranks and all(rank is not None for rank, _ in ranks):
+            return max(ranks)[1], "education"
+    if path == "full_address":
+        parts = [
+            profile.get(key)
+            for key in (
+                "address_line1",
+                "address_line2",
+                "city",
+                "postal_code",
+                "country_of_residence",
+            )
+        ]
+        if profile.get("address_line1"):
+            return ", ".join(filter(None, parts)), "address_parts"
+    return None, ""
+
+
+def resolve_match(source, path, field, profile, project, rule):
+    data = profile if source == "profile" else project
+    value = (
+        _profile_value(data, path, field)
+        if source == "profile"
+        else _nested_value(data, path, field)
+    )
+    if source == "profile" and value in (None, "", []):
+        value, inferred_from = infer(profile, path)
+        if inferred_from:
+            return Match(source, path, value, f"inferred:{inferred_from}", "medium")
+    return Match(source, path, value, rule)
+
+
 def identify(
     field: FormField, profile: dict, project: dict, sensitive: dict
 ) -> Match | None:
@@ -173,16 +249,40 @@ def identify(
         return None
     secret_path = sensitive_field(field)
     if secret_path:
-        return Match("profile", secret_path, sensitive.get(secret_path))
-    if SENSITIVE_TEXT.search(descriptor(field)):
+        return Match(
+            "profile", secret_path, sensitive.get(secret_path), f"exact:{secret_path}"
+        )
+    if SENSITIVE_TEXT.search(sensitive_descriptor(field)):
         return None
+    label = normalize(intent_label(field.label))
+    if re.search(
+        r"\b(?:years? of experience|interested in|preference|preferred position|desired|expected|earliest available)\b",
+        label,
+    ):
+        return None
+    intent = parse_intent(field)
+    if intent:
+        prefix = "qualifier" if intent.qualified else "matched"
+        return resolve_match(
+            intent.source,
+            intent.path,
+            field,
+            profile,
+            project,
+            f"{prefix}:{intent.path}",
+        )
     parts = [
         re.sub(
             r"\b(reference|referee|education|experience|team member|founder|award|publication|language) \d+\b",
             r"\1",
             normalize(value),
         )
-        for value in (field.label, field.name, field.id, field.placeholder)
+        for value in (
+            intent_label(field.label),
+            field.name,
+            field.id,
+            intent_label(field.placeholder),
+        )
     ]
     text = descriptor(field)
     project_context = bool(set(normalize(field.section).split()) & PROJECT_CONTEXT)
@@ -269,88 +369,80 @@ def identify(
     if project:
         for item in project.get("custom_fields", []):
             if normalize(item["label"]) in parts and normalize(item["label"]):
-                return Match("project", "custom_fields", item["value"])
+                return Match(
+                    "project", "custom_fields", item["value"], "matched:custom_fields"
+                )
     if not candidates:
         return None
     _, source, path = max(candidates)
-    data = profile if source == "profile" else project
-    value = (
-        _profile_value(data, path, field)
-        if source == "profile"
-        else _nested_value(data, path, field)
-    )
-    return Match(source, path, value)
+    return resolve_match(source, path, field, profile, project, f"matched:{path}")
 
 
 def country(value: str):
-    aliases = {
-        "uk": "GB",
-        "usa": "US",
-        "u s a": "US",
-        "united states of america": "US",
-        "ghanaian": "GH",
-        "nigerian": "NG",
-        "british": "GB",
-        "american": "US",
-    }
-    try:
-        return pycountry.countries.lookup(aliases.get(normalize(value), value))
-    except LookupError:
-        return None
+    return concepts.country(value)
 
 
-def _option_names(value: str, path: str) -> set[str]:
-    names = {normalize(value)}
-    if path in COUNTRY_PATHS:
-        item = country(value)
-        if item:
-            names.update(
-                normalize(getattr(item, key, ""))
-                for key in (
-                    "name",
-                    "official_name",
-                    "common_name",
-                    "alpha_2",
-                    "alpha_3",
-                )
-            )
-    if normalize(value) in {"true", "yes", "1"}:
-        names.update({"true", "yes", "1"})
-    if normalize(value) in {"false", "no", "0"}:
-        names.update({"false", "no", "0"})
-    stage = {
-        "early revenue": {"early revenue", "revenue generating", "early stage revenue"},
-        "idea": {"idea", "ideation", "pre seed"},
-        "prototype": {"prototype", "mvp", "minimum viable product"},
-        "growth": {"growth", "scaling"},
-    }
-    if path == "stage":
-        names.update(stage.get(normalize(value), set()))
-    return names - {""}
-
-
-def match_options(
-    value: str | list[str], field: FormField, path: str = ""
-) -> str | list[str] | None:
+def option_match(value: str | list[str], field: FormField, path: str = ""):
     values = value if isinstance(value, list) else [value]
     selected = []
+    rules = []
+    kind = concepts.concept_kind(path, field.label)
     for item in values:
-        names = _option_names(item, path)
-        matches = [
-            option
-            for option in field.options
-            if names & (_option_names(option.label, path) | {normalize(option.value)})
-        ]
+        target = concepts.canonical(item, kind)
+        matches = []
+        rule = ""
+        if target:
+            for option in field.options:
+                concept = concepts.canonical(option.label, kind) or concepts.canonical(
+                    option.value, kind
+                )
+                if concept == target:
+                    matches.append(option)
+            rule = f"concept:{kind}"
+        if not matches:
+            matches = [
+                option
+                for option in field.options
+                if normalize(item) in {normalize(option.label), normalize(option.value)}
+                and (
+                    not target
+                    or concepts.canonical(option.label, kind) in {None, target}
+                )
+            ]
+            rule = "option:normalized"
+        if not matches and not target:
+            tokens = set(normalize(item).split())
+            scored = []
+            for option in field.options:
+                other = set(normalize(option.label).split())
+                union = tokens | other
+                score = len(tokens & other) / len(union) if union else 0
+                if score >= 0.8 and len(tokens & other) >= 2:
+                    scored.append((score, option))
+            if scored:
+                best = max(score for score, _ in scored)
+                matches = [option for score, option in scored if score == best]
+            rule = "option:tokens"
         if len(matches) != 1:
-            return None
+            return None, ""
         selected.append(matches[0].value)
-    return (
+        rules.append(rule)
+    if not selected:
+        return None, ""
+    result = (
         list(dict.fromkeys(selected))
         if field.type.lower() == "checkbox"
         else selected[0]
         if len(selected) == 1
         else None
     )
+    return result, rules[0] if len(set(rules)) == 1 else "option:mixed"
+
+
+def match_options(
+    value: str | list[str], field: FormField, path: str = ""
+) -> str | list[str] | None:
+    return option_match(value, field, path)[0]
 
 
 def format_date(value: str, field: FormField) -> str | None:
@@ -403,14 +495,15 @@ def format_date(value: str, field: FormField) -> str | None:
 def format_phone(value: str, field: FormField, residence: str) -> str:
     item = country(residence)
     try:
-        parsed = phonenumbers.parse(value, item.alpha_2 if item else None)
+        parsed = phonenumbers.parse(value, item["alpha_2"] if item else None)
     except phonenumbers.NumberParseException:
         return value.strip()
     tokens = field.autocomplete.lower().split()
     hints = normalize(field.placeholder + " " + field.help_text)
-    if "tel-country-code" in tokens:
+    label = normalize(field.label)
+    if "tel-country-code" in tokens or label == "country code":
         return f"+{parsed.country_code}"
-    if "tel-area-code" in tokens:
+    if "tel-area-code" in tokens or label == "area code":
         count = phonenumbers.length_of_national_destination_code(parsed)
         return str(parsed.national_number)[:count]
     if "tel-local" in tokens:
@@ -458,39 +551,76 @@ def deterministic(
     if match is None or match.value is None or match.value == "" or match.value == []:
         return None
     value = render(match.value)
+    rule = match.rule
     if match.path in DATE_PATHS:
         value = format_date(value, field)
         if value is None:
             return None
     if match.path.endswith("phone"):
         value = format_phone(value, field, profile.get("country_of_residence", ""))
-    if match.path in COUNTRY_PATHS and "country" in field.autocomplete.lower().split():
+    if match.path in COUNTRY_PATHS and match.path != "nationality":
         item = country(value)
-        value = item.alpha_2 if item else value
+        if item:
+            code_format = (
+                "country" in field.autocomplete.lower().split() or field.max_length == 2
+            )
+            value = item["alpha_2"] if code_format else item["name"]
+    choice_values = None
     if field.options and not (
         match.path in DATE_PATHS
         and any(option.value == value for option in field.options)
     ):
         choices = (
-            [render(item) for item in match.value]
+            [item["language"] for item in match.value if item.get("language")]
+            if match.path == "languages" and isinstance(match.value, list)
+            else [render(item) for item in match.value]
             if isinstance(match.value, list)
             and all(isinstance(item, str) for item in match.value)
             else value
         )
-        value = match_options(choices, field, match.path)
+        choice_values = choices
+        value, option_rule = option_match(choices, field, match.path)
         if value is None:
             return None
+        if not rule.startswith(("qualifier:", "inferred:")):
+            rule = option_rule
     elif field.type.lower() in {"checkbox", "radio"}:
         return None
     if not within_limits(value, field):
         return None
     if match.path not in SENSITIVE and contains_sensitive(value, sensitive):
         return None
+    note = f"From {match.source.replace('_', ' ')}: {match.path.replace('_', ' ')}"
+    if rule.startswith("concept:"):
+        selected = value if isinstance(value, list) else [value]
+        labels = [option.label for option in field.options if option.value in selected]
+        original = (
+            ", ".join(choice_values)
+            if isinstance(choice_values, list)
+            else choice_values
+        )
+        candidate = f"Matched '{original}' to '{', '.join(labels)}'"
+        if not contains_sensitive(candidate, sensitive):
+            note = candidate
+    elif rule.startswith("inferred:"):
+        origin = rule.removeprefix("inferred:")
+        description = {"experience.current": "current experience"}.get(
+            origin, origin.replace("_", " ")
+        )
+        original = profile.get(origin, match.value)
+        candidate = f"From your {description} '{render(original)}'"
+        note = (
+            f"From your {description}"
+            if contains_sensitive(candidate, sensitive)
+            else candidate
+        )
     return Fill(
         key=field.key,
         value=value,
         source=match.source,
-        note=f"From {match.source.replace('_', ' ')}: {match.path.replace('_', ' ')}",
+        rule=rule,
+        confidence=match.confidence,
+        note=note,
     )
 
 
@@ -531,6 +661,7 @@ def document_match(field: FormField, documents: list[dict]) -> Fill | None:
     return Fill(
         key=field.key,
         source="document",
+        rule=f"document:{kind}",
         document_id=matches[0]["id"],
         note=f"Default {kind.replace('_', ' ')}",
     )

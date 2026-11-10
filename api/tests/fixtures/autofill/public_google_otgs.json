@@ -1,0 +1,197 @@
+{
+  "name": "public_google_otgs",
+  "source": {
+    "url": "https://docs.google.com/forms/d/e/1FAIpQLSddKFrCTp3gYD6nU8faR6NJU-ER5Sr_mctzzLWER6sZzSY6YA/viewform",
+    "fetched_at": "2026-11-10T02:28:34.611631+00:00",
+    "sha256": "0acfac7a60aa2dd3c5146cd4a90c83f2d1d68b6e3428232f0a3693badd48ba1f",
+    "method": "public GET; field descriptors only"
+  },
+  "fields": [
+    {
+      "key": "1786865410",
+      "label": "Full Name:",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.1488164941",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "1318481440",
+      "label": "Email Address:",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.1054656246",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "1680111863",
+      "label": "Country of Residence:",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.361954857",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "Ghana"
+      }
+    },
+    {
+      "key": "478494244",
+      "label": "Please add a link to your LinkedIn profile:",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.1307809391",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "https://linkedin.com/in/ama-example"
+      }
+    },
+    {
+      "key": "812178742",
+      "label": "Please add a link to your CV:",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.1010682978",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "1408901776",
+      "label": "Please add a link to your Portfolio/GitHub account.",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.363410493",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "https://ama.example.com"
+      }
+    },
+    {
+      "key": "476916405",
+      "label": "Required monthly earnings in EUR gross:",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.5032231",
+      "section": "",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "619599768",
+      "label": "Your area of expertise: (e.g., development, design, marketing)",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.886462793",
+      "section": "Your experience",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "183352658",
+      "label": "How many years of experience do you have in your area of expertise?",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.1060346530",
+      "section": "Your experience",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "1154029873",
+      "label": "Please share the key skills you are proud of",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.221711822",
+      "section": "Your experience",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "Python\nResearch"
+      }
+    },
+    {
+      "key": "1576740043",
+      "label": "Please list the tools or technologies you excel at",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.451608852",
+      "section": "Your experience",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "245862567",
+      "label": "Is there a specific position you are interested in?",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.612378669",
+      "section": "Your experience",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "607427261",
+      "label": "Why would you like to join us?",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.1304089769",
+      "section": "Motivation to join",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "1908121535",
+      "label": "What makes you stand out?",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.451005022",
+      "section": "Motivation to join",
+      "help_text": "",
+      "required": true,
+      "options": [],
+      "expected": null
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-import type { PopupMessage, Reply } from "./types"
+import type { PanelMessage, Reply } from "./types"
 
-export async function send<T>(message: PopupMessage): Promise<T> {
+export async function send<T>(message: PanelMessage): Promise<T> {
   const reply = (await chrome.runtime.sendMessage(message)) as Reply<T> | undefined
   if (!reply) throw new Error("The Blesser extension didn't answer. Try again.")
   if (!reply.ok) throw new Error(reply.error)

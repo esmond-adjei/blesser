@@ -1,5 +1,6 @@
 import type {
   AnswerInput,
+  Correction,
   DocumentKind,
   Education,
   Experience,
@@ -296,4 +297,21 @@ export function maskSecret(value: string): string {
   if (!value) return ""
   if (value.length <= 4) return "•".repeat(value.length)
   return `${"•".repeat(Math.min(8, value.length - 4))}${value.slice(-4)}`
+}
+
+/** Corrections grouped by site, sites A to Z, newest first within each; `query` matches site, label or value. */
+export function groupCorrections(list: Correction[], query = ""): { host: string; items: Correction[] }[] {
+  const q = query.trim().toLowerCase()
+  const hit = (c: Correction) => !q || [c.host, c.label, correctionValue(c)].some((t) => t.toLowerCase().includes(q))
+  const groups = new Map<string, Correction[]>()
+  for (const c of list.filter(hit)) groups.set(c.host, [...(groups.get(c.host) ?? []), c])
+  return [...groups]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([host, items]) => ({ host, items: items.sort((a, b) => b.updated_at.localeCompare(a.updated_at)) }))
+}
+
+export function correctionValue(c: Pick<Correction, "value" | "wrong_field">): string {
+  if (c.wrong_field) return "Wrong field: Blesser leaves it alone"
+  if (c.value === null || c.value === "" || (Array.isArray(c.value) && !c.value.length)) return "Leave empty"
+  return Array.isArray(c.value) ? c.value.join(", ") : c.value
 }

@@ -1,4 +1,4 @@
-import type { FillSummary, Prefs, Settings } from "../shared/types"
+import type { Prefs, Review, Settings } from "../shared/types"
 
 export interface Auth {
   access_token: string
@@ -20,6 +20,8 @@ export interface Area {
 export const DEFAULT_SETTINGS: Settings = { apiUrl: __DEFAULT_API_URL__, appUrl: __DEFAULT_APP_URL__ }
 export const DEFAULT_PREFS: Prefs = { fillAs: "me", allowDrafting: true }
 const CONNECT_TTL_MS = 10 * 60_000
+
+export const reviewKey = (tabId: number) => `review:${tabId}`
 
 const trim = (url: string) => url.trim().replace(/\/+$/, "")
 
@@ -85,11 +87,30 @@ export class Store {
     return !!pending && pending.state === state && now - pending.created < CONNECT_TTL_MS
   }
 
-  result(tabId: number) {
-    return this.read<FillSummary>(this.session, `result:${tabId}`)
+  private queue = new Map<number, Promise<unknown>>()
+
+  review(tabId: number) {
+    return this.read<Review>(this.session, reviewKey(tabId))
   }
 
-  saveResult(summary: FillSummary) {
-    return this.session.set({ [`result:${summary.tabId}`]: summary })
+  saveReview(review: Review) {
+    return this.session.set({ [reviewKey(review.tabId)]: review })
+  }
+
+  dropReview(tabId: number) {
+    return this.session.remove(reviewKey(tabId))
+  }
+
+  /** Read-modify-write of one tab's review, serialized so page events and panel actions don't overwrite each other. */
+  updateReview(tabId: number, change: (review: Review) => Review | Promise<Review>): Promise<Review | undefined> {
+    const run = (this.queue.get(tabId) ?? Promise.resolve()).catch(() => {}).then(async () => {
+      const current = await this.review(tabId)
+      if (!current) return undefined
+      const next = await change(current)
+      await this.saveReview(next)
+      return next
+    })
+    this.queue.set(tabId, run)
+    return run
   }
 }

@@ -1,0 +1,350 @@
+{
+  "name": "public_google_teaching",
+  "source": {
+    "url": "https://docs.google.com/forms/d/e/1FAIpQLSfycIw9fZGftztw3-w0NApkrWM5D_LtAI0xeRX_w20BKsk5Ag/viewform",
+    "fetched_at": "2026-11-10T02:28:35.231979+00:00",
+    "sha256": "20f9488bb56b22ef5daccad8878f5f403e7750e0b707a31927a15d1ca3d70268",
+    "method": "public GET; field descriptors only"
+  },
+  "fields": [
+    {
+      "key": "485987791",
+      "label": "First Name",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.1667114038",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "Ama"
+      }
+    },
+    {
+      "key": "1215482656",
+      "label": "Last Name",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.2076234378",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "Mensah"
+      }
+    },
+    {
+      "key": "824407665",
+      "label": "e-mail address",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.230039780",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "510574203",
+      "label": "Phone number",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.954262939",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "+233201234567"
+      }
+    },
+    {
+      "key": "1502392851",
+      "label": "School You Attend",
+      "tag": "input",
+      "type": "text",
+      "name": "entry.445372944",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": {
+        "source": "profile",
+        "value": "University of Ghana"
+      }
+    },
+    {
+      "key": "1603227287",
+      "label": "Grade",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.1971448757",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Freshman",
+          "value": "Freshman"
+        },
+        {
+          "label": "Sophomore",
+          "value": "Sophomore"
+        },
+        {
+          "label": "Junior",
+          "value": "Junior"
+        },
+        {
+          "label": "Senior",
+          "value": "Senior"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "2126381645",
+      "label": "What Breakthrough Site do you want to be a Teaching Assistant for?",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.1290374862",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Miami Country Day",
+          "value": "Miami Country Day"
+        },
+        {
+          "label": "Ransom Everglades",
+          "value": "Ransom Everglades"
+        },
+        {
+          "label": "Carrollton of the Sacred Hearts",
+          "value": "Carrollton of the Sacred Hearts"
+        },
+        {
+          "label": "BreakthroughU",
+          "value": "BreakthroughU"
+        },
+        {
+          "label": "Gulliver Prep",
+          "value": "Gulliver Prep"
+        },
+        {
+          "label": "Palmer Trinity",
+          "value": "Palmer Trinity"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "1322442867",
+      "label": "Summer Availability",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.2035560584",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Full Summer (June 6 - July 23rd)",
+          "value": "Full Summer (June 6 - July 23rd)"
+        },
+        {
+          "label": "First Half (June 14 - July 2)",
+          "value": "First Half (June 14 - July 2)"
+        },
+        {
+          "label": "Second Half (July 6 - July 23)",
+          "value": "Second Half (July 6 - July 23)"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "1756627022",
+      "label": "Program Model Preference- I am willing to be considered for:",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.460618292",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Virtual Only",
+          "value": "Virtual Only"
+        },
+        {
+          "label": "In Person Only",
+          "value": "In Person Only"
+        },
+        {
+          "label": "Hybrid (Both)",
+          "value": "Hybrid (Both)"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "672459554",
+      "label": "Subject Preference",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.1924821491",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Math",
+          "value": "Math"
+        },
+        {
+          "label": "Science",
+          "value": "Science"
+        },
+        {
+          "label": "Social Studies",
+          "value": "Social Studies"
+        },
+        {
+          "label": "English Language Arts",
+          "value": "English Language Arts"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "1032799401",
+      "label": "Grade Preference (select all that apply)",
+      "tag": "input",
+      "type": "checkbox",
+      "name": "entry.942611126",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "5th",
+          "value": "5th"
+        },
+        {
+          "label": "6th",
+          "value": "6th"
+        },
+        {
+          "label": "7th",
+          "value": "7th"
+        },
+        {
+          "label": "8th",
+          "value": "8th"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "691719096",
+      "label": "Have you led an academic or elective session during School Year 20-21?",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.1184130436",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Yes",
+          "value": "Yes"
+        },
+        {
+          "label": "No",
+          "value": "No"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "702516454",
+      "label": "Are you interested in leading an elective?",
+      "tag": "input",
+      "type": "radio",
+      "name": "entry.862056410",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Yes",
+          "value": "Yes"
+        },
+        {
+          "label": "No",
+          "value": "No"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "key": "1160507994",
+      "label": "If yes, list electives you are interested in leading (Previous electives include things like coding, art, dance, chess, etc. New, creative electives are always welcome!)",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.237341178",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "726536270",
+      "label": "Why are you interested in learning, teaching, and leading at Breakthrough? If you have worked with Breakthrough in the past, please explain why you want to return as a leader this summer. (Please provide a thoughtful response)",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.1689669728",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "1093953426",
+      "label": "Write about a time you engaged and supported others to accomplish a shared goal. What was challenging, and how did you grow? (Please provide a thoughtful response)",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.637738049",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": null
+    },
+    {
+      "key": "1414241769",
+      "label": "Reflect on a time when you didn’t perform as well as you had anticipated. How did you respond? What did you learn? (Please provide a thoughtful response)",
+      "tag": "textarea",
+      "type": "text",
+      "name": "entry.1558016271",
+      "section": "",
+      "help_text": "",
+      "required": false,
+      "options": [],
+      "expected": null
+    }
+  ]
+}

@@ -16,6 +16,8 @@ PROFILE_COMPLETENESS = (
     "family_name",
     "email",
     "phone",
+    "country_of_birth",
+    "place_of_birth",
     "country_of_residence",
     "city",
     "headline",

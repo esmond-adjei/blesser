@@ -43,6 +43,8 @@ export interface Profile {
   date_of_birth: string | null
   gender: string
   nationality: string
+  country_of_birth: string
+  place_of_birth: string
   country_of_residence: string
   city: string
   address_line1: string
@@ -171,3 +173,13 @@ export interface Answer {
 }
 
 export type AnswerInput = Pick<Answer, "question" | "answer" | "tags" | "project_id">
+
+export interface Correction {
+  id: string
+  host: string
+  label: string
+  field_type: string
+  value: string | string[] | null
+  wrong_field: boolean
+  updated_at: string
+}

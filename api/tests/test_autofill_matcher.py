@@ -16,19 +16,22 @@ FORMS = [
     for path in sorted(FIXTURES.glob("*.json"))
     if path.stem != "kit"
 ]
-CASES = [(form["name"], row) for form in FORMS for row in form["fields"]]
+CASES = [(form, row) for form in FORMS for row in form["fields"]]
 
 
 @pytest.mark.parametrize(
-    ("site", "row"), CASES, ids=[f"{site}:{row['key']}" for site, row in CASES]
+    ("form", "row"), CASES, ids=[f"{form['name']}:{row['key']}" for form, row in CASES]
 )
-def test_realistic_field_corpus(site, row):
+def test_realistic_field_corpus(form, row):
     field = FormField.model_validate(
         {key: value for key, value in row.items() if key != "expected"}
     )
     expected = row["expected"]
     result = deterministic(
-        field, KIT["profile"], KIT["project"], KIT["profile"]["sensitive"]
+        field,
+        {**KIT["profile"], **form.get("profile", {})},
+        KIT["project"],
+        KIT["profile"]["sensitive"],
     ) or document_match(field, KIT["documents"])
     if expected is None or expected["source"] == "drafted":
         assert result is None

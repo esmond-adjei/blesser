@@ -96,7 +96,8 @@ def test_profile_created_once_email_default_and_full_replace(kit):
         "passport_number": "",
         "passport_expiry": None,
     }
-    assert data["completeness"] == 8
+    assert data["completeness"] == 7
+    assert data["country_of_birth"] == data["place_of_birth"] == ""
     assert client.get("/api/app/profile").json() == data
     changed = client.put(
         "/api/app/profile", json={"given_name": "Ama", "skills": ["Python"]}
@@ -184,6 +185,8 @@ def test_profile_completeness_ignores_empty_nested_rows_and_sensitive(kit):
         "family_name": "Mensah",
         "email": "ama@example.com",
         "phone": "+233200000000",
+        "country_of_birth": "Ghana",
+        "place_of_birth": "Kumasi",
         "country_of_residence": "Ghana",
         "city": "Accra",
         "headline": "Researcher",
@@ -198,7 +201,7 @@ def test_profile_completeness_ignores_empty_nested_rows_and_sensitive(kit):
     data["experience"] = [{}]
     data["languages"] = [{}]
     data["sensitive"] = {"national_id": "123456789"}
-    assert client.put("/api/app/profile", json=data).json()["completeness"] == 75
+    assert client.put("/api/app/profile", json=data).json()["completeness"] == 79
 
 
 def test_project_crud_completeness_and_bidirectional_document_links(kit):

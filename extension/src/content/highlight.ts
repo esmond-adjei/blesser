@@ -77,6 +77,12 @@ export function markField(key: string, target: Element, drafted: boolean) {
   schedule()
 }
 
+export function unmarkField(key: string, target: Element) {
+  target.removeAttribute(ATTR)
+  tagged.get(key)?.tag.remove()
+  tagged.delete(key)
+}
+
 export function flashField(target: Element) {
   ensureStyle(target.ownerDocument)
   const previous = target.getAttribute(ATTR)

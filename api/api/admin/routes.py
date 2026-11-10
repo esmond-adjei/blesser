@@ -11,6 +11,8 @@ from api.auth import schemas as auth_schemas
 from api.auth import service as auth_service
 from api.auth.models import RefreshToken, User
 from api.auth.security import hash_token
+from api.autofill import feedback as autofill_feedback
+from api.autofill.schemas import FormReportOut
 from api.core.db import get_session, like_pattern
 from api.core.exceptions import NotFoundError
 from api.editorial import models as m
@@ -24,6 +26,16 @@ from api.scans.models import Scan
 from api.scans.routes import ScanCreate, ScanOut
 
 router = APIRouter(tags=["admin"])
+
+
+@router.get("/autofill-reports", response_model=list[FormReportOut])
+async def autofill_reports(
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_staff),
+):
+    return await autofill_feedback.reports(session, limit, offset)
 
 
 async def staff_session(session, result):

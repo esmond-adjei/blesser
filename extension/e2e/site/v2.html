@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Accra Fellowship: personal details</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; background: #f4f5f7; color: #1d2330; margin: 0; }
+  main { max-width: 640px; margin: 24px auto; background: #fff; padding: 24px 32px; border-radius: 8px; border: 1px solid #dde1e7; }
+  h1 { font-size: 21px; margin: 0 0 16px; } fieldset { border: 1px solid #e3e6eb; border-radius: 6px; margin: 16px 0; padding: 8px 16px 16px; }
+  legend { font-weight: 600; padding: 0 6px; } .row { margin: 12px 0; } label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  input, select { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid #b9c0ca; border-radius: 4px; font: inherit; }
+  button { padding: 8px 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Accra Fellowship 2027: step 1 of 2</h1>
+  <form id="apply" onsubmit="document.title = 'SUBMITTED'; return false;">
+    <fieldset><legend>Personal details</legend>
+      <div class="row"><label for="fname">First name</label><input id="fname" name="first_name"></div>
+      <div class="row"><label for="gender">Gender</label>
+        <select id="gender" name="gender"><option value="">Select…</option><option value="1">Man</option><option value="2">Woman</option><option value="3">Non-binary</option><option value="4">Prefer not to say</option></select></div>
+      <div class="row"><label for="cob">Country of birth</label>
+        <select id="cob" name="country_of_birth"><option value="">Select…</option><option value="CI">Côte d'Ivoire</option><option value="GH">Ghana</option><option value="NG">Nigeria</option><option value="TG">Togo</option></select></div>
+      <div class="row"><label for="cob_text">Country of birth (as on your passport)</label><input id="cob_text" name="birth_country_text"></div>
+    </fieldset>
+    <fieldset><legend>Education</legend>
+      <div class="row"><label for="inst">Name of institution</label><input id="inst" name="institution_name"></div>
+      <div class="row"><label for="inst_country">Country of institution</label>
+        <select id="inst_country" name="institution_country"><option value="">Select…</option><option>Ghana</option><option>Kenya</option><option>United Kingdom</option><option>United States</option></select></div>
+    </fieldset>
+    <button type="submit">Next</button>
+  </form>
+</main>
+</body>
+</html>

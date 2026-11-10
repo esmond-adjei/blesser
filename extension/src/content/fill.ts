@@ -1,12 +1,15 @@
-import type { AttachedFile, CollectedField, FillInstruction, FillOutcome } from "../shared/types"
+import type { AttachedFile, CollectedField, FillInstruction, FillOutcome, WriteResult } from "../shared/types"
 import type { Collected } from "./collect"
 import { isForbidden } from "./guards"
-import { matchOption, normalize, truthy } from "./text"
+import { matchOption, normalize, squash, truthy } from "./text"
 
 type TextControl = HTMLInputElement | HTMLTextAreaElement
 type Mark = (key: string, target: Element, drafted: boolean) => void
+type Value = string | string[] | null
 
 const ours = new WeakMap<Element, string>()
+
+export const filledByBlesser = (el: Element) => ours.has(el)
 
 function fire(el: Element, type: string, init: EventInit = {}) {
   const view = el.ownerDocument.defaultView!
@@ -197,8 +200,96 @@ export function applyFills(collected: Collected, instructions: FillInstruction[]
     if (hasMemberValue(controls, field)) return skip("Already has your answer")
     const problem = fillOne(controls, field, instruction)
     if (problem) return skip(problem)
-    controls.forEach((c) => ours.set(c, field.tag === "contenteditable" ? (c.textContent ?? "") : ((c as TextControl).value ?? "")))
+    remember(controls, field)
     mark(instruction.key, collected.targets.get(instruction.key) ?? controls[0], instruction.drafted)
     return { key: instruction.key, status: instruction.drafted ? "drafted" : "filled", reason: "" }
   })
+}
+
+function remember(controls: Element[], field: CollectedField) {
+  controls.forEach((c) => ours.set(c, field.tag === "contenteditable" ? (c.textContent ?? "") : ((c as TextControl).value ?? "")))
+}
+
+/** What the field holds now, as the member reads it: option labels rather than codes. */
+export function readValue(controls: Element[], field: CollectedField): Value {
+  const first = controls[0]
+  if (!first) return null
+  if (field.type === "file") return (first as HTMLInputElement).files?.[0]?.name ?? null
+  if (field.tag === "select") {
+    const picked = Array.from((first as HTMLSelectElement).selectedOptions ?? []).filter((o) => o.value !== "" || squash(o.textContent ?? ""))
+    const labels = picked.filter((o) => o.value !== "").map((o) => squash(o.textContent ?? ""))
+    if (field.type === "select-multiple") return labels
+    return labels[0] ?? null
+  }
+  const inputs = controls as HTMLInputElement[]
+  if (field.type === "checkbox" && inputs.length === 1) return inputs[0].checked ? "Yes" : "No"
+  if (field.type === "radio" || field.type === "checkbox") {
+    const labels = inputs.map((c, i) => (c.checked ? (field.options[i]?.label ?? c.value) : null)).filter((l): l is string => l !== null)
+    return field.type === "radio" ? (labels[0] ?? null) : labels
+  }
+  const text = field.tag === "contenteditable" ? (first.textContent ?? "") : (first as TextControl).value
+  return text === "" ? null : text
+}
+
+function eraseControls(controls: Element[], field: CollectedField) {
+  const first = controls[0]
+  if (field.type === "file") {
+    ;(first as HTMLInputElement).value = ""
+    fire(first, "input")
+    fire(first, "change")
+  } else if (field.tag === "select") {
+    const select = first as HTMLSelectElement
+    const blank = Array.from(select.options).findIndex((o) => o.value === "")
+    commit(select, () => {
+      if (select.multiple) Array.from(select.options).forEach((o) => (o.selected = false))
+      else if (blank >= 0) setNative(select, "value", "")
+      else select.selectedIndex = -1
+    })
+  } else if (field.type === "radio" || field.type === "checkbox") {
+    for (const input of controls as HTMLInputElement[]) if (input.checked) commit(input, () => setNative(input, "checked", false))
+  } else if (field.tag === "contenteditable") {
+    first.textContent = ""
+    fire(first, "input")
+  } else {
+    commit(first, () => setNative(first, "value", ""))
+  }
+}
+
+function locate(collected: Collected, key: string) {
+  const field = collected.fields.find((f) => f.key === key)
+  const controls = collected.controls.get(key)
+  if (!field || !controls?.length || !controls.every((c) => c.isConnected)) return { problem: "The field is gone from the page" } as const
+  if (controls.some((c) => isForbidden(c, ""))) return { problem: "Blesser never fills this kind of field" } as const
+  return { field, controls } as const
+}
+
+/** Writes the member's own value from the panel, replacing whatever the field holds. */
+export function writeField(collected: Collected, key: string, value: Value, mark: Mark = () => {}): WriteResult {
+  const found = locate(collected, key)
+  if ("problem" in found) return { ok: false, reason: found.problem!, value: null }
+  const { field, controls } = found
+  const fail = (reason: string): WriteResult => ({ ok: false, reason, value: readValue(controls, field) })
+  if (field.custom) return fail("Blesser can't operate this kind of field. Set it on the page.")
+  if (field.type === "file") return fail("Choose the file on the page.")
+  if (value === null || value === "" || (Array.isArray(value) && !value.length)) {
+    eraseControls(controls, field)
+    controls.forEach((c) => ours.delete(c))
+    return { ok: true, reason: "", value: readValue(controls, field) }
+  }
+  if (field.type === "checkbox" && controls.length > 1) {
+    const wanted = Array.isArray(value) ? value : value.split(/\s*[;\n]\s*/)
+    const picks = new Set(wanted.map((w) => matchOption(field.options, w)).filter((i) => i >= 0))
+    if (!picks.size) return fail("None of the options matched")
+    ;(controls as HTMLInputElement[]).forEach((input, i) => setChecked(input, picks.has(i)))
+  } else if (field.type === "checkbox") {
+    const yes = truthy(Array.isArray(value) ? value[0] : value) ?? (matchOption(field.options, String(value)) === 0 ? true : null)
+    if (yes === null) return fail("Couldn't tell whether to tick this")
+    setChecked(controls[0] as HTMLInputElement, yes)
+  } else {
+    const problem = fillOne(controls, field, { key, value, drafted: false, file: null })
+    if (problem) return fail(problem)
+  }
+  remember(controls, field)
+  mark(key, collected.targets.get(key) ?? controls[0], false)
+  return { ok: true, reason: "", value: readValue(controls, field) }
 }

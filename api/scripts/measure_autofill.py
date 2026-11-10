@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import time
+from collections import Counter
 from pathlib import Path
 
 import httpx
@@ -63,15 +64,41 @@ async def measure(real_draft):
     ]
     start = time.perf_counter()
     rows = []
+    rule_counts = Counter()
+    rule_correct = Counter()
     for form in forms:
         fields = load_fields(form)
-        fills = match(fields, kit)
+        form_kit = {**kit, "profile": {**kit["profile"], **form.get("profile", {})}}
+        fills = match(fields, form_kit)
         keys = {fill.key for fill in fills}
+        expected = {row["key"]: row["expected"] for row in form["fields"]}
+        correct = 0
+        for item in fills:
+            rule = item.rule
+            rule_counts[rule] += 1
+            target = expected[item.key]
+            if (
+                target
+                and target.get("source") != "drafted"
+                and all(
+                    getattr(item, key) == value
+                    for key, value in target.items()
+                    if key not in {"rule", "confidence"}
+                )
+            ):
+                correct += 1
+                rule_correct[rule] += 1
         rows.append(
             {
                 "fixture": form["name"],
                 "fields": len(fields),
                 "deterministic": len(fills),
+                "correct": correct,
+                "incorrect": len(fills) - correct,
+                "expected_saved": sum(
+                    row is not None and row.get("source") != "drafted"
+                    for row in expected.values()
+                ),
                 "drafted": 0,
                 "unfilled": len(fields) - len(fills),
                 "draft_eligible": sum(
@@ -81,7 +108,16 @@ async def measure(real_draft):
         )
     totals = {
         key: sum(row[key] for row in rows)
-        for key in ("fields", "deterministic", "drafted", "unfilled", "draft_eligible")
+        for key in (
+            "fields",
+            "deterministic",
+            "correct",
+            "incorrect",
+            "expected_saved",
+            "drafted",
+            "unfilled",
+            "draft_eligible",
+        )
     }
     output = {
         "baseline": {
@@ -93,6 +129,14 @@ async def measure(real_draft):
                 for key in ("deterministic", "drafted", "unfilled")
             },
             "elapsed_ms": round((time.perf_counter() - start) * 1000, 2),
+            "per_rule": {
+                rule: {
+                    "fills": count,
+                    "correct": rule_correct[rule],
+                    "incorrect": count - rule_correct[rule],
+                }
+                for rule, count in sorted(rule_counts.items())
+            },
         }
     }
     if real_draft:

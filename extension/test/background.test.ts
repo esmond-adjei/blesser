@@ -3,6 +3,7 @@ import { Api, SignedOut } from "../src/background/api"
 import { acceptConnect, connectUrl } from "../src/background/connect"
 import { blockedReason, runFill, type Scripting } from "../src/background/fill"
 import { Store, type Area } from "../src/background/store"
+import { counts } from "../src/shared/review"
 import type { CollectedField, FillInstruction, FillRequest, FillResponse } from "../src/shared/types"
 
 function memory(): Area & { data: Record<string, unknown> } {
@@ -150,6 +151,7 @@ describe("runFill", () => {
             : { key: i.key, status: i.drafted ? ("drafted" as const) : ("filled" as const), reason: "" },
         )
       },
+      write: async () => ({ ok: true, reason: "", value: null }),
     }
     const summary = await runFill(new Api(store, fetcher as typeof fetch), scripting, { id: 3, url: "https://boards.greenhouse.io/x/jobs/1", title: "Apply" }, { fillAs: "proj1", allowDrafting: false })
 
@@ -162,15 +164,19 @@ describe("runFill", () => {
     )
     expect(filled[0][1].file).toEqual({ name: "cv.pdf", type: "application/pdf", base64: btoa("cv") })
     expect(filled[7][0].drafted).toBe(true)
-    expect(summary).toMatchObject({ filled: 2, drafted: 1, matchedOpportunityId: "opp1", remainingToday: 59 })
-    expect(summary.needsYou.map((n) => [n.key, n.label])).toEqual([["0:2", "Pronouns"], ["7:1", "Stage"]])
+    expect(counts(summary)).toEqual({ filled: 2, drafted: 1, needs: 2 })
+    expect(summary).toMatchObject({ host: "boards.greenhouse.io", matchedOpportunityId: "opp1", remainingToday: 59, moved: null })
+    expect(summary.rows.filter((r) => r.status === "needs").map((n) => [n.key, n.label])).toEqual([["0:2", "Pronouns"], ["7:1", "Stage"]])
+    const first = summary.rows.find((r) => r.key === "0:0")!
+    expect(first).toMatchObject({ status: "filled", value: "Ama", filled: { value: "Ama", source: "profile", rule: null } })
+    expect(summary.rows.find((r) => r.key === "0:1")).toMatchObject({ status: "filled", document: "cv.pdf" })
   })
 
   it("refuses browser pages and pages without fields", async () => {
     expect(blockedReason("chrome://extensions")).toMatch(/browser pages/)
     expect(blockedReason("https://chromewebstore.google.com/detail/x")).toMatch(/store/)
     const store = await signedIn()
-    const scripting: Scripting = { collect: async () => [{ frameId: 0, result: [] }], fill: async () => [] }
+    const scripting: Scripting = { collect: async () => [{ frameId: 0, result: [] }], fill: async () => [], write: async () => ({ ok: true, reason: "", value: null }) }
     await expect(runFill(new Api(store), scripting, { id: 1, url: "https://example.org", title: "" }, { fillAs: "me", allowDrafting: true })).rejects.toThrow(/No form fields/)
   })
 })

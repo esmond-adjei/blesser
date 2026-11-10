@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom"
-import { FileText, FolderKanban, MessageSquareText, UserRound } from "lucide-react"
+import { FileText, FolderKanban, MessageSquareText, Undo2, UserRound } from "lucide-react"
 import { cn } from "@blesser/ui"
 import { PageHeader } from "../../components/layout/PageHeader"
 import { KIT_PITCH } from "../../lib/kit"
@@ -9,13 +9,14 @@ const TABS = [
   { to: "/kit/projects", label: "Projects", icon: FolderKanban },
   { to: "/kit/documents", label: "Documents", icon: FileText },
   { to: "/kit/answers", label: "Answers", icon: MessageSquareText },
+  { to: "/kit/corrections", label: "Corrections", icon: Undo2 },
 ]
 
 export function KitLayout() {
   return (
     <div className="space-y-6">
       <PageHeader title="Apply kit" description={KIT_PITCH} />
-      <nav aria-label="Apply kit sections" className="nice-scroll -mx-4 overflow-x-auto border-b border-separator px-4 sm:mx-0 sm:px-0">
+      <nav aria-label="Apply kit sections" className="nice-scroll -mx-4 overflow-x-auto overflow-y-hidden border-b border-separator px-4 sm:mx-0 sm:px-0">
         <ul className="flex gap-1">
           {TABS.map((t) => (
             <li key={t.to}>

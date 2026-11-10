@@ -44,6 +44,7 @@ export interface Fill {
   source: FillSource
   confidence: "high" | "medium" | "low"
   note: string
+  rule?: string | null
 }
 
 export interface FillResponse {
@@ -95,23 +96,64 @@ export interface ConnectPayload {
   session: ExtensionSession
 }
 
-export interface NeedsYou {
+export type RowStatus = "filled" | "drafted" | "needs"
+
+export interface ReviewRow {
   key: string
   label: string
+  field: FieldDescriptor
+  status: RowStatus
+  value: string | string[] | null
+  document: string | null
+  source: FillSource | "member" | null
+  rule: string | null
+  confidence: Fill["confidence"] | null
+  note: string
   reason: string
+  /** What Blesser first put there; feedback reports it. */
+  filled: { value: string | string[] | null; source: string; rule: string | null } | null
+  /** A change the member made on the page that hasn't been remembered or dismissed. */
+  pageEdit: { value: string | string[] | null } | null
 }
 
-export interface FillSummary {
+export interface Review {
   tabId: number
   url: string
+  host: string
+  title: string
   at: string
-  filled: number
-  drafted: number
-  needsYou: NeedsYou[]
+  rows: ReviewRow[]
   matchedOpportunityId: string | null
   applied: boolean
   remainingToday: number | null
+  /** "navigated": the tab loaded another page; "step": new fields appeared on the same page. */
+  moved: "navigated" | "step" | null
 }
+
+export type Corrected = { value: string | string[] | null } | { wrong_field: true }
+
+export interface FillFeedback {
+  page: { url: string; host: string }
+  field: FieldDescriptor
+  filled: { value: string | string[] | null; source: string; rule: string | null }
+  corrected: Corrected
+}
+
+export interface ProblemReport {
+  page: { url: string; host: string; title: string }
+  fields: FieldDescriptor[]
+  note: string
+}
+
+export interface WriteResult {
+  ok: boolean
+  reason: string
+  value: string | string[] | null
+}
+
+export type PageMessage =
+  | { type: "blesser.edited"; key: string; value: string | string[] | null }
+  | { type: "blesser.step"; added: number }
 
 export interface Settings {
   apiUrl: string
@@ -131,15 +173,22 @@ export interface Status {
   error: string | null
 }
 
-export type PopupMessage =
+export type PanelMessage =
   | { type: "status" }
   | { type: "connect" }
   | { type: "disconnect" }
   | { type: "prefs"; prefs: Prefs }
   | { type: "fill"; tabId: number }
-  | { type: "lastResult"; tabId: number }
+  | { type: "review"; tabId: number }
   | { type: "focus"; tabId: number; key: string }
   | { type: "markApplied"; tabId: number }
+  | { type: "edit"; tabId: number; key: string; value: string | string[] | null }
+  | { type: "clear"; tabId: number; key: string }
+  | { type: "wrongField"; tabId: number; key: string }
+  | { type: "remember"; tabId: number; key: string }
+  | { type: "dismissEdit"; tabId: number; key: string }
+  | { type: "reportPreview"; tabId: number }
+  | { type: "report"; tabId: number; report: ProblemReport }
   | { type: "settings"; settings: Settings }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }

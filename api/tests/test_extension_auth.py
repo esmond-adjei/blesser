@@ -81,6 +81,8 @@ def test_every_mounted_app_route_has_the_expected_ext_audience_boundary(kit):
         ("GET", "/api/app/applications/{application_id}"),
         ("PATCH", "/api/app/applications/{application_id}"),
         ("POST", "/api/app/autofill/fill"),
+        ("POST", "/api/app/autofill/feedback"),
+        ("POST", "/api/app/autofill/reports"),
         ("GET", "/api/app/extension/me"),
         ("POST", "/api/app/extension/logout"),
     }
@@ -110,8 +112,29 @@ def test_every_mounted_app_route_has_the_expected_ext_audience_boundary(kit):
                     "fields": [],
                     "allow_drafting": False,
                 }
+            if path.endswith("/autofill/feedback"):
+                body = {
+                    "page": {"url": "https://example.com"},
+                    "field": {"key": "name", "label": "Name"},
+                    "filled": {
+                        "value": "Name",
+                        "source": "profile",
+                        "rule": "matched:full_name",
+                    },
+                    "corrected": {"wrong_field": True},
+                }
+            if path.endswith("/autofill/reports"):
+                body = {
+                    "page": {"url": "https://example.com"},
+                    "fields": [],
+                    "note": "Test",
+                }
             response = ext.request(method, url, json=body)
             expected = 200 if (method, path) in allowed else 401
+            if (method, path) in allowed and path.endswith(
+                ("/autofill/feedback", "/autofill/reports")
+            ):
+                expected = 204
             assert response.status_code == expected, (method, path, response.text)
     assert allowed <= checked
     assert len(checked) > len(allowed)

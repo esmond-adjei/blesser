@@ -1,4 +1,4 @@
-import type { ExtensionMe, FillRequest, FillResponse } from "../shared/types"
+import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, ProblemReport } from "../shared/types"
 import type { Store } from "./store"
 
 const FILL_TIMEOUT_MS = 75_000
@@ -123,6 +123,14 @@ export class Api {
         throw new Error(body.allow_drafting ? "Blesser took too long to answer. Try again, or turn off drafting for this page." : "Blesser took too long to answer. Try again.")
       throw err
     }
+  }
+
+  feedback(body: FillFeedback) {
+    return this.json<void>("/api/app/autofill/feedback", { method: "POST", body: JSON.stringify(body) })
+  }
+
+  report(body: ProblemReport) {
+    return this.json<void>("/api/app/autofill/reports", { method: "POST", body: JSON.stringify(body) })
   }
 
   applications() {

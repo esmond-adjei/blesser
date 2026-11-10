@@ -113,6 +113,8 @@ These routes exist only under `/api/app` and never expose another member's kit. 
 
 `Profile` and `Project` use the field shapes in [the binding plan, section 2](plans/sharing-and-autofill.md#2-applicant-kit). `completeness`, `created_at`, `updated_at`, `id`, and `word_count` are server-owned where present. Replacement bodies may include those response fields, but the API ignores them. Unknown fields are rejected. Dates use ISO `YYYY-MM-DD`; timestamps use ISO strings.
 
+`Profile` also has `country_of_birth: string` and `place_of_birth: string`, each limited to 200 characters and empty by default. Both contribute to profile completeness. Migration `0006_autofill_v2` backfills empty defaults without replacing existing values.
+
 `Profile.sensitive` contains `{national_id, passport_number, passport_expiry}`. All three values are encrypted at rest. Reads mask all but the final four characters of nonempty values unless `reveal=1`. Clients must fetch revealed values before writing a populated sensitive object back; masked placeholders are rejected. PUT defaults to a masked response too.
 
 ```ts
@@ -156,7 +158,7 @@ type FillResponse = {
 	fills: {
 		key: string; value: string | string[] | null; document_id: string | null;
 		source: "profile" | "project" | "answer" | "document" | "drafted";
-		confidence: "high" | "medium" | "low"; note: string;
+		confidence: "high" | "medium" | "low"; note: string; rule: string;
 	}[];
 	unfilled: { key: string; reason: string }[];
 	matched_opportunity_id: string | null;
@@ -164,7 +166,17 @@ type FillResponse = {
 };
 ```
 
-Matching tries profile and project facts, compatible default documents, saved answers, then one batched model call for remaining free-text questions. Saved answers use normalized-question `pg_trgm` similarity of at least 0.65. Global answers and answers for the selected project qualify. Returned values must fit both limits. Ambiguous options, incompatible documents, unsupported questions, and invalid model values remain unfilled. Unknown model keys are ignored.
+Matching applies the member's corrections first. It then tries profile and project facts, compatible default documents, saved answers, and one batched model call. Saved answers use normalized-question `pg_trgm` similarity of at least 0.65. Global answers and answers for the selected project qualify. Returned values must fit both limits. Ambiguous options, incompatible documents, unsupported questions, and invalid model values remain unfilled. Unknown model keys are ignored.
+
+The label's head selects an attribute and its qualifier selects the record. Explicit qualifiers take priority over section headings and fieldset legends. For example, `Country of Institution` selects `education.country`, even inside a personal-information section. A qualified attribute absent from the selected record stays empty. Unqualified labels use their section before ordinary synonyms and input hints.
+
+Option matching tries canonical concepts, normalized text, then token similarity. Concepts cover gender, country names and ISO codes and demonyms, degree levels, yes/no wording, employment types, languages, proficiency, months, titles, project stages, and Ghana's 16 regions. Ambiguous concepts and tied options remain unresolved. Consent and declaration controls stay blocked.
+
+Inferences have medium confidence: birth country and citizenship from nationality, nationality from birth country, age from birth date, current employer and role from current experience, highest qualification from education, and full address from its parts. Explicit saved values take priority. `Ghanaian` implies `Ghana` for an empty birth country and carries `rule: "inferred:nationality"`. These suggestions require member review.
+
+Unresolved choices with a known saved fact join the same call as remaining free-text questions. Each choice receives its relevant fact and options with the task `choose_one_option_or_null`. The response must equal an option's value exactly. Labels, invented values, arrays, and other non-string responses are rejected. Checkbox choices return a one-element array. Every model attempt consumes the same daily allowance. Accepted choices use `source: "drafted"`, low confidence, and `rule: "model:choice"`.
+
+Every fill has a rule. Common rules include `concept:gender`, `qualifier:education.country`, `inferred:nationality`, `matched:full_name`, `option:normalized`, `option:tokens`, `document:cv`, `answer:similarity`, `correction`, `model:draft`, and `model:choice`.
 
 Draft context contains only the selected profile and project facts. Sensitive identifiers and passport expiry are excluded, including copies detected in other facts or question metadata. Only exact deterministic matches can return sensitive values. Extension profile reads return empty sensitive fields even with `reveal=1`. Password, payment, consent, declaration, and signature fields remain unfilled. Drafts have low confidence and a review note.
 
@@ -172,7 +184,41 @@ Draft context contains only the selected profile and project facts. Sensitive id
 
 Requests allow at most 300 fields, unique nonempty keys of at most 200 characters, and 500 options per field. Strings are trimmed. Labels and help text allow 4,000 characters, most other descriptors allow 500, input types allow 50, and page URLs allow 2,048. Invalid bodies return 422. The ordinary request-body ceiling applies, with overflow returning 413. An unowned project returns 404.
 
-`matched_opportunity_id` is the catalogue opportunity ID from a tracked application whose opportunity `link` or `source_url` matches `page.url`. Matching ignores HTTP versus HTTPS, `www`, fragments, trailing slashes, and common tracking parameters. Other query parameters remain significant. Form descriptors and generated answers are never stored. Responses use private, no-store caching.
+`matched_opportunity_id` is the catalogue opportunity ID from a tracked application whose opportunity `link` or `source_url` matches `page.url`. Matching ignores HTTP versus HTTPS, `www`, fragments, trailing slashes, and common tracking parameters. Other query parameters remain significant. Fill requests and generated answers are not stored by the fill route. Explicit feedback and reports have the separate retention rules below. Responses use private, no-store caching.
+
+### Autofill corrections and reports
+
+```ts
+type FillFeedback = {
+	page: { url: string; host: string };
+	field: FillRequest["fields"][number];
+	filled: { value: string | string[] | null; source: string; rule: string | null };
+	corrected: { value: string | string[] | null } | { wrong_field: true };
+};
+type Correction = {
+	id: string; host: string; label: string; field_type: string;
+	value: string | string[] | null; wrong_field: boolean; updated_at: string;
+};
+type AutofillReport = {
+	page: { url: string; host: string; title: string };
+	fields: FillRequest["fields"];
+	note: string;
+};
+```
+
+| Method, path | Auth | Body | Returns |
+|---|---|---|---|
+| `POST /api/app/autofill/feedback` | `ext` | `FillFeedback` | `204` |
+| `GET /api/app/autofill/corrections` | `app` | | `Correction[]`, newest first |
+| `DELETE /api/app/autofill/corrections/{id}` | `app` | | `204`, or `404` for an unowned or missing correction |
+| `POST /api/app/autofill/reports` | `ext` | `AutofillReport` | `204` |
+| `GET /api/admin/autofill-reports?limit=30&offset=0` | Staff, editor or admin | | `{id, page, fields, note, created_at}[]`, newest first |
+
+Corrections belong to one member and use the lowercase URL hostname, normalized label, and lowercase field type as their key. Normalization ignores case, accents, punctuation, and repeated whitespace. Empty labels fall back to placeholder, name, then ID. A hash of the normalized label bounds the database index size. Concurrent updates use an atomic upsert, so the last write wins. A supplied `host` must match the URL hostname, otherwise the API returns 422.
+
+Feedback stores the descriptor and original fill as well as the correction. Original and corrected values are encrypted at rest. They never enter model context. `wrong_field`, null, an empty string, and an empty list suppress all later matching stages for that field. Incompatible options and values over the current field's limits also leave it empty. Corrections cannot override blocked password, payment, consent, declaration, or signature fields. Deleting a correction restores ordinary matching. Staff cannot read corrections.
+
+Feedback values allow 20,000 characters per string and 500 strings per array, within the ordinary request-body ceiling. Feedback and report writes share the autofill throttle. Reports allow 300 field descriptors, a 4,000-character note, and at most 256,000 bytes of serialized validated content. Field descriptors reject an extra `value` property and other unknown properties with 422. Option values are retained because they describe the available choices. Reports contain no original fills or corrections. Staff reads allow `limit` from 1 to 100 and nonnegative `offset`. They follow existing staff report reads, which do not add audit-log entries. Deleting the account cascades corrections and reports.
 
 ### Extension authentication
 
@@ -197,7 +243,7 @@ Names are whitespace-trimmed and must contain 1 through 200 characters. Refresh 
 
 Every extension request checks session ownership, revocation, and account status in the database. Last-used timestamps update at most once every five minutes, with refresh also updating them. Revocation and logout immediately reject that session's access and refresh tokens. Reusing a rotated refresh token revokes the entire browser session, including the newer pair. Other sessions remain active. Password reset revokes browser sessions. Account deletion cascades them.
 
-The extension audience is accepted only for `POST /autofill/fill`, `GET /profile`, project list and detail reads, document list, usage and download reads, application list and detail reads, `PATCH /applications/{id}`, and the two extension-only routes above. The patch body must contain exactly `{status: "submitted"}`. Other application patches return 403. All other member routes reject `ext` with 401, including kit writes, scans, answers, settings, connect, and session management. Legacy member routes and admin routes also reject extension tokens.
+The extension audience is accepted only for `POST /autofill/fill`, `POST /autofill/feedback`, `POST /autofill/reports`, `GET /profile`, project list and detail reads, document list, usage and download reads, application list and detail reads, `PATCH /applications/{id}`, and the two extension-only routes above. The patch body must contain exactly `{status: "submitted"}`. Other application patches return 403. All other member routes reject `ext` with 401, including correction list and deletion, kit writes, scans, answers, settings, connect, and session management. Legacy member routes and admin routes also reject extension tokens.
 
 ## `/api/admin` (staff token, `aud = admin`)
 

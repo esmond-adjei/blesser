@@ -1,0 +1,518 @@
+{
+  "name": "public_lever_mashgin",
+  "source": {
+    "url": "https://jobs.lever.co/mashgin/f82e7b37-9e91-416e-97b6-64449ab28f48/apply",
+    "fetched_at": "2026-11-10T02:28:36.119422+00:00",
+    "sha256": "dbbec9e28956ce4f1f0b768af740b6c833687a29319656ceedeace852d63e648",
+    "method": "public GET; field descriptors only"
+  },
+  "fields": [
+    {
+      "key": "resume-upload-input",
+      "tag": "input",
+      "type": "file",
+      "name": "resume",
+      "id": "resume-upload-input",
+      "label": "Resume/CV",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "document",
+        "document_id": "cv-file"
+      }
+    },
+    {
+      "key": "name",
+      "tag": "input",
+      "type": "text",
+      "name": "name",
+      "id": "",
+      "label": "Full name",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": true,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "Ama Mensah"
+      }
+    },
+    {
+      "key": "email",
+      "tag": "input",
+      "type": "email",
+      "name": "email",
+      "id": "",
+      "label": "Email",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": true,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "ama@example.com"
+      }
+    },
+    {
+      "key": "phone",
+      "tag": "input",
+      "type": "text",
+      "name": "phone",
+      "id": "",
+      "label": "Phone",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": true,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "+233201234567"
+      }
+    },
+    {
+      "key": "location-input",
+      "tag": "input",
+      "type": "text",
+      "name": "location",
+      "id": "location-input",
+      "label": "Current location",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "Accra"
+      }
+    },
+    {
+      "key": "org",
+      "tag": "input",
+      "type": "text",
+      "name": "org",
+      "id": "",
+      "label": "Current company",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "Example Labs",
+        "confidence": "medium",
+        "rule": "inferred:experience.current"
+      }
+    },
+    {
+      "key": "urls[LinkedIn]",
+      "tag": "input",
+      "type": "text",
+      "name": "urls[LinkedIn]",
+      "id": "",
+      "label": "LinkedIn URL",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "https://linkedin.com/in/ama-example"
+      }
+    },
+    {
+      "key": "urls[Twitter]",
+      "tag": "input",
+      "type": "text",
+      "name": "urls[Twitter]",
+      "id": "",
+      "label": "Twitter URL",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "urls[GitHub]",
+      "tag": "input",
+      "type": "text",
+      "name": "urls[GitHub]",
+      "id": "",
+      "label": "GitHub URL",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "https://github.com/ama-example"
+      }
+    },
+    {
+      "key": "urls[Portfolio]",
+      "tag": "input",
+      "type": "text",
+      "name": "urls[Portfolio]",
+      "id": "",
+      "label": "Portfolio URL",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "https://ama.example.com"
+      }
+    },
+    {
+      "key": "urls[Other]",
+      "tag": "input",
+      "type": "text",
+      "name": "urls[Other]",
+      "id": "",
+      "label": "Other website",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "cards[cd4dfd97-aa1d-406b-a759-796e5204f59f][field0]",
+      "tag": "input",
+      "type": "radio",
+      "name": "cards[cd4dfd97-aa1d-406b-a759-796e5204f59f][field0]",
+      "id": "",
+      "label": "Are you authorized to work lawfully in the United States?",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": true,
+      "options": [
+        {
+          "label": "Yes",
+          "value": "Yes"
+        },
+        {
+          "label": "No",
+          "value": "No"
+        }
+      ],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "cards[cd4dfd97-aa1d-406b-a759-796e5204f59f][field1]",
+      "tag": "input",
+      "type": "radio",
+      "name": "cards[cd4dfd97-aa1d-406b-a759-796e5204f59f][field1]",
+      "id": "",
+      "label": "Will you now, or in the future require to commence (sponsor) an immigration case in order to employ you (for example, H-1B or other employment-based immigration case)?",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Yes",
+          "value": "Yes"
+        },
+        {
+          "label": "no",
+          "value": "no"
+        }
+      ],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "cards[f10a97cc-50d4-454b-b25e-7b2f0c10e38b][field0]",
+      "tag": "input",
+      "type": "text",
+      "name": "cards[f10a97cc-50d4-454b-b25e-7b2f0c10e38b][field0]",
+      "id": "",
+      "label": "How did you hear about Mashgin?",
+      "section": "",
+      "placeholder": "Type your response",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "eeo[gender]",
+      "tag": "select",
+      "type": "select",
+      "name": "eeo[gender]",
+      "id": "",
+      "label": "Gender",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Male",
+          "value": "Male"
+        },
+        {
+          "label": "Female",
+          "value": "Female"
+        },
+        {
+          "label": "Decline to self-identify",
+          "value": "Decline to self-identify"
+        }
+      ],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "Female"
+      }
+    },
+    {
+      "key": "eeo[race]",
+      "tag": "select",
+      "type": "select",
+      "name": "eeo[race]",
+      "id": "",
+      "label": "Race",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Hispanic or Latino",
+          "value": "Hispanic or Latino"
+        },
+        {
+          "label": "White (Not Hispanic or Latino)",
+          "value": "White (Not Hispanic or Latino)"
+        },
+        {
+          "label": "Black or African American (Not Hispanic or Latino)",
+          "value": "Black or African American (Not Hispanic or Latino)"
+        },
+        {
+          "label": "Native Hawaiian or Other Pacific Islander (Not Hispanic or Latino)",
+          "value": "Native Hawaiian or Other Pacific Islander (Not Hispanic or Latino)"
+        },
+        {
+          "label": "Asian (Not Hispanic or Latino)",
+          "value": "Asian (Not Hispanic or Latino)"
+        },
+        {
+          "label": "American Indian or Alaska Native (Not Hispanic or Latino)",
+          "value": "American Indian or Alaska Native (Not Hispanic or Latino)"
+        },
+        {
+          "label": "Two or More Races (Not Hispanic or Latino)",
+          "value": "Two or More Races (Not Hispanic or Latino)"
+        },
+        {
+          "label": "Decline to self-identify",
+          "value": "Decline to self-identify"
+        }
+      ],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "eeo[veteran]",
+      "tag": "select",
+      "type": "select",
+      "name": "eeo[veteran]",
+      "id": "",
+      "label": "Veteran status",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "I am a veteran",
+          "value": "I am a veteran"
+        },
+        {
+          "label": "I am not a veteran",
+          "value": "I am not a veteran"
+        },
+        {
+          "label": "Decline to self-identify",
+          "value": "Decline to self-identify"
+        }
+      ],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "surveysResponses[cf2c4df2-2479-48ee-a826-199464702115][responses][field0]",
+      "tag": "input",
+      "type": "radio",
+      "name": "surveysResponses[cf2c4df2-2479-48ee-a826-199464702115][responses][field0]",
+      "id": "",
+      "label": "What is your age range?",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "17 or younger",
+          "value": "17 or younger"
+        },
+        {
+          "label": "18-20",
+          "value": "18-20"
+        },
+        {
+          "label": "21-29",
+          "value": "21-29"
+        },
+        {
+          "label": "30-39",
+          "value": "30-39"
+        },
+        {
+          "label": "40-49",
+          "value": "40-49"
+        },
+        {
+          "label": "50-59",
+          "value": "50-59"
+        },
+        {
+          "label": "60 or older",
+          "value": "60 or older"
+        }
+      ],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "surveysResponses[cf2c4df2-2479-48ee-a826-199464702115][responses][field1]",
+      "tag": "input",
+      "type": "checkbox",
+      "name": "surveysResponses[cf2c4df2-2479-48ee-a826-199464702115][responses][field1]",
+      "id": "",
+      "label": "I identify my ethnicity asSelect all that apply",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "White / Caucasian",
+          "value": "White / Caucasian"
+        },
+        {
+          "label": "Hispanic, Latino, or Spanish origin",
+          "value": "Hispanic, Latino, or Spanish origin"
+        },
+        {
+          "label": "Black or African American",
+          "value": "Black or African American"
+        },
+        {
+          "label": "Asian",
+          "value": "Asian"
+        },
+        {
+          "label": "Native Hawaiian or other Pacific Islander",
+          "value": "Native Hawaiian or other Pacific Islander"
+        },
+        {
+          "label": "Indigenous Peoples, First Nations, Native American, or Alaska Native",
+          "value": "Indigenous Peoples, First Nations, Native American, or Alaska Native"
+        },
+        {
+          "label": "Middle Eastern or North African",
+          "value": "Middle Eastern or North African"
+        },
+        {
+          "label": "Some other race, ethnicity, or origin",
+          "value": "Some other race, ethnicity, or origin"
+        }
+      ],
+      "accept": "",
+      "expected": null
+    },
+    {
+      "key": "surveysResponses[cf2c4df2-2479-48ee-a826-199464702115][responses][field2]",
+      "tag": "input",
+      "type": "radio",
+      "name": "surveysResponses[cf2c4df2-2479-48ee-a826-199464702115][responses][field2]",
+      "id": "",
+      "label": "What gender do you identify as?",
+      "section": "",
+      "placeholder": "",
+      "help_text": "",
+      "autocomplete": "",
+      "required": false,
+      "options": [
+        {
+          "label": "Female",
+          "value": "Female"
+        },
+        {
+          "label": "Male",
+          "value": "Male"
+        },
+        {
+          "label": "Non-binary",
+          "value": "Non-binary"
+        }
+      ],
+      "accept": "",
+      "expected": {
+        "source": "profile",
+        "value": "Female"
+      }
+    }
+  ]
+}

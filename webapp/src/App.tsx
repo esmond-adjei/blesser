@@ -20,6 +20,7 @@ const KitProjects = React.lazy(() => import("./pages/kit/ProjectsTab").then((m) 
 const KitProject = React.lazy(() => import("./pages/kit/ProjectPage").then((m) => ({ default: m.ProjectPage })))
 const KitDocuments = React.lazy(() => import("./pages/kit/DocumentsTab").then((m) => ({ default: m.DocumentsTab })))
 const KitAnswers = React.lazy(() => import("./pages/kit/AnswersTab").then((m) => ({ default: m.AnswersTab })))
+const KitCorrections = React.lazy(() => import("./pages/kit/CorrectionsTab").then((m) => ({ default: m.CorrectionsTab })))
 const Settings = React.lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })))
 const Login = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.Login })))
 const Register = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.Register })))
@@ -81,6 +82,7 @@ export default function App() {
                 <Route path="projects/:projectId" element={<KitProject />} />
                 <Route path="documents" element={<KitDocuments />} />
                 <Route path="answers" element={<KitAnswers />} />
+                <Route path="corrections" element={<KitCorrections />} />
               </Route>
               <Route path="scans" element={<Scans />} />
               <Route path="scans/:scanId" element={<ScanDetail />} />

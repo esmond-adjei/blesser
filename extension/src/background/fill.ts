@@ -1,4 +1,4 @@
-import type { AttachedFile, CollectedField, FieldDescriptor, FillInstruction, FillOutcome, FillSummary, NeedsYou, Prefs } from "../shared/types"
+import type { AttachedFile, CollectedField, FieldDescriptor, FillInstruction, FillOutcome, Prefs, Review, ReviewRow, WriteResult } from "../shared/types"
 import type { Api } from "./api"
 
 export interface FrameResult<T> {
@@ -9,6 +9,7 @@ export interface FrameResult<T> {
 export interface Scripting {
   collect(tabId: number): Promise<FrameResult<CollectedField[]>[]>
   fill(tabId: number, frameId: number, instructions: FillInstruction[]): Promise<FillOutcome[]>
+  write(tabId: number, frameId: number, key: string, value: string | string[] | null): Promise<WriteResult>
 }
 
 export interface TabInfo {
@@ -33,14 +34,15 @@ export function blockedReason(url: string): string | null {
   return null
 }
 
-const split = (key: string) => {
+export const split = (key: string) => {
   const at = key.indexOf(":")
   return { frameId: Number(key.slice(0, at)), local: key.slice(at + 1) }
 }
 
-function toDescriptor(field: CollectedField, frameId: number): FieldDescriptor {
+/** Only the descriptor keys, trimmed; anything else a caller attached (values included) is dropped. */
+export function cleanDescriptor(field: FieldDescriptor): FieldDescriptor {
   return {
-    key: `${frameId}:${field.key}`,
+    key: cut(field.key, 50),
     tag: field.tag,
     type: cut(field.type, 50),
     name: cut(field.name, 500),
@@ -58,8 +60,9 @@ function toDescriptor(field: CollectedField, frameId: number): FieldDescriptor {
   }
 }
 
-/** Collect in every frame, ask the API, download documents, then fill frame by frame. */
-export async function runFill(api: Api, scripting: Scripting, tab: TabInfo, prefs: Prefs): Promise<FillSummary> {
+export const toDescriptor = (field: CollectedField, frameId: number): FieldDescriptor => cleanDescriptor({ ...field, key: `${frameId}:${field.key}` })
+
+export async function collectPage(scripting: Scripting, tab: TabInfo) {
   const blocked = blockedReason(tab.url)
   if (blocked) throw new Error(blocked)
   const frames = await scripting.collect(tab.id)
@@ -73,11 +76,18 @@ export async function runFill(api: Api, scripting: Scripting, tab: TabInfo, pref
       fields.push(descriptor)
     }
   }
+  return { collected, fields }
+}
+
+const labelOf = (field: FieldDescriptor) => cut(field.label || field.placeholder || field.name || "Unlabelled field", 160)
+
+/** Collect in every frame, ask the API, download documents, then fill frame by frame. */
+export async function runFill(api: Api, scripting: Scripting, tab: TabInfo, prefs: Prefs): Promise<Review> {
+  const { collected, fields } = await collectPage(scripting, tab)
   if (!fields.length) throw new Error("No form fields found on this page.")
 
-  const url = new URL(tab.url)
   const response = await api.fill({
-    page: { url: tab.url, title: cut(tab.title, 500), host: url.host },
+    page: { url: tab.url, title: cut(tab.title, 500), host: new URL(tab.url).host },
     use: { profile: true, project_id: prefs.fillAs === "me" ? null : prefs.fillAs },
     allow_drafting: prefs.allowDrafting,
     fields,
@@ -106,30 +116,44 @@ export async function runFill(api: Api, scripting: Scripting, tab: TabInfo, pref
   }
 
   const reasons = new Map(response.unfilled.map((u) => [u.key, u.reason]))
-  const needsYou: NeedsYou[] = []
-  let filled = 0
-  let drafted = 0
+  const fills = new Map(response.fills.map((f) => [f.key, f]))
+  const docNames = new Map([...files].map(([id, file]) => [id, file?.name ?? null]))
+  const rows: ReviewRow[] = []
   for (const field of fields) {
     const outcome = outcomes.get(field.key)
-    if (outcome?.status === "filled") filled++
-    else if (outcome?.status === "drafted") drafted++
-    const reason = outcome?.status === "skipped" ? outcome.reason : reasons.get(field.key)
+    const fill = fills.get(field.key)
     if (outcome?.status === "skipped" && outcome.reason === "Already has your answer") continue
-    if (reason || (!outcome && field.required)) {
-      const label = field.label || field.placeholder || field.name || "Unlabelled field"
-      needsYou.push({ key: field.key, label: cut(label, 120), reason: reason || "Required, and nothing in your kit fits" })
-    }
+    const reason = outcome?.status === "skipped" ? outcome.reason : reasons.get(field.key)
+    const done = outcome?.status === "filled" || outcome?.status === "drafted"
+    if (!done && !reason && !field.required) continue
+    rows.push({
+      key: field.key,
+      label: labelOf(field),
+      field,
+      status: done ? (outcome.status as "filled" | "drafted") : "needs",
+      value: done ? (fill?.value ?? null) : null,
+      document: done && fill?.document_id ? (docNames.get(fill.document_id) ?? null) : null,
+      source: fill?.source ?? null,
+      rule: fill?.rule ?? null,
+      confidence: fill?.confidence ?? null,
+      note: fill?.note ?? "",
+      reason: done ? "" : reason || "Required, and nothing in your kit fits",
+      filled: done && fill ? { value: fill.value, source: fill.source, rule: fill.rule ?? null } : null,
+      pageEdit: null,
+    })
   }
 
+  const url = new URL(tab.url)
   return {
     tabId: tab.id,
     url: tab.url,
+    host: url.hostname,
+    title: cut(tab.title, 500),
     at: new Date().toISOString(),
-    filled,
-    drafted,
-    needsYou,
+    rows,
     matchedOpportunityId: response.matched_opportunity_id,
     applied: false,
     remainingToday: response.usage.remaining_today,
+    moved: null,
   }
 }

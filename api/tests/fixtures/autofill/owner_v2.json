@@ -1,0 +1,114 @@
+{
+  "name": "owner_v2",
+  "profile": {
+    "gender": "Male",
+    "country_of_birth": "",
+    "place_of_birth": ""
+  },
+  "fields": [
+    {
+      "key": "gender",
+      "label": "Gender",
+      "type": "radio",
+      "options": [
+        {
+          "label": "Man",
+          "value": "Man"
+        },
+        {
+          "label": "Woman",
+          "value": "Woman"
+        },
+        {
+          "label": "Non-binary",
+          "value": "Non-binary"
+        },
+        {
+          "label": "Prefer not to say",
+          "value": "Prefer not to say"
+        }
+      ],
+      "expected": {
+        "source": "profile",
+        "value": "Man",
+        "rule": "concept:gender"
+      }
+    },
+    {
+      "key": "institution-country",
+      "label": "Country of Institution",
+      "expected": {
+        "source": "profile",
+        "value": "Ghana",
+        "rule": "qualifier:education.country"
+      }
+    },
+    {
+      "key": "birth-text",
+      "label": "Country of birth",
+      "expected": {
+        "source": "profile",
+        "value": "Ghana",
+        "confidence": "medium",
+        "rule": "inferred:nationality"
+      }
+    },
+    {
+      "key": "birth-select",
+      "label": "Country of birth",
+      "tag": "select",
+      "options": [
+        {
+          "label": "Ghana",
+          "value": "GH"
+        },
+        {
+          "label": "Nigeria",
+          "value": "NG"
+        }
+      ],
+      "expected": {
+        "source": "profile",
+        "value": "GH",
+        "confidence": "medium",
+        "rule": "inferred:nationality"
+      }
+    },
+    {
+      "key": "institution-country-section",
+      "label": "Country",
+      "section": "Institution",
+      "expected": {
+        "source": "profile",
+        "value": "Ghana",
+        "rule": "qualifier:education.country"
+      }
+    },
+    {
+      "key": "ref-email",
+      "label": "Email of referee",
+      "type": "email",
+      "expected": {
+        "source": "profile",
+        "value": "kojo@example.com",
+        "rule": "qualifier:references.email"
+      }
+    },
+    {
+      "key": "org-name",
+      "label": "Name of organization",
+      "expected": {
+        "source": "project",
+        "value": "Siwa",
+        "rule": "qualifier:name"
+      }
+    },
+    {
+      "key": "university-email",
+      "label": "Email",
+      "section": "Institution",
+      "type": "email",
+      "expected": null
+    }
+  ]
+}

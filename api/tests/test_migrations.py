@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import json
 import os
 import uuid
 from urllib.parse import urlsplit, urlunsplit
@@ -79,6 +80,8 @@ EXPECTED_TABLES = sorted(
         "applicant_answers",
         "auth_extension_sessions",
         "autofill_daily_usage",
+        "autofill_corrections",
+        "autofill_reports",
         "sources",
         "crawl_candidates",
         "page_cache",
@@ -168,6 +171,7 @@ def test_autofill_migration_backfills_normalized_answers_and_preserves_content()
             )
         )
         command.upgrade(cfg, "head")
+
         row = _run(
             _fetch(
                 url,
@@ -195,6 +199,42 @@ def test_autofill_migration_backfills_normalized_answers_and_preserves_content()
             )[0]["answer"]
             == "Original answer."
         )
+        command.upgrade(cfg, "head")
+
+
+def test_autofill_v2_backfills_birth_fields_and_preserves_explicit_values():
+    with _scratch_db() as url:
+        cfg = _cfg(url)
+        command.upgrade(cfg, "0005_autofill")
+        _run(
+            _fetch(
+                url,
+                "INSERT INTO users (id, email, password_hash, role) VALUES ('old', 'old@example.com', '!oauth', 'member'), ('explicit', 'explicit@example.com', '!oauth', 'member')",
+            )
+        )
+        _run(
+            _fetch(
+                url,
+                """
+            INSERT INTO applicant_profiles (user_id, data, sensitive)
+            VALUES ('old', '{"given_name":"Ama"}', 'encrypted-placeholder'),
+                   ('explicit', '{"country_of_birth":"Ghana","place_of_birth":"Kumasi"}', 'encrypted-placeholder')
+        """,
+            )
+        )
+        command.upgrade(cfg, "head")
+        rows = _run(
+            _fetch(url, "SELECT user_id, data FROM applicant_profiles ORDER BY user_id")
+        )
+        assert {row["user_id"]: json.loads(row["data"]) for row in rows} == {
+            "old": {"given_name": "Ama", "country_of_birth": "", "place_of_birth": ""},
+            "explicit": {"country_of_birth": "Ghana", "place_of_birth": "Kumasi"},
+        }
+        command.downgrade(cfg, "0005_autofill")
+        data = _run(
+            _fetch(url, "SELECT data FROM applicant_profiles WHERE user_id = 'old'")
+        )[0]["data"]
+        assert json.loads(data) == {"given_name": "Ama"}
         command.upgrade(cfg, "head")
 
 

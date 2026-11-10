@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 import {
   completenessLabel,
+  correctionValue,
   emptyProject,
   formatBytes,
+  groupCorrections,
   guessKind,
   limitFromQuestion,
   limitStatus,
@@ -23,7 +25,7 @@ import {
 import type { Profile } from "./kitTypes"
 
 const profile = (patch: Partial<Profile> = {}): Profile => ({
-  given_name: "", family_name: "", preferred_name: "", pronouns: "", date_of_birth: null, gender: "", nationality: "",
+  given_name: "", family_name: "", preferred_name: "", pronouns: "", date_of_birth: null, gender: "", nationality: "", country_of_birth: "", place_of_birth: "",
   country_of_residence: "", city: "", address_line1: "", address_line2: "", postal_code: "", email: "", phone: "",
   linkedin_url: "", website_url: "", github_url: "", other_links: [], headline: "", short_bio: "", long_bio: "",
   education: [], experience: [], skills: [], languages: [], awards: [], publications: [], references: [],
@@ -201,5 +203,29 @@ describe("documents", () => {
     expect(maskSecret("GHA-123456789-0")).toBe("••••••••89-0")
     expect(maskSecret("123")).toBe("•••")
     expect(maskSecret("")).toBe("")
+  })
+})
+
+describe("corrections", () => {
+  const c = (id: string, host: string, label: string, value: string | string[] | null, updated_at: string, wrong_field = false) =>
+    ({ id, host, label, field_type: "select", value, wrong_field, updated_at })
+  const list = [
+    c("1", "forms.example.org", "Gender", "Man", "2026-11-09T10:00:00Z"),
+    c("2", "apply.fund.org", "Country of birth", "Ghana", "2026-11-08T10:00:00Z"),
+    c("3", "forms.example.org", "Country of institution", null, "2026-11-10T10:00:00Z", true),
+    c("4", "apply.fund.org", "Languages", ["English", "Twi"], "2026-11-01T10:00:00Z"),
+  ]
+  it("groups by site, newest first, and filters", () => {
+    expect(groupCorrections(list).map((g) => [g.host, g.items.map((i) => i.id)])).toEqual([
+      ["apply.fund.org", ["2", "4"]],
+      ["forms.example.org", ["3", "1"]],
+    ])
+    expect(groupCorrections(list, "twi").map((g) => g.items.map((i) => i.id))).toEqual([["4"]])
+    expect(groupCorrections(list, "FORMS")).toHaveLength(1)
+  })
+  it("says values in plain words", () => {
+    expect(correctionValue(list[2])).toMatch(/Wrong field/)
+    expect(correctionValue(list[3])).toBe("English, Twi")
+    expect(correctionValue({ value: "", wrong_field: false })).toBe("Leave empty")
   })
 })

@@ -24,15 +24,31 @@ SYNONYMS = {
                 "month of birth",
                 "year of birth",
             ),
-            "gender": ("gender", "sex"),
+            "gender": (
+                "gender",
+                "sex",
+                "gender identity",
+                "what gender do you identify as",
+            ),
             "nationality": ("nationality", "citizenship", "country of citizenship"),
+            "country_of_birth": (
+                "country of birth",
+                "birth country",
+                "country born in",
+            ),
+            "place_of_birth": (
+                "place of birth",
+                "birthplace",
+                "birth city",
+                "town of birth",
+            ),
             "country_of_residence": (
                 "country of residence",
                 "residence country",
                 "country",
                 "current country",
             ),
-            "city": ("city", "town", "current city"),
+            "city": ("city", "town", "current city", "current location"),
             "address_line1": (
                 "address line 1",
                 "address line one",

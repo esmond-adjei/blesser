@@ -146,6 +146,8 @@ function ProfileForm({ initial }: { initial: Profile }) {
               <option value="Prefer not to say" />
             </datalist>
             <TextField label="Nationality" value={p.nationality} onChange={(v) => set({ nationality: v })} placeholder="Ghanaian" />
+            <TextField label="Country of birth" value={p.country_of_birth} onChange={(v) => set({ country_of_birth: v })} hint="Leave empty and Blesser assumes your nationality's country, marked for review." />
+            <TextField label="Place of birth" value={p.place_of_birth} onChange={(v) => set({ place_of_birth: v })} placeholder="Kumasi" hint="Town or city, as on your passport." />
             <TextField label="Country of residence" value={p.country_of_residence} onChange={(v) => set({ country_of_residence: v })} autoComplete="country-name" />
             <TextField label="City" value={p.city} onChange={(v) => set({ city: v })} autoComplete="address-level2" />
             <TextField label="Postal code" value={p.postal_code} onChange={(v) => set({ postal_code: v })} autoComplete="postal-code" hint="Or digital address, such as GA-123-4567." />

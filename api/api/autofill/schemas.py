@@ -1,3 +1,5 @@
+import json
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -71,6 +73,7 @@ class Fill(BaseModel):
     value: str | list[str] | None = None
     document_id: str | None = None
     source: Literal["profile", "project", "answer", "document", "drafted"]
+    rule: str
     confidence: Literal["high", "medium", "low"] = "high"
     note: str = ""
 
@@ -90,3 +93,58 @@ class FillResponse(BaseModel):
     unfilled: list[Unfilled]
     matched_opportunity_id: str | None
     usage: Usage
+
+
+FeedbackText = Annotated[str, Field(max_length=20000)]
+Value = FeedbackText | Annotated[list[FeedbackText], Field(max_length=500)] | None
+
+
+class FilledValue(Input):
+    value: Value
+    source: Annotated[str, Field(max_length=50)]
+    rule: Short | None = None
+
+
+class CorrectedValue(Input):
+    value: Value
+
+
+class WrongField(Input):
+    wrong_field: Literal[True]
+
+
+class FillFeedback(Input):
+    page: Page
+    field: FormField
+    filled: FilledValue
+    corrected: CorrectedValue | WrongField
+
+
+class Correction(BaseModel):
+    id: str
+    host: str
+    label: str
+    field_type: str
+    value: str | list[str] | None
+    wrong_field: bool
+    updated_at: datetime
+
+
+class FormReport(Input):
+    page: Page
+    fields: list[FormField] = Field(max_length=300)
+    note: Text
+
+    @model_validator(mode="after")
+    def bounded_descriptors(self):
+        if len(json.dumps(self.model_dump(), ensure_ascii=False).encode()) > 256_000:
+            raise ValueError("Reports must be at most 256 KB")
+        return self
+
+
+class FormReportOut(BaseModel):
+    id: str
+    page: Page
+    fields: list[FormField]
+    note: str
+    created_at: datetime

@@ -31,7 +31,7 @@ export default defineConfig({
     target: "chrome116",
     rollupOptions: {
       input: {
-        popup: "popup.html",
+        sidepanel: "sidepanel.html",
         options: "options.html",
         background: "src/background/index.ts",
       },

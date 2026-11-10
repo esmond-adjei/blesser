@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { API_BASE, ApiError, getAccessToken, parseDetail, refreshAccessToken, request } from "./api"
-import type { Answer, AnswerInput, DocumentPatch, KitDocument, Profile, ProfileInput, Project, ProjectInput, StorageUsage } from "./kitTypes"
+import type { Answer, AnswerInput, Correction, DocumentPatch, KitDocument, Profile, ProfileInput, Project, ProjectInput, StorageUsage } from "./kitTypes"
 
 const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) })
 const qs = (params: Record<string, string | null | undefined>) => {
@@ -29,6 +29,9 @@ export const listAnswers = (params: { q?: string; project_id?: string } = {}) =>
 export const createAnswer = (body: AnswerInput) => request<Answer>("/api/app/answers", json("POST", body))
 export const putAnswer = (id: string, body: AnswerInput) => request<Answer>(`/api/app/answers/${encodeURIComponent(id)}`, json("PUT", body))
 export const deleteAnswer = (id: string) => request<unknown>(`/api/app/answers/${encodeURIComponent(id)}`, json("DELETE"))
+
+export const listCorrections = () => request<Correction[]>("/api/app/autofill/corrections")
+export const deleteCorrection = (id: string) => request<unknown>(`/api/app/autofill/corrections/${encodeURIComponent(id)}`, json("DELETE"))
 
 export type UploadInput = { file: File; kind: string; title: string; project_ids?: string[]; is_default?: boolean }
 
@@ -97,6 +100,7 @@ export const kitKeys = {
   documents: ["kit", "documents"] as const,
   usage: ["kit", "documents", "usage"] as const,
   answers: (q: string, projectId: string) => ["kit", "answers", q, projectId] as const,
+  corrections: ["kit", "corrections"] as const,
 }
 
 export const useKitProfile = () => useQuery({ queryKey: kitKeys.profile, queryFn: () => getKitProfile(), staleTime: Infinity })
@@ -106,3 +110,4 @@ export const useDocuments = () => useQuery({ queryKey: kitKeys.documents, queryF
 export const useUsage = () => useQuery({ queryKey: kitKeys.usage, queryFn: documentUsage })
 export const useAnswers = (q: string, projectId: string) =>
   useQuery({ queryKey: kitKeys.answers(q, projectId), queryFn: () => listAnswers({ q, project_id: projectId }), placeholderData: (prev) => prev })
+export const useCorrections = () => useQuery({ queryKey: kitKeys.corrections, queryFn: listCorrections })
