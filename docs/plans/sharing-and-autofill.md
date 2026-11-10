@@ -280,3 +280,40 @@ type ExtensionSession = { id: string; name: string; created_at: string; last_use
 - The extension's name in the store (working: "Blesser: Apply with your kit").
 - Whether drafting with the model should be on by default or opt-in per fill.
 - Whether to count referral sign-ups from share links and show members how many people they brought in.
+
+---
+
+## Autofill v2 (after first real use)
+
+First real use showed matching that is too literal: "Male" did not match the option "Man"; "Country of institution" received the institution's name; "Country of birth" stayed empty although the profile says "Ghanaian". v2 fixes the causes, adds a way to learn from corrections, and moves the extension into Chrome's side panel.
+
+### Matching
+
+1. **Field intent from the whole label.** Parse labels as head plus qualifier ("country" + "of institution", "date" + "of birth", "name" + "of organization", "email" + "of referee"). The qualifier picks the record (education, experience, reference, project, profile) and the head picks the attribute; a qualifier always beats a head-only match. Section headings and fieldset legends act as qualifiers for unqualified labels inside them.
+2. **Value equivalence.** A canonical-concept layer used for every select, radio and checkbox match and for text fields with a known format:
+   - gender (male / man / M / masculine; female / woman / F; non-binary; prefer not to say),
+   - countries with ISO codes, official and common names, and demonyms (Ghanaian -> Ghana, Ivorian -> Côte d'Ivoire),
+   - degree levels (BSc, B.Sc., Bachelor's, undergraduate; MSc, MPhil, Master's; PhD, doctorate),
+   - yes/no and agreement wording, employment types, languages and proficiency scales, months, titles (Mr, Ms, Dr), and Ghana regions.
+   Matching runs canonical concept first, then normalized text, then token similarity, and records which rule fired.
+3. **Inference with a confidence.** Derive values the profile implies, marked `medium` confidence: country of birth and citizenship from nationality, nationality from country of birth, age from date of birth, current role and employer from experience marked current, highest qualification from education, full address from parts. The profile gains `country_of_birth` and `place_of_birth` so members can state them outright.
+4. **Model fallback for choices.** Select, radio and checkbox fields whose value exists but whose options did not match deterministically join the single drafting call as "choose one option or null", with the relevant facts only. The answer must be one of the given options.
+5. **Corrections.** `POST /api/app/autofill/feedback` (ext token) records, per member, a field's descriptor, what Blesser filled, and what the member changed it to (or "wrong field"). Before matching, the engine applies the member's own corrections for the same host and normalized label; corrections are never shared between members. Members can see and delete them in the Apply kit.
+
+```ts
+// POST /api/app/autofill/feedback  (ext token)
+type FillFeedback = {
+  page: { url: string; host: string };
+  field: FillRequest["fields"][number];
+  filled: { value: string | string[] | null; source: string; rule: string | null };
+  corrected: { value: string | string[] | null } | { wrong_field: true };
+}
+// -> 204.  FillResponse fills gain `rule: string` (e.g. "concept:gender", "qualifier:education.country", "inferred:nationality", "correction", "model:choice").
+```
+
+### Extension side panel
+
+- Use `chrome.sidePanel` (Chrome and Edge 114+) instead of the popup; clicking the toolbar icon opens the panel for the current tab. The panel stays open across pages and steps of a multi-page form.
+- Panel content: who it fills as, the drafting switch, **Fill this page**, then a review list grouped as Filled, Drafted, Needs you. Each row shows the field label, the value, its source and rule in plain words ("From your nationality"), and actions: jump to the field, edit the value in place (writes it to the page), clear, and "Wrong field". Edits and "Wrong field" send feedback.
+- The panel follows the page: after navigation or a new form step it offers **Fill this step**; it also notices when the member edits a filled field on the page and offers to remember the correction.
+- **Report a problem** sends the page's field descriptors (no values) plus a note to `POST /api/app/autofill/reports` so mis-fills can be fixed in the matcher. Opt-in per report.
