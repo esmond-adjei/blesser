@@ -22,6 +22,14 @@
   --color-ring: var(--focus);
   --color-sidebar: var(--canvas);
   --color-sidebar-border: var(--separator);
+  --color-sidebar-foreground: var(--ink);
+  --color-sidebar-accent: var(--surface-sunk);
+  --color-sidebar-accent-foreground: var(--ink);
+  --color-sidebar-primary: var(--forest);
+  --color-sidebar-primary-foreground: var(--on-forest);
+  --color-sidebar-ring: var(--focus);
+  --color-accent-foreground: var(--ink);
+  --color-popover-foreground: var(--ink);
 }
 
 @layer base {

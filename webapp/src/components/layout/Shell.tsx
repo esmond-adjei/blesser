@@ -10,6 +10,7 @@ import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { AccountMenu } from "./AccountMenu"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "../ui/sidebar"
 
 const NAV = [
   { to: "/opportunities", label: "Opportunities", icon: Sparkles },
@@ -36,76 +37,68 @@ function useDocumentTitle() {
   }, [pathname])
 }
 
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    "flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-callout transition-colors duration-160 [&_svg]:size-4",
-    isActive ? "bg-surface-sunk font-semibold text-ink" : "font-medium text-ink-secondary hover:bg-surface-sunk hover:text-ink",
-  )
-
-const mobileNavClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    "flex size-9 items-center justify-center rounded-sm [&_svg]:size-5",
-    isActive ? "bg-surface-sunk text-ink" : "text-ink-tertiary hover:bg-surface-sunk hover:text-ink",
-  )
-
 export function Shell() {
   useDocumentTitle()
   return (
-    <div className="flex h-dvh flex-col bg-canvas md:flex-row">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-separator bg-canvas md:flex">
-        <div className="flex items-center justify-between gap-2 pt-3 pr-2 pb-4 pl-4">
-          <Link to="/opportunities" className="flex items-center gap-2">
-            <Logo title="" className="size-6" />
-            <span className="font-display text-base font-semibold tracking-[-0.01em] text-ink">Blesser</span>
-          </Link>
-          <NotificationBell align="left" />
-        </div>
-        <nav aria-label="App" className="flex-1 space-y-0.5 px-2">
-          {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} className={navClass}>
-              <item.icon strokeWidth={1.75} />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="border-t border-separator p-2">
-          <AccountMenu />
-        </div>
-      </aside>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-separator bg-canvas px-3 py-1.5 md:hidden">
-          <Link to="/opportunities" aria-label="Blesser home" className="mr-1 flex items-center md:hidden">
-            <Logo title="" className="size-7" />
-          </Link>
-          <nav aria-label="App" className="flex items-center gap-1 md:hidden">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                aria-label={item.label}
-                className={mobileNavClass}
-              >
-                <item.icon strokeWidth={1.75} />
-              </NavLink>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-1">
-            <NotificationBell />
-            <AccountMenu variant="compact" />
-          </div>
+    <SidebarProvider defaultOpen={document.cookie.split("; ").find((entry) => entry.startsWith("sidebar_state=")) !== "sidebar_state=false"} className="h-dvh min-h-0 bg-canvas">
+      <AppSidebar />
+      <SidebarInset className="min-h-0 min-w-0 bg-canvas">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-separator px-4">
+          <SidebarTrigger />
+          <span aria-hidden="true" className="h-4 w-px bg-separator" />
+          <ShellTitle />
+          <div className="ml-auto"><NotificationBell /></div>
         </header>
-        <main className="nice-scroll min-h-0 flex-1 overflow-y-auto">
+        <div className="nice-scroll min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-content px-4 pt-5 pb-12 sm:px-8 md:pt-8">
             <React.Suspense fallback={<LoadingScreen />}>
-              <ErrorBoundary>
-                <Outlet />
-              </ErrorBoundary>
+              <ErrorBoundary><Outlet /></ErrorBoundary>
             </React.Suspense>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
+
+function ShellTitle() {
+  const { pathname } = useLocation()
+  const key = Object.keys(TITLES).find((path) => pathname === path || pathname.startsWith(`${path}/`))
+  return <span className="text-callout font-medium text-ink-secondary">{key ? TITLES[key] : "Blesser"}</span>
+}
+
+function AppSidebar() {
+  const { state, isMobile, setOpenMobile } = useSidebar()
+  const { pathname } = useLocation()
+  const compact = state === "collapsed" && !isMobile
+  return (
+    <Sidebar collapsible="icon" className="border-separator">
+      <SidebarHeader className="h-14 justify-center border-b border-separator">
+        <Link to="/opportunities" aria-label="Blesser home" onClick={() => setOpenMobile(false)} className="flex items-center gap-2 overflow-hidden px-1.5">
+          <Logo title="" className="size-7 shrink-0" />
+          {!compact && <span className="font-display text-base font-semibold tracking-[-0.01em] text-ink">Blesser</span>}
+        </Link>
+      </SidebarHeader>
+      <SidebarContent className="p-2">
+        <nav aria-label="App">
+          <SidebarMenu>
+            {NAV.map((item) => (
+              <SidebarMenuItem key={item.to}>
+                <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}>
+                  <NavLink to={item.to} onClick={() => setOpenMobile(false)} aria-label={item.label}>
+                    <item.icon strokeWidth={1.75} /><span>{item.label}</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </nav>
+      </SidebarContent>
+      <SidebarFooter className="border-t border-separator">
+        <AccountMenu variant={compact ? "compact" : "sidebar"} />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   )
 }
 
