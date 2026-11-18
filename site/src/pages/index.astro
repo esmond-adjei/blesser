@@ -22,7 +22,7 @@ import Illustration from "../components/Illustration.astro"
 import ApiErrorSection from "../components/ApiError.astro"
 import { ChecklistChip, FloatChip, Panelled } from "../components/FloatChip"
 import { ApiError, api, settle, type Announcement } from "../lib/api"
-import { loginUrl, registerUrl, siteUrl } from "../lib/config"
+import { STATIC_BUILD, loginUrl, registerUrl, siteUrl, withBase } from "../lib/config"
 import { plural } from "../lib/format"
 import { wholeRows } from "../lib/listing"
 import { organizationLd } from "../lib/seo"
@@ -33,7 +33,7 @@ const [siteData, collections, recent] = await Promise.all([
   settle(api.opportunities({ sort: "new", limit: 24 })),
 ])
 const failed = siteData instanceof ApiError
-if (failed) Astro.response.status = 503
+if (failed && !STATIC_BUILD) Astro.response.status = 503
 
 const content = failed ? null : siteData.content
 const heroTitle = content?.hero_title || "Find your next opportunity"
@@ -108,7 +108,7 @@ const steps = [
           <h1 id="hero-title" class="m-0 type-title-1 text-on-forest md:type-hero">{heroTitle}</h1>
           <p class="m-0 mt-5 max-w-[50ch] text-lg leading-7 text-on-forest/85">{heroSubtitle}</p>
           <div class="mt-8 flex flex-wrap gap-3">
-            <a href="/opportunities" class={buttonVariants({ variant: "primary", size: "lg" })}>Browse opportunities</a>
+            <a href={withBase("/opportunities")} class={buttonVariants({ variant: "primary", size: "lg" })}>Browse opportunities</a>
             <a
               href={registerUrl()}
               class={cn(buttonVariants({ variant: "quiet", size: "lg" }), "border-on-forest/40 text-on-forest hover:bg-on-forest/10")}
@@ -156,7 +156,7 @@ const steps = [
           eyebrow="Featured"
           title="Picked by our editors"
           description="Open opportunities our team has checked against the official page this week."
-          link={{ href: "/opportunities", label: "See all opportunities" }}
+          link={{ href: withBase("/opportunities"), label: "See all opportunities" }}
         >
           <Decor slot="decor" kind="sun" class="-top-8 right-16 size-20" />
           <Decor slot="decor" kind="steps" class="top-20 left-12" />
@@ -173,7 +173,7 @@ const steps = [
           title="There's still time"
           description="Deadlines in the next two weeks."
           tone="sun"
-          link={{ href: "/opportunities?closing_within=14", label: "See everything closing soon" }}
+          link={{ href: withBase("/opportunities?closing_within=14"), label: "See everything closing soon" }}
         >
           <Decor slot="decor" kind="spot" src={tracked.src} class="-top-10 left-10 w-36" />
           <CardGrid items={closingSoon} rows />
@@ -207,7 +207,7 @@ const steps = [
                   <h3 class="m-0 type-title-2 text-ink">{a.title}</h3>
                   <p class="m-0 text-ink-secondary">{a.body}</p>
                   <div class="mt-auto border-t border-separator pt-3">
-                    <ArrowLink href={`/${a.slug}`}>See opportunities</ArrowLink>
+                    <ArrowLink href={withBase(`/${a.slug}`)}>See opportunities</ArrowLink>
                   </div>
                 </div>
               </article>
@@ -294,7 +294,7 @@ const steps = [
                 </div>
                 <div class="flex flex-1 flex-col gap-2 px-1 pt-4">
                   <h3 class="m-0 text-title-3 text-ink">
-                    <a href={`/collections/${c.slug}`} class="text-ink no-underline after:absolute after:inset-0 after:content-['']">
+                    <a href={withBase(`/collections/${c.slug}`)} class="text-ink no-underline after:absolute after:inset-0 after:content-['']">
                       {c.title}
                     </a>
                   </h3>

@@ -5,17 +5,24 @@ import NotFound from "../../components/NotFound.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import ShareBox from "../../components/ShareBox.astro"
 import { ArrowRightIcon, CalendarIcon, CheckCircleIcon, ExternalIcon, PlusIcon, ShieldIcon } from "../../components/icons"
-import { ApiError, api, movedSlug, settle } from "../../lib/api"
-import { registerUrl, siteUrl } from "../../lib/config"
+import { ApiError, allOpportunities, api, movedSlug, settle, type PublicOpportunity } from "../../lib/api"
+import { STATIC_BUILD, registerUrl, siteUrl, withBase } from "../../lib/config"
 import { categoryLabel, checkedAgo, countdownFor, hostname, isHttpUrl, kindLabel } from "../../lib/format"
 import { landingForKind } from "../../lib/landings"
 import { opportunityLd } from "../../lib/seo"
 
+export async function getStaticPaths() {
+  const all = await settle(allOpportunities({ include_closed: true }))
+  return all instanceof ApiError ? [] : all.items.map((opp) => ({ params: { slug: opp.slug }, props: { opp } }))
+}
+
 const slug = Astro.params.slug ?? ""
+const prebuilt = (Astro.props as { opp?: PublicOpportunity }).opp
 const [result, collections, shareKit] = await Promise.all([
-  settle(api.opportunity(slug)),
+  prebuilt ?? settle(api.opportunity(slug)),
   settle(api.collections()),
-  settle(api.shareKit(slug)),
+  // Share links point at /s/ pages, which a static build can't serve.
+  STATIC_BUILD ? null : settle(api.shareKit(slug)),
 ])
 
 if (result instanceof ApiError && result.moved) {
@@ -25,7 +32,7 @@ if (result instanceof ApiError && result.moved) {
 const opp = result instanceof ApiError ? null : result
 const missing = result instanceof ApiError && (result.notFound || result.moved)
 if (missing) Astro.response.status = 404
-else if (!opp) Astro.response.status = 503
+else if (!opp && !STATIC_BUILD) Astro.response.status = 503
 
 const path = `/opportunities/${encodeURIComponent(slug)}`
 const related =
@@ -33,7 +40,7 @@ const related =
     ? collections.filter((c) => c.item_ids.includes(opp.id) || c.items.some((i) => i.id === opp.id))
     : []
 const kindLanding = opp ? landingForKind(opp.kind) : undefined
-const kit = opp && !opp.closed && !(shareKit instanceof ApiError) ? shareKit : null
+const kit = opp && !opp.closed && shareKit && !(shareKit instanceof ApiError) ? shareKit : null
 const applyUrl = opp && isHttpUrl(opp.link) ? opp.link : opp && isHttpUrl(opp.source_url) ? opp.source_url : null
 const sourceHost = opp ? hostname(opp.source_url || opp.link) : ""
 const checked = opp ? checkedAgo(opp.verified_at) : null
@@ -69,7 +76,7 @@ const deadlineText = opp
               <p class="m-0 text-headline text-ink">This opportunity has closed</p>
               <p class="m-0 mt-1 text-ink-secondary">
                 Its deadline has passed. Keep going, more are coming:{" "}
-                <a href={kindLanding ? `/${kindLanding.slug}` : "/opportunities"} class="text-link underline">
+                <a href={withBase(kindLanding ? `/${kindLanding.slug}` : "/opportunities")} class="text-link underline">
                   see what's open now
                 </a>
                 .
@@ -82,10 +89,10 @@ const deadlineText = opp
               <div class="min-w-0">
                 <nav aria-label="Breadcrumb" class="mb-6 text-callout text-ink-secondary">
                   <ol class="m-0 flex list-none flex-wrap items-center gap-1.5 p-0">
-                    <li><a href="/opportunities" class="text-ink-secondary hover:text-ink">Opportunities</a></li>
+                    <li><a href={withBase("/opportunities")} class="text-ink-secondary hover:text-ink">Opportunities</a></li>
                     {kindLanding && (
                       <li class="before:mr-1.5 before:content-['/']">
-                        <a href={`/${kindLanding.slug}`} class="text-ink-secondary hover:text-ink">{kindLanding.title}</a>
+                        <a href={withBase(`/${kindLanding.slug}`)} class="text-ink-secondary hover:text-ink">{kindLanding.title}</a>
                       </li>
                     )}
                   </ol>
@@ -156,7 +163,7 @@ const deadlineText = opp
                   <ul class="m-0 mt-3 flex list-none flex-col gap-2 p-0">
                     {related.map((c) => (
                       <li>
-                        <a href={`/collections/${c.slug}`} class="inline-flex items-center gap-1.5 font-semibold text-link no-underline hover:underline [&_svg]:size-[18px]">
+                        <a href={withBase(`/collections/${c.slug}`)} class="inline-flex items-center gap-1.5 font-semibold text-link no-underline hover:underline [&_svg]:size-[18px]">
                           {c.title}
                           <ArrowRightIcon />
                         </a>
@@ -205,7 +212,7 @@ const deadlineText = opp
                   )}
                   {!opp.closed && opp.deadline_date && (
                     <a
-                      href={`/api/public/opportunities/${encodeURIComponent(opp.slug)}/calendar.ics`}
+                      href={withBase(`/api/public/opportunities/${encodeURIComponent(opp.slug)}/calendar.ics`)}
                       class={cn(buttonVariants({ variant: "quiet", size: "md" }))}
                       download={`${opp.slug}.ics`}
                     >

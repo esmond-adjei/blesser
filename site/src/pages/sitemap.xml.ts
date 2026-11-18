@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro"
 import { api } from "../lib/api"
-import { PAGE_CACHE, siteUrl } from "../lib/config"
+import { PAGE_CACHE, STATIC_BUILD, siteUrl } from "../lib/config"
 import { LANDINGS } from "../lib/landings"
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -11,7 +11,8 @@ export const GET: APIRoute = async () => {
   try {
     data = await api.sitemap()
   } catch {
-    return new Response("Sitemap unavailable", { status: 503, headers: { "cache-control": "no-store" } })
+    if (STATIC_BUILD) data = { opportunities: [], collections: [] }
+    else return new Response("Sitemap unavailable", { status: 503, headers: { "cache-control": "no-store" } })
   }
   const urls: { loc: string; lastmod?: string }[] = [
     ...["/", "/opportunities", "/about", "/privacy", "/terms"].map((p) => ({ loc: p })),

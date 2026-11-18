@@ -1,4 +1,4 @@
-import { apiUrl } from "./config"
+import { STATIC_BUILD, apiUrl } from "./config"
 
 export type PublicOpportunity = {
   id: string
@@ -116,13 +116,21 @@ async function request(path: string): Promise<Response> {
   return res
 }
 
-async function get<T>(path: string): Promise<T> {
+async function fetchJson<T>(path: string): Promise<T> {
   const res = await request(path)
   try {
     return (await res.json()) as T
   } catch {
     throw new ApiError(502)
   }
+}
+
+// A static build renders every page in one process; share responses instead of refetching per page.
+const memo = new Map<string, Promise<unknown>>()
+function get<T>(path: string): Promise<T> {
+  if (!STATIC_BUILD) return fetchJson<T>(path)
+  if (!memo.has(path)) memo.set(path, fetchJson<T>(path))
+  return memo.get(path) as Promise<T>
 }
 
 function query(params: Record<string, string | number | boolean | undefined>): string {
@@ -147,6 +155,18 @@ export const api = {
   collection: (slug: string) => get<PublicCollection>(`/collections/${encodeURIComponent(slug)}`),
   site: () => get<PublicSite>("/site"),
   sitemap: () => get<Sitemap>("/sitemap"),
+}
+
+const MAX_PAGE = 100
+
+/** Every page of a listing, for static builds. */
+export async function allOpportunities(q: OpportunityQuery = {}): Promise<Page<PublicOpportunity>> {
+  const items: PublicOpportunity[] = []
+  for (let offset = 0; ; offset += MAX_PAGE) {
+    const page = await api.opportunities({ ...q, limit: MAX_PAGE, offset })
+    items.push(...page.items)
+    if (page.items.length < MAX_PAGE || items.length >= page.total) return { items, total: items.length }
+  }
 }
 
 /** The slug a 301 from /api/public/opportunities/{slug}[/suffix] points at. */

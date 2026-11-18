@@ -2,19 +2,24 @@
 import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 import Base from "../../layouts/Base.astro"
 import CardGrid from "../../components/CardGrid.astro"
+import ClientListing from "../../components/ClientListing.astro"
 import Pagination from "../../components/Pagination.astro"
 import PageHeader from "../../components/PageHeader.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import { Filters } from "../../components/Filters"
 import { LinkEmptyState } from "../../components/States"
-import { ApiError, api, settle } from "../../lib/api"
+import { ApiError, allOpportunities, api, settle } from "../../lib/api"
+import { STATIC_BUILD, withBase } from "../../lib/config"
 import { categoryLabel, kindLabel, plural } from "../../lib/format"
 import { PAGE_SIZE, isFiltered, readFilters, toQuery } from "../../lib/listing"
 
 const filters = readFilters(Astro.url.searchParams)
-const [result, facets] = await Promise.all([settle(api.opportunities(toQuery(filters))), settle(api.facets())])
+const [result, facets] = await Promise.all([
+  settle(STATIC_BUILD ? allOpportunities() : api.opportunities(toQuery(filters))),
+  settle(api.facets()),
+])
 const failed = result instanceof ApiError
-if (failed) Astro.response.status = 503
+if (failed && !STATIC_BUILD) Astro.response.status = 503
 
 const heading = filters.kind
   ? `${kindLabel(filters.kind)} opportunities`
@@ -56,16 +61,30 @@ const pageNote = filters.page > 1 ? `, page ${filters.page}` : ""
               ? "Try fewer filters or a different word. New opportunities arrive every day."
               : "New opportunities arrive every day. Create an account and we'll tell you when they do."
           }
-          actions={filtered ? [{ href: "/opportunities", label: "Clear filters" }] : []}
+          actions={filtered ? [{ href: withBase("/opportunities"), label: "Clear filters" }] : []}
         />
       ) : (
         <section aria-labelledby="results" class="mt-8">
           <h2 id="results" class="m-0 mb-4 text-callout text-ink-secondary" aria-live="polite">
-            {plural(result.total, "opportunity", "opportunities")}
-            {filters.page > 1 && ` · page ${filters.page}`}
+            <span data-count>{plural(result.total, "opportunity", "opportunities")}</span>
+            <span data-page-note>{filters.page > 1 && ` · page ${filters.page}`}</span>
           </h2>
-          <CardGrid items={result.items} />
-          <Pagination total={result.total} page={filters.page} pageSize={PAGE_SIZE} />
+          {STATIC_BUILD ? (
+            <ClientListing
+              items={result.items}
+              filters
+              empty={{
+                title: "Nothing matches those filters",
+                description: "Try fewer filters or a different word. New opportunities arrive every day.",
+                actions: [{ href: withBase("/opportunities"), label: "Clear filters" }],
+              }}
+            />
+          ) : (
+            <>
+              <CardGrid items={result.items} />
+              <Pagination total={result.total} page={filters.page} pageSize={PAGE_SIZE} />
+            </>
+          )}
         </section>
       )
     }

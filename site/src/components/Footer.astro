@@ -1,26 +1,26 @@
 ---
 import { Logo } from "@blesser/ui"
 import { CATEGORY_LANDINGS, KIND_LANDINGS } from "../lib/landings"
-import { loginUrl, registerUrl } from "../lib/config"
+import { loginUrl, registerUrl, withBase } from "../lib/config"
 
 const year = new Date().getUTCFullYear()
 const columns = [
   {
     title: "Who it's for",
-    links: CATEGORY_LANDINGS.map((l) => ({ href: `/${l.slug}`, label: l.slug.charAt(0).toUpperCase() + l.slug.slice(1) })),
+    links: CATEGORY_LANDINGS.map((l) => ({ href: withBase(`/${l.slug}`), label: l.slug.charAt(0).toUpperCase() + l.slug.slice(1) })),
   },
   {
     title: "Browse",
-    links: [{ href: "/opportunities", label: "All opportunities" }, ...KIND_LANDINGS.slice(0, 4).map((l) => ({ href: `/${l.slug}`, label: l.title }))],
+    links: [{ href: withBase("/opportunities"), label: "All opportunities" }, ...KIND_LANDINGS.slice(0, 4).map((l) => ({ href: withBase(`/${l.slug}`), label: l.title }))],
   },
   {
     title: "Blesser",
     links: [
-      { href: "/about", label: "About" },
+      { href: withBase("/about"), label: "About" },
       { href: registerUrl(), label: "Create account" },
       { href: loginUrl(), label: "Sign in" },
-      { href: "/privacy", label: "Privacy" },
-      { href: "/terms", label: "Terms" },
+      { href: withBase("/privacy"), label: "Privacy" },
+      { href: withBase("/terms"), label: "Terms" },
     ],
   },
 ]
@@ -29,7 +29,7 @@ const columns = [
 <footer class="mt-20 bg-surface-sunk text-ink">
   <div class="site-container grid gap-10 pt-14 pb-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
     <div class="flex flex-col gap-3">
-      <a href="/" class="flex items-center gap-2.5 text-ink no-underline" aria-label="Blesser home">
+      <a href={withBase("/")} class="flex items-center gap-2.5 text-ink no-underline" aria-label="Blesser home">
         <Logo title="" className="size-8" />
         <span class="font-display text-xl font-bold tracking-[-0.02em]">Blesser</span>
       </a>

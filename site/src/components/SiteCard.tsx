@@ -1,10 +1,11 @@
 import { Chip, Countdown, OpportunityArt, buttonVariants, cn } from "@blesser/ui"
 import type { PublicOpportunity } from "../lib/api"
+import { withBase } from "../lib/config"
 import { categoryLabel, countdownFor, kindLabel } from "../lib/format"
 import { ArrowRightIcon, PlusIcon } from "./icons"
 
 export function SiteCard({ opp, trackUrl }: { opp: PublicOpportunity; trackUrl: string }) {
-  const href = `/opportunities/${encodeURIComponent(opp.slug)}`
+  const href = withBase(`/opportunities/${encodeURIComponent(opp.slug)}`)
   return (
     <article className="group relative flex h-full flex-col rounded-lg bg-surface p-4 shadow-elevation-1 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0">
       <div className="relative overflow-hidden rounded-md">

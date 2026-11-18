@@ -4,7 +4,7 @@ import path from "@blesser/ui/illustrations/site-path.webp"
 import path768 from "@blesser/ui/illustrations/site-path-768.webp"
 import Base from "../layouts/Base.astro"
 import Illustration from "../components/Illustration.astro"
-import { registerUrl } from "../lib/config"
+import { registerUrl, withBase } from "../lib/config"
 
 const points = [
   {
@@ -59,7 +59,7 @@ const points = [
       <h2 id="start" class="m-0 type-title-2">Start with what's open now</h2>
       <p class="m-0 mt-2 max-w-[52ch] text-on-forest/85">Browse for free. Create an account when you want to track deadlines and plan applications.</p>
       <div class="mt-6 flex flex-wrap items-center gap-3">
-        <a href="/opportunities" class={buttonVariants({ variant: "primary", size: "lg" })}>Browse opportunities</a>
+        <a href={withBase("/opportunities")} class={buttonVariants({ variant: "primary", size: "lg" })}>Browse opportunities</a>
         <a href={registerUrl()} class="px-2 font-semibold text-on-forest underline">Create account</a>
       </div>
     </div>

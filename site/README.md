@@ -20,6 +20,14 @@ node site/dist/server/entry.mjs
 
 Pages send `Cache-Control: public, s-maxage=300, stale-while-revalidate=3600`; API failures render a friendly section with status 503. The calendar link points at `/api/public/opportunities/<slug>/calendar.ics` on the same host; in production nginx sends `/api` to the API, elsewhere the site proxies that one route itself.
 
+## GitHub Pages (static snapshot)
+
+`.github/workflows/pages.yml` builds with `SITE_STATIC=1` and `SITE_BASE=/blesser`: every page is prerendered from the API at build time, and the workflow reruns daily. Listings filter and page in the browser; share pages (`/s/*`) and share images aren't built. Set the repo variables `BLESSER_API_URL` (public API origin), `BLESSER_APP_URL` and optionally `BLESSER_CONTACT_EMAIL`. If the API can't be reached, the site still builds without its listing sections.
+
+```bash
+SITE_STATIC=1 SITE_BASE=/blesser SITE_URL=https://esmond-adjei.github.io/blesser npm run -w site build
+```
+
 ## Docker
 
 ```bash

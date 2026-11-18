@@ -1,5 +1,6 @@
 ---
 import LegalShell from "../components/LegalShell.astro"
+import { withBase } from "../lib/config"
 ---
 
 <LegalShell title="Terms of use" description="The terms for using Blesser to find and track opportunities.">
@@ -23,7 +24,7 @@ import LegalShell from "../components/LegalShell.astro"
     <h2>Accounts</h2>
     <p>
       You can delete your account at any time in Settings. We may suspend accounts that break these terms or put the service at risk.
-      See the <a href="/privacy">Privacy notice</a> for how your data is handled.
+      See the <a href={withBase("/privacy")}>Privacy notice</a> for how your data is handled.
     </p>
   </section>
 </LegalShell>

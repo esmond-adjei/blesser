@@ -4,26 +4,38 @@ import { LinkEmptyState } from "../components/States"
 import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 import Base from "../layouts/Base.astro"
 import CardGrid from "../components/CardGrid.astro"
+import ClientListing from "../components/ClientListing.astro"
 import Pagination from "../components/Pagination.astro"
 import NotFound from "../components/NotFound.astro"
 import PageHeader from "../components/PageHeader.astro"
 import ApiErrorSection from "../components/ApiError.astro"
 import { ArrowRightIcon } from "../components/icons"
-import { ApiError, api, settle } from "../lib/api"
-import { registerUrl } from "../lib/config"
+import { ApiError, allOpportunities, api, settle } from "../lib/api"
+import { STATIC_BUILD, registerUrl, withBase } from "../lib/config"
 import { plural } from "../lib/format"
-import { landingFor, CATEGORY_LANDINGS, KIND_LANDINGS } from "../lib/landings"
+import { landingFor, CATEGORY_LANDINGS, KIND_LANDINGS, LANDINGS } from "../lib/landings"
 import { PAGE_SIZE, readFilters } from "../lib/listing"
+
+export const getStaticPaths = () => LANDINGS.map((l) => ({ params: { landing: l.slug } }))
 
 const landing = landingFor(Astro.params.landing ?? "")
 const { page } = readFilters(Astro.url.searchParams)
 const result = landing
-  ? await settle(api.opportunities({ ...landing.filter, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }))
+  ? await settle(
+      STATIC_BUILD
+        ? allOpportunities(landing.filter)
+        : api.opportunities({ ...landing.filter, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+    )
   : null
 if (!landing) Astro.response.status = 404
-else if (result instanceof ApiError) Astro.response.status = 503
+else if (result instanceof ApiError && !STATIC_BUILD) Astro.response.status = 503
 
-const listHref = landing ? `/opportunities?${new URLSearchParams(landing.filter).toString()}` : "/opportunities"
+const listHref = withBase(landing ? `/opportunities?${new URLSearchParams(landing.filter).toString()}` : "/opportunities")
+const emptyState = {
+  title: "Nothing open here right now",
+  description: "New opportunities arrive every day. Create an account and we'll tell you when they do.",
+  actions: [{ href: withBase("/opportunities"), label: "See everything open" }],
+}
 const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : KIND_LANDINGS.slice(0, 6)).filter((l) => l.slug !== landing.slug) : []
 ---
 
@@ -52,19 +64,20 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
         {result instanceof ApiError || !result ? (
           <ApiErrorSection />
         ) : result.items.length === 0 ? (
-          <LinkEmptyState
-            illustration={notFound.src}
-            title="Nothing open here right now"
-            description="New opportunities arrive every day. Create an account and we'll tell you when they do."
-            actions={[{ href: "/opportunities", label: "See everything open" }]}
-          />
+          <LinkEmptyState illustration={notFound.src} {...emptyState} />
         ) : (
           <>
             <h2 id="open-now" class="m-0 mb-4 type-title-2 text-ink">
-              Open now <span class="text-ink-tertiary">· {plural(result.total, "opportunity", "opportunities")}</span>
+              Open now <span class="text-ink-tertiary">· <span data-count>{plural(result.total, "opportunity", "opportunities")}</span></span>
             </h2>
-            <CardGrid items={result.items} />
-            <Pagination total={result.total} page={page} pageSize={PAGE_SIZE} />
+            {STATIC_BUILD ? (
+              <ClientListing items={result.items} empty={emptyState} />
+            ) : (
+              <>
+                <CardGrid items={result.items} />
+                <Pagination total={result.total} page={page} pageSize={PAGE_SIZE} />
+              </>
+            )}
           </>
         )}
       </section>
@@ -75,7 +88,7 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
           <ul class="m-0 flex list-none flex-wrap gap-3 p-0">
             {siblings.map((l) => (
               <li>
-                <a href={`/${l.slug}`} class={buttonVariants({ variant: "secondary", size: "sm" })}>
+                <a href={withBase(`/${l.slug}`)} class={buttonVariants({ variant: "secondary", size: "sm" })}>
                   {l.title}
                   <ArrowRightIcon />
                 </a>

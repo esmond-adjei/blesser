@@ -2,6 +2,7 @@
 import { LinkEmptyState } from "../components/States"
 import offline from "@blesser/ui/illustrations/spot-offline.webp"
 import Base from "../layouts/Base.astro"
+import { withBase } from "../lib/config"
 ---
 
 <Base title="Something went wrong" noindex>
@@ -13,7 +14,7 @@ import Base from "../layouts/Base.astro"
       description="Something went wrong on our side. Try again in a minute, or start from the opportunities list."
       actions={[
         { href: Astro.url.pathname, label: "Try again", primary: true },
-        { href: "/opportunities", label: "Browse opportunities" },
+        { href: withBase("/opportunities"), label: "Browse opportunities" },
       ]}
     />
   </section>

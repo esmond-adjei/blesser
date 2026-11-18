@@ -1,6 +1,7 @@
 ---
 import { LinkEmptyState } from "./States"
 import offline from "@blesser/ui/illustrations/spot-offline.webp"
+import { STATIC_BUILD } from "../lib/config"
 
 interface Props {
   title?: string
@@ -9,12 +10,17 @@ const { title = "We can't load opportunities right now" } = Astro.props
 const retry = Astro.url.pathname + Astro.url.search
 ---
 
-<section class="site-container py-12">
-  <LinkEmptyState
-    error
-    illustration={offline.src}
-    title={title}
-    description="Our listings service didn't answer. Try again in a minute."
-    actions={[{ href: retry, label: "Try again" }]}
-  />
-</section>
+{
+  // A static snapshot can't retry, so it leaves the section out instead of baking in an error.
+  !STATIC_BUILD && (
+    <section class="site-container py-12">
+      <LinkEmptyState
+        error
+        illustration={offline.src}
+        title={title}
+        description="Our listings service didn't answer. Try again in a minute."
+        actions={[{ href: retry, label: "Try again" }]}
+      />
+    </section>
+  )
+}

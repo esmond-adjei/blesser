@@ -1,5 +1,6 @@
 ---
 import { LinkEmptyState } from "./States"
+import { withBase } from "../lib/config"
 import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 
 interface Props {
@@ -18,8 +19,8 @@ const {
     title={title}
     description={description}
     actions={[
-      { href: "/opportunities", label: "Browse opportunities", primary: true },
-      { href: "/", label: "Go home" },
+      { href: withBase("/opportunities"), label: "Browse opportunities", primary: true },
+      { href: withBase("/"), label: "Go home" },
     ]}
   />
 </section>

@@ -1,8 +1,13 @@
 import type { APIRoute } from "astro"
-import { ApiError, api, movedSlug } from "../../../../../lib/api"
+import { ApiError, allOpportunities, api, movedSlug, settle } from "../../../../../lib/api"
 import { PAGE_CACHE } from "../../../../../lib/config"
 
 // Production nginx sends /api to the API directly; this keeps the same-origin link working in dev and behind a bare site container.
+export async function getStaticPaths() {
+  const all = await settle(allOpportunities())
+  return all instanceof ApiError ? [] : all.items.filter((o) => o.deadline_date).map((o) => ({ params: { slug: o.slug } }))
+}
+
 export const GET: APIRoute = async ({ params, redirect }) => {
   const slug = params.slug ?? ""
   try {

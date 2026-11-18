@@ -1,0 +1,60 @@
+name: Site to GitHub Pages
+
+# Static snapshot of the public site. Data is read from the API at build time,
+# so the daily run keeps listings and countdowns fresh.
+on:
+  push:
+    branches: [main, claude/keen-mendel-cape9f]
+    paths: [site/**, design-system/**, package-lock.json, .github/workflows/pages.yml]
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --workspace site --include-workspace-root
+
+      - name: Build
+        env:
+          SITE_STATIC: "1"
+          SITE_BASE: /${{ github.event.repository.name }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          # Unset or unreachable: the site still builds, without the listing sections.
+          API_INTERNAL_URL: ${{ vars.BLESSER_API_URL }}
+          PUBLIC_APP_URL: ${{ vars.BLESSER_APP_URL }}
+          CONTACT_EMAIL: ${{ vars.BLESSER_CONTACT_EMAIL }}
+        run: npm run --workspace site build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -5,15 +5,21 @@ import NotFound from "../../components/NotFound.astro"
 import PageHeader from "../../components/PageHeader.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import { LinkEmptyState } from "../../components/States"
-import { ApiError, api, settle } from "../../lib/api"
+import { ApiError, api, settle, type PublicCollection } from "../../lib/api"
+import { STATIC_BUILD, withBase } from "../../lib/config"
 import { plural } from "../../lib/format"
 
+export async function getStaticPaths() {
+  const collections = await settle(api.collections())
+  return collections instanceof ApiError ? [] : collections.map((c) => ({ params: { slug: c.slug }, props: { collection: c } }))
+}
+
 const slug = Astro.params.slug ?? ""
-const result = await settle(api.collection(slug))
+const result = (Astro.props as { collection?: PublicCollection }).collection ?? (await settle(api.collection(slug)))
 const collection = result instanceof ApiError ? null : result
 const missing = result instanceof ApiError && result.notFound
 if (missing) Astro.response.status = 404
-else if (!collection) Astro.response.status = 503
+else if (!collection && !STATIC_BUILD) Astro.response.status = 503
 const items = collection?.items.filter((o) => !o.closed) ?? []
 ---
 
@@ -39,7 +45,7 @@ const items = collection?.items.filter((o) => !o.closed) ?? []
             <LinkEmptyState
               title="Everything in this collection has closed"
               description="Keep going, more are coming. See what's open now."
-              actions={[{ href: "/opportunities", label: "Browse opportunities" }]}
+              actions={[{ href: withBase("/opportunities"), label: "Browse opportunities" }]}
             />
           )}
         </div>

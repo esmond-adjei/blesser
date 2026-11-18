@@ -5,19 +5,23 @@ import NotFound from "../../components/NotFound.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import { ShieldIcon } from "../../components/icons"
 import { ApiError, api, settle } from "../../lib/api"
-import { loginUrl, registerUrl } from "../../lib/config"
+import { loginUrl, registerUrl, withBase } from "../../lib/config"
 import { cardFromTeaser } from "../../lib/share/model"
 import { siteHost } from "../../lib/share/route"
+
+// Tokens can't be listed, so a static build has no share pages.
+export const getStaticPaths = () => [] as { params: { token: string } }[]
 
 const token = Astro.params.token ?? ""
 const result = await settle(api.shared(token))
 const teaser = result instanceof ApiError ? null : result
 
-if (teaser?.audience === "public") return Astro.redirect(`/opportunities/${encodeURIComponent(teaser.slug)}?ref=share`, 302)
+if (teaser?.audience === "public") return Astro.redirect(withBase(`/opportunities/${encodeURIComponent(teaser.slug)}?ref=share`), 302)
 if (result instanceof ApiError) Astro.response.status = result.notFound ? 404 : 503
 
 const card = teaser ? cardFromTeaser(teaser, siteHost()) : null
 const image = `/share/${encodeURIComponent(token)}`
+const imageSrc = withBase(image)
 const description = teaser
   ? [teaser.organization && `Offered by ${teaser.organization}`, teaser.benefits].filter(Boolean).join(". ").slice(0, 300)
   : undefined
@@ -50,7 +54,7 @@ const description = teaser
                 <p class="m-0 text-headline text-ink">This opportunity has closed</p>
                 <p class="m-0 mt-1 text-ink-secondary">
                   Its deadline has passed. Keep going, more are coming:{" "}
-                  <a href="/opportunities" class="text-link underline">see what's open now</a>.
+                  <a href={withBase("/opportunities")} class="text-link underline">see what's open now</a>.
                 </p>
               </div>
             ) : (
@@ -81,7 +85,7 @@ const description = teaser
             </div>
           </div>
           <img
-            src={`${image}/square.png`}
+            src={`${imageSrc}/square.png`}
             alt=""
             width="1080"
             height="1080"

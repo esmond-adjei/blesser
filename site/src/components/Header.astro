@@ -1,7 +1,7 @@
 ---
 import { Logo, buttonVariants, cn } from "@blesser/ui"
 import { MenuIcon } from "./icons"
-import { loginUrl, registerUrl } from "../lib/config"
+import { loginUrl, registerUrl, withBase } from "../lib/config"
 
 const NAV = [
   { href: "/opportunities", label: "Opportunities" },
@@ -10,7 +10,7 @@ const NAV = [
   { href: "/fellowships", label: "Fellowships" },
   { href: "/accelerators", label: "Accelerators" },
   { href: "/about", label: "About" },
-]
+].map((item) => ({ ...item, href: withBase(item.href) }))
 
 interface Props {
   onForest?: boolean
@@ -22,7 +22,7 @@ const current = (href: string) => path === href || path.startsWith(`${href}/`)
 
 <header class={onForest ? "bg-forest text-on-forest" : "border-b border-separator bg-canvas"}>
   <div class="site-container flex h-16 items-center gap-6">
-    <a href="/" class="flex items-center gap-2.5 rounded-full no-underline" aria-label="Blesser home">
+    <a href={withBase("/")} class="flex items-center gap-2.5 rounded-full no-underline" aria-label="Blesser home">
       <Logo title="" className="size-8" />
       <span class={cn("font-display text-xl font-bold tracking-[-0.02em]", onForest ? "text-on-forest" : "text-ink")}>Blesser</span>
     </a>

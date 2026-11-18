@@ -2,6 +2,7 @@ import { Field, Select, buttonVariants } from "@blesser/ui"
 import type { Facets } from "../lib/api"
 import { CATEGORY_LABELS, CLOSING_WITHIN, KIND_LABELS } from "../lib/format"
 import type { Filters as FilterState } from "../lib/listing"
+import { withBase } from "../lib/config"
 import { SearchIcon } from "./icons"
 
 const count = (facets: Facets | null, group: "categories" | "kinds", key: string) => {
@@ -15,7 +16,7 @@ export function Filters({ filters, facets }: { filters: FilterState; facets: Fac
     (k) => k === filters.kind || !facets || facets.kinds.some((f) => f.key === k && f.count > 0),
   )
   return (
-    <form method="get" action="/opportunities" role="search" className="rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
+    <form method="get" action={withBase("/opportunities")} role="search" className="rounded-lg border border-separator bg-surface p-5 shadow-elevation-1">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
         <Field label="Search" id="f-q" name="q" type="search" defaultValue={filters.q} placeholder="Title, organisation or topic" />
         <Field label="For" id="f-category">
@@ -60,7 +61,7 @@ export function Filters({ filters, facets }: { filters: FilterState; facets: Fac
           <SearchIcon />
           Show opportunities
         </button>
-        <a href="/opportunities" className={buttonVariants({ variant: "quiet" })}>
+        <a href={withBase("/opportunities")} className={buttonVariants({ variant: "quiet" })}>
           Clear filters
         </a>
       </div>
