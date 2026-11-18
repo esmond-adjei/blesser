@@ -13,8 +13,9 @@ from api.agent.llm.base import LLMResponse, ToolCall
 from api.agent.tools.context import ToolContext
 from api.agent.tools.dispatch import _fetch_page
 from api.core.db import SessionLocal
+from api.core.exceptions import NotFoundError
 from api.core.time import utcnow_naive
-from api.opportunities import crawler, extraction, page_cache, pipeline
+from api.opportunities import crawler, extraction, page_cache, pipeline, service
 from api.opportunities.crawl_models import CrawlCandidate, PageCache, Source
 from api.opportunities.page_content import (
     Page,
@@ -426,9 +427,16 @@ def test_worker_crawls_extracts_and_holds_low_confidence(monkeypatch):
             source = await session.get(Source, candidate.source_id)
             assert source.candidates_found == source.opportunities_saved == 1
             assert candidate.content_hash
-            assert (await scans.scan_detail(session, TEST_USER_ID, scan.id))["metrics"][
-                "saved"
-            ] == 1
+            detail = await scans.scan_detail(session, TEST_USER_ID, scan.id)
+            assert detail["metrics"]["saved"] == 1
+            assert [
+                (find["opportunity_id"], find["source"], find["in_review"])
+                for find in detail["finds"]
+            ] == [(row.id, "web", True)]
+            with pytest.raises(NotFoundError):
+                await service.track(session, "other-user", row.id)
+            app, created = await service.track(session, TEST_USER_ID, row.id)
+            assert created and app["opportunity_id"] == row.id
 
     run(check())
 

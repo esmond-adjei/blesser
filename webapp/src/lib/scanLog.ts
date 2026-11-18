@@ -1,5 +1,5 @@
 import { utcMs } from "./format"
-import type { Scan, ScanTask, ScanTaskEvent } from "./types"
+import type { Scan, ScanTaskEvent } from "./types"
 
 export type LineKind = "search" | "read" | "save" | "update" | "note" | "other"
 
@@ -12,14 +12,6 @@ export interface LogLine {
   failed: boolean
   reason?: string
   at?: string
-}
-
-export interface Saved {
-  opportunityId: string | null
-  title: string
-  deadline: string | null
-  created: boolean
-  taskId: string
 }
 
 function parse(preview: string | undefined): Record<string, unknown> {
@@ -68,51 +60,19 @@ export function describeEvent(event: ScanTaskEvent): LogLine {
     const url = String(input.url ?? "")
     return { kind: "read", text: `${failed ? "Couldn't read" : "Read"} ${shortUrl(url)}`, href: url || undefined, failed, reason: failed ? errorReason(event.result_preview) : undefined, at }
   }
+  if (event.tool === "crawl_candidate") {
+    const url = typeof input.url === "string" ? input.url : ""
+    return { kind: "read", text: url ? `Checked ${shortUrl(url)}` : "Checked a candidate", href: url || undefined, failed: false, at }
+  }
   if (event.tool === "save_opportunity") {
     const title = String(input.title ?? "an opportunity")
     if (failed) return { kind: "save", text: `Not saved: ${title}`, failed, reason: errorReason(event.result_preview), at }
     const result = parse(event.result_preview)
-    const id = typeof result.opportunity_id === "string" ? result.opportunity_id : undefined
+    const id = typeof result.opportunity_id === "string" && result.status !== "in_review" ? result.opportunity_id : undefined
     const created = result.created !== false
     return { kind: created ? "save" : "update", text: `${created ? "Saved" : "Updated"} ${title}`, opportunityId: id, failed, at }
   }
   return { kind: "other", text: event.tool ? `Used ${event.tool.replaceAll("_", " ")}` : "Step", failed, at }
-}
-
-export function taskStats(task: ScanTask) {
-  let searches = 0
-  let reads = 0
-  let saved = 0
-  let failures = 0
-  for (const e of task.log) {
-    if (e.kind === "turn") continue
-    if (e.ok === false) failures++
-    if (e.tool === "search_web") searches++
-    else if (e.tool === "fetch_page") reads++
-    else if (e.tool === "save_opportunity" && e.ok) saved++
-  }
-  return { searches, reads, saved, failures }
-}
-
-/** Every successful save across tasks, newest title wins per opportunity. */
-export function savedOpportunities(tasks: ScanTask[]): Saved[] {
-  const out = new Map<string, Saved>()
-  for (const task of tasks) {
-    for (const e of task.log) {
-      if (e.tool !== "save_opportunity" || !e.ok) continue
-      const result = parse(e.result_preview)
-      const id = typeof result.opportunity_id === "string" ? result.opportunity_id : null
-      const title = String(e.input?.title ?? "Untitled")
-      out.set(id ?? `${task.id}:${title}`, {
-        opportunityId: id,
-        title,
-        deadline: typeof result.deadline_date === "string" ? result.deadline_date : null,
-        created: result.created !== false,
-        taskId: task.id,
-      })
-    }
-  }
-  return [...out.values()]
 }
 
 /** Milliseconds a task or scan ran; up to now while it is still going. */

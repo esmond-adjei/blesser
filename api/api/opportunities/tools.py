@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert
 
 from api.agent.tools.context import ToolContext
 from api.applications.dates import parse_deadline
@@ -12,6 +13,7 @@ from api.opportunities import models as m
 from api.opportunities import schemas
 from api.opportunities import service as opp_service
 from api.opportunities.page_content import dates_in, expired, normalized_url
+from api.scans.models import ScanFind
 
 #: Fetched text kept per page for grounding checks.
 MAX_PAGE_CHARS = 400_000
@@ -168,6 +170,16 @@ async def handle_save_opportunity(
         low_confidence=getattr(ctx, "extraction_confidence", 1)
         < settings.extraction_min_confidence,
     )
+    if scan_id:
+        await ctx.session.execute(
+            insert(ScanFind)
+            .values(
+                scan_id=scan_id,
+                opportunity_id=opp.id,
+                source_url=data.source_url if created else None,
+            )
+            .on_conflict_do_nothing()
+        )
     from api.opportunities.crawler import propose_source, record_candidate
 
     source_id = await propose_source(ctx.session, data.source_url, data.category.value)

@@ -9,6 +9,8 @@ import { SITE_URL } from "./lib/site"
 
 const Shell = React.lazy(() => import("./components/layout/Shell").then((m) => ({ default: m.Shell })))
 const Opportunities = React.lazy(() => import("./pages/Opportunities").then((m) => ({ default: m.Opportunities })))
+const Assistant = React.lazy(() => import("./pages/Assistant").then((m) => ({ default: m.Assistant })))
+const OpportunityPage = React.lazy(() => import("./pages/OpportunityPage").then((m) => ({ default: m.OpportunityPage })))
 const Applications = React.lazy(() => import("./pages/Applications").then((m) => ({ default: m.Applications })))
 const Todos = React.lazy(() => import("./pages/Todos").then((m) => ({ default: m.Todos })))
 const Scans = React.lazy(() => import("./pages/Scans").then((m) => ({ default: m.Scans })))
@@ -71,6 +73,8 @@ export default function App() {
             <Route index element={<Home />} />
             <Route element={<RequireAuth />}>
               <Route path="opportunities" element={<Opportunities />} />
+              <Route path="opportunities/:id" element={<OpportunityPage />} />
+              <Route path="assistant/:chatId?" element={<Assistant />} />
               <Route path="applications" element={<Applications />} />
               <Route path="todos" element={<Todos />} />
               <Route path="kit" element={<KitLayout />}>

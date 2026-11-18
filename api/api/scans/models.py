@@ -112,3 +112,16 @@ class WorkerHeartbeat(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime, default=utcnow_naive, index=True
     )
+
+
+class ScanFind(Base):
+    __tablename__ = "scan_finds"
+
+    scan_id: Mapped[str] = mapped_column(
+        ForeignKey("scans.id", ondelete="CASCADE"), primary_key=True
+    )
+    opportunity_id: Mapped[str] = mapped_column(
+        ForeignKey("opportunities.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    found_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+    source_url: Mapped[str | None] = mapped_column(Text)

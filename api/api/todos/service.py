@@ -121,7 +121,7 @@ async def _check_links(session, user_id: str, opportunity_id, application_id) ->
             raise BadRequestError("Application not found")
 
 
-async def create_todo(session, user_id: str, data: schemas.TodoCreate) -> dict:
+async def create_todo(session, user_id: str, data: schemas.TodoCreate, *, commit: bool = True) -> dict:
     await _check_links(session, user_id, data.opportunity_id, data.application_id)
     last = (
         await session.execute(
@@ -139,7 +139,10 @@ async def create_todo(session, user_id: str, data: schemas.TodoCreate) -> dict:
         position=(last or 0) + 1,
     )
     session.add(row)
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
     await session.refresh(row)
     return await _one_out(session, row)
 

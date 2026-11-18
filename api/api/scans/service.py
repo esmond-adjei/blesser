@@ -2,8 +2,10 @@
 
 import json
 from datetime import timedelta
+from urllib.parse import urlsplit
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, tuple_, update
+from sqlalchemy.orm import aliased
 
 from api.core.config import settings
 from api.core.exceptions import NotFoundError
@@ -189,6 +191,61 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
     return result
 
 
+def _web_url(url: str | None) -> tuple[str | None, str | None]:
+    if url:
+        try:
+            parsed = urlsplit(url)
+            if parsed.scheme in {"http", "https"} and parsed.hostname:
+                return url, parsed.hostname.removeprefix("www.")
+        except ValueError:
+            pass
+    return None, None
+
+
+async def _scan_finds(session, scan: m.Scan) -> list[dict]:
+    earlier = aliased(m.ScanFind)
+    seen = (
+        select(1)
+        .select_from(earlier)
+        .join(m.Scan, m.Scan.id == earlier.scan_id)
+        .where(
+            m.Scan.user_id == scan.user_id,
+            earlier.opportunity_id == m.ScanFind.opportunity_id,
+            tuple_(earlier.found_at, earlier.scan_id)
+            < tuple_(m.ScanFind.found_at, m.ScanFind.scan_id),
+        )
+        .exists()
+    )
+    rows = await session.execute(
+        select(Opportunity, m.ScanFind.source_url, seen.label("seen"))
+        .join(m.ScanFind, m.ScanFind.opportunity_id == Opportunity.id)
+        .where(
+            m.ScanFind.scan_id == scan.id,
+            (Opportunity.status == "published")
+            | ((Opportunity.scan_id == scan.id) & (Opportunity.status == "in_review")),
+        )
+        .order_by(m.ScanFind.found_at, Opportunity.id)
+    )
+    finds = []
+    for opportunity, found_url, already_seen in rows:
+        from_web = opportunity.scan_id == scan.id
+        source_url, domain = _web_url(found_url if from_web else opportunity.source_url)
+        official_url, _ = _web_url(opportunity.link)
+        finds.append(
+            {
+                "opportunity_id": opportunity.id,
+                "title": opportunity.title,
+                "deadline_date": opportunity.deadline_date,
+                "source": "web" if from_web else "catalog",
+                "source_domain": domain if from_web else None,
+                "official_url": official_url or source_url,
+                "is_new": not already_seen,
+                "in_review": opportunity.status == "in_review",
+            }
+        )
+    return finds
+
+
 async def scan_detail(session, user_id: str, scan_id: str) -> dict:
     scan = await get_or_404(session, user_id, scan_id)
     tasks = (
@@ -197,7 +254,9 @@ async def scan_detail(session, user_id: str, scan_id: str) -> dict:
         .all()
     )
     added = await _added_counts(session, [scan.id])
-    return _scan_out(scan, added.get(scan.id, 0), list(tasks))
+    out = _scan_out(scan, added.get(scan.id, 0), list(tasks))
+    out["finds"] = await _scan_finds(session, scan)
+    return out
 
 
 async def cancel_scan(session, user_id: str, scan_id: str) -> dict:

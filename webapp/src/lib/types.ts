@@ -93,6 +93,15 @@ export interface ScanTask {
   finished_at: string | null
 }
 
+export type ScanFind = {
+  opportunity_id: string
+  title: string
+  deadline_date: string | null
+  official_url: string | null
+  is_new: boolean
+  in_review: boolean
+} & ({ source: "catalog"; source_domain: null } | { source: "web"; source_domain: string | null })
+
 export interface Scan {
   id: string
   region: string
@@ -103,7 +112,8 @@ export interface Scan {
   opportunities_added: number
   /** Not sent by every API version; the UI falls back to task timestamps. */
   finished_at?: string | null
-  tasks?: ScanTask[]
+  tasks?: ScanTask[] | null
+  finds?: ScanFind[] | null
 }
 
 export interface ScanRequest {

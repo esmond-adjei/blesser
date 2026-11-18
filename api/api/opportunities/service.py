@@ -438,9 +438,22 @@ def kind_label(kind: str) -> str:
     return _KIND_LABELS.get(kind, kind.replace("_", " ").capitalize())
 
 
-async def track(session, user_id: str, opportunity_id: str) -> tuple[dict, bool]:
+async def track(session, user_id: str, opportunity_id: str, *, commit: bool = True) -> tuple[dict, bool]:
     """Copy an opportunity into the person's application tracker; idempotent."""
-    opp = await get_or_404(session, opportunity_id)
+    opp = await get_or_404(session, opportunity_id, public=False)
+    if opp.status != "published":
+        from api.scans.models import Scan
+
+        owner = (
+            await session.scalar(select(Scan.user_id).where(Scan.id == opp.scan_id))
+            if opp.status == "in_review" and opp.scan_id
+            else None
+        )
+        if owner != user_id:
+            raise NotFoundError("Opportunity not found")
+    await session.execute(
+        select(func.pg_advisory_xact_lock(func.hashtext(f"track:{user_id}:{opp.id}")))
+    )
     existing = (
         await session.execute(
             select(application_models.Application).where(
@@ -467,6 +480,9 @@ async def track(session, user_id: str, opportunity_id: str) -> tuple[dict, bool]
         opportunity_id=opp.id,
     )
     session.add(app)
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
     await session.refresh(app)
     return application_service.to_out(app), True

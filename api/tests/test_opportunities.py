@@ -231,6 +231,52 @@ def test_save_creates_then_refreshes_without_duplicating():
     assert asyncio.run(count()) == 1
 
 
+def test_scan_finds_keep_web_and_catalog_provenance_without_logs():
+    first_scan, next_scan = _run_id(), _run_id()
+    data = {
+        **BASE,
+        "title": "Accra Ventures Climate Fund",
+        "source_url": "https://www.accraventures.example/climate",
+        "link": "https://applications.example/climate",
+    }
+    pages = {url: data["title"] for url in (data["source_url"], data["link"])}
+    opportunity_id = _save(first_scan, data, pages)["opportunity_id"]
+    for _ in range(2):
+        assert _save(next_scan, data, pages)["opportunity_id"] == opportunity_id
+
+    client = _client()
+    first = client.get(f"/api/app/scans/{first_scan}").json()
+    later = client.get(f"/api/app/scans/{next_scan}").json()
+    assert first["opportunities_added"] == 1
+    assert first["finds"] == [
+        {
+            "opportunity_id": opportunity_id,
+            "title": data["title"],
+            "deadline_date": None,
+            "source": "web",
+            "source_domain": "accraventures.example",
+            "official_url": data["link"],
+            "is_new": True,
+            "in_review": False,
+        }
+    ]
+    assert later["opportunities_added"] == 0
+    assert later["tasks"] == []
+    assert later["finds"] == [
+        {
+            **first["finds"][0],
+            "source": "catalog",
+            "source_domain": None,
+            "is_new": False,
+        }
+    ]
+    client.delete(f"/api/app/scans/{first_scan}").raise_for_status()
+    assert (
+        client.get(f"/api/app/scans/{next_scan}").json()["finds"][0]["source"]
+        == "catalog"
+    )
+
+
 def test_save_respects_task_budget(monkeypatch):
     monkeypatch.setattr(settings, "max_opportunities_per_task", 0)
     result = _save(_run_id(), BASE, {BASE["source_url"]: PAGE})

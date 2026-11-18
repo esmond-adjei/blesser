@@ -9,9 +9,12 @@ import {
   ChevronRight,
   CircleAlert,
   CircleDashed,
+  Database,
   FileText,
+  Globe,
   Info,
-  Loader,
+  Loader2,
+  PanelRightOpen,
   MessageSquareText,
   Plus,
   Search,
@@ -20,20 +23,18 @@ import {
 } from "lucide-react"
 import * as api from "../lib/api"
 import { formatAgo } from "../lib/format"
-import { CATEGORIES, CATEGORY_DESCRIPTIONS, CATEGORY_LABELS } from "../lib/opportunities"
+import { CATEGORIES, CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, useTrackedOpportunities, useTrackOpportunity } from "../lib/opportunities"
 import {
   clock,
   describeEvent,
   elapsedMs,
   formatDuration,
-  savedOpportunities,
   scanElapsedMs,
-  taskStats,
   type LogLine,
 } from "../lib/scanLog"
 import { toastError, toastSuccess } from "../lib/toast"
-import type { OpportunityCategory, Scan, ScanTask } from "../lib/types"
-import { Button, Countdown, Field, Input, cn, daysUntil } from "@blesser/ui"
+import type { OpportunityCategory, Scan, ScanFind, ScanTask } from "../lib/types"
+import { Button, Chip, Countdown, Field, Input, buttonVariants, cn, daysUntil } from "@blesser/ui"
 import {
   Dialog,
   DialogBody,
@@ -45,13 +46,14 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
+import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 
 type Status = ScanTask["status"] | Scan["status"]
 
 const STATUS: Record<Status, { label: string; dot: string }> = {
-  running: { label: "Running", dot: "bg-info motion-safe:animate-pulse" },
-  pending: { label: "Waiting", dot: "bg-control-border" },
-  done: { label: "Finished", dot: "bg-positive" },
+  running: { label: "Running", dot: "bg-sun motion-safe:animate-pulse" },
+  pending: { label: "Queued", dot: "bg-ink-tertiary" },
+  done: { label: "Finished", dot: "bg-forest" },
   error: { label: "Stopped early", dot: "bg-caution" },
   cancelled: { label: "Stopped", dot: "bg-ink-tertiary" },
 }
@@ -74,7 +76,6 @@ function scanTitle(scan: Scan): string {
   return scan.region ? `${audiences(scan)} in ${scan.region}` : audiences(scan)
 }
 
-/** Re-renders every `ms` while `active`, for elapsed timers. */
 function useTick(active: boolean, ms = 15_000) {
   const [, setTick] = React.useState(0)
   React.useEffect(() => {
@@ -93,10 +94,10 @@ export function Scans() {
   const [open, setOpen] = React.useState(false)
   useTick(!!scans.data?.some((s) => s.status === "running"))
   return (
-    <div className="space-y-6">
+    <div className="bl-enter min-w-0 space-y-6">
       <PageHeader
         title="Scans"
-        description="Agents search the web, read each opportunity's own page and save what they can verify."
+        description="Find opportunities from the Blesser catalog and across the web."
         actions={
           <Button size="sm" variant="primary" onClick={() => setOpen(true)} icon={<Plus />}>
             New scan
@@ -110,12 +111,7 @@ export function Scans() {
       ) : !scans.data?.length ? (
         <EmptyState
           title="No scans yet"
-          description="A scan sends agents to find new opportunities for startups, researchers or students."
-          action={
-            <Button size="sm" onClick={() => setOpen(true)} icon={<Plus />}>
-              New scan
-            </Button>
-          }
+          description="Look for opportunities for startups, researchers or students."
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-separator bg-surface">
@@ -152,7 +148,7 @@ function ScanRow({ scan }: { scan: Scan }) {
     >
       <span className="min-w-0">
         <span className="block truncate text-callout font-semibold text-ink">{scanTitle(scan)}</span>
-        {scan.focus ? <span className="block truncate text-footnote text-ink-tertiary">Focus: {scan.focus}</span> : null}
+        {scan.focus ? <span className="block truncate text-footnote text-ink-tertiary">Focus on {scan.focus}</span> : null}
       </span>
       <StatusLabel status={scan.status} className="justify-self-end md:justify-self-start" />
       <span className="col-span-2 text-footnote text-ink-tertiary md:hidden">
@@ -195,7 +191,7 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
         >
           <DialogHeader>
             <DialogTitle>New scan</DialogTitle>
-            <DialogDescription>Find open opportunities and add the ones that check out to the catalogue.</DialogDescription>
+            <DialogDescription>Find open opportunities and add the ones that check out to the catalog.</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <fieldset>
@@ -257,7 +253,8 @@ export function ScanDetail() {
   const scan = useQuery({
     queryKey: ["scan", scanId],
     queryFn: () => api.getScan(scanId),
-    refetchInterval: (query) => (query.state.data?.status === "running" ? 4000 : false),
+    refetchInterval: ({ state: { data } }) =>
+      data?.status === "running" || data?.tasks?.some((task) => task.status === "running") ? 4000 : false,
   })
   const refresh = (next: Scan) => {
     client.setQueryData(["scan", scanId], next)
@@ -268,7 +265,7 @@ export function ScanDetail() {
     mutationFn: () => api.deleteScan(scanId),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["scans"] })
-      toastSuccess("Scan deleted. What it found stays in the catalogue.")
+      toastSuccess("Scan deleted. What it found stays in the catalog.")
       navigate("/scans")
     },
     onError: (e) => toastError(e),
@@ -283,7 +280,7 @@ export function ScanDetail() {
   const tasks = data.tasks ?? []
   const duration = scanElapsedMs(data)
   return (
-    <div className="space-y-6">
+    <div className="bl-enter min-w-0 space-y-6">
       <PageHeader
         back={
           <Link to="/scans" className="hover:text-ink hover:underline">
@@ -301,7 +298,7 @@ export function ScanDetail() {
               </span>
             ) : null}
             {data.focus ? (
-              <span className="min-w-0 truncate">Focus: {data.focus}</span>
+              <span className="min-w-0 truncate">Focus on {data.focus}</span>
             ) : null}
           </span>
         }
@@ -317,14 +314,15 @@ export function ScanDetail() {
           )
         }
       />
-      <Outcome scan={data} />
-      <Progress tasks={tasks} />
+      {running ? <Progress tasks={tasks} /> : null}
+      <Outcome finds={data.finds ?? []} running={running} />
+      {running ? null : <Progress tasks={tasks} />}
       <ActivityLog tasks={tasks} />
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent className="max-w-sm">
           <DialogHeader>
             <AlertDialogTitle className="type-title-3">Delete this scan?</AlertDialogTitle>
-            <AlertDialogDescription className="text-callout text-ink-secondary">Its activity log goes. The opportunities it saved stay in the catalogue.</AlertDialogDescription>
+            <AlertDialogDescription className="text-callout text-ink-secondary">Its activity log goes. The opportunities it saved stay in the catalog.</AlertDialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-5">
             <Button variant="quiet" onClick={() => setConfirmDelete(false)}>
@@ -342,85 +340,116 @@ export function ScanDetail() {
 
 const OUTCOME_PREVIEW = 8
 
-function Outcome({ scan }: { scan: Scan }) {
-  const tasks = scan.tasks ?? []
-  const saved = savedOpportunities(tasks)
+function Outcome({ finds, running }: { finds: ScanFind[]; running: boolean }) {
   const [all, setAll] = React.useState(false)
-  const running = scan.status === "running"
-  const failures = tasks.reduce((n, t) => n + taskStats(t).failures, 0)
-  const shown = all ? saved : saved.slice(0, OUTCOME_PREVIEW)
-  const count = Math.max(saved.length, scan.opportunities_added)
+  const tracked = useTrackedOpportunities()
+  const shown = all ? finds : finds.slice(0, OUTCOME_PREVIEW)
   return (
     <section aria-labelledby="outcome-heading" className="rounded-lg border border-separator bg-surface">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4 pb-3">
-        <h2 id="outcome-heading" className="text-headline text-ink" aria-live="polite">
-          {count === 0
-            ? running
-              ? "Nothing saved yet"
-              : "No new opportunities"
-            : `${count} ${count === 1 ? "opportunity" : "opportunities"} saved`}
-        </h2>
-        {count ? (
-          <Link to="/opportunities?sort=new" className="text-footnote font-medium text-link hover:underline">
-            See newest in catalogue
-          </Link>
-        ) : null}
-      </div>
-      {saved.length ? (
+      <h2 id="outcome-heading" className="px-4 pt-4 pb-3 text-headline text-ink" aria-live="polite">
+        {finds.length
+          ? `${finds.length} ${finds.length === 1 ? "opportunity" : "opportunities"} found`
+          : running ? "No finds yet" : "No opportunities found"}
+      </h2>
+      {shown.length ? (
         <ul className="divide-y divide-separator border-t border-separator">
-          {shown.map((s) => (
-            <li key={s.opportunityId ?? s.title} className="flex items-center gap-3 px-4 py-2.5">
-              <Check aria-hidden="true" className="size-4 shrink-0 text-positive" />
-              <span className="min-w-0 flex-1">
-                {s.opportunityId ? (
-                  <Link to={`/opportunities?open=${s.opportunityId}`} className="block truncate text-callout text-ink hover:underline">
-                    {s.title}
-                  </Link>
-                ) : (
-                  <span className="block truncate text-callout text-ink">{s.title}</span>
-                )}
-              </span>
-              {!s.created ? <span className="text-footnote text-ink-tertiary">Updated</span> : null}
-              {s.deadline ? <Countdown variant="text" daysLeft={daysUntil(s.deadline)} date={s.deadline} /> : null}
-            </li>
+          {shown.map((find, index) => (
+            <FindRow key={find.opportunity_id} find={find} tracking={!!tracked.data?.[find.opportunity_id]} index={index} />
           ))}
         </ul>
-      ) : (
-        <p className="border-t border-separator px-4 py-3 text-footnote text-ink-secondary">
-          {running
-            ? "Agents are searching and reading pages. Saved opportunities appear here as they are verified."
-            : "The agents didn't find anything new they could verify. Try a narrower focus or another region."}
-        </p>
-      )}
-      {saved.length > OUTCOME_PREVIEW ? (
-        <div className="border-t border-separator px-4 py-2">
-          <button type="button" className="cursor-pointer text-footnote font-medium text-link hover:underline" onClick={() => setAll((v) => !v)}>
-            {all ? "Show fewer" : `Show all ${saved.length}`}
-          </button>
-        </div>
+      ) : running ? (
+        <p className="px-4 pb-4 text-footnote text-ink-secondary">Finds will appear here as the scan runs.</p>
       ) : null}
-      {failures ? (
-        <p className="flex items-center gap-2 border-t border-separator px-4 py-2.5 text-footnote text-ink-tertiary">
-          <Info aria-hidden="true" className="size-3.5 shrink-0" />
-          {failures} {failures === 1 ? "step" : "steps"} didn't work and the agents moved on. Details are in the activity log.
-        </p>
+      {finds.length > OUTCOME_PREVIEW ? (
+        <div className="border-t border-separator px-4 py-2">
+          <Button size="sm" variant="quiet" aria-expanded={all} onClick={() => setAll((v) => !v)}>
+            {all ? "Show fewer" : `Show all ${finds.length}`}
+          </Button>
+        </div>
       ) : null}
     </section>
   )
 }
 
-function taskName(task: ScanTask): string {
-  const category = (task.target ?? "").replace(/^category:/, "") as OpportunityCategory
-  return CATEGORY_LABELS[category] ?? "Agent"
+function FindRow({ find, tracking, index }: { find: ScanFind; tracking: boolean; index: number }) {
+  const navigate = useNavigate()
+  const track = useTrackOpportunity()
+  const fromWeb = find.source === "web"
+  const SourceIcon = fromWeb ? Globe : Database
+  const actions: MenuAction[] = []
+  if (!find.in_review) {
+    actions.push({
+      label: "Open details",
+      icon: <PanelRightOpen />,
+      onSelect: () => navigate(`/opportunities/${find.opportunity_id}`),
+    })
+  }
+  if (find.official_url) {
+    actions.push({ label: "Official page", icon: <ArrowUpRight />, href: find.official_url })
+  }
+  const style: React.CSSProperties & { "--i": number } = { "--i": index }
+
+  return (
+    <ActionContextMenu actions={actions}>
+      <li
+        style={style}
+        className="bl-enter grid min-w-0 gap-x-4 gap-y-2 px-4 py-3 hover:bg-highlight sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="min-w-0 text-callout font-semibold text-ink wrap-anywhere">{find.title}</h3>
+            {find.is_new && !tracking ? <Chip tone="sun">New</Chip> : null}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <SourceIcon aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
+              <span className="min-w-0 wrap-anywhere">
+                {fromWeb
+                  ? `Found on the web${find.source_domain ? `, ${find.source_domain}` : ""}`
+                  : "From the Blesser catalog"}
+              </span>
+            </span>
+            {find.deadline_date ? <Countdown variant="text" daysLeft={daysUntil(find.deadline_date)} date={find.deadline_date} /> : null}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 sm:justify-end">
+          {tracking ? (
+            <Link to="/applications" className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "bg-forest-soft text-link")}>
+              <Check aria-hidden="true" /> Tracking
+            </Link>
+          ) : (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Plus />}
+              disabled={track.isPending}
+              onClick={() => track.mutate(find.opportunity_id, {
+                onSuccess: () => toastSuccess("Added to your applications."),
+                onError: (err) => toastError(err, "Couldn't track this opportunity."),
+              })}
+            >
+              Track
+            </Button>
+          )}
+          {actions.length ? <ActionMenuButton actions={actions} label={`More for ${find.title}`} /> : null}
+        </div>
+      </li>
+    </ActionContextMenu>
+  )
 }
 
-function TaskIcon({ status }: { status: ScanTask["status"] }) {
-  const cls = "size-4 shrink-0"
-  if (status === "running") return <Loader aria-hidden="true" className={cn(cls, "text-info motion-safe:animate-spin motion-safe:[animation-duration:2.4s]")} />
-  if (status === "done") return <Check aria-hidden="true" className={cn(cls, "text-positive")} />
-  if (status === "error") return <CircleAlert aria-hidden="true" className={cn(cls, "text-caution")} />
-  return <CircleDashed aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
+function taskName(task: ScanTask): string {
+  const category = CATEGORIES.find((value) => task.target === `category:${value}`)
+  return category ? CATEGORY_LABELS[category] : "Agent"
 }
+
+const TASK_STATE = {
+  pending: { tone: "neutral", icon: CircleDashed, label: "Queued" },
+  running: { tone: "sun", icon: Loader2, label: "Running" },
+  done: { tone: "forest", icon: Check, label: "Done" },
+  error: { tone: "caution", icon: CircleAlert, label: "Stopped early" },
+  cancelled: { tone: "neutral", icon: Square, label: "Stopped" },
+} as const
 
 function lastAction(task: ScanTask): string | null {
   for (let i = task.log.length - 1; i >= 0; i--) {
@@ -432,36 +461,27 @@ function lastAction(task: ScanTask): string | null {
 function Progress({ tasks }: { tasks: ScanTask[] }) {
   if (!tasks.length) return null
   return (
-    <section aria-labelledby="progress-heading" className="space-y-2">
-      <h2 id="progress-heading" className="text-caption text-ink-tertiary">
-        Agents
-      </h2>
-      <ol className="divide-y divide-separator rounded-lg border border-separator bg-surface">
+    <section aria-labelledby="progress-heading" className="rounded-lg border border-separator bg-surface">
+      <h2 id="progress-heading" className="px-4 pt-4 pb-3 text-headline text-ink">Scan tasks</h2>
+      <ol className="divide-y divide-separator border-t border-separator">
         {tasks.map((task) => {
-          const stats = taskStats(task)
-          const ms = elapsedMs(task.started_at, task.finished_at)
-          const now = task.status === "running" ? lastAction(task) : null
-          const note = task.error || task.final_text
+          const { tone, icon: Icon, label } = TASK_STATE[task.status]
+          const activity = task.status === "running" ? lastAction(task) : task.error || task.final_text
+          const duration = task.started_at ? formatDuration(elapsedMs(task.started_at, task.finished_at)) : ""
           return (
-            <li key={task.id} className="flex items-start gap-3 px-4 py-3">
-              <span className="mt-0.5">
-                <TaskIcon status={task.status} />
-              </span>
+            <li key={task.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                  <span className="text-callout font-semibold text-ink">{taskName(task)}</span>
-                  <span className="text-footnote text-ink-tertiary">
-                    {task.status === "pending"
-                      ? "Waiting for a free worker"
-                      : `${stats.searches} searches, ${stats.reads} pages read, ${stats.saved} saved`}
-                  </span>
-                </div>
-                {now ? <p className="mt-0.5 truncate text-footnote text-ink-secondary">{now}</p> : null}
-                {!now && note ? <p className="mt-0.5 text-footnote text-ink-tertiary">{note}</p> : null}
+                <h3 className="text-callout font-semibold text-ink">{taskName(task)}</h3>
+                {activity ? (
+                  <p className="mt-0.5 text-footnote text-ink-secondary wrap-anywhere">{activity}</p>
+                ) : null}
               </div>
-              <span className="shrink-0 text-right text-footnote text-ink-tertiary tabular-nums">
-                {task.status === "pending" ? "" : formatDuration(ms)}
-              </span>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {duration ? <span className="text-footnote text-ink-tertiary tabular-nums">{duration}</span> : null}
+                <Chip tone={tone} icon={<Icon aria-hidden="true" className={task.status === "running" ? "motion-safe:animate-spin" : undefined} />}>
+                  {label}
+                </Chip>
+              </div>
             </li>
           )
         })}
@@ -547,7 +567,7 @@ function LogRow({ line }: { line: LogLine }) {
       </span>
       <span className={cn("min-w-0 text-footnote break-words", line.kind === "note" ? "text-ink-tertiary italic" : line.kind === "save" || line.kind === "update" ? "text-ink" : "text-ink-secondary")}>
         {line.opportunityId ? (
-          <Link to={`/opportunities?open=${line.opportunityId}`} className="hover:underline">
+          <Link to={`/opportunities/${line.opportunityId}`} className="hover:underline">
             {line.text}
           </Link>
         ) : line.href && !line.failed ? (

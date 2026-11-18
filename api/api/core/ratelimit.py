@@ -27,6 +27,7 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
     "public_report": [(10, 3600)],
     # Agent scans spend model tokens and search calls.
     "scan": [(3, 3600), (10, 86400)],
+    "assistant": [(10, 60), (60, 3600)],
     # Community submissions to the catalogue.
     "submit": [(10, 3600), (30, 86400)],
     # Password-reset requests, keyed by the email asked about and by IP
@@ -45,6 +46,7 @@ _LABEL = {
     "public_submit": "submissions",
     "public_report": "reports",
     "scan": "scans",
+    "assistant": "Assistant requests",
     "submit": "submissions",
     "reset_email": "reset requests",
     "reset_ip": "reset requests",

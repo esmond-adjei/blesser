@@ -1,6 +1,7 @@
 """Scan routes: start agent scans for opportunities and watch them work."""
 
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -45,6 +46,17 @@ class TaskOut(BaseModel):
     finished_at: datetime | None
 
 
+class ScanFindOut(BaseModel):
+    opportunity_id: str
+    title: str
+    deadline_date: date | None
+    source: Literal["catalog", "web"]
+    source_domain: str | None
+    official_url: str | None
+    is_new: bool
+    in_review: bool
+
+
 class ScanOut(BaseModel):
     metrics: dict = Field(default_factory=dict)
     id: str
@@ -55,6 +67,7 @@ class ScanOut(BaseModel):
     created_at: datetime
     opportunities_added: int
     tasks: list[TaskOut] | None = None
+    finds: list[ScanFindOut] | None = None
 
 
 @router.post(

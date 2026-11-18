@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { describeEvent, errorReason, formatDuration, savedOpportunities, scanElapsedMs, shortUrl } from "./scanLog"
+import { describeEvent, errorReason, formatDuration, scanElapsedMs, shortUrl } from "./scanLog"
 import type { Scan, ScanTask } from "./types"
 
 const task = (log: ScanTask["log"]): ScanTask => ({
@@ -25,15 +25,10 @@ describe("scan log", () => {
     )
   })
 
-  it("collects saved opportunities with ids", () => {
-    const saved = savedOpportunities([
-      task([
-        { turn: 1, tool: "save_opportunity", input: { title: "A" }, ok: true, result_preview: JSON.stringify({ opportunity_id: "o1", created: true, deadline_date: "2026-12-08" }) },
-        { turn: 2, tool: "save_opportunity", input: { title: "B" }, ok: false, result_preview: "{}" },
-        { turn: 3, tool: "save_opportunity", input: { title: "C" }, ok: true, result_preview: "not json" },
-      ]),
-    ])
-    expect(saved.map((s) => [s.opportunityId, s.title, s.deadline])).toEqual([["o1", "A", "2026-12-08"], [null, "C", null]])
+  it("reports a crawler check even when it yields no find", () => {
+    expect(describeEvent({
+      turn: 0, tool: "crawl_candidate", input: { url: "https://www.gea.gov.gh/youstart/" }, ok: false,
+    })).toMatchObject({ text: "Checked gea.gov.gh/youstart", failed: false })
   })
 
   it("times a finished scan from its tasks", () => {
