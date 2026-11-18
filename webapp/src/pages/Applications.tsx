@@ -1,9 +1,14 @@
+import { useIsMobile } from "../hooks/use-mobile"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
 import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link } from "react-router-dom"
 import { ArrowUpRight, CalendarDays, Columns3, List, MoveRight, PanelRightOpen, Plus, Trash2 } from "lucide-react"
 import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useApplications } from "../lib/applications"
 import { toastError, toastSuccess } from "../lib/toast"
+import { useUrlParam } from "../lib/urlParams"
+import { useTodos } from "../lib/opportunities"
+import { TodoAdd, TodoRow, todayIso } from "../components/todos/TodoList"
 import type { Application, ApplicationStatus as Status, RequirementItem } from "../lib/types"
 import {
   ApplicationStatus,
@@ -119,6 +124,13 @@ export function Applications() {
   const [view, setView] = useView()
   const [editing, setEditing] = React.useState<Application | null>(null)
   const [adding, setAdding] = React.useState(false)
+  // ?open=<id> opens that application, e.g. from a to-do's link.
+  const [openId, setOpenId] = useUrlParam("open")
+  const linked = openId ? data?.find((a) => a.id === openId) : undefined
+  if (linked && editing?.id !== linked.id) {
+    setEditing(linked)
+    setOpenId("")
+  }
   const { move, actionsFor } = useAppActions(setEditing)
 
   const apps = (data ?? []).filter((a) => {
@@ -221,7 +233,7 @@ export function Applications() {
         </ul>
       )}
 
-      <ApplicationDialog app={editing} onClose={() => setEditing(null)} />
+      <ApplicationSheet app={editing} onClose={() => setEditing(null)} />
       <AddDialog open={adding} onClose={() => setAdding(false)} />
     </div>
   )
@@ -394,8 +406,9 @@ function BoardTile({
   )
 }
 
-function ApplicationDialog({ app, onClose }: { app: Application | null; onClose: () => void }) {
+function ApplicationSheet({ app, onClose }: { app: Application | null; onClose: () => void }) {
   const { update, remove } = useApplicationMutations()
+  const phone = useIsMobile()
   const [shown, setShown] = React.useState<Application | null>(app)
   const [notes, setNotes] = React.useState("")
   const [deadline, setDeadline] = React.useState("")
@@ -412,16 +425,16 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
     shown && update.mutate({ id: shown.id, body }, { onError: (err) => toastError(err, "Couldn't save") })
 
   return (
-    <Dialog open={!!app} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={!!app} onOpenChange={(open) => !open && onClose()}>
       {shown ? (
-        <DialogContent className="max-w-xl" onClose={onClose}>
-          <DialogHeader>
-            <DialogTitle>{shown.title}</DialogTitle>
-            <DialogDescription>
+        <SheetContent side={phone ? "bottom" : "right"} className="gap-0 max-sm:h-[92dvh] sm:w-full sm:max-w-xl">
+          <SheetHeader className="border-b border-separator p-5 pr-14">
+            <SheetTitle>{shown.title}</SheetTitle>
+            <SheetDescription>
               {[shown.organization, shown.kind].filter(Boolean).join(", ")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             <ApplicationStatus status={stage(shown.status)} />
             {shown.benefits ? <p className="text-callout font-semibold text-ink">{shown.benefits}</p> : null}
             <Field label="Deadline">
@@ -473,6 +486,7 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
                 </Button>
               </form>
             </div>
+            <ApplicationTodos app={shown} />
             <Field label="Notes">
               <Textarea
                 rows={4}
@@ -481,8 +495,8 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
                 onBlur={() => notes !== shown.notes && save({ notes })}
               />
             </Field>
-          </DialogBody>
-          <DialogFooter className="flex-wrap">
+          </div>
+          <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button
               size="sm"
               variant="quiet"
@@ -508,10 +522,10 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
             <Button size="sm" variant="primary" onClick={onClose}>
               Done
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </SheetFooter>
+        </SheetContent>
       ) : null}
-    </Dialog>
+    </Sheet>
   )
 }
 
@@ -567,5 +581,22 @@ function AddDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ApplicationTodos({ app }: { app: Application }) {
+  const todos = useTodos("open")
+  const today = todayIso()
+  const mine = (todos.data ?? []).filter((t) => t.application_id === app.id)
+  return (
+    <section aria-labelledby="app-todos-heading" className="space-y-2">
+      <h3 id="app-todos-heading" className="text-headline text-ink">To-dos</h3>
+      {mine.length ? (
+        <ul className="overflow-hidden rounded-lg border border-separator bg-surface">
+          {mine.map((todo, i) => <TodoRow key={todo.id} todo={todo} today={today} index={i} showLink={false} />)}
+        </ul>
+      ) : null}
+      <TodoAdd link={{ application_id: app.id }} placeholder="Add a step, e.g. Ask for two references" />
+    </section>
   )
 }

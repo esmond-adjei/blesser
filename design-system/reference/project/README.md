@@ -94,6 +94,7 @@ Screen patterns live in the Layouts group, built only from these tokens, the com
 - **Deadline calendar**: deadlines, interviews and to-dos by day, with the week's agenda.
 - **Scan**: what to look for, the running scan's tasks, and finds labelled by source (the Blesser catalog or the web).
 - **Assistant**: chat with visible tool steps and opportunities as trackable rows.
+- **To-dos**: the steps that move an application forward, grouped by when they are due.
 - **Opportunity detail** and the **Extension side panel**.
 
 Every layout sits on `canvas`, puts content on `surface`, keeps one sun action per region and shows deadlines as countdowns.
