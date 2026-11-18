@@ -4,7 +4,7 @@ name: Site to GitHub Pages
 # so the daily run keeps listings and countdowns fresh.
 on:
   push:
-    branches: [main, claude/keen-mendel-cape9f]
+    branches: [main]
     paths: [site/**, design-system/**, package-lock.json, .github/workflows/pages.yml]
   schedule:
     - cron: "0 5 * * *"
