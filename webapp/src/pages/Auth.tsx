@@ -42,10 +42,10 @@ function AuthShell({
     <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-2 lg:gap-4 lg:p-4">
       <div aria-hidden="true" className="relative hidden overflow-hidden rounded-lg bg-surface-sunk lg:block">
         <AuthPhoto />
-        <svg viewBox="0 0 32 32" className="absolute inset-[7.5%] size-[85%]" fill="none" strokeWidth={2} strokeLinejoin="round">
+        <svg viewBox="0 0 32 32" className="absolute inset-[7.5%] size-[85%]" fill="none" strokeWidth={4} strokeLinejoin="round">
           <g transform={LOGO.fill}>
-            <path d="M9 18a7 7 0 0 1 14 0" stroke="var(--forest)" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-            <path d={LOGO.steps} stroke="var(--forest)" vectorEffect="non-scaling-stroke" />
+            <path d="M9 18a7 7 0 0 1 14 0" stroke="#ffffff" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <path d={LOGO.steps} stroke="#ffffff" vectorEffect="non-scaling-stroke" />
           </g>
         </svg>
       </div>
