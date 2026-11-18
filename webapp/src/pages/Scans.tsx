@@ -520,7 +520,7 @@ export function ScanDetail() {
   )
 }
 
-function ScanBody({ scan, onDeleted }: { scan: Scan; onDeleted: () => void }) {
+function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () => void; log?: boolean }) {
   const client = useQueryClient()
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const refresh = (next: Scan) => {
@@ -549,7 +549,7 @@ function ScanBody({ scan, onDeleted }: { scan: Scan; onDeleted: () => void }) {
           <ActionMenuButton label="Scan actions" actions={[{ label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
         )}
       />
-      <ActivityLog tasks={scan.tasks ?? []} />
+      {log ? <ActivityLog tasks={scan.tasks ?? []} /> : null}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent className="max-w-sm">
           <DialogHeader>
@@ -599,6 +599,7 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
   const frame = React.useRef<HTMLDivElement>(null)
   const shell = React.useRef<HTMLDivElement>(null)
   const content = React.useRef<HTMLDivElement>(null)
+  const body = React.useRef<HTMLDivElement>(null)
   const scan = useScan(id)
   const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
@@ -677,7 +678,7 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
         aria-modal="false"
         aria-label={scan.data ? scanTitle(scan.data) : "Scan"}
         tabIndex={-1}
-        className="pointer-events-auto absolute inset-0 flex flex-col overflow-hidden rounded-lg outline-none will-change-[transform,clip-path]"
+        className="pointer-events-auto absolute inset-0 flex flex-col overflow-hidden rounded-lg outline-none"
       >
         <header className="flex shrink-0 items-start gap-3 border-b border-separator px-5 py-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-soft text-link">
@@ -691,14 +692,17 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
             <X className="size-4" />
           </button>
         </header>
-        <div className="nice-scroll min-h-0 flex-1 overflow-y-auto p-5">
-          {scan.isLoading ? (
-            <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
-          ) : scan.isError || !scan.data ? (
-            <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
-          ) : (
-            <ScanBody scan={scan.data} onDeleted={onClosed} />
-          )}
+        <div ref={body} className="flex min-h-0 flex-1 flex-col">
+          <div className="nice-scroll min-h-0 flex-1 overflow-y-auto p-5">
+            {scan.isLoading ? (
+              <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
+            ) : scan.isError || !scan.data ? (
+              <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
+            ) : (
+              <ScanBody scan={scan.data} onDeleted={onClosed} log={false} />
+            )}
+          </div>
+          {scan.data?.tasks?.length ? <DockedLog tasks={scan.data.tasks} container={body} /> : null}
         </div>
       </div>
     </div>
@@ -846,7 +850,76 @@ const PREFIX: Record<string, { label: string; tone: string }> = {
   note: { label: "note", tone: "text-console-dim" },
 }
 
-function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
+const LOG_HEIGHT_KEY = "blesser.scan-log-height"
+const LOG_MIN = 96
+
+function DockedLog({ tasks, container }: { tasks: ScanTask[]; container: React.RefObject<HTMLDivElement | null> }) {
+  const [height, setHeight] = React.useState(() => {
+    try {
+      return Number(localStorage.getItem(LOG_HEIGHT_KEY)) || 280
+    } catch {
+      return 280
+    }
+  })
+  const [dragging, setDragging] = React.useState(false)
+  const max = () => Math.max(LOG_MIN, (container.current?.clientHeight ?? 600) - 120)
+  const commit = (h: number) => {
+    const next = Math.round(Math.min(max(), Math.max(LOG_MIN, h)))
+    setHeight(next)
+    try {
+      localStorage.setItem(LOG_HEIGHT_KEY, String(next))
+    } catch {
+      // Height is a per-browser convenience.
+    }
+  }
+
+  const drag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    const startY = e.clientY
+    const startH = height
+    setDragging(true)
+    const onMove = (ev: PointerEvent) => setHeight(Math.min(max(), Math.max(LOG_MIN, startH - (ev.clientY - startY))))
+    const onUp = (ev: PointerEvent) => {
+      el.removeEventListener("pointermove", onMove)
+      el.removeEventListener("pointerup", onUp)
+      setDragging(false)
+      commit(startH - (ev.clientY - startY))
+    }
+    el.addEventListener("pointermove", onMove)
+    el.addEventListener("pointerup", onUp)
+  }
+
+  const shown = Math.min(height, max())
+  return (
+    <div style={{ height: shown }} className="relative flex shrink-0 flex-col">
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize activity log"
+        aria-valuemin={LOG_MIN}
+        aria-valuemax={max()}
+        aria-valuenow={shown}
+        tabIndex={0}
+        onPointerDown={drag}
+        onDoubleClick={() => commit(shown > LOG_MIN + 40 ? LOG_MIN : 280)}
+        onKeyDown={(e) => {
+          const step = e.shiftKey ? 80 : 24
+          if (e.key === "ArrowUp") { e.preventDefault(); commit(shown + step) }
+          else if (e.key === "ArrowDown") { e.preventDefault(); commit(shown - step) }
+        }}
+        className="group absolute inset-x-0 -top-1.5 z-10 flex h-3 cursor-row-resize touch-none items-center outline-none"
+      >
+        <span className={cn("h-0.5 w-full transition-colors duration-150 group-hover:bg-focus group-focus-visible:bg-focus", dragging ? "bg-focus" : "bg-transparent")} />
+      </div>
+      <ActivityLog tasks={tasks} docked />
+    </div>
+  )
+}
+
+function ActivityLog({ tasks, docked = false }: { tasks: ScanTask[]; docked?: boolean }) {
   const [picked, setPicked] = React.useState<string | null>(null)
   const [notes, setNotes] = React.useState(true)
   const scroller = React.useRef<HTMLOListElement>(null)
@@ -862,7 +935,7 @@ function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
 
   if (!current) return null
   return (
-    <section aria-label="Activity log" className="overflow-hidden rounded-lg bg-console text-console-ink shadow-elevation-1">
+    <section aria-label="Activity log" className={cn("overflow-hidden bg-console text-console-ink", docked ? "flex h-full min-h-0 flex-col" : "rounded-lg shadow-elevation-1")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-console-line bg-console-bar px-4 py-2.5">
         <span className="flex items-center gap-2 font-mono text-[12px] text-console-dim">
           <span aria-hidden="true" className={cn("size-2 rounded-full", live ? "bg-console-ok motion-safe:animate-pulse" : "bg-console-line")} />
@@ -897,7 +970,7 @@ function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
         </button>
       </div>
       {lines.length === 0 ? (
-        <p className="px-4 py-4 font-mono text-[12.5px] text-console-dim">
+        <p className="px-4 py-4 font-mono text-[12px] text-console-dim">
           {current.status === "pending" ? "$ waiting for this agent to start" : "$ no steps recorded"}
         </p>
       ) : (
@@ -909,7 +982,7 @@ function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
           }}
           aria-label={`${taskName(current)} activity`}
           aria-live={live ? "polite" : undefined}
-          className="max-h-[28rem] overflow-y-auto overscroll-contain px-4 py-3 font-mono text-[12.5px] leading-[20px] [scrollbar-color:var(--console-line)_transparent]"
+          className={cn(docked ? "min-h-0 flex-1" : "max-h-[28rem]", "overflow-y-auto overscroll-contain px-4 py-3 font-mono text-[12px] leading-[20px] [scrollbar-color:var(--console-line)_transparent]")}
         >
           {lines.map((line, i) => <LogRow key={i} line={line} />)}
           {live ? (
