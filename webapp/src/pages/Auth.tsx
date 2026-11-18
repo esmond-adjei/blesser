@@ -42,7 +42,6 @@ function AuthShell({
     <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-2 lg:gap-4 lg:p-4">
       <div aria-hidden="true" className="relative hidden overflow-hidden rounded-lg bg-surface-sunk lg:block">
         <AuthPhoto />
-        <div className="absolute inset-0 bg-forest/90" />
         <svg viewBox="0 0 32 32" className="absolute inset-[7.5%] size-[85%]" fill="none" strokeWidth={2} strokeLinejoin="round">
           <g transform={LOGO.fill}>
             <path d={LOGO.sun_cut} stroke="var(--sun)" vectorEffect="non-scaling-stroke" />
