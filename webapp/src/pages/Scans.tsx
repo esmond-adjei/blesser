@@ -572,39 +572,89 @@ function ScanBody({ scan, onDeleted }: { scan: Scan; onDeleted: () => void }) {
   )
 }
 
-const MORPH_MS = 320
-const MORPH_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)"
+/** Samples a critically damped-ish spring into a CSS linear() easing. */
+function springEasing(damping: number, points = 48): string {
+  const w = 9
+  const wd = w * Math.sqrt(1 - damping * damping)
+  const stops = Array.from({ length: points + 1 }, (_, i) => {
+    const t = i / points
+    const x = 1 - Math.exp(-damping * w * t) * (Math.cos(wd * t) + ((damping * w) / wd) * Math.sin(wd * t))
+    return (i === points ? 1 : x).toFixed(4)
+  })
+  return `linear(${stops.join(", ")})`
+}
 
-/** The card grows into a panel over the canvas; no scrim, and the composer stays on top. */
+const LINEAR_OK = typeof CSS !== "undefined" && CSS.supports("transition-timing-function", "linear(0, 1)")
+const OPEN = { duration: 620, easing: LINEAR_OK ? springEasing(0.78) : "cubic-bezier(0.2, 0.9, 0.25, 1.05)" }
+const CLOSE = { duration: 420, easing: LINEAR_OK ? springEasing(0.92) : "cubic-bezier(0.3, 0.8, 0.3, 1)" }
+const RADIUS = 20
+
+type Box = { left: number; top: number; width: number; height: number }
+
+/**
+ * The card grows into a panel over the canvas; no scrim, and the composer stays on top.
+ * The panel keeps its final layout and is revealed through a window that grows from the
+ * card's rect, so text never re-wraps mid-animation.
+ */
 function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed: () => void }) {
-  const ref = React.useRef<HTMLDivElement>(null)
+  const frame = React.useRef<HTMLDivElement>(null)
+  const shell = React.useRef<HTMLDivElement>(null)
+  const content = React.useRef<HTMLDivElement>(null)
   const scan = useScan(id)
   const closing = React.useRef(false)
   const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
-  const frames = React.useCallback((el: HTMLElement, rect: DOMRect) => {
-    const parent = el.offsetParent?.getBoundingClientRect() ?? new DOMRect()
-    const box = { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight }
-    const card = { left: rect.left - parent.left, top: rect.top - parent.top, width: rect.width, height: rect.height }
-    const px = (r: typeof box) => ({ left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` })
-    return [px(card), px(box)]
-  }, [])
+  const play = React.useCallback((rect: DOMRect, direction: "open" | "close") => {
+    const f = frame.current, s = shell.current, c = content.current
+    if (!f || !s || !c) return Promise.resolve()
+    const box = f.getBoundingClientRect()
+    const card: Box = { left: rect.left - box.left, top: rect.top - box.top, width: rect.width, height: rect.height }
+    const full: Box = { left: 0, top: 0, width: box.width, height: box.height }
+    const geo = (b: Box) => ({ left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` })
+    const win = (b: Box) => ({
+      transform: `translate(${b.left}px, ${b.top}px)`,
+      clipPath: `inset(0px ${box.width - b.width}px ${box.height - b.height}px 0px round ${RADIUS}px)`,
+    })
+    const [a, b] = direction === "open" ? [card, full] : [full, card]
+    const timing = { ...(direction === "open" ? OPEN : CLOSE), fill: "both" as const }
+    const fade = direction === "open"
+      ? c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: 60, easing: "ease-out", fill: "both" })
+      : c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, delay: CLOSE.duration - 240, easing: "ease-in", fill: "both" })
+    const moves = [
+      s.animate([geo(a), geo(b)], timing),
+      c.animate([win(a), win(b)], timing),
+      fade,
+    ]
+    // A copy of the card rides in the growing shell and cross-fades with the panel.
+    const source = document.querySelector<HTMLElement>(`[data-scan-card="${id}"]`)
+    const ghost = source?.cloneNode(true) as HTMLElement | undefined
+    if (ghost) {
+      ghost.removeAttribute("data-scan-card")
+      ghost.classList.remove("invisible", "bl-pop")
+      Object.assign(ghost.style, { transform: "none", inset: "0 auto auto 0", border: "0", boxShadow: "none", background: "transparent", pointerEvents: "none" })
+      s.appendChild(ghost)
+      moves.push(direction === "open"
+        ? ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: "ease-out", fill: "both" })
+        : ghost.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, delay: CLOSE.duration - 220, easing: "ease-in", fill: "both" }))
+    }
+    return Promise.all(moves.map((m) => m.finished)).then(() => {
+      ghost?.remove()
+      if (direction === "open") moves.forEach((m) => m.cancel())
+    })
+  }, [id])
 
   React.useLayoutEffect(() => {
-    const el = ref.current
-    if (!el || reduced) return
-    el.animate(frames(el, from), { duration: MORPH_MS, easing: MORPH_EASE })
-    el.querySelector("[data-morph-body]")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 120, fill: "backwards" })
-  }, [from, frames, reduced])
+    if (reduced) return
+    void play(from, "open")
+  }, [from, play, reduced])
 
   const close = React.useCallback(() => {
-    const el = ref.current
+    if (closing.current) return
     const card = document.querySelector(`[data-scan-card="${id}"]`)
-    if (!el || !card || reduced || closing.current) return onClosed()
+    if (!card || reduced) return onClosed()
     closing.current = true
-    el.querySelector("[data-morph-body]")?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" })
-    el.animate(frames(el, card.getBoundingClientRect()).reverse(), { duration: MORPH_MS - 60, easing: MORPH_EASE, fill: "forwards" }).finished.then(onClosed, onClosed)
-  }, [id, frames, onClosed, reduced])
+    play(card.getBoundingClientRect(), "close").then(onClosed, onClosed)
+  }, [id, onClosed, play, reduced])
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("[role=alertdialog],[role=menu]")) close() }
@@ -612,18 +662,19 @@ function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed
     return () => window.removeEventListener("keydown", onKey)
   }, [close])
 
-  React.useEffect(() => { ref.current?.focus() }, [])
+  React.useEffect(() => { content.current?.focus({ preventScroll: true }) }, [])
 
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="false"
-      aria-label={scan.data ? scanTitle(scan.data) : "Scan"}
-      tabIndex={-1}
-      className="absolute inset-x-3 top-3 bottom-3 z-30 mx-auto flex max-w-[880px] flex-col overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-3 outline-none sm:inset-x-6 sm:top-5 sm:bottom-5"
-    >
-      <div data-morph-body className="flex min-h-0 flex-1 flex-col">
+    <div ref={frame} className="pointer-events-none absolute inset-x-3 top-3 bottom-3 z-30 mx-auto max-w-[880px] sm:inset-x-6 sm:top-5 sm:bottom-5">
+      <div ref={shell} aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-3" />
+      <div
+        ref={content}
+        role="dialog"
+        aria-modal="false"
+        aria-label={scan.data ? scanTitle(scan.data) : "Scan"}
+        tabIndex={-1}
+        className="pointer-events-auto absolute inset-0 flex flex-col overflow-hidden rounded-lg outline-none will-change-[transform,clip-path]"
+      >
         <header className="flex shrink-0 items-start gap-3 border-b border-separator px-5 py-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-soft text-link">
             <Radar className="size-4" strokeWidth={1.75} aria-hidden="true" />
