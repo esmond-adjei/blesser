@@ -59,7 +59,7 @@ export function OpportunityCard({
   return (
     <article
       className={cn(
-        "flex flex-col gap-3 overflow-hidden rounded-lg border border-separator bg-surface p-5 shadow-elevation-1 transition-[box-shadow,translate] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0",
+        "relative flex flex-col gap-3 overflow-hidden rounded-lg border border-separator bg-surface p-5 shadow-elevation-1 transition-[box-shadow,translate] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0",
         className,
       )}
     >
@@ -89,7 +89,7 @@ export function OpportunityCard({
         ))}
       </div>
       {children}
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-separator pt-3">
+      <div className="relative z-10 mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-separator pt-3">
         <Countdown {...(countdown ?? { rolling: true })} />
         <div className="flex flex-wrap items-center gap-1">
           {actions}

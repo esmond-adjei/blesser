@@ -136,7 +136,6 @@ export function Opportunities() {
   const facets = useOpportunityFacets()
   const tracked = useTrackedOpportunities()
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
-  const total = list.data?.pages[0]?.total ?? 0
   const counts = new Map(facets.data?.categories.map((c) => [c.key, c.count]))
 
   const [detail, setDetail] = React.useState<Opportunity | null>(null)
@@ -172,10 +171,7 @@ export function Opportunities() {
             label="Audience"
             value={category ?? ""}
             onChange={(v) => setCategory(v)}
-            options={[
-              { value: "", label: "All", count: facets.data?.total },
-              ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 })),
-            ]}
+            options={CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 }))}
           />
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-tertiary" />
@@ -224,13 +220,11 @@ export function Opportunities() {
           <FilterToggle pressed={!!closedParam} onChange={(on) => setClosed(on ? "1" : "")}>
             Include closed
           </FilterToggle>
-          <span className="ml-auto text-footnote text-ink-tertiary" aria-live="polite">
-            {list.isSuccess ? `${total} ${total === 1 ? "result" : "results"}` : ""}
-          </span>
           <Segmented
             label="View"
             value={view}
             onChange={setView}
+            className="ml-auto"
             options={[
               { value: "cards", label: "Cards", icon: <LayoutGrid aria-hidden="true" /> },
               { value: "list", label: "List", icon: <List aria-hidden="true" /> },
@@ -244,7 +238,6 @@ export function Opportunities() {
           <div className={GRID}>
             {Array.from({ length: 6 }, (_, i) => (
               <div key={i} className="overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1 [&_div:empty]:animate-pulse [&_div:empty]:bg-surface-sunk motion-reduce:[&_div:empty]:animate-none">
-                <div className="aspect-[16/7]" />
                 <div className="space-y-3 p-5 [&>div]:rounded-sm">
                   <div className="h-7 w-1/2 rounded-full!" />
                   <div className="h-5 w-3/4" />
@@ -434,22 +427,16 @@ export function Art({ opp, shape, className }: { opp: Opportunity; shape: "banne
 
 function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) {
   const { pending, onTrack } = useTrack(opp, applicationId)
-  const open = () => handlers.onOpen?.(opp)
   const actions = secondaryActions(opp, handlers)
-  const markers = opp.is_new || opp.location
   return (
     <ActionContextMenu actions={actions}>
       <li style={{ "--i": index } as React.CSSProperties} className="bl-enter flex min-w-0">
         <OpportunityCard
           className="w-full"
-          media={
-            <button type="button" tabIndex={-1} aria-hidden="true" onClick={open} className="block w-full cursor-pointer">
-              <Art opp={opp} shape="banner" />
-            </button>
-          }
           organization={opp.organization || undefined}
           title={
-            <button type="button" onClick={open} className="line-clamp-3 cursor-pointer text-left hover:underline">
+            // The stretched hit area makes the whole card open the details; footer buttons sit above it.
+            <button type="button" onClick={() => handlers.onOpen?.(opp)} className="line-clamp-3 cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-focus">
               {opp.title}
             </button>
           }
@@ -461,19 +448,7 @@ function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) 
           trackDisabled={pending}
           onTrack={onTrack}
           actions={<ActionMenuButton actions={actions} label={`More for ${opp.title}`} />}
-        >
-          {markers ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
-              {opp.location ? (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin aria-hidden="true" className="size-3.5 text-ink-tertiary" />
-                  {opp.location}
-                </span>
-              ) : null}
-              <Markers opp={opp} members={false} />
-            </div>
-          ) : null}
-        </OpportunityCard>
+        />
       </li>
     </ActionContextMenu>
   )
@@ -534,7 +509,12 @@ function OpportunityDetail({
           side={phone ? "bottom" : "right"}
           className="gap-0 max-sm:h-[92dvh] sm:w-full sm:max-w-xl"
         >
-          <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-14">
+          <ActionMenuButton
+            actions={secondaryActions(shown, { onTodo, onShare }, false)}
+            label="More actions"
+            className="absolute top-4 right-14 z-20 size-8"
+          />
+          <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-24">
             <Art opp={shown} shape="square" className="size-14 shrink-0 rounded-md" />
             <div className="min-w-0 space-y-1.5">
               <SheetTitle>{shown.title}</SheetTitle>
@@ -578,11 +558,6 @@ function OpportunityDetail({
             </p>
           </div>
           <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <ActionMenuButton
-              actions={secondaryActions(shown, { onTodo, onShare }, false)}
-              label="More actions"
-              className="mr-auto"
-            />
             {shown.link || shown.source_url ? (
               <a
                 href={shown.link || shown.source_url}
