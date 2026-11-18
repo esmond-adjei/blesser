@@ -40,6 +40,14 @@
   --color-on-critical: var(--on-critical);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-console: var(--console);
+  --color-console-bar: var(--console-bar);
+  --color-console-line: var(--console-line);
+  --color-console-ink: var(--console-ink);
+  --color-console-dim: var(--console-dim);
+  --color-console-ok: var(--console-ok);
+  --color-console-warn: var(--console-warn);
+  --color-console-info: var(--console-info);
   --color-focus: var(--focus);
   --color-scrim: var(--scrim);
   --shadow-elevation-1: var(--elevation-1);

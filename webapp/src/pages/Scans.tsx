@@ -6,20 +6,16 @@ import {
   ArrowUp,
   ArrowUpRight,
   Check,
-  ChevronRight,
   CircleAlert,
   CircleDashed,
   Database,
-  FileText,
   GripVertical,
   Globe,
   LayoutGrid,
   Loader2,
   PanelRightOpen,
   Radar,
-  MessageSquareText,
   Plus,
-  Search,
   Square,
   Trash2,
   X,
@@ -48,7 +44,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { ErrorState } from "../components/feedback/EmptyState"
-import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
+import { PageHeader } from "../components/layout/PageHeader"
 import { useShellHeader } from "../components/layout/shellHeader"
 import { CountrySelect } from "../components/ui/country-select"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
@@ -143,6 +139,8 @@ export function Scans() {
   const [front, setFront] = React.useState<string | null>(null)
   const [fresh, setFresh] = React.useState<string | null>(null)
   const [expanded, setExpanded] = React.useState<{ id: string; from: DOMRect } | null>(null)
+  const closeMorph = React.useRef<(() => Promise<void>) | null>(null)
+  const collapse = () => closeMorph.current?.() ?? Promise.resolve()
   useTick(!!scans.data?.some((s) => s.status === "running"))
 
   // Oldest first, so a new scan takes the next free spot without moving older cards.
@@ -190,7 +188,7 @@ export function Scans() {
 
   const pan = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget || e.button !== 0) return
-    if (expanded) return setExpanded(null)
+    if (expanded) return void collapse()
     const start = { x: e.clientX - offset.x, y: e.clientY - offset.y }
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
@@ -230,7 +228,13 @@ export function Scans() {
               fresh={fresh === scan.id}
               onRaise={() => setFront(scan.id)}
               hidden={expanded?.id === scan.id}
-              onExpand={(from) => setExpanded({ id: scan.id, from })}
+              onExpand={(from) => {
+                if (!expanded) return setExpanded({ id: scan.id, from })
+                void collapse().then(() => {
+                  const el = document.querySelector(`[data-scan-card="${scan.id}"]`)
+                  if (el) setExpanded({ id: scan.id, from: el.getBoundingClientRect() })
+                })
+              }}
             />
           ) : null)}
         </div>
@@ -246,7 +250,7 @@ export function Scans() {
           </div>
         ) : null}
       </div>
-      {expanded ? <ScanMorph key={expanded.id} id={expanded.id} from={expanded.from} onClosed={() => setExpanded(null)} /> : null}
+      {expanded ? <ScanMorph key={expanded.id} id={expanded.id} from={expanded.from} closeRef={closeMorph} onClosed={() => setExpanded(null)} /> : null}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
         <ScanComposer onStarted={onStarted} className="pointer-events-auto mx-auto max-w-[760px] shadow-elevation-3" />
       </div>
@@ -267,12 +271,6 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
   const ref = React.useRef<HTMLElement>(null)
   const client = useQueryClient()
   const running = scan.status === "running"
-  const live = useQuery({
-    queryKey: ["scan", scan.id],
-    queryFn: () => api.getScan(scan.id),
-    enabled: running,
-    refetchInterval: running ? 5000 : false,
-  })
   const cancel = useMutation({
     mutationFn: () => api.cancelScan(scan.id),
     onSuccess: () => void client.invalidateQueries({ queryKey: ["scans"] }),
@@ -281,15 +279,14 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
   const [dragging, setDragging] = React.useState(false)
   const status = STATUS[scan.status] ?? STATUS.pending
   const duration = formatDuration(scanElapsedMs(scan))
-  const tasks = live.data?.tasks ?? []
-  const done = tasks.filter((t) => t.status !== "running" && t.status !== "pending").length
-  const now = tasks.map(lastAction).find(Boolean)
   const focus = scanFocus(scan)
   const open = () => { if (ref.current) onExpand(ref.current.getBoundingClientRect()) }
 
   const drag = (e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest("button, a, [role=menuitem]")) return
     onRaise()
+    // Details load only once someone reaches for the card, so they arrive while it grows.
+    void client.prefetchQuery({ queryKey: ["scan", scan.id], queryFn: () => api.getScan(scan.id), staleTime: 10_000 })
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
     const start = { x: e.clientX, y: e.clientY }
@@ -367,19 +364,16 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
       <p className={cn("line-clamp-2 text-footnote", focus ? "text-ink" : "text-ink-tertiary")}>{focus || "Any open opportunity"}</p>
       <div className="mt-auto space-y-2">
         {running ? (
-          <>
-            <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunk" role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={tasks.length || 1} aria-valuenow={done}>
-              <div className="h-full rounded-full bg-sun transition-[width] duration-500" style={{ width: `${tasks.length ? Math.max(6, (done / tasks.length) * 100) : 6}%` }} />
-            </div>
-            <p className="truncate text-caption text-ink-secondary" aria-live="polite">{now ?? "Getting started"}</p>
-          </>
+          <div className="h-1 overflow-hidden rounded-full bg-surface-sunk" role="progressbar" aria-label="Scan in progress">
+            <div className="bl-indeterminate h-full w-1/3 rounded-full bg-sun" />
+          </div>
         ) : null}
         <div className="flex items-center justify-between gap-2">
           <Chip tone={status.tone} icon={running ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : undefined}>
             {duration ? `${status.label} ${running ? "for" : "in"} ${duration}` : status.label}
           </Chip>
           <span className="text-caption text-ink-tertiary tabular-nums">
-            {running ? `${done} of ${tasks.length || "?"} tasks` : `${scan.opportunities_added} saved, ${formatAgo(scan.created_at)}`}
+            {running ? `${scan.opportunities_added} saved so far` : `${scan.opportunities_added} saved, ${formatAgo(scan.created_at)}`}
           </span>
         </div>
       </div>
@@ -585,8 +579,8 @@ function springEasing(damping: number, points = 48): string {
 }
 
 const LINEAR_OK = typeof CSS !== "undefined" && CSS.supports("transition-timing-function", "linear(0, 1)")
-const OPEN = { duration: 620, easing: LINEAR_OK ? springEasing(0.78) : "cubic-bezier(0.2, 0.9, 0.25, 1.05)" }
-const CLOSE = { duration: 420, easing: LINEAR_OK ? springEasing(0.92) : "cubic-bezier(0.3, 0.8, 0.3, 1)" }
+const OPEN = { duration: 380, easing: LINEAR_OK ? springEasing(0.78) : "cubic-bezier(0.2, 0.9, 0.25, 1.05)" }
+const CLOSE = { duration: 300, easing: LINEAR_OK ? springEasing(0.92) : "cubic-bezier(0.3, 0.8, 0.3, 1)" }
 const RADIUS = 20
 
 type Box = { left: number; top: number; width: number; height: number }
@@ -596,12 +590,16 @@ type Box = { left: number; top: number; width: number; height: number }
  * The panel keeps its final layout and is revealed through a window that grows from the
  * card's rect, so text never re-wraps mid-animation.
  */
-function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed: () => void }) {
+function ScanMorph({ id, from, onClosed, closeRef }: {
+  id: string
+  from: DOMRect
+  onClosed: () => void
+  closeRef: React.RefObject<(() => Promise<void>) | null>
+}) {
   const frame = React.useRef<HTMLDivElement>(null)
   const shell = React.useRef<HTMLDivElement>(null)
   const content = React.useRef<HTMLDivElement>(null)
   const scan = useScan(id)
-  const closing = React.useRef(false)
   const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
   const play = React.useCallback((rect: DOMRect, direction: "open" | "close") => {
@@ -618,8 +616,8 @@ function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed
     const [a, b] = direction === "open" ? [card, full] : [full, card]
     const timing = { ...(direction === "open" ? OPEN : CLOSE), fill: "both" as const }
     const fade = direction === "open"
-      ? c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: 60, easing: "ease-out", fill: "both" })
-      : c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, delay: CLOSE.duration - 240, easing: "ease-in", fill: "both" })
+      ? c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, delay: 40, easing: "ease-out", fill: "both" })
+      : c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 130, delay: CLOSE.duration - 170, easing: "ease-in", fill: "both" })
     const moves = [
       s.animate([geo(a), geo(b)], timing),
       c.animate([win(a), win(b)], timing),
@@ -634,8 +632,8 @@ function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed
       Object.assign(ghost.style, { transform: "none", inset: "0 auto auto 0", border: "0", boxShadow: "none", background: "transparent", pointerEvents: "none" })
       s.appendChild(ghost)
       moves.push(direction === "open"
-        ? ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: "ease-out", fill: "both" })
-        : ghost.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, delay: CLOSE.duration - 220, easing: "ease-in", fill: "both" }))
+        ? ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: "ease-out", fill: "both" })
+        : ghost.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, delay: CLOSE.duration - 150, easing: "ease-in", fill: "both" }))
     }
     return Promise.all(moves.map((m) => m.finished)).then(() => {
       ghost?.remove()
@@ -648,16 +646,22 @@ function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed
     void play(from, "open")
   }, [from, play, reduced])
 
-  const close = React.useCallback(() => {
-    if (closing.current) return
+  const closed = React.useRef<Promise<void> | null>(null)
+  const close = React.useCallback((): Promise<void> => {
+    if (closed.current) return closed.current
     const card = document.querySelector(`[data-scan-card="${id}"]`)
-    if (!card || reduced) return onClosed()
-    closing.current = true
-    play(card.getBoundingClientRect(), "close").then(onClosed, onClosed)
+    const done = (!card || reduced ? Promise.resolve() : play(card.getBoundingClientRect(), "close")).catch(() => undefined).then(onClosed)
+    closed.current = done
+    return done
   }, [id, onClosed, play, reduced])
 
   React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("[role=alertdialog],[role=menu]")) close() }
+    closeRef.current = close
+    return () => { if (closeRef.current === close) closeRef.current = null }
+  }, [close, closeRef])
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("[role=alertdialog],[role=menu]")) void close() }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [close])
@@ -665,7 +669,7 @@ function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed
   React.useEffect(() => { content.current?.focus({ preventScroll: true }) }, [])
 
   return (
-    <div ref={frame} className="pointer-events-none absolute inset-x-3 top-3 bottom-3 z-30 mx-auto max-w-[880px] sm:inset-x-6 sm:top-5 sm:bottom-5">
+    <div ref={frame} className="pointer-events-none absolute inset-x-3 top-3 bottom-3 z-50 mx-auto max-w-[880px] sm:inset-x-6 sm:top-5 sm:bottom-5">
       <div ref={shell} aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-3" />
       <div
         ref={content}
@@ -683,11 +687,11 @@ function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed
             <h2 className="truncate type-title-3 text-ink">{scan.data ? scanTitle(scan.data) : "Scan"}</h2>
             {scan.data ? <p className="text-footnote text-ink-secondary">Started {formatAgo(scan.data.created_at)}</p> : null}
           </div>
-          <button type="button" aria-label="Close" onClick={close} className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">
+          <button type="button" aria-label="Close" onClick={() => void close()} className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">
             <X className="size-4" />
           </button>
         </header>
-        <div className="nice-scroll min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-44">
+        <div className="nice-scroll min-h-0 flex-1 overflow-y-auto p-5">
           {scan.isLoading ? (
             <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
           ) : scan.isError || !scan.data ? (
@@ -834,97 +838,107 @@ function Tasks({ tasks }: { tasks: ScanTask[] }) {
   )
 }
 
-function LineIcon({ line }: { line: LogLine }) {
-  const cls = "size-3.5 shrink-0"
-  if (line.failed) return <CircleAlert aria-hidden="true" className={cn(cls, "text-caution")} />
-  if (line.kind === "search") return <Search aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
-  if (line.kind === "read") return <FileText aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
-  if (line.kind === "save" || line.kind === "update") return <Check aria-hidden="true" className={cn(cls, "text-positive")} />
-  if (line.kind === "note") return <MessageSquareText aria-hidden="true" className={cn(cls, "text-ink-tertiary")} />
-  return <span aria-hidden="true" className="size-3.5 shrink-0" />
+const PREFIX: Record<string, { label: string; tone: string }> = {
+  search: { label: "search", tone: "text-console-info" },
+  read: { label: "read", tone: "text-console-dim" },
+  save: { label: "save", tone: "text-console-ok" },
+  update: { label: "update", tone: "text-console-ok" },
+  note: { label: "note", tone: "text-console-dim" },
 }
 
 function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
-  const [open, setOpen] = React.useState(false)
   const [picked, setPicked] = React.useState<string | null>(null)
   const [notes, setNotes] = React.useState(true)
-  const id = React.useId()
-  const steps = tasks.reduce((n, t) => n + t.log.filter((e) => e.kind !== "turn").length, 0)
-  if (!tasks.length) return null
+  const scroller = React.useRef<HTMLOListElement>(null)
+  const follow = React.useRef(true)
   const current = tasks.find((t) => t.id === picked) ?? tasks.find((t) => t.status === "running") ?? tasks[0]
-  const lines = current.log.map(describeEvent).filter((l) => (l.kind === "note" ? notes && l.text : true))
+  const lines = current ? current.log.map(describeEvent).filter((l) => (l.kind === "note" ? notes && l.text : true)) : []
+  const live = current?.status === "running"
+
+  React.useEffect(() => {
+    const el = scroller.current
+    if (el && follow.current) el.scrollTop = el.scrollHeight
+  }, [lines.length, current?.id])
+
+  if (!current) return null
   return (
-    <section className="rounded-lg border border-separator bg-surface">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-4 py-3 text-left hover:bg-highlight"
-      >
-        <ChevronRight aria-hidden="true" className={cn("size-4 text-ink-tertiary transition-transform duration-160", open && "rotate-90")} />
-        <span className="text-callout font-semibold text-ink">Activity log</span>
-        <span className="text-footnote text-ink-tertiary">{steps} steps</span>
-      </button>
-      <div id={id} hidden={!open} className="border-t border-separator">
-        {open ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-              {tasks.length > 1 ? (
-                <Segmented
-                  label="Agent"
-                  value={current.id}
-                  onChange={setPicked}
-                  options={tasks.map((t) => ({ value: t.id, label: taskName(t), count: t.log.filter((e) => e.kind !== "turn").length }))}
-                />
-              ) : (
-                <span />
-              )}
-              <FilterToggle pressed={notes} onChange={setNotes}>
-                Agent notes
-              </FilterToggle>
-            </div>
-            {lines.length === 0 ? (
-              <p className="px-4 pb-4 text-footnote text-ink-secondary">
-                {current.status === "pending" ? "This agent hasn't started yet." : "No steps recorded."}
-              </p>
-            ) : (
-              <ol className="max-h-[32rem] overflow-y-auto overscroll-contain px-4 pb-3 nice-scroll" aria-label={`${taskName(current)} activity`}>
-                {lines.map((line, i) => (
-                  <LogRow key={i} line={line} />
-                ))}
-              </ol>
-            )}
-          </>
+    <section aria-label="Activity log" className="overflow-hidden rounded-lg bg-console text-console-ink shadow-elevation-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-console-line bg-console-bar px-4 py-2.5">
+        <span className="flex items-center gap-2 font-mono text-[12px] text-console-dim">
+          <span aria-hidden="true" className={cn("size-2 rounded-full", live ? "bg-console-ok motion-safe:animate-pulse" : "bg-console-line")} />
+          activity.log
+        </span>
+        {tasks.length > 1 ? (
+          <div role="tablist" aria-label="Agent" className="flex gap-1">
+            {tasks.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={t.id === current.id}
+                onClick={() => setPicked(t.id)}
+                className={cn(
+                  "h-6 cursor-pointer rounded-[6px] px-2 font-mono text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-focus",
+                  t.id === current.id ? "bg-console-line text-console-ink" : "text-console-dim hover:text-console-ink",
+                )}
+              >
+                {taskName(t)}
+              </button>
+            ))}
+          </div>
         ) : null}
+        <button
+          type="button"
+          aria-pressed={notes}
+          onClick={() => setNotes((v) => !v)}
+          className="ml-auto h-6 cursor-pointer rounded-[6px] px-2 font-mono text-[12px] text-console-dim transition-colors hover:text-console-ink focus-visible:outline-2 focus-visible:outline-focus aria-pressed:text-console-ink"
+        >
+          {notes ? "[x]" : "[ ]"} notes
+        </button>
       </div>
+      {lines.length === 0 ? (
+        <p className="px-4 py-4 font-mono text-[12.5px] text-console-dim">
+          {current.status === "pending" ? "$ waiting for this agent to start" : "$ no steps recorded"}
+        </p>
+      ) : (
+        <ol
+          ref={scroller}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          }}
+          aria-label={`${taskName(current)} activity`}
+          aria-live={live ? "polite" : undefined}
+          className="max-h-[28rem] overflow-y-auto overscroll-contain px-4 py-3 font-mono text-[12.5px] leading-[20px] [scrollbar-color:var(--console-line)_transparent]"
+        >
+          {lines.map((line, i) => <LogRow key={i} line={line} />)}
+          {live ? (
+            <li aria-hidden="true" className="flex gap-3 text-console-dim">
+              <span className="w-[4.5rem] shrink-0" />
+              <span className="inline-block h-[15px] w-[7px] translate-y-[3px] bg-console-ink motion-safe:animate-pulse" />
+            </li>
+          ) : null}
+        </ol>
+      )}
     </section>
   )
 }
 
 function LogRow({ line }: { line: LogLine }) {
+  const prefix = line.failed ? { label: "error", tone: "text-console-warn" } : PREFIX[line.kind] ?? { label: "tool", tone: "text-console-dim" }
+  const text = line.opportunityId ? (
+    <Link to={`/opportunities/${line.opportunityId}`} className="underline decoration-console-line underline-offset-2 hover:decoration-console-ink">{line.text}</Link>
+  ) : line.href && !line.failed ? (
+    <a href={line.href} target="_blank" rel="noopener noreferrer" className="underline decoration-console-line underline-offset-2 hover:decoration-console-ink">{line.text}</a>
+  ) : line.text
   return (
-    <li className="grid grid-cols-[2.75rem_14px_minmax(0,1fr)] items-start gap-x-2 py-1">
-      <time className="pt-px font-mono text-[11px] leading-[18px] text-ink-tertiary">{clock(line.at)}</time>
-      <span className="pt-0.5">
-        <LineIcon line={line} />
-      </span>
-      <span className={cn("min-w-0 text-footnote break-words", line.kind === "note" ? "text-ink-tertiary italic" : line.kind === "save" || line.kind === "update" ? "text-ink" : "text-ink-secondary")}>
-        {line.opportunityId ? (
-          <Link to={`/opportunities/${line.opportunityId}`} className="hover:underline">
-            {line.text}
-          </Link>
-        ) : line.href && !line.failed ? (
-          <a href={line.href} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-0.5 hover:underline">
-            <span className="truncate">{line.text}</span>
-            <ArrowUpRight aria-hidden="true" className="size-3 shrink-0 opacity-60" />
-          </a>
-        ) : (
-          line.text
-        )}
-        {line.reason ? <span className="block text-ink-tertiary not-italic">{line.reason}</span> : null}
+    <li className="flex gap-3 rounded-[4px] hover:bg-console-bar">
+      <time className="w-[4.5rem] shrink-0 text-console-dim tabular-nums">{clock(line.at)}</time>
+      <span className={cn("w-12 shrink-0", prefix.tone)}>{prefix.label}</span>
+      <span className={cn("min-w-0 flex-1 break-words", line.kind === "note" ? "text-console-dim italic" : line.failed ? "text-console-warn" : "text-console-ink")}>
+        {text}
+        {line.reason ? <span className="block text-console-dim not-italic">{line.reason}</span> : null}
       </span>
     </li>
   )
 }
-
