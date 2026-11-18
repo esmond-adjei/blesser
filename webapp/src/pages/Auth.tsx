@@ -44,8 +44,8 @@ function AuthShell({
         <AuthPhoto />
         <svg viewBox="0 0 32 32" className="absolute inset-[7.5%] size-[85%]" fill="none" strokeWidth={2} strokeLinejoin="round">
           <g transform={LOGO.fill}>
-            <path d={LOGO.sun_cut} stroke="var(--sun)" vectorEffect="non-scaling-stroke" />
-            <path d={LOGO.steps} stroke="#ffffff" vectorEffect="non-scaling-stroke" />
+            <path d="M9 18a7 7 0 0 1 14 0" stroke="var(--forest)" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <path d={LOGO.steps} stroke="var(--forest)" vectorEffect="non-scaling-stroke" />
           </g>
         </svg>
       </div>
