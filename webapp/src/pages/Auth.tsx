@@ -13,10 +13,6 @@ import { Alert, AlertDescription } from "../components/ui/feedback"
 import { OAUTH_STATE_KEY, OAuthButtons } from "../components/auth/OAuthButtons"
 import { PasswordInput } from "../components/auth/PasswordInput"
 
-const photoMask = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><g transform="${LOGO.fill}"><path d="${LOGO.sun_cut}"/><path d="${LOGO.steps}"/></g></svg>`,
-)}")`
-
 // Desktop only: phones never request the photo.
 function AuthPhoto() {
   return (
@@ -46,18 +42,13 @@ function AuthShell({
     <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-2 lg:gap-4 lg:p-4">
       <div aria-hidden="true" className="relative hidden overflow-hidden rounded-lg bg-surface-sunk lg:block">
         <AuthPhoto />
-        <div className="absolute inset-0 bg-forest/75" />
-        <div
-          className="absolute inset-0"
-          style={{
-            maskImage: photoMask,
-            maskSize: "85% 85%",
-            maskPosition: "center",
-            maskRepeat: "no-repeat",
-          }}
-        >
-          <AuthPhoto />
-        </div>
+        <div className="absolute inset-0 bg-forest/90" />
+        <svg viewBox="0 0 32 32" className="absolute inset-[7.5%] size-[85%]" fill="none" strokeWidth={2} strokeLinejoin="round">
+          <g transform={LOGO.fill}>
+            <path d={LOGO.sun_cut} stroke="var(--sun)" vectorEffect="non-scaling-stroke" />
+            <path d={LOGO.steps} stroke="#ffffff" vectorEffect="non-scaling-stroke" />
+          </g>
+        </svg>
       </div>
       <div className="mx-auto flex min-h-dvh w-full max-w-[448px] flex-col justify-center gap-6 px-4 py-8 lg:min-h-[calc(100dvh-2rem)]">
         <div className="flex w-full flex-col items-center gap-4 text-center">
