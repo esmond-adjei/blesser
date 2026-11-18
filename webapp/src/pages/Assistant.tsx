@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
-  ArrowUp, Briefcase, ChevronDown, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
-  MessageCircle, MessagesSquare, Pencil, Plus, Sparkles, Square, Trash2, Wrench,
+  ArrowUp, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
+  MessageCircle, MessagesSquare, Pencil, Plus, Square, Trash2, Wrench,
 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import {
   CHAT_PAGE, activitySummary, assistantHref, createChat, deleteChat, getChat, isToolStep, listChats, renameChat,
   stopTurn, streamTurn,
-  type AssistantChat, type AssistantEvent, type AssistantMessage, type PendingCall, type ToolStep, type TraceEntry,
+  type AssistantChat, type AssistantEvent, type AssistantMessage, type PendingCall, type TraceEntry,
   type TurnRequest,
 } from "../lib/assistant"
 import { ApiError, apiMessage } from "../lib/api"
@@ -22,8 +22,6 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
-const FOLLOW_UPS = ["Who can apply?", "What should I prepare?"]
-const CHAT_FOLLOW_UPS = ["What's next on my to-do list?", "What are my upcoming deadlines?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
 const chatsKey = (userId: string) => ["assistant", userId, "chats"]
 
@@ -34,7 +32,7 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
   list_todos: ListChecks,
   read_apply_kit: FolderOpen,
   search_web: Globe,
-  enable_changes: Sparkles,
+  enable_changes: Pencil,
   track_opportunity: Plus,
   add_todo: ListPlus,
 }
@@ -57,7 +55,6 @@ interface LiveReply {
   id: string
   type: TurnRequest["type"]
   status: string
-  thoughts: string[]
   text: string
   trace: TraceEntry[]
   user: AssistantMessage | null
@@ -68,10 +65,12 @@ interface LiveReply {
 function updateReply(reply: LiveReply, event: AssistantEvent): LiveReply {
   switch (event.type) {
     case "status": return { ...reply, status: event.message }
-    case "reasoning":
-      return event.text && reply.thoughts.at(-1) !== event.text
-        ? { ...reply, thoughts: [...reply.thoughts, event.text] }
+    case "reasoning": {
+      const last = reply.trace.at(-1)
+      return event.text && !(last?.kind === "thought" && last.text === event.text)
+        ? { ...reply, trace: [...reply.trace, { kind: "thought", text: event.text }] }
         : reply
+    }
     case "commentary": {
       const last = reply.trace.at(-1)
       return event.text && !(last && !isToolStep(last) && last.text === event.text)
@@ -100,7 +99,7 @@ function useLiveReply(userId: string) {
     const controller = new AbortController()
     connection.current = controller
     setError(null)
-    setReply({ id, type: turn.type, status: "Opening your reply…", thoughts: [], text: "", trace: [], user: null, answer: null, pending: null })
+    setReply({ id, type: turn.type, status: "Opening your reply…", text: "", trace: [], user: null, answer: null, pending: null })
     try {
       await streamTurn(id, turn, (event) => {
         if (controller.signal.aborted) return
@@ -186,7 +185,7 @@ function AssistantWorkspace({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (followScroll.current) end.current?.scrollIntoView({ block: "nearest" })
-  }, [active?.status, active?.text, active?.trace.length, active?.thoughts.length, rows.length, pending?.id, chatId])
+  }, [active?.status, active?.text, active?.trace.length, rows.length, pending?.id, chatId])
 
   function selectChat(id?: string) {
     navigate(id ? assistantHref(id) : "/assistant")
@@ -258,7 +257,6 @@ function AssistantWorkspace({ userId }: { userId: string }) {
     ? [...rows, active.user]
     : rows
   const visibleAnswer = active?.answer && !visibleRows.some((row) => row.id === active.answer?.id) ? active.answer : null
-  const last = visibleRows.at(-1)
   const working = !!active || !!thread.data?.running || creating
   const replyError = error?.id === chatId ? error?.message : null
   const disabled = working || !!pending || (!!chatId && thread.isError)
@@ -298,7 +296,7 @@ function AssistantWorkspace({ userId }: { userId: string }) {
             : <AssistantReply key={message.id} message={message} />)}
           {visibleAnswer ? <AssistantReply message={visibleAnswer} /> : null}
           {active && !active.answer && !pending ? (
-            <AssistantReply text={active.text} status={active.status} thoughts={active.thoughts.join("\n\n")} entries={active.trace} live />
+            <AssistantReply text={active.text} status={active.status} entries={active.trace} live />
           ) : null}
           {pending ? (
             <AssistantReply entries={pending.trace}>
@@ -310,10 +308,6 @@ function AssistantWorkspace({ userId }: { userId: string }) {
                 </div>
               </div>
             </AssistantReply>
-          ) : null}
-          {last?.role === "assistant" && !disabled ? (
-            <Prompts className="pl-11" prompts={last.sources.some((source) => source.kind === "opportunity") ? FOLLOW_UPS : CHAT_FOLLOW_UPS}
-              onPick={(prompt) => void send(prompt)} />
           ) : null}
           <div ref={end} />
         </div>
@@ -376,103 +370,138 @@ function Prompts({ prompts, onPick, className }: { prompts: string[]; onPick: (p
   )
 }
 
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = window.setTimeout(() => setCopied(false), 1600)
+    return () => window.clearTimeout(t)
+  }, [copied])
+  return (
+    <button
+      type="button"
+      aria-label={copied ? "Copied" : label}
+      title={copied ? "Copied" : label}
+      onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true), () => undefined)}
+      className="grid size-7 cursor-pointer place-items-center rounded-sm text-ink-tertiary transition-colors hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      {copied ? <Check className="size-3.5 text-positive" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+      <span className="sr-only" aria-live="polite">{copied ? "Copied" : ""}</span>
+    </button>
+  )
+}
+
+// Hover reveals turn actions on pointers; touch screens always show them.
+const TURN_ACTIONS = "flex opacity-0 transition-opacity duration-150 group-hover/turn:opacity-100 group-focus-within/turn:opacity-100 [@media(hover:none)]:opacity-100"
+
 function UserBubble({ content }: { content: string }) {
   return (
-    <div className="bl-enter flex justify-end">
+    <div className="group/turn bl-enter flex flex-col items-end gap-1">
       <p className="max-w-[85%] rounded-[20px_20px_6px_20px] bg-surface-sunk px-4 py-2.5 text-body whitespace-pre-wrap text-ink wrap-anywhere sm:max-w-[70%]">
         <span className="sr-only">You said </span>{content}
       </p>
+      <div className={TURN_ACTIONS}><CopyButton text={content} label="Copy message" /></div>
     </div>
   )
 }
 
-function AssistantReply({ message, text, status, thoughts, entries = [], live, children }: {
+function AssistantReply({ message, text, status, entries = [], live, children }: {
   message?: AssistantMessage
   text?: string
   status?: string
-  thoughts?: string
   entries?: TraceEntry[]
   live?: boolean
   children?: React.ReactNode
 }) {
   const content = message?.content || text
   const trace = message?.trace ?? entries
+  const working = live && !content
   return (
-    <div className="bl-enter flex min-w-0 gap-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5 pt-1">
-        <span className="sr-only">Assistant said</span>
-        {thoughts ? (
-          <details open={live} className="text-footnote text-ink-secondary">
-            <summary className="cursor-pointer select-none text-ink-tertiary">Thoughts</summary>
-            <p className="mt-1 max-h-48 overflow-y-auto pr-1 whitespace-pre-wrap wrap-anywhere">{thoughts}</p>
-          </details>
-        ) : null}
-        {trace.length ? <ActivityTrace entries={trace} /> : null}
-        {live && !content ? (
-          <div className="flex flex-col gap-1" role="status">
-            <span className="self-start text-callout font-medium">
-              <span className="bl-shimmer">{status && !status.startsWith("Opening") ? status : "Thinking"}</span>
-            </span>
-          </div>
-        ) : null}
-        {content ? (
-          <div className="text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-              table: ({ children }) => <div className="overflow-x-auto"><table>{children}</table></div>,
-            }}>{content}</ReactMarkdown>
-          </div>
-        ) : null}
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function ActivityTrace({ entries }: { entries: TraceEntry[] }) {
-  const [open, setOpen] = useState(true)
-  const firstTool = entries.findIndex(isToolStep)
-  const leading = firstTool === -1 ? entries : entries.slice(0, firstTool)
-  const activity = firstTool === -1 ? [] : entries.slice(firstTool)
-  const summary = activitySummary(entries)
-  return (
-    <>
-      {leading.map((entry, index) => !isToolStep(entry) ? (
-        <p key={`commentary-${index}`} className="text-body text-ink wrap-anywhere">{entry.text}</p>
-      ) : null)}
-      {summary ? (
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-            className="flex w-fit max-w-full cursor-pointer items-start gap-1 rounded-sm text-left text-callout font-medium text-ink-secondary transition-colors duration-160 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          >
-            <span className="min-w-0">{summary}</span>
-            <ChevronDown aria-hidden="true" className={cn("mt-px size-4 shrink-0 transition-transform duration-160", !open && "-rotate-90")} />
-          </button>
-          {open ? (
-            <div role="group" aria-label="Activity" className="flex flex-col rounded-md border border-separator bg-surface px-1 py-1">
-              {activity.map((entry, index) => isToolStep(entry)
-                ? <ActivityRow key={`tool-${entry.tool}-${index}`} step={entry} />
-                : <p key={`commentary-${index}`} className="px-2.5 py-2 text-callout text-ink wrap-anywhere">{entry.text}</p>)}
-            </div>
-          ) : null}
+    <div className="group/turn bl-enter flex min-w-0 flex-col gap-3">
+      <span className="sr-only">Assistant said</span>
+      {trace.length || working ? <AgentSteps entries={trace} live={!!working} status={status} /> : null}
+      {content ? (
+        <div className="text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+            table: ({ children }) => <div className="overflow-x-auto"><table>{children}</table></div>,
+          }}>{content}</ReactMarkdown>
         </div>
       ) : null}
-    </>
+      {children}
+      {content && !live ? <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}><CopyButton text={content} label="Copy reply" /></div> : null}
+    </div>
   )
 }
 
-function ActivityRow({ step }: { step: ToolStep }) {
-  const Icon = step.ok ? TOOL_ICONS[step.tool] ?? Wrench : CircleAlert
+/** The agent's work for one turn: thoughts, notes and tool calls in the order they happened. */
+function AgentSteps({ entries, live, status }: { entries: TraceEntry[]; live: boolean; status?: string }) {
+  const [open, setOpen] = useState(live)
+  const expanded = live || open
+  const id = useId()
+  const summary = activitySummary(entries) || "Worked on it"
+  const now = status && !status.startsWith("Opening") ? status : "Thinking"
   return (
-    <div className={cn(
-      "flex min-w-0 items-start gap-2 rounded-sm px-2.5 py-2 text-callout",
-      step.ok ? "text-ink-secondary" : "text-critical",
-    )}>
-      <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span className="min-w-0 wrap-anywhere">{step.label}</span>
+    <div className="flex min-w-0 flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={id}
+        disabled={live}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-fit max-w-full cursor-pointer items-center gap-2 rounded-sm text-left text-callout font-medium text-ink-secondary transition-colors duration-150 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default disabled:hover:text-ink-secondary"
+      >
+        {live ? <Loader2 className="size-4 shrink-0 text-link motion-safe:animate-spin" aria-hidden="true" /> : <CircleCheck className="size-4 shrink-0 text-ink-tertiary" aria-hidden="true" />}
+        <span className="min-w-0" role={live ? "status" : undefined}>{live ? <span className="bl-shimmer">{now}</span> : summary}</span>
+        {live ? null : <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 transition-transform duration-150", !expanded && "-rotate-90")} />}
+      </button>
+      {expanded && entries.length ? (
+        <ol id={id} aria-label="Steps" className="ml-2 flex flex-col gap-3 border-l border-separator py-1 pl-5">
+          {entries.map((entry, index) => <AgentStep key={`${entry.kind ?? "tool"}-${index}`} entry={entry} />)}
+        </ol>
+      ) : null}
     </div>
+  )
+}
+
+function StepIcon({ children, tone }: { children: React.ReactNode; tone?: string }) {
+  return (
+    <span aria-hidden="true" className={cn("absolute top-0 -left-[31px] grid size-5 place-items-center rounded-full bg-canvas text-ink-tertiary ring-4 ring-canvas", tone)}>
+      {children}
+    </span>
+  )
+}
+
+function AgentStep({ entry }: { entry: TraceEntry }) {
+  const [more, setMore] = useState(false)
+  if (entry.kind === "thought") {
+    const long = entry.text.length > 320
+    return (
+      <li className="relative min-w-0">
+        <StepIcon><Brain className="size-3.5" /></StepIcon>
+        <p className="text-caption font-medium text-ink-tertiary">Thought</p>
+        <p className={cn("mt-0.5 text-footnote whitespace-pre-wrap text-ink-secondary wrap-anywhere", long && !more && "line-clamp-4")}>{entry.text}</p>
+        {long ? (
+          <button type="button" onClick={() => setMore((v) => !v)} className="mt-0.5 cursor-pointer text-caption font-semibold text-link hover:underline">
+            {more ? "Show less" : "Show more"}
+          </button>
+        ) : null}
+      </li>
+    )
+  }
+  if (entry.kind === "commentary") {
+    return (
+      <li className="relative min-w-0">
+        <StepIcon><MessageSquareText className="size-3.5" /></StepIcon>
+        <p className="text-callout text-ink wrap-anywhere">{entry.text}</p>
+      </li>
+    )
+  }
+  const Icon = entry.ok ? TOOL_ICONS[entry.tool] ?? Wrench : CircleAlert
+  return (
+    <li className="relative min-w-0">
+      <StepIcon tone={entry.ok ? undefined : "text-critical"}><Icon className="size-3.5" /></StepIcon>
+      <p className={cn("text-callout wrap-anywhere", entry.ok ? "text-ink-secondary" : "text-critical")}>{entry.label}</p>
+    </li>
   )
 }
 

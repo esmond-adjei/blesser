@@ -44,7 +44,12 @@ class Commentary(BaseModel):
     text: str
 
 
-TraceEntry = ToolStep | Commentary
+class Thought(BaseModel):
+    kind: Literal["thought"] = "thought"
+    text: str
+
+
+TraceEntry = ToolStep | Commentary | Thought
 
 
 class Source(BaseModel):

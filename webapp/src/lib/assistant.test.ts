@@ -68,3 +68,12 @@ it("reports an interrupted turn without a terminal frame", async () => {
   await expect(streamTurn("chat-1", { type: "live" }, () => {}, new AbortController().signal))
     .rejects.toThrow("The reply stream was interrupted.")
 })
+
+it("counts thoughts as thinking, not as tool steps", () => {
+  const entries: TraceEntry[] = [
+    { kind: "thought", text: "Check the catalog first." },
+    { kind: "tool", tool: "search_catalog", label: "Searched", ok: true, note: "" },
+  ]
+  expect(activitySummary(entries)).toBe("Thought it through and searched the catalog")
+  expect(activitySummary([entries[0]])).toBe("Thought it through")
+})

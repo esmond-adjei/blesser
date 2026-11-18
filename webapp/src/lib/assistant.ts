@@ -14,7 +14,12 @@ export interface Commentary {
   text: string
 }
 
-export type TraceEntry = ToolStep | Commentary
+export interface Thought {
+  kind: "thought"
+  text: string
+}
+
+export type TraceEntry = ToolStep | Commentary | Thought
 
 const TOOL_SUMMARY: Record<string, { done: string; tried: string }> = {
   search_catalog: { done: "searched the catalog", tried: "tried to search the catalog" },
@@ -29,11 +34,11 @@ const TOOL_SUMMARY: Record<string, { done: string; tried: string }> = {
 }
 
 export function isToolStep(entry: TraceEntry): entry is ToolStep {
-  return entry.kind !== "commentary"
+  return entry.kind === undefined || entry.kind === "tool"
 }
 
 export function activitySummary(entries: TraceEntry[]): string {
-  const phrases: string[] = []
+  const phrases: string[] = entries.some((e) => e.kind === "thought") ? ["thought it through"] : []
   for (const entry of entries) {
     if (!isToolStep(entry)) continue
     const summary = TOOL_SUMMARY[entry.tool] ?? { done: "used a tool", tried: "tried a tool" }

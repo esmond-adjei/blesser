@@ -209,11 +209,15 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
     assert events[-3]["text"] == "Seed Fund closes on 8 Sep 2040."
     reply = events[-2]["message"]
     assert reply["trace"][0] == {
+        "kind": "thought",
+        "text": "I should look in the catalog before answering.",
+    }
+    assert reply["trace"][1] == {
         "kind": "commentary",
         "text": "I'll check the catalog.",
     }
-    assert reply["trace"][1]["kind"] == "tool"
-    assert reply["trace"][1]["label"] == "Searched the Blesser catalog, 1 match"
+    assert reply["trace"][2]["kind"] == "tool"
+    assert reply["trace"][2]["label"] == "Searched the Blesser catalog, 1 match"
     assert reply["sources"][0]["id"] == "record"
     assert reply["cited_deadlines"]
 

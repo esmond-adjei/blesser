@@ -198,6 +198,7 @@ async def _loop(chat_id, user_id, lease, content):
             response = await _model_call(provider, history, offered, ROOMY_MAX_TOKENS)
         thoughts = response.reasoning.strip()
         if thoughts:
+            trace.append({"kind": "thought", "text": thoughts[:4000]})
             yield {"event": "reasoning", "text": thoughts[:4000]}
         if not response.tool_calls:
             reply, sources, cited_deadlines = registry.render(response.text)
