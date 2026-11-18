@@ -3,6 +3,7 @@ import * as React from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  ArrowUp,
   ArrowUpRight,
   Check,
   ChevronRight,
@@ -10,8 +11,11 @@ import {
   CircleDashed,
   Database,
   FileText,
+  GripVertical,
   Globe,
+  LayoutGrid,
   Loader2,
+  MapPin,
   PanelRightOpen,
   Radar,
   MessageSquareText,
@@ -33,7 +37,7 @@ import {
 } from "../lib/scanLog"
 import { toastError, toastSuccess } from "../lib/toast"
 import type { OpportunityCategory, Scan, ScanFind, ScanTask } from "../lib/types"
-import { Button, Chip, Countdown, Field, Input, OpportunityArt, Textarea, buttonVariants, cn, daysUntil } from "@blesser/ui"
+import { Button, Chip, Countdown, OpportunityArt, buttonVariants, cn, daysUntil } from "@blesser/ui"
 import {
   Dialog,
   DialogBody,
@@ -45,6 +49,7 @@ import {
 } from "../components/ui/dialog"
 import { ErrorState } from "../components/feedback/EmptyState"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
+import { useShellHeader } from "../components/layout/shellHeader"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 
 type Status = ScanTask["status"] | Scan["status"]
@@ -95,139 +100,367 @@ function AllowanceNote() {
   return <span className="text-footnote text-ink-secondary tabular-nums">{text}</span>
 }
 
+const CARD_W = 300
+const CARD_H = 172
+const GAP = 24
+const LAYOUT_KEY = "blesser.scan-canvas"
+type Pos = { x: number; y: number }
+
+function loadLayout(): Record<string, Pos> {
+  try {
+    return JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "{}") as Record<string, Pos>
+  } catch {
+    return {}
+  }
+}
+
+function saveLayout(layout: Record<string, Pos>) {
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout))
+  } catch {
+    // Layout is a per-browser convenience; losing it only resets positions.
+  }
+}
+
+function freeSlot(taken: Pos[], width: number): Pos {
+  const cols = Math.max(1, Math.floor((width - GAP) / (CARD_W + GAP)))
+  for (let k = 0; ; k++) {
+    const slot = { x: GAP + (k % cols) * (CARD_W + GAP), y: GAP + Math.floor(k / cols) * (CARD_H + GAP) }
+    if (!taken.some((p) => Math.abs(p.x - slot.x) < CARD_W && Math.abs(p.y - slot.y) < CARD_H)) return slot
+  }
+}
+
 export function Scans() {
   const scans = useQuery({
     queryKey: ["scans"],
     queryFn: api.listScans,
     refetchInterval: (q) => (q.state.data?.some((s) => s.status === "running") ? 10_000 : 60_000),
   })
-  const running = scans.data?.find((s) => s.status === "running")
-  useTick(!!running)
+  const viewport = React.useRef<HTMLDivElement>(null)
+  const [layout, setLayout] = React.useState(loadLayout)
+  const [offset, setOffset] = React.useState<Pos>({ x: 0, y: 0 })
+  const [front, setFront] = React.useState<string | null>(null)
+  const [fresh, setFresh] = React.useState<string | null>(null)
+  useTick(!!scans.data?.some((s) => s.status === "running"))
+
+  // Oldest first, so a new scan takes the next free spot without moving older cards.
+  React.useEffect(() => {
+    if (!scans.data) return
+    const missing = [...scans.data].reverse().filter((s) => !layout[s.id])
+    if (!missing.length) return
+    const width = viewport.current?.clientWidth ?? 1200
+    const next = { ...layout }
+    for (const s of missing) next[s.id] = freeSlot(Object.values(next), width)
+    setLayout(next)
+    saveLayout(next)
+  }, [scans.data, layout])
+
+  const move = React.useCallback((id: string, pos: Pos, commit: boolean) => {
+    setLayout((prev) => {
+      const next = { ...prev, [id]: { x: Math.max(0, pos.x), y: Math.max(0, pos.y) } }
+      if (commit) saveLayout(next)
+      return next
+    })
+  }, [])
+
+  const arrange = React.useCallback(() => {
+    saveLayout({})
+    setLayout({})
+    setOffset({ x: 0, y: 0 })
+  }, [])
+
+  const header = React.useMemo(() => ({
+    title: "Scans",
+    actions: (
+      <div className="flex items-center gap-3">
+        <AllowanceNote />
+        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Arrange</Button>
+      </div>
+    ),
+  }), [arrange])
+  useShellHeader(header)
+
+  const onStarted = (scan: Scan) => {
+    setFresh(scan.id)
+    setFront(scan.id)
+    setOffset({ x: 0, y: 0 })
+  }
+
+  const pan = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || e.button !== 0) return
+    const start = { x: e.clientX - offset.x, y: e.clientY - offset.y }
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    el.dataset.panning = "true"
+    const onMove = (ev: PointerEvent) => setOffset({ x: Math.min(0, ev.clientX - start.x), y: Math.min(0, ev.clientY - start.y) })
+    const onUp = () => {
+      delete el.dataset.panning
+      el.removeEventListener("pointermove", onMove)
+      el.removeEventListener("pointerup", onUp)
+    }
+    el.addEventListener("pointermove", onMove)
+    el.addEventListener("pointerup", onUp)
+  }
+
   return (
-    <div className="bl-enter min-w-0 space-y-6">
-      <PageHeader
-        title="Scans"
-        description="Find opportunities from the Blesser catalog and across the web."
-        actions={<AllowanceNote />}
-      />
-      <div className="grid items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <section aria-labelledby="new-scan-heading" className={cn(PANEL, "lg:sticky lg:top-0")}>
-          <h2 id="new-scan-heading" className="text-headline text-ink">New scan</h2>
-          <NewScanForm />
-        </section>
-        <div className="min-w-0 space-y-5">
-          {running ? <RunningScan id={running.id} /> : null}
-          <section aria-labelledby="your-scans-heading" className={cn(PANEL, "gap-0 p-0")}>
-            <h2 id="your-scans-heading" className="px-5 pt-5 pb-3 text-headline text-ink">Your scans</h2>
-            {scans.isLoading ? (
-              <div className="mx-5 mb-5 h-24 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
-            ) : scans.isError ? (
-              <div className="px-5 pb-5"><ErrorState compact title="Your scans didn't load" description="Try again in a moment." onRetry={() => void scans.refetch()} /></div>
-            ) : !scans.data?.length ? (
-              <p className="px-5 pb-5 text-callout text-ink-secondary">No scans yet. Start one to look beyond the catalog.</p>
-            ) : (
-              <ul className="border-t border-separator">
-                {scans.data.map((scan, i) => <ScanRow key={scan.id} scan={scan} index={i} />)}
-              </ul>
-            )}
-          </section>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        ref={viewport}
+        role="region"
+        aria-label="Scan canvas. Drag empty space to pan, drag a card to move it."
+        onPointerDown={pan}
+        className="relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden bg-canvas data-[panning=true]:cursor-grabbing"
+        style={{
+          backgroundImage: "radial-gradient(circle, var(--separator) 1.2px, transparent 1.4px)",
+          backgroundSize: "22px 22px",
+          backgroundPosition: `${offset.x}px ${offset.y}px`,
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}>
+          {scans.data?.map((scan) => layout[scan.id] ? (
+            <AgentCard
+              key={scan.id}
+              scan={scan}
+              pos={layout[scan.id]}
+              onMove={move}
+              raised={front === scan.id}
+              fresh={fresh === scan.id}
+              onRaise={() => setFront(scan.id)}
+            />
+          ) : null)}
         </div>
+        {scans.isLoading ? (
+          <div className="absolute top-6 left-6 h-[172px] w-[300px] animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
+        ) : scans.isError ? (
+          <div className="absolute inset-x-4 top-6 mx-auto max-w-md"><ErrorState compact title="Your scans didn't load" description="Try again in a moment." onRetry={() => void scans.refetch()} /></div>
+        ) : !scans.data?.length ? (
+          <div className="pointer-events-none absolute inset-x-4 top-[28%] mx-auto max-w-sm text-center">
+            <Radar className="mx-auto size-8 text-ink-tertiary" strokeWidth={1.5} aria-hidden="true" />
+            <p className="mt-3 text-headline text-ink">Send your first agent</p>
+            <p className="mt-1 text-callout text-ink-secondary">Each scan is one agent looking for one audience. It appears here as a card you can move around.</p>
+          </div>
+        ) : null}
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <ScanComposer onStarted={onStarted} className="pointer-events-auto mx-auto max-w-[760px] shadow-elevation-3" />
       </div>
     </div>
   )
 }
 
-function ScanRow({ scan, index }: { scan: Scan; index: number }) {
-  const duration = formatDuration(scanElapsedMs(scan))
+function AgentCard({ scan, pos, onMove, raised, fresh, onRaise }: {
+  scan: Scan
+  pos: Pos
+  onMove: (id: string, pos: Pos, commit: boolean) => void
+  raised: boolean
+  fresh: boolean
+  onRaise: () => void
+}) {
+  const navigate = useNavigate()
+  const client = useQueryClient()
+  const running = scan.status === "running"
+  const live = useQuery({
+    queryKey: ["scan", scan.id],
+    queryFn: () => api.getScan(scan.id),
+    enabled: running,
+    refetchInterval: running ? 5000 : false,
+  })
+  const cancel = useMutation({
+    mutationFn: () => api.cancelScan(scan.id),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["scans"] }),
+    onError: (e) => toastError(e),
+  })
+  const [dragging, setDragging] = React.useState(false)
   const status = STATUS[scan.status] ?? STATUS.pending
+  const duration = formatDuration(scanElapsedMs(scan))
+  const tasks = live.data?.tasks ?? []
+  const done = tasks.filter((t) => t.status !== "running" && t.status !== "pending").length
+  const now = tasks.map(lastAction).find(Boolean)
+  const focus = scanFocus(scan)
+  const open = () => navigate(`/scans/${scan.id}`)
+
+  const drag = (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest("button, a, [role=menuitem]")) return
+    onRaise()
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    const start = { x: e.clientX, y: e.clientY }
+    let moved = false
+    let last = pos
+    const onMovePtr = (ev: PointerEvent) => {
+      const dx = ev.clientX - start.x
+      const dy = ev.clientY - start.y
+      if (!moved && Math.hypot(dx, dy) < 4) return
+      moved = true
+      setDragging(true)
+      last = { x: pos.x + dx, y: pos.y + dy }
+      onMove(scan.id, last, false)
+    }
+    const onUp = () => {
+      el.removeEventListener("pointermove", onMovePtr)
+      el.removeEventListener("pointerup", onUp)
+      setDragging(false)
+      if (moved) onMove(scan.id, last, true)
+      else open()
+    }
+    el.addEventListener("pointermove", onMovePtr)
+    el.addEventListener("pointerup", onUp)
+  }
+
+  const nudge = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 64 : 16
+    const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]
+    if (!d) return
+    e.preventDefault()
+    onMove(scan.id, { x: pos.x + d[0], y: pos.y + d[1] }, true)
+  }
+
   return (
-    <li style={{ "--i": index } as React.CSSProperties} className="bl-enter border-t border-separator first:border-t-0">
-      <Link
-        to={`/scans/${scan.id}`}
-        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-highlight focus-visible:-outline-offset-2"
-      >
-        <span className="min-w-0">
-          <span className="block truncate text-callout font-semibold text-ink">{scanTitle(scan)}</span>
-          <span className="block truncate text-footnote text-ink-tertiary">
-            {[scanFocus(scan) && `Focus on ${scanFocus(scan)}`, `${scan.opportunities_added} saved`, duration, formatAgo(scan.created_at)].filter(Boolean).join(", ")}
-          </span>
+    <article
+      aria-label={scanTitle(scan)}
+      onPointerDown={drag}
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, width: CARD_W, minHeight: CARD_H }}
+      className={cn(
+        "pointer-events-auto absolute top-0 left-0 flex cursor-pointer touch-none flex-col gap-3 rounded-lg border bg-surface p-4 shadow-elevation-1 select-none",
+        "transition-[box-shadow,border-color] duration-150 hover:border-input-border-hover hover:shadow-elevation-2",
+        raised ? "z-20" : "z-10",
+        dragging && "cursor-grabbing shadow-elevation-3",
+        fresh ? "bl-pop border-focus" : "border-separator",
+      )}
+    >
+      <header className="flex items-center gap-2">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-forest-soft text-link">
+          {running ? <Radar className="size-4 motion-safe:animate-pulse" strokeWidth={1.75} aria-hidden="true" /> : <Radar className="size-4" strokeWidth={1.75} aria-hidden="true" />}
         </span>
-        <Chip tone={status.tone}>{status.label}</Chip>
-      </Link>
-    </li>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-callout font-semibold text-ink">{audiences(scan)}</h2>
+          <p className="truncate text-caption text-ink-tertiary">{scan.region || "Anywhere"}</p>
+        </div>
+        <button
+          type="button"
+          aria-label={`Move ${scanTitle(scan)} with the arrow keys`}
+          onKeyDown={nudge}
+          className="grid size-7 cursor-grab place-items-center rounded-sm text-ink-tertiary hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <GripVertical className="size-4" aria-hidden="true" />
+        </button>
+        <ActionMenuButton
+          label={`More for ${scanTitle(scan)}`}
+          actions={[
+            { label: "Open scan", icon: <PanelRightOpen />, onSelect: open },
+            ...(running ? [{ label: "Stop", icon: <Square />, onSelect: () => cancel.mutate() }] : []),
+          ]}
+        />
+      </header>
+      <p className={cn("line-clamp-2 text-footnote", focus ? "text-ink" : "text-ink-tertiary")}>{focus || "Any open opportunity"}</p>
+      <div className="mt-auto space-y-2">
+        {running ? (
+          <>
+            <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunk" role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={tasks.length || 1} aria-valuenow={done}>
+              <div className="h-full rounded-full bg-sun transition-[width] duration-500" style={{ width: `${tasks.length ? Math.max(6, (done / tasks.length) * 100) : 6}%` }} />
+            </div>
+            <p className="truncate text-caption text-ink-secondary" aria-live="polite">{now ?? "Getting started"}</p>
+          </>
+        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <Chip tone={status.tone} icon={running ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : undefined}>
+            {duration ? `${status.label} ${running ? "for" : "in"} ${duration}` : status.label}
+          </Chip>
+          <span className="text-caption text-ink-tertiary tabular-nums">
+            {running ? `${done} of ${tasks.length || "?"} tasks` : `${scan.opportunities_added} saved, ${formatAgo(scan.created_at)}`}
+          </span>
+        </div>
+      </div>
+    </article>
   )
 }
 
-function NewScanForm({ onStarted, className }: { onStarted?: () => void; className?: string }) {
-  const navigate = useNavigate()
+function ScanComposer({ onStarted, className, showAllowance = false }: { onStarted?: (scan: Scan) => void; className?: string; showAllowance?: boolean }) {
   const client = useQueryClient()
   const allowance = useAllowance()
-  const [categories, setCategories] = React.useState<OpportunityCategory[]>([...CATEGORIES])
+  const [category, setCategory] = React.useState<OpportunityCategory>("startup")
   const [region, setRegion] = React.useState("Ghana")
   const [focus, setFocus] = React.useState("")
   const start = useMutation({
-    mutationFn: () => api.startScan({ categories, region: region.trim(), focus: focus.trim() }),
+    mutationFn: () => api.startScan({ categories: [category], region: region.trim(), focus: focus.trim() }),
     onSuccess: (scan) => {
       void client.invalidateQueries({ queryKey: ["scans"] })
-      onStarted?.()
-      navigate(`/scans/${scan.id}`)
+      setFocus("")
+      toastSuccess(`Agent sent to find ${CATEGORY_LABELS[category].toLowerCase()} opportunities`)
+      onStarted?.(scan)
     },
     onError: (err) => toastError(err, "Couldn't start the scan"),
   })
-  const toggle = (c: OpportunityCategory) =>
-    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
   const a = allowance.data
   const blocked = !!a?.enabled && (a.left_this_hour === 0 || a.left_today === 0)
+  const submit = () => { if (!blocked && !start.isPending) start.mutate() }
   return (
     <form
-      className={cn("flex flex-col gap-4", className)}
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (categories.length && !blocked) start.mutate()
-      }}
+      onSubmit={(e) => { e.preventDefault(); submit() }}
+      className={cn("rounded-lg border border-input-border bg-surface p-2.5 pl-4 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--focus-soft)]", className)}
     >
-      <Field label="What are you looking for?" hint="Optional. Sectors, fields or kinds to look at first.">
-        <Textarea
-          value={focus}
-          onChange={(e) => setFocus(e.target.value)}
-          maxLength={2000}
-          rows={3}
-          className="min-h-20"
-          placeholder="Climate and agritech funding for an early-stage startup"
-        />
-      </Field>
-      <fieldset>
-        <legend className="mb-1.5 text-callout font-semibold text-ink">For</legend>
-        <div className="flex flex-wrap gap-1.5">
+      <label htmlFor="scan-focus" className="sr-only">What should this agent look for?</label>
+      <textarea
+        id="scan-focus"
+        rows={1}
+        value={focus}
+        maxLength={2000}
+        onChange={(e) => setFocus(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit() } }}
+        placeholder="What should this agent look for? e.g. climate and agritech grants"
+        className="max-h-32 min-h-9 w-full resize-none bg-transparent py-1.5 text-body text-ink outline-none [field-sizing:content] placeholder:text-ink-tertiary"
+      />
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <div role="radiogroup" aria-label="Audience" className="flex rounded-full bg-surface-sunk p-0.5">
           {CATEGORIES.map((c) => (
-            <Chip key={c} selected={categories.includes(c)} onClick={() => toggle(c)}>{CATEGORY_LABELS[c]}</Chip>
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={category === c}
+              onClick={() => setCategory(c)}
+              className={cn(
+                "h-7 cursor-pointer rounded-full px-3 text-footnote font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-focus",
+                category === c ? "bg-surface text-ink shadow-elevation-1" : "text-ink-secondary hover:text-ink",
+              )}
+            >
+              {CATEGORY_LABELS[c]}
+            </button>
           ))}
         </div>
-        {!categories.length ? <p className="mt-1.5 text-footnote text-caution">Pick at least one.</p> : null}
-      </fieldset>
-      <Field label="Where">
-        <Input value={region} onChange={(e) => setRegion(e.target.value)} maxLength={120} placeholder="Ghana" />
-      </Field>
-      <p className="text-footnote text-ink-secondary">
-        We check the Blesser catalog first, then search the web for anything missing. Scans take 15 to 30 minutes and keep running if you leave.
-      </p>
-      <Button type="submit" size="lg" variant="primary" icon={<Radar />} disabled={start.isPending || !categories.length || blocked}>
-        {start.isPending ? "Starting" : blocked ? "No scans left for now" : "Start a scan"}
-      </Button>
+        <label className="flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-separator px-3 text-footnote text-ink-secondary focus-within:border-focus">
+          <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="sr-only">Where</span>
+          <input value={region} onChange={(e) => setRegion(e.target.value)} maxLength={120} placeholder="Anywhere" className="w-24 min-w-0 bg-transparent text-ink outline-none placeholder:text-ink-tertiary" />
+        </label>
+        {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
+        <Button
+          type="submit"
+          size="sm"
+          variant="primary"
+          iconOnly
+          aria-label={blocked ? "No scans left for now" : "Start scan"}
+          title={blocked ? "No scans left for now" : undefined}
+          disabled={blocked || start.isPending}
+          icon={start.isPending ? <Loader2 className="motion-safe:animate-spin" /> : <ArrowUp />}
+          className={cn("size-9", !showAllowance && "ml-auto")}
+        />
+      </div>
     </form>
   )
 }
 
 export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const navigate = useNavigate()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" onClose={() => onOpenChange(false)}>
+      <DialogContent className="max-w-xl" onClose={() => onOpenChange(false)}>
         <DialogHeader>
           <DialogTitle>New scan</DialogTitle>
-          <DialogDescription><AllowanceNote /></DialogDescription>
+          <DialogDescription>One agent looks for one audience, in the catalog first and then across the web.</DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <NewScanForm onStarted={() => onOpenChange(false)} />
+          <ScanComposer showAllowance onStarted={() => { onOpenChange(false); navigate("/scans") }} />
         </DialogBody>
       </DialogContent>
     </Dialog>
@@ -241,12 +474,6 @@ function useScan(id: string) {
     refetchInterval: ({ state: { data } }) =>
       data?.status === "running" || data?.tasks?.some((task) => task.status === "running") ? 4000 : false,
   })
-}
-
-function RunningScan({ id }: { id: string }) {
-  const scan = useScan(id)
-  if (!scan.data) return null
-  return <ScanPanel scan={scan.data} />
 }
 
 function ScanPanel({ scan, actions }: { scan: Scan; actions?: React.ReactNode }) {

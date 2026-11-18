@@ -34,11 +34,12 @@ function useDocumentTitle() {
 
 // Pages that manage their own scrolling, like the Assistant's pinned composer.
 const FULL_BLEED = ["/assistant"]
+const FULL_BLEED_EXACT = ["/scans"]
 
 export function Shell() {
   useDocumentTitle()
   const { pathname } = useLocation()
-  const fullBleed = FULL_BLEED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  const fullBleed = FULL_BLEED_EXACT.includes(pathname) || FULL_BLEED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
   const [pageHeader, setPageHeader] = React.useState<ShellHeader | null>(null)
   return (
     <SidebarProvider defaultOpen={document.cookie.split("; ").find((entry) => entry.startsWith("sidebar_state=")) !== "sidebar_state=false"} className="h-dvh min-h-0 bg-canvas">
