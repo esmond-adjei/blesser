@@ -64,6 +64,8 @@ import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHe
 import { ShareDialog } from "../components/share/ShareDialog"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { ScanDialog } from "./Scans"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
+import { useIsMobile } from "../hooks/use-mobile"
 
 const SORTS = [
   { value: "deadline", label: "Closing soonest" },
@@ -521,21 +523,25 @@ function OpportunityDetail({
   onTodo: (opp: Opportunity) => void
   onShare: (opp: Opportunity) => void
 }) {
-  // Keep the last row while the dialog animates out.
+  // Keep the last row while the sheet animates out.
   const [shown, setShown] = React.useState<Opportunity | null>(opp)
   if (opp && opp !== shown) setShown(opp)
+  const phone = useIsMobile()
   return (
-    <Dialog open={!!opp} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={!!opp} onOpenChange={(open) => !open && onClose()}>
       {shown ? (
-        <DialogContent className="max-w-2xl" onClose={onClose}>
-          <DialogHeader className="flex-row items-start gap-4">
+        <SheetContent
+          side={phone ? "bottom" : "right"}
+          className="gap-0 max-sm:h-[92dvh] sm:w-full sm:max-w-xl"
+        >
+          <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-14">
             <Art opp={shown} shape="square" className="size-14 shrink-0 rounded-md" />
             <div className="min-w-0 space-y-1.5">
-              <DialogTitle>{shown.title}</DialogTitle>
-              {shown.organization ? <DialogDescription>{shown.organization}</DialogDescription> : null}
+              <SheetTitle>{shown.title}</SheetTitle>
+              {shown.organization ? <SheetDescription>{shown.organization}</SheetDescription> : null}
             </div>
-          </DialogHeader>
-          <DialogBody className="space-y-4">
+          </SheetHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             <OpportunityMeta opp={shown} />
             {shown.summary ? <p className="max-w-reading text-body text-ink">{shown.summary}</p> : null}
             <dl className="grid gap-3 text-callout sm:grid-cols-[140px_1fr]">
@@ -570,8 +576,8 @@ function OpportunityDetail({
               ) : null}
               . Confirm the details on the official page before you apply.
             </p>
-          </DialogBody>
-          <DialogFooter className="flex-row flex-wrap items-center justify-end">
+          </div>
+          <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
             <ActionMenuButton
               actions={secondaryActions(shown, { onTodo, onShare }, false)}
               label="More actions"
@@ -594,10 +600,10 @@ function OpportunityDetail({
               Open full page
             </Link>
             <TrackButton opp={shown} applicationId={applicationId} />
-          </DialogFooter>
-        </DialogContent>
+          </SheetFooter>
+        </SheetContent>
       ) : null}
-    </Dialog>
+    </Sheet>
   )
 }
 
