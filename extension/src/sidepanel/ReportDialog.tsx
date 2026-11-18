@@ -100,7 +100,7 @@ export function ReportDialog({ tabId, open, onClose, onSent }: { tabId: number; 
                 <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-[12px] leading-4 text-ink-secondary">
                   {preview.fields.map((f) => (
                     <li key={f.key} className="truncate">
-                      {f.label || f.placeholder || f.name || "Unlabelled"} <span className="text-ink-tertiary">· {f.type}{f.options.length ? `, ${f.options.length} options` : ""}</span>
+                      {f.label || f.placeholder || f.name || "Unlabelled"} <span className="text-ink-tertiary">({f.type}{f.options.length ? `, ${f.options.length} options` : ""})</span>
                     </li>
                   ))}
                 </ul>

@@ -130,6 +130,12 @@ export interface Review {
   moved: "navigated" | "step" | null
 }
 
+export interface TrackedApplication {
+  title: string
+  deadline: string
+  deadline_date: string | null
+}
+
 export type Corrected = { value: string | string[] | null } | { wrong_field: true }
 
 export interface FillFeedback {
@@ -180,6 +186,7 @@ export type PanelMessage =
   | { type: "prefs"; prefs: Prefs }
   | { type: "fill"; tabId: number }
   | { type: "review"; tabId: number }
+  | { type: "trackedApplication"; tabId: number }
   | { type: "focus"; tabId: number; key: string }
   | { type: "markApplied"; tabId: number }
   | { type: "edit"; tabId: number; key: string; value: string | string[] | null }

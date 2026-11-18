@@ -206,8 +206,8 @@ try {
 
   const row = (label) => panel.getByRole("region", { name: "Review" }).locator("li").filter({ has: panel.getByText(label, { exact: true }) })
 
-  await row("First name").getByRole("button").first().click()
-  await row("First name").getByRole("button", { name: "Edit" }).click()
+  await row("First name").getByRole("button", { name: "Actions for First name" }).click()
+  await panel.getByRole("menuitem", { name: "Edit" }).click()
   const editor = row("First name").getByRole("form", { name: "Edit First name" })
   await editor.getByRole("textbox").fill("Ama Serwaa")
   await shot(panel, "06-edit-in-place.png")
@@ -222,8 +222,8 @@ try {
   assert.equal(edit.page.host, "localhost")
   results.steps.push("edit in place wrote to the page and sent feedback")
 
-  await row("Phone").getByRole("button").first().click()
-  await row("Phone").getByRole("button", { name: "Wrong field" }).click()
+  await row("Phone").getByRole("button", { name: "Actions for Phone" }).click()
+  await panel.getByRole("menuitem", { name: "Wrong field" }).click()
   await row("Phone").getByText(/Marked as the wrong field/).waitFor()
   assert.equal(await tabPage.locator("#phone").inputValue(), "")
   assert.deepEqual(recorded.feedback.at(-1).corrected, { wrong_field: true })
@@ -252,7 +252,8 @@ try {
   await shot(panel, "08-new-step-noticed.png")
   results.steps.push("noticed a new form step")
 
-  await panel.getByRole("button", { name: "Report a problem" }).click()
+  await panel.getByRole("button", { name: "Account actions" }).click()
+  await panel.getByRole("menuitem", { name: "Report a problem" }).click()
   const dialog = panel.getByRole("dialog", { name: "Report a problem" })
   await dialog.getByRole("button", { name: /See what's sent/ }).click()
   await dialog.getByLabel("What went wrong?").fill("Phone went into the wrong field.")

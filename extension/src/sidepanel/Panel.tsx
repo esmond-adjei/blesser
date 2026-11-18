@@ -1,9 +1,10 @@
 import * as React from "react"
-import { ArrowUpRight, Check, Flag, Footprints, LogOut, Settings as SettingsIcon, Sparkles } from "lucide-react"
+import { ArrowUpRight, Check, Flag, Footprints, LogOut, Settings as SettingsIcon, Sparkles, WandSparkles } from "lucide-react"
 import { Button, Logo, Select, Wordmark, cn } from "@blesser/ui"
-import { counts } from "../shared/review"
+import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../../../webapp/src/components/ui/menu"
 import type { Prefs, Review, Status } from "../shared/types"
 import { FILL_REQUEST, send } from "../shared/ui"
+import { Opportunity } from "./Opportunity"
 import { ReportDialog } from "./ReportDialog"
 import { ReviewList } from "./ReviewList"
 import { usePanelTab } from "./usePanelTab"
@@ -27,74 +28,20 @@ function Switch({ checked, onChange, label, disabled }: { checked: boolean; onCh
   )
 }
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-
-function Summary({ review }: { review: Review }) {
-  const c = counts(review)
-  return (
-    <p className="flex flex-wrap items-baseline gap-x-1.5 text-footnote text-ink-secondary" aria-live="polite">
-      <span className="font-semibold text-ink tabular-nums">{c.filled}</span> filled
-      <span aria-hidden="true">·</span>
-      <span className="font-semibold text-ink tabular-nums">{c.drafted}</span> drafted
-      <span aria-hidden="true">·</span>
-      <span className="font-semibold text-ink tabular-nums">{c.needs}</span> {c.needs === 1 ? "needs" : "need"} you
-      <span className="ml-auto text-[12px] text-ink-tertiary">{time(review.at)}</span>
-    </p>
-  )
-}
-
 function Moved({ moved }: { moved: NonNullable<Review["moved"]> }) {
   return (
     <div className="flex items-start gap-2 rounded-md bg-info-soft px-3 py-2" role="status">
       <Footprints className="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
       <p className="text-footnote text-ink">
-        {moved === "navigated" ? "You're on a new page or step." : "New fields appeared on this page."} Fill this step when you're ready; the list below is from before.
+        {moved === "navigated" ? "You're on a new page or step." : "New fields appeared on this page."} Fill this step when you're ready. The list shows fields from the previous fill.
       </p>
-    </div>
-  )
-}
-
-function Applied({ review, tabId }: { review: Review; tabId: number }) {
-  const [marking, setMarking] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  if (!review.matchedOpportunityId) return null
-  if (review.applied)
-    return (
-      <p className="flex items-center gap-1.5 text-callout text-positive">
-        <Check className="size-4" aria-hidden="true" /> Marked as applied
-      </p>
-    )
-  return (
-    <div className="rounded-md border border-separator bg-surface px-3 py-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-footnote text-ink-secondary">You track this one. Submitted it?</p>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={marking}
-          onClick={async () => {
-            setMarking(true)
-            setError(null)
-            try {
-              await send<Review>({ type: "markApplied", tabId })
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Couldn't mark it")
-            } finally {
-              setMarking(false)
-            }
-          }}
-        >
-          Mark as applied
-        </Button>
-      </div>
-      {error ? <p role="alert" className="mt-1.5 text-footnote text-critical">{error}</p> : null}
     </div>
   )
 }
 
 export function Panel() {
   const [status, setStatus] = React.useState<Status | null>(null)
-  const { tabId, review } = usePanelTab()
+  const { tabId, pageTitle, review } = usePanelTab()
   const [busy, setBusy] = React.useState(false)
   const [failure, setFailure] = React.useState<{ tabId: number | null; text: string } | null>(null)
   const error = failure && (failure.tabId === null || failure.tabId === tabId) ? failure.text : null
@@ -181,38 +128,49 @@ export function Panel() {
     if (await chrome.permissions.request({ origins: ["https://*/*", "http://*/*"] })) void fill()
   }
 
-  const appUrl = status?.settings.appUrl ?? ""
   const me = status?.me
   const moved = review?.moved ?? null
+  const currentReview = moved === "navigated" ? null : review
   const projectChosen = !!me?.projects.some((p) => p.id === status?.prefs.fillAs)
+  const filledCount = review?.rows.filter((row) => row.filled).length ?? 0
+  const fillLabel = moved ? "Fill this step" : filledCount ? `Fill ${filledCount} ${filledCount === 1 ? "field" : "fields"}` : "Fill this page"
+  const accountActions: MenuAction[] = [
+    { label: "Extension options", icon: <SettingsIcon />, onSelect: () => void chrome.runtime.openOptionsPage() },
+  ]
+  if (status?.connected) {
+    accountActions.push(
+      { label: "Apply kit", icon: <ArrowUpRight />, href: `${status.settings.appUrl}/kit` },
+      { label: "Report a problem", icon: <Flag />, disabled: !tabId, onSelect: () => setReporting(true) },
+      { kind: "separator" },
+      {
+        label: "Disconnect this browser",
+        icon: <LogOut />,
+        onSelect: async () => {
+          await send({ type: "disconnect" })
+          void load()
+        },
+      },
+    )
+  }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-separator bg-canvas/95 px-4 py-2.5 backdrop-blur">
-        <Logo className="size-6" title="" />
-        <div className="-ml-1.5 min-w-0 flex-1">
-          <p><Wordmark className="text-[21px]" /></p>
-          {me ? <p className="truncate text-[12px] leading-4 text-ink-secondary">{me.user.display_name || me.user.email}</p> : null}
-        </div>
-        <Button size="sm" variant="quiet" iconOnly icon={<SettingsIcon />} aria-label="Extension options" title="Extension options" className="size-8 [&_svg]:size-4" onClick={() => void chrome.runtime.openOptionsPage()} />
-        {status?.connected ? (
-          <Button
-            size="sm"
-            variant="quiet"
-            iconOnly
-            icon={<LogOut />}
-            aria-label="Disconnect this browser"
-            title="Disconnect this browser"
-            className="size-8 [&_svg]:size-4"
-            onClick={async () => {
-              await send({ type: "disconnect" })
-              void load()
-            }}
-          />
-        ) : null}
-      </header>
+    <div className="min-h-dvh">
+      <ActionContextMenu actions={accountActions}>
+        <header className="sticky top-0 z-20 border-b border-separator bg-canvas">
+          <div className="mx-auto flex max-w-reading items-center justify-between gap-3 px-4 py-3">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Logo className="size-[22px]" title="" />
+              <Wordmark className="text-[22px]" />
+            </div>
+            <div className="flex min-w-0 items-center gap-1.5">
+              {me ? <p className="truncate text-right text-footnote text-ink-secondary" title={me.user.display_name || me.user.email}>{me.user.display_name || me.user.email}</p> : null}
+              <ActionMenuButton actions={accountActions} label={me ? "Account actions" : "Extension actions"} />
+            </div>
+          </div>
+        </header>
+      </ActionContextMenu>
 
-      <main className="flex-1 space-y-4 px-4 py-4">
+      <main className="mx-auto max-w-reading space-y-3 p-4">
         {!status ? (
           <div className="space-y-2" aria-busy="true">
             <div className="h-10 animate-pulse rounded-md bg-surface-sunk" />
@@ -235,95 +193,77 @@ export function Panel() {
           </section>
         ) : (
           <>
-            <section aria-label="Fill settings" className="divide-y divide-separator rounded-md border border-separator bg-surface">
-              <label className="flex items-center gap-3 px-3 py-2">
-                <span className="w-16 shrink-0 text-footnote font-medium text-ink-secondary">Fill as</span>
-                <Select
-                  value={projectChosen ? status.prefs.fillAs : "me"}
-                  onChange={(e) => setPrefs({ ...status.prefs, fillAs: e.target.value })}
-                  className="h-8 min-w-0 flex-1 px-2.5 pr-9 text-footnote"
-                >
-                  <option value="me">Me</option>
-                  {me.projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </Select>
-              </label>
-              <div className="flex items-center justify-between gap-3 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-footnote font-medium text-ink">
-                    <Sparkles className="size-3.5 text-caution" aria-hidden="true" /> Draft answers I haven't saved
-                  </p>
-                  <p className="text-[12px] leading-4 text-ink-tertiary">
-                    {me.drafting.enabled ? `${me.drafting.remaining_today} left today. You review every draft.` : "Drafting is off on this Blesser."}
-                  </p>
+            <Opportunity key={`${tabId}:${currentReview?.matchedOpportunityId ?? ""}`} tabId={tabId} pageTitle={pageTitle} review={currentReview} />
+
+            <section aria-labelledby="fill-title" aria-busy={busy} className="bl-enter space-y-4 rounded-lg border border-separator bg-surface p-3.5 [--i:1]">
+              <h2 id="fill-title" className="type-title-3 text-ink">Fill this form</h2>
+              <div className="divide-y divide-separator rounded-md bg-surface-sunk">
+                <label className="flex items-center gap-3 px-3 py-2">
+                  <span className="shrink-0 text-footnote font-medium text-ink-secondary">Fill as</span>
+                  <Select
+                    value={projectChosen ? status.prefs.fillAs : "me"}
+                    onChange={(e) => setPrefs({ ...status.prefs, fillAs: e.target.value })}
+                    className="h-control-sm min-w-0 flex-1 px-2.5 pr-9 text-footnote"
+                  >
+                    <option value="me">Me</option>
+                    {me.projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </Select>
+                </label>
+                <div className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-footnote font-medium text-ink">
+                      <Sparkles className="size-3.5 shrink-0 text-caution" aria-hidden="true" /> Draft answers I haven't saved
+                    </p>
+                    <p className="text-caption text-ink-tertiary">
+                      {me.drafting.enabled ? `${me.drafting.remaining_today} left today. You review every draft.` : "Drafting is off on this Blesser."}
+                    </p>
+                  </div>
+                  <Switch
+                    label="Draft answers I haven't saved"
+                    disabled={!me.drafting.enabled}
+                    checked={status.prefs.allowDrafting && me.drafting.enabled}
+                    onChange={(allowDrafting) => setPrefs({ ...status.prefs, allowDrafting })}
+                  />
                 </div>
-                <Switch
-                  label="Draft answers I haven't saved"
-                  disabled={!me.drafting.enabled}
-                  checked={status.prefs.allowDrafting && me.drafting.enabled}
-                  onChange={(allowDrafting) => setPrefs({ ...status.prefs, allowDrafting })}
-                />
               </div>
-            </section>
-            {projectChosen ? <p className="-mt-2 text-[12px] leading-4 text-ink-tertiary">Personal questions still use your profile.</p> : null}
-
-            {moved ? <Moved moved={moved} /> : null}
-
-            <div className="space-y-1.5">
-              <Button variant="primary" className="w-full" disabled={busy || !tabId} onClick={() => void fill()}>
-                {busy ? "Filling…" : moved ? "Fill this step" : "Fill this page"}
+              {projectChosen ? <p className="text-caption text-ink-tertiary">Personal questions still use your profile.</p> : null}
+              {moved ? <Moved moved={moved} /> : null}
+              {review && tabId ? (
+                <>
+                  {review.rows.some((row) => row.status === "drafted") ? (
+                    <p className="text-caption text-ink-tertiary">Drafted answers have a dashed outline on the page. Read them before you submit.</p>
+                  ) : null}
+                  <ReviewList key={review.at} review={review} tabId={tabId} stale={!!moved} />
+                </>
+              ) : (
+                <p className="text-footnote text-ink-secondary">Fields will appear here after you fill the page.</p>
+              )}
+              <Button variant="primary" icon={<WandSparkles aria-hidden="true" />} className="w-full" disabled={busy || !tabId} onClick={() => void fill()} title={!moved && filledCount ? "Based on the last fill" : undefined}>
+                {busy ? "Filling…" : fillLabel}
               </Button>
-              <p className="text-center text-[12px] leading-4 text-ink-tertiary">Blesser never submits. You check and send.</p>
-            </div>
-
-            {error ? <p role="alert" className="rounded-md bg-critical-soft px-3 py-2 text-footnote text-critical">{error}</p> : null}
-            {error?.startsWith("Chrome hasn't let Blesser") ? (
-              <div className="space-y-1.5 rounded-md border border-separator px-3 py-2.5">
-                <p className="text-footnote text-ink-secondary">
-                  Or let Blesser read form pages on any site. It still only fills when you ask, and you can turn this off in Chrome's extension settings.
-                </p>
-                <Button variant="secondary" className="w-full" onClick={() => void allowEverywhere()}>
-                  Allow on all sites
-                </Button>
-              </div>
-            ) : null}
-
-            {review && tabId ? (
-              <section aria-label="Results" className="space-y-3">
-                <Summary review={review} />
-                {counts(review).drafted ? (
-                  <p className="text-[12px] leading-4 text-ink-tertiary">Drafted answers have a dashed outline on the page. Read them before you submit.</p>
-                ) : null}
-                <ReviewList key={review.at} review={review} tabId={tabId} stale={!!moved} />
-                <Applied review={review} tabId={tabId} />
-              </section>
-            ) : null}
+              {error ? <p role="alert" className="rounded-md bg-critical-soft px-3 py-2 text-footnote text-critical">{error}</p> : null}
+              {error?.startsWith("Chrome hasn't let Blesser") ? (
+                <div className="space-y-1.5 rounded-md bg-surface-sunk px-3 py-2.5">
+                  <p className="text-footnote text-ink-secondary">
+                    You can let Blesser read form pages on any site. It still only fills when you ask. You can turn this off in Chrome's extension settings.
+                  </p>
+                  <Button variant="secondary" className="w-full" onClick={() => void allowEverywhere()}>
+                    Allow on all sites
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+            <p className="px-2 text-center text-footnote text-ink-tertiary">We never submit for you. Review every field before you send.</p>
           </>
         )}
+        {notice ? (
+          <p role="status" className="flex items-center gap-1.5 text-footnote text-positive">
+            <Check className="size-3.5" aria-hidden="true" /> {notice}
+          </p>
+        ) : null}
       </main>
-
-      {status?.connected ? (
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-separator px-4 py-2.5">
-          {notice ? (
-            <p role="status" className="flex items-center gap-1.5 text-footnote text-positive">
-              <Check className="size-3.5" aria-hidden="true" /> {notice}
-            </p>
-          ) : (
-            <button
-              type="button"
-              disabled={!tabId}
-              onClick={() => setReporting(true)}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-footnote font-medium text-ink-secondary hover:text-ink focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-50"
-            >
-              <Flag className="size-3.5" aria-hidden="true" /> Report a problem
-            </button>
-          )}
-          <a href={`${appUrl}/kit`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-sm text-footnote font-medium text-link focus-visible:outline-2 focus-visible:outline-focus">
-            Apply kit <ArrowUpRight className="size-3.5" aria-hidden="true" />
-          </a>
-        </footer>
-      ) : null}
 
       {tabId ? (
         <ReportDialog

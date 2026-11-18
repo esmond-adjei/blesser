@@ -1,4 +1,4 @@
-import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, ProblemReport } from "../shared/types"
+import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, ProblemReport, TrackedApplication } from "../shared/types"
 import type { Store } from "./store"
 
 const FILL_TIMEOUT_MS = 75_000
@@ -37,9 +37,8 @@ interface DocumentMeta {
   content_type: string
 }
 
-export interface Application {
+export interface Application extends TrackedApplication {
   id: string
-  title: string
   status: string
   opportunity_id: string | null
 }

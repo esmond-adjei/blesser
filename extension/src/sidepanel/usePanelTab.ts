@@ -12,6 +12,7 @@ function forcedTab(): number | null {
 /** The tab the panel works on (the active tab of its window) and that tab's stored review, kept live. */
 export function usePanelTab() {
   const [tabId, setTabId] = React.useState<number | null>(forcedTab)
+  const [page, setPage] = React.useState<{ tabId: number; title: string } | null>(null)
   const [stored, setStored] = React.useState<{ tabId: number; review: Review | null } | null>(null)
 
   React.useEffect(() => {
@@ -31,6 +32,25 @@ export function usePanelTab() {
   React.useEffect(() => {
     if (tabId === null) return
     let live = true
+    void chrome.tabs.get(tabId).then((tab) => {
+      if (live) setPage((current) => current?.tabId === tabId ? current : { tabId, title: tab.title ?? "" })
+    }, () => {})
+    const onUpdated = (id: number, changes: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
+      if (id === tabId && (changes.status || changes.title !== undefined)) {
+        setPage({ tabId, title: tab.title ?? "" })
+      }
+    }
+    chrome.tabs.onUpdated.addListener(onUpdated)
+    return () => {
+      live = false
+      chrome.tabs.onUpdated.removeListener(onUpdated)
+      setPage((current) => current?.tabId === tabId ? null : current)
+    }
+  }, [tabId])
+
+  React.useEffect(() => {
+    if (tabId === null) return
+    let live = true
     void send<Review | null>({ type: "review", tabId }).then((review) => live && setStored({ tabId, review }), () => {})
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       const change = changes[reviewKey(tabId)]
@@ -43,5 +63,5 @@ export function usePanelTab() {
     }
   }, [tabId])
 
-  return { tabId, review: stored && stored.tabId === tabId ? stored.review : null }
+  return { tabId, pageTitle: page?.tabId === tabId ? page.title : "", review: stored && stored.tabId === tabId ? stored.review : null }
 }

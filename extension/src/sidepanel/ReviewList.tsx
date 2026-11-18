@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Ban, Check, ChevronDown, Eraser, LocateFixed, PencilLine, X } from "lucide-react"
-import { Button, Input, Select, Textarea, cn } from "@blesser/ui"
+import { Button, Chip, Input, Select, Textarea, cn } from "@blesser/ui"
+import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../../../webapp/src/components/ui/menu"
 import { describeSource, displayValue, groupRows } from "../shared/review"
 import type { PanelMessage, Review, ReviewRow, RowStatus } from "../shared/types"
 import { send } from "../shared/ui"
@@ -34,7 +35,7 @@ export function ReviewList({ review, tabId, stale }: { review: Review; tabId: nu
   }
 
   return (
-    <div className="space-y-3" aria-label="Review" role="region">
+    <div className="space-y-2" aria-label="Review" role="region">
       {GROUPS.map(({ status, title }) => {
         const rows = groups[status]
         if (!rows.length) return null
@@ -42,13 +43,13 @@ export function ReviewList({ review, tabId, stale }: { review: Review; tabId: nu
         const id = `group-${status}`
         return (
           <section key={status} aria-labelledby={`${id}-title`}>
-            <h2 id={`${id}-title`} className="sticky top-0 z-10 bg-canvas">
+            <h2 id={`${id}-title`} className="bg-surface">
               <button
                 type="button"
                 aria-expanded={!hidden}
                 aria-controls={id}
                 onClick={() => setCollapsed((c) => ({ ...c, [status]: !hidden }))}
-                className="flex w-full items-center gap-2 rounded-sm py-1.5 text-left text-[12px] font-semibold tracking-[0.04em] text-ink-secondary uppercase focus-visible:outline-2 focus-visible:outline-focus"
+                className="flex w-full items-center gap-2 rounded-sm py-1.5 text-left text-caption font-semibold text-ink-secondary hover:bg-highlight focus-visible:outline-2 focus-visible:outline-focus"
               >
                 <span className={cn("size-2 shrink-0 rounded-full", DOT[status])} aria-hidden="true" />
                 {title}
@@ -57,7 +58,7 @@ export function ReviewList({ review, tabId, stale }: { review: Review; tabId: nu
               </button>
             </h2>
             {hidden ? null : (
-              <ul id={id} className="divide-y divide-separator overflow-hidden rounded-md border border-separator bg-surface">
+              <ul id={id} className="divide-y divide-separator border-t border-separator">
                 {rows.map((row) => (
                   <Row
                     key={row.key}
@@ -93,8 +94,14 @@ function Row({ row, tabId, stale, open, onToggle }: { row: ReviewRow; tabId: num
   const headRef = React.useRef<HTMLButtonElement | null>(null)
   const panelId = `row-${row.key.replace(/[^a-z0-9]/gi, "-")}`
   const value = displayValue(row)
-  const source = row.status === "needs" ? row.reason : describeSource(row)
   const filled = row.status !== "needs"
+  const saved = filled && row.source === "answer"
+  const needs = row.status === "needs"
+  const fromKit = /^(No matching saved fact, document or answer|Required, and nothing in your kit fits)$/.test(row.reason)
+  const statusLabel = needs
+    ? row.field.type === "file" ? "Choose a document" : fromKit || row.reason.startsWith("No saved match") ? "Not in your kit" : "Needs you"
+    : row.status === "drafted" ? "Drafted" : "Filled"
+  const source = needs ? fromKit ? "" : row.reason : saved ? "" : describeSource(row)
 
   const run = async (label: string, message_: PanelMessage, after?: () => void) => {
     setBusy(label)
@@ -110,108 +117,94 @@ function Row({ row, tabId, stale, open, onToggle }: { row: ReviewRow; tabId: num
     }
   }
 
-  const jump = () => void run("jump", { type: "focus", tabId, key: row.key })
+  const disabled = stale || !!busy
+  const actions: MenuAction[] = [
+    { label: "Jump to field", icon: <LocateFixed />, disabled, onSelect: () => void run("jump", { type: "focus", tabId, key: row.key }) },
+  ]
+  if (canEdit(row.field)) {
+    actions.push({ label: filled ? "Edit" : "Fill in", icon: <PencilLine />, disabled, onSelect: () => {
+      if (!open) onToggle()
+      setEditing(true)
+    } })
+  }
+  if (filled) {
+    actions.push(
+      { label: "Clear", icon: <Eraser />, disabled, onSelect: () => void run("clear", { type: "clear", tabId, key: row.key }) },
+      { label: "Wrong field", icon: <Ban />, disabled, onSelect: () => void run("wrong", { type: "wrongField", tabId, key: row.key }) },
+    )
+  }
 
   return (
-    <li className={cn("relative", open && "bg-surface-raised")}>
-      <button
-        ref={headRef}
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={onToggle}
-        className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors duration-160 hover:bg-highlight/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-      >
-        <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", DOT[row.status])} aria-hidden="true" />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-baseline gap-2">
-            <span className="min-w-0 flex-1 truncate text-callout text-ink">{row.label}</span>
-            <Confidence level={row.confidence} />
-          </span>
-          {filled ? (
-            <span className={cn("block text-footnote break-words text-ink", open ? "whitespace-pre-wrap" : "line-clamp-2")}>{value || "Empty"}</span>
-          ) : null}
-          <span className={cn("block text-[12px] leading-4", filled ? "text-ink-tertiary" : "text-ink-secondary")}>{source}</span>
-        </span>
-      </button>
-
-      {row.pageEdit ? (
-        <div className="mx-3 mb-2 rounded-sm bg-info-soft px-2.5 py-2" role="status">
-          <p className="text-footnote text-ink">
-            You changed this on the page{row.pageEdit.value === null ? " to empty" : <> to <q className="font-medium">{displayValue({ ...row, value: row.pageEdit.value, document: null })}</q></>}.
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <Button size="sm" variant="brand" className="h-7 px-3 text-[12px]" disabled={!!busy} onClick={() => void run("remember", { type: "remember", tabId, key: row.key })}>
-              {busy === "remember" ? "Remembering…" : "Remember this correction"}
-            </Button>
-            <Button size="sm" variant="quiet" className="h-7 px-2.5 text-[12px]" disabled={!!busy} onClick={() => void run("dismiss", { type: "dismissEdit", tabId, key: row.key })}>
-              Just this once
-            </Button>
-          </div>
+    <ActionContextMenu actions={actions}>
+      <li className={cn("relative", open && "rounded-sm bg-highlight")}>
+        <div className="flex items-start gap-1">
+          <button
+            ref={headRef}
+            type="button"
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={onToggle}
+            className="min-w-0 flex-1 rounded-sm py-2 pl-2 text-left hover:bg-highlight focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+          >
+            <span className="block wrap-anywhere text-callout font-medium text-ink">{row.label}</span>
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {saved ? <Chip tone="sun">From a saved answer</Chip> : (
+                <span className={cn("text-footnote", filled && row.status === "filled" ? "text-link" : "text-ink-secondary")}>{statusLabel}</span>
+              )}
+              <Confidence level={row.confidence} />
+            </span>
+            {filled ? (
+              <span className={cn("mt-0.5 block wrap-anywhere text-footnote text-ink", open ? "whitespace-pre-wrap" : "line-clamp-2")}>{value || "Empty"}</span>
+            ) : null}
+            {source ? <span className="block wrap-anywhere text-caption text-ink-tertiary">{source}</span> : null}
+          </button>
+          <ActionMenuButton actions={actions} label={`Actions for ${row.label}`} className="mt-1.5" />
         </div>
-      ) : null}
 
-      {open ? (
-        <div id={panelId} className="px-3 pb-2.5 pl-7">
-          {editing ? (
-            <Editor
-              row={row}
-              busy={busy === "edit"}
-              onCancel={() => {
-                setEditing(false)
-                headRef.current?.focus()
-              }}
-              onSave={(draft) =>
-                void run("edit", { type: "edit", tabId, key: row.key, value: draft }, () => {
+        {row.pageEdit ? (
+          <div className="mx-3 mb-2 rounded-sm bg-info-soft px-2.5 py-2" role="status">
+            <p className="text-footnote text-ink">
+              You changed this on the page{row.pageEdit.value === null ? " to empty" : <> to <q className="font-medium">{displayValue({ ...row, value: row.pageEdit.value, document: null })}</q></>}.
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <Button size="sm" variant="brand" className="h-7 px-3 text-[12px]" disabled={!!busy} onClick={() => void run("remember", { type: "remember", tabId, key: row.key })}>
+                {busy === "remember" ? "Remembering…" : "Remember this correction"}
+              </Button>
+              <Button size="sm" variant="quiet" className="h-7 px-2.5 text-[12px]" disabled={!!busy} onClick={() => void run("dismiss", { type: "dismissEdit", tabId, key: row.key })}>
+                Just this once
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {open ? (
+          <div id={panelId} className={cn((editing || stale) && "px-2 pb-2.5")}>
+            {editing ? (
+              <Editor
+                row={row}
+                busy={busy === "edit"}
+                onCancel={() => {
                   setEditing(false)
                   headRef.current?.focus()
-                })
-              }
-            />
-          ) : (
-            <div className="flex flex-wrap gap-1" role="group" aria-label={`Actions for ${row.label}`}>
-              <Action icon={<LocateFixed />} label="Jump to field" onClick={jump} disabled={stale || !!busy} />
-              {canEdit(row.field) ? (
-                <Action icon={<PencilLine />} label={filled ? "Edit" : "Fill in"} onClick={() => setEditing(true)} disabled={stale || !!busy} />
-              ) : null}
-              {filled ? (
-                <>
-                  <Action icon={<Eraser />} label="Clear" onClick={() => void run("clear", { type: "clear", tabId, key: row.key })} disabled={stale || !!busy} />
-                  <Action
-                    icon={<Ban />}
-                    label="Wrong field"
-                    title="Clears it and tells Blesser not to fill this field on this site"
-                    onClick={() => void run("wrong", { type: "wrongField", tabId, key: row.key })}
-                    disabled={stale || !!busy}
-                  />
-                </>
-              ) : null}
-            </div>
-          )}
-          {stale && !editing ? <p className="mt-1.5 text-[12px] leading-4 text-ink-tertiary">The page moved on. Fill this step to work with its fields.</p> : null}
-        </div>
-      ) : null}
-      {error ? (
-        <p role="alert" className="px-3 pb-2 pl-7 text-footnote text-critical">
-          {error}
-        </p>
-      ) : null}
-    </li>
-  )
-}
-
-function Action({ icon, label, onClick, disabled, title }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; title?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full px-2 text-[12px] font-medium text-ink-secondary transition-colors duration-160 hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:size-3.5"
-    >
-      {icon}
-      {label}
-    </button>
+                }}
+                onSave={(draft) =>
+                  void run("edit", { type: "edit", tabId, key: row.key, value: draft }, () => {
+                    setEditing(false)
+                    headRef.current?.focus()
+                  })
+                }
+              />
+            ) : null}
+            {stale && !editing ? <p className="mt-1.5 text-[12px] leading-4 text-ink-tertiary">The page moved on. Fill this step to work with its fields.</p> : null}
+          </div>
+        ) : null}
+        {error ? (
+          <p role="alert" className="px-2 pb-2 text-footnote text-critical">
+            {error}
+          </p>
+        ) : null}
+      </li>
+    </ActionContextMenu>
   )
 }
 
@@ -219,7 +212,22 @@ function Editor({ row, busy, onSave, onCancel }: { row: ReviewRow; busy: boolean
   const { kind, inputType } = editorFor(row.field)
   const [draft, setDraft] = React.useState<Draft>(() => initialDraft(row))
   const id = React.useId()
-  const focusRef = React.useCallback((el: HTMLElement | null) => el?.focus(), [])
+  const focusTarget = React.useRef<HTMLElement | null>(null)
+  const focusRef = React.useCallback((el: HTMLElement | null) => {
+    focusTarget.current = el
+  }, [])
+  React.useEffect(() => {
+    // Let the action menu restore focus before moving it to the editor.
+    let frame = 0
+    const focusWhenMenuCloses = () => {
+      frame = window.requestAnimationFrame(() => {
+        if (document.querySelector('[role="menu"]')) focusWhenMenuCloses()
+        else frame = window.requestAnimationFrame(() => focusTarget.current?.focus())
+      })
+    }
+    focusWhenMenuCloses()
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
   const text = typeof draft === "string" ? draft : ""
   const limit = row.field.word_limit
   const words = wordCount(text)
