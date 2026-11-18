@@ -44,6 +44,7 @@ import {
   Field,
   Input,
   OpportunityArt,
+  OpportunityCard,
   Select,
   Textarea,
   buttonVariants,
@@ -91,7 +92,7 @@ function useView(): [View, (view: View) => void] {
   return [view, choose]
 }
 
-const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @7xl:gap-6"
+const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @xl:gap-6"
 
 export function Opportunities() {
   const [query, setQuery] = useUrlParam("q")
@@ -240,12 +241,14 @@ export function Opportunities() {
         <div className="@container">
           <div className={GRID}>
             {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="overflow-hidden rounded-lg border border-separator bg-surface">
-                <div className="aspect-[16/7] animate-pulse bg-surface-sunk motion-reduce:animate-none" />
-                <div className="space-y-3 p-5">
-                  <div className="h-3 w-1/3 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
-                  <div className="h-4 w-3/4 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
-                  <div className="h-3 w-1/2 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
+              <div key={i} className="overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1 [&_div:empty]:animate-pulse [&_div:empty]:bg-surface-sunk motion-reduce:[&_div:empty]:animate-none">
+                <div className="aspect-[16/7]" />
+                <div className="space-y-3 p-5 [&>div]:rounded-sm">
+                  <div className="h-7 w-1/2 rounded-full!" />
+                  <div className="h-5 w-3/4" />
+                  <div className="h-4 w-1/2" />
+                  <div className="h-6 w-28 rounded-full!" />
+                  <div className="mt-5 h-8 w-full" />
                 </div>
               </div>
             ))}
@@ -374,7 +377,7 @@ function useTrack(opp: Opportunity, applicationId: string | undefined) {
   }
 }
 
-function TrackButton({ opp, applicationId, className }: { opp: Opportunity; applicationId: string | undefined; className?: string }) {
+export function TrackButton({ opp, applicationId, className }: { opp: Opportunity; applicationId: string | undefined; className?: string }) {
   const { pending, onTrack } = useTrack(opp, applicationId)
   if (applicationId)
     return (
@@ -396,7 +399,7 @@ export interface OpportunityHandlers {
 }
 
 /** Everything but Track, which each surface shows as its own button. */
-function secondaryActions(opp: Opportunity, { onOpen, onTodo, onShare }: OpportunityHandlers, withOfficial = true): MenuAction[] {
+export function secondaryActions(opp: Opportunity, { onOpen, onTodo, onShare }: OpportunityHandlers, withOfficial = true): MenuAction[] {
   const google = googleCalendarUrl(opp)
   const official = withOfficial ? opp.link || opp.source_url : ""
   const actions: MenuAction[] = []
@@ -423,41 +426,52 @@ interface ItemProps extends OpportunityHandlers {
   index: number
 }
 
-function Art({ opp, shape, className }: { opp: Opportunity; shape: "banner" | "square"; className?: string }) {
+export function Art({ opp, shape, className }: { opp: Opportunity; shape: "banner" | "square"; className?: string }) {
   return <OpportunityArt seed={opp.slug || opp.id} category={opp.category} kind={opp.kind} shape={shape} className={className} />
 }
 
 function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) {
-  const meta = [KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
-  const actions = secondaryActions(opp, handlers)
+  const { pending, onTrack } = useTrack(opp, applicationId)
   const open = () => handlers.onOpen?.(opp)
+  const actions = secondaryActions(opp, handlers)
+  const markers = opp.is_new || opp.location
   return (
     <ActionContextMenu actions={actions}>
-      <li
-        style={{ "--i": index } as React.CSSProperties}
-        className="bl-enter bl-lift flex min-w-0 flex-col overflow-hidden rounded-lg border border-separator bg-surface hover:shadow-elevation-1"
-      >
-        <div aria-hidden="true" onClick={open} className="cursor-pointer">
-          <Art opp={opp} shape="banner" />
-        </div>
-        <div className="flex flex-1 flex-col p-5 sm:p-6">
-          {opp.organization ? <p className="truncate text-footnote text-ink-tertiary">{opp.organization}</p> : null}
-          <h3 className="mt-1.5">
-            <button type="button" onClick={open} className="line-clamp-2 cursor-pointer text-left text-headline text-balance text-ink hover:underline">
+      <li style={{ "--i": index } as React.CSSProperties} className="bl-enter flex min-w-0">
+        <OpportunityCard
+          className="w-full"
+          media={
+            <button type="button" tabIndex={-1} aria-hidden="true" onClick={open} className="block w-full cursor-pointer">
+              <Art opp={opp} shape="banner" />
+            </button>
+          }
+          organization={opp.organization || undefined}
+          title={
+            <button type="button" onClick={open} className="line-clamp-3 cursor-pointer text-left hover:underline">
               {opp.title}
             </button>
-          </h3>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
-            <span>{meta.join(", ")}</span>
-            <Markers opp={opp} members={false} />
-          </div>
-          {opp.benefits ? <p className="mt-4 line-clamp-2 text-callout text-ink">{opp.benefits}</p> : null}
-          <div className="mt-auto flex items-center gap-2 pt-5">
-            <Countdown variant="text" {...countdownFor(opp)} className="mr-auto" />
-            <TrackButton opp={opp} applicationId={applicationId} />
-            <ActionMenuButton actions={actions} label={`More for ${opp.title}`} />
-          </div>
-        </div>
+          }
+          kind={KIND_LABELS[opp.kind] ?? opp.kind}
+          audiences={CATEGORY_LABELS[opp.category] ? [CATEGORY_LABELS[opp.category]] : []}
+          amount={opp.benefits || undefined}
+          countdown={countdownFor(opp)}
+          tracked={!!applicationId}
+          trackDisabled={pending}
+          onTrack={onTrack}
+          actions={<ActionMenuButton actions={actions} label={`More for ${opp.title}`} />}
+        >
+          {markers ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
+              {opp.location ? (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin aria-hidden="true" className="size-3.5 text-ink-tertiary" />
+                  {opp.location}
+                </span>
+              ) : null}
+              <Markers opp={opp} members={false} />
+            </div>
+          ) : null}
+        </OpportunityCard>
       </li>
     </ActionContextMenu>
   )
@@ -573,6 +587,12 @@ function OpportunityDetail({
                 Official page <ArrowUpRight />
               </a>
             ) : null}
+            <Link
+              to={`/opportunities/${encodeURIComponent(shown.slug || shown.id)}`}
+              className={buttonVariants({ size: "sm", variant: "quiet" })}
+            >
+              Open full page
+            </Link>
             <TrackButton opp={shown} applicationId={applicationId} />
           </DialogFooter>
         </DialogContent>
@@ -590,7 +610,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-function TodoDialog({ opp, onClose }: { opp: Opportunity | null; onClose: () => void }) {
+export function TodoDialog({ opp, onClose }: { opp: Opportunity | null; onClose: () => void }) {
   const { create } = useTodoMutations()
   const [title, setTitle] = React.useState("")
   const [due, setDue] = React.useState("")

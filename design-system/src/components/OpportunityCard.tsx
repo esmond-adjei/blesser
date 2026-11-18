@@ -19,6 +19,8 @@ export interface OpportunityCardProps {
   children?: React.ReactNode
   /** Extra footer actions, placed before the track button. */
   actions?: React.ReactNode
+  /** Full-bleed artwork above the content, such as OpportunityArt. */
+  media?: React.ReactNode
   className?: string
 }
 
@@ -51,15 +53,17 @@ export function OpportunityCard({
   trackDisabled,
   children,
   actions,
+  media,
   className,
 }: OpportunityCardProps) {
   return (
     <article
       className={cn(
-        "flex flex-col gap-3 rounded-lg border border-separator bg-surface p-5 shadow-elevation-1 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0",
+        "flex flex-col gap-3 overflow-hidden rounded-lg border border-separator bg-surface p-5 shadow-elevation-1 transition-[box-shadow,translate] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0",
         className,
       )}
     >
+      {media ? <div className="-mx-5 -mt-5 mb-1">{media}</div> : null}
       {organization ? (
         <div className="flex min-w-0 items-center gap-2 text-callout text-ink-secondary">
           <span
@@ -73,7 +77,7 @@ export function OpportunityCard({
       ) : null}
       <h3 className="m-0 text-title-3 text-balance text-ink">{title}</h3>
       {amount ? (
-        <div className="text-[15px] leading-[22px] font-semibold text-ink">
+        <div className="line-clamp-2 text-[15px] leading-[22px] font-semibold text-ink">
           {amount}
           {amountNote ? <span className="ml-1.5 font-normal text-ink-tertiary">{amountNote}</span> : null}
         </div>
