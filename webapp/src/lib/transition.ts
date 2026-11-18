@@ -9,7 +9,7 @@ export function useOpenTransition(open: boolean, durationMs = 200) {
   React.useEffect(() => {
     if (open) {
       setRender(true)
-      // Two frames so the browser paints the hidden state first —
+      // Two frames so the browser paints the hidden state first;
       // otherwise the enter transition never runs.
       const raf = requestAnimationFrame(() =>
         requestAnimationFrame(() => setShown(true)),

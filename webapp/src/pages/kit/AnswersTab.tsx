@@ -86,7 +86,7 @@ function AnswersBody() {
             aria-label="Filter by project"
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="select-chevron h-control-sm w-full cursor-pointer appearance-none rounded-sm border border-control-border bg-surface pr-9 pl-3 text-footnote text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+            className="select-chevron h-control-sm w-full cursor-pointer appearance-none rounded-sm border border-input-border bg-surface pr-9 pl-3 text-footnote text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)]"
           >
             <option value="">All projects</option>
             {projectList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -107,16 +107,15 @@ function AnswersBody() {
                     onClick={() => setSelected({ key: a.id, answer: a })}
                     className={cn(
                       "block w-full cursor-pointer px-4 py-3 text-left transition-colors duration-160 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus",
-                      on ? "bg-forest-soft/50" : "hover:bg-surface-sunk/70",
+                      on ? "bg-forest-soft/50" : "hover:bg-highlight/70",
                     )}
                   >
                     <span className="line-clamp-2 text-callout font-medium text-ink">{a.question || "Untitled question"}</span>
                     <span className="mt-1 line-clamp-1 text-footnote text-ink-secondary">{a.answer || "No answer yet"}</span>
-                    <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-caption text-ink-tertiary">
+                    <span className="mt-1.5 flex flex-wrap items-center gap-x-3 text-caption text-ink-tertiary">
                       <span className="tabular-nums">{a.word_count} {a.word_count === 1 ? "word" : "words"}</span>
-                      {project ? <><span aria-hidden="true">·</span><span className="truncate">{project.name}</span></> : null}
-                      {a.tags.slice(0, 2).map((t) => <React.Fragment key={t}><span aria-hidden="true">·</span><span>{t}</span></React.Fragment>)}
-                      <span aria-hidden="true">·</span>
+                      {project ? <span className="truncate">{project.name}</span> : null}
+                      {a.tags.slice(0, 2).map((t) => <span key={t}>{t}</span>)}
                       <span>{formatAgo(a.updated_at)}</span>
                     </span>
                   </button>

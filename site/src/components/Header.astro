@@ -1,5 +1,5 @@
 ---
-import { Logo, buttonVariants, cn } from "@blesser/ui"
+import { Logo, Wordmark, buttonVariants, cn } from "@blesser/ui"
 import { MenuIcon } from "./icons"
 import { loginUrl, registerUrl, withBase } from "../lib/config"
 
@@ -22,9 +22,9 @@ const current = (href: string) => path === href || path.startsWith(`${href}/`)
 
 <header class={onForest ? "bg-forest text-on-forest" : "border-b border-separator bg-canvas"}>
   <div class="site-container flex h-16 items-center gap-6">
-    <a href={withBase("/")} class="flex items-center gap-2.5 rounded-full no-underline" aria-label="Blesser home">
+    <a href={withBase("/")} class={cn("flex items-center gap-1 rounded-full no-underline", onForest && "[--logo-ink:#ffffff]")} aria-label="Blesser home">
       <Logo title="" className="size-8" />
-      <span class={cn("font-display text-xl font-bold tracking-[-0.02em]", onForest ? "text-on-forest" : "text-ink")}>Blesser</span>
+      <Wordmark />
     </a>
     <nav aria-label="Main" class="hidden flex-1 lg:block">
       <ul class="m-0 flex list-none items-center gap-1 p-0">
@@ -38,7 +38,7 @@ const current = (href: string) => path === href || path.startsWith(`${href}/`)
                   "relative inline-flex h-control-md items-center rounded-full px-3 text-callout no-underline transition-colors duration-160",
                   onForest
                     ? "text-on-forest/80 hover:bg-on-forest/10 hover:text-on-forest"
-                    : "text-ink-secondary hover:bg-surface-sunk hover:text-ink",
+                    : "text-ink-secondary hover:bg-highlight hover:text-ink",
                   current(item.href) &&
                     cn(onForest ? "text-on-forest" : "text-ink", "after:absolute after:inset-x-3 after:bottom-1 after:h-0.5 after:rounded-full after:bg-sun"),
                 )}
@@ -85,7 +85,7 @@ const current = (href: string) => path === href || path.startsWith(`${href}/`)
                   <a
                     href={item.href}
                     aria-current={current(item.href) ? "page" : undefined}
-                    class="flex h-control-md items-center rounded-sm px-3 text-ink no-underline hover:bg-surface-sunk aria-[current=page]:font-semibold"
+                    class="flex h-control-md items-center rounded-sm px-3 text-ink no-underline hover:bg-highlight aria-[current=page]:font-semibold"
                   >
                     {item.label}
                   </a>

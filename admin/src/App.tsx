@@ -20,7 +20,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react";
-import { Button, Chip, EmptyState, Logo } from "@blesser/ui";
+import { Button, Chip, EmptyState, Logo, Wordmark } from "@blesser/ui";
 import { toast } from "sonner";
 import { Protected, useAuth } from "./lib/auth";
 import * as api from "./lib/api";
@@ -61,7 +61,8 @@ function Shell() {
         <NavLink to="/review" className="wordmark">
           <Logo title="" />
           <span>
-            Blesser<span className="wordmark-sub">Admin console</span>
+            <Wordmark className="block" />
+            <span className="wordmark-sub">Admin console</span>
           </span>
         </NavLink>
         <nav aria-label="Main navigation">

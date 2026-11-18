@@ -1,6 +1,5 @@
 ---
 import { LinkEmptyState } from "../components/States"
-import offline from "@blesser/ui/illustrations/spot-offline.webp"
 import Base from "../layouts/Base.astro"
 import { withBase } from "../lib/config"
 ---
@@ -9,7 +8,6 @@ import { withBase } from "../lib/config"
   <section class="site-container py-16">
     <LinkEmptyState
       error
-      illustration={offline.src}
       title="This page didn't load"
       description="Something went wrong on our side. Try again in a minute, or start from the opportunities list."
       actions={[

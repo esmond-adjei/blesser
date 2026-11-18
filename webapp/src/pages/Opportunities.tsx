@@ -10,6 +10,7 @@ import {
   List,
   ListPlus,
   Lock,
+  PanelRightOpen,
   MapPin,
   Plus,
   Search,
@@ -23,7 +24,6 @@ import {
   KINDS,
   KIND_LABELS,
   countdownFor,
-  deadlineLabel,
   googleCalendarUrl,
   isCategory,
   isKind,
@@ -61,6 +61,7 @@ import {
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
 import { ShareDialog } from "../components/share/ShareDialog"
+import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { ScanDialog } from "./Scans"
 
 const SORTS = [
@@ -142,6 +143,7 @@ export function Opportunities() {
   const [scanOpen, setScanOpen] = React.useState(false)
   const [submitOpen, setSubmitOpen] = React.useState(false)
   const [shareFor, setShareFor] = React.useState<Opportunity | null>(null)
+  const handlers: OpportunityHandlers = { onOpen: setDetail, onTodo: setTodoFor, onShare: setShareFor }
   const filtered = !!(query || category || kind || soonParam || newParam || closedParam)
 
   return (
@@ -273,29 +275,17 @@ export function Opportunities() {
       ) : (
         <>
           {view === "cards" ? (
-            <div className="@container">
+            <div className="@container" key="cards">
               <ul className={GRID}>
-                {items.map((opp) => (
-                  <OpportunityTile
-                    key={opp.id}
-                    opp={opp}
-                    applicationId={tracked.data?.[opp.id]}
-                    onOpen={() => setDetail(opp)}
-                    onShare={() => setShareFor(opp)}
-                  />
+                {items.map((opp, i) => (
+                  <OpportunityTile key={opp.id} index={i} opp={opp} applicationId={tracked.data?.[opp.id]} {...handlers} />
                 ))}
               </ul>
             </div>
           ) : (
             <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
-              {items.map((opp) => (
-                <OpportunityRow
-                  key={opp.id}
-                  opp={opp}
-                  applicationId={tracked.data?.[opp.id]}
-                  onOpen={() => setDetail(opp)}
-                  onShare={() => setShareFor(opp)}
-                />
+              {items.map((opp, i) => (
+                <OpportunityRow key={opp.id} index={i} opp={opp} applicationId={tracked.data?.[opp.id]} {...handlers} />
               ))}
             </ul>
           )}
@@ -384,159 +374,123 @@ function useTrack(opp: Opportunity, applicationId: string | undefined) {
   }
 }
 
-function TrackButton({ opp, applicationId }: { opp: Opportunity; applicationId: string | undefined }) {
+function TrackButton({ opp, applicationId, className }: { opp: Opportunity; applicationId: string | undefined; className?: string }) {
   const { pending, onTrack } = useTrack(opp, applicationId)
   if (applicationId)
     return (
-      <Link to="/applications" className={buttonVariants({ size: "sm", variant: "quiet" })}>
+      <Link to="/applications" className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "text-link", className)}>
         <Check /> Tracking
       </Link>
     )
   return (
-    <Button size="sm" variant="primary" disabled={pending} onClick={onTrack} icon={<Plus />}>
+    <Button size="sm" variant="primary" disabled={pending} onClick={onTrack} icon={<Plus />} className={className}>
       Track
     </Button>
   )
 }
 
-function CalendarButtons({ opp, compact }: { opp: Opportunity; compact?: boolean }) {
+export interface OpportunityHandlers {
+  onOpen?: (opp: Opportunity) => void
+  onTodo: (opp: Opportunity) => void
+  onShare: (opp: Opportunity) => void
+}
+
+/** Everything but Track, which each surface shows as its own button. */
+function secondaryActions(opp: Opportunity, { onOpen, onTodo, onShare }: OpportunityHandlers, withOfficial = true): MenuAction[] {
   const google = googleCalendarUrl(opp)
-  if (!google) return null
-  return (
-    <>
-      <a
-        href={google}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={compact ? "Add to Google Calendar" : undefined}
-        className={buttonVariants({ size: "sm", variant: "quiet", iconOnly: compact })}
-        data-tooltip="Add the deadline to Google Calendar"
-      >
-        <CalendarPlus />
-        {compact ? null : "Add to calendar"}
-      </a>
-      <Button
-        size="sm"
-        variant="quiet"
-        aria-label="Download the deadline as an .ics file"
-        data-tooltip="Download .ics (Apple Calendar, Outlook)"
-        onClick={() => api.downloadOpportunityIcs(opp.id).catch((err) => toastError(err, "The .ics didn't download"))}
-        icon={<Download />}
-      />
-    </>
-  )
+  const official = withOfficial ? opp.link || opp.source_url : ""
+  const actions: MenuAction[] = []
+  if (onOpen) actions.push({ label: "Open details", icon: <PanelRightOpen />, onSelect: () => onOpen(opp) }, { kind: "separator" })
+  actions.push({ label: "Add a to-do", icon: <ListPlus />, onSelect: () => onTodo(opp) })
+  if (google) {
+    actions.push(
+      { label: "Add to Google Calendar", icon: <CalendarPlus />, href: google },
+      {
+        label: "Download .ics",
+        icon: <Download />,
+        onSelect: () => void api.downloadOpportunityIcs(opp.id).catch((err) => toastError(err, "The .ics didn't download")),
+      },
+    )
+  }
+  actions.push({ label: "Share", icon: <Share2 />, onSelect: () => onShare(opp) })
+  if (official) actions.push({ kind: "separator" }, { label: "Official page", icon: <ArrowUpRight />, href: official })
+  return actions
 }
 
-function RowActions({ opp, applicationId, onShare }: { opp: Opportunity; applicationId: string | undefined; onShare: () => void }) {
-  const { pending, onTrack } = useTrack(opp, applicationId)
-  return (
-    <>
-      {applicationId ? (
-        <Link to="/applications" className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "w-[104px] text-link")}>
-          <Check /> Tracking
-        </Link>
-      ) : (
-        <Button size="sm" variant="secondary" className="w-[104px]" disabled={pending} onClick={onTrack} icon={<Plus />}>
-          Track
-        </Button>
-      )}
-      <Button
-        size="sm"
-        variant="quiet"
-        iconOnly
-        aria-label={`Share ${opp.title}`}
-        data-tooltip="Share"
-        className="text-ink-secondary"
-        onClick={onShare}
-        icon={<Share2 />}
-      />
-      {opp.link || opp.source_url ? (
-        <a
-          href={opp.link || opp.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Open the official page for ${opp.title}`}
-          data-tooltip="Official page"
-          className={cn(buttonVariants({ size: "sm", variant: "quiet", iconOnly: true }), "text-ink-secondary")}
-        >
-          <ArrowUpRight />
-        </a>
-      ) : null}
-    </>
-  )
-}
-
-interface ItemProps {
+interface ItemProps extends OpportunityHandlers {
   opp: Opportunity
   applicationId: string | undefined
-  onOpen: () => void
-  onShare: () => void
+  index: number
 }
 
 function Art({ opp, shape, className }: { opp: Opportunity; shape: "banner" | "square"; className?: string }) {
   return <OpportunityArt seed={opp.slug || opp.id} category={opp.category} kind={opp.kind} shape={shape} className={className} />
 }
 
-function OpportunityTile({ opp, applicationId, onOpen, onShare }: ItemProps) {
+function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) {
   const meta = [KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
+  const actions = secondaryActions(opp, handlers)
+  const open = () => handlers.onOpen?.(opp)
   return (
-    <li className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-separator bg-surface transition-shadow duration-200 hover:shadow-elevation-1">
-      <div aria-hidden="true" onClick={onOpen} className="cursor-pointer">
-        <Art opp={opp} shape="banner" />
-      </div>
-      <div className="flex flex-1 flex-col p-5 sm:p-6">
-        {opp.organization ? <p className="truncate text-footnote text-ink-tertiary">{opp.organization}</p> : null}
-        <h3 className="mt-1.5">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="line-clamp-2 cursor-pointer text-left text-headline text-balance text-ink hover:underline"
-          >
-            {opp.title}
-          </button>
-        </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
-          <span>{meta.join(" · ")}</span>
-          <Markers opp={opp} members={false} />
+    <ActionContextMenu actions={actions}>
+      <li
+        style={{ "--i": index } as React.CSSProperties}
+        className="bl-enter bl-lift flex min-w-0 flex-col overflow-hidden rounded-lg border border-separator bg-surface hover:shadow-elevation-1"
+      >
+        <div aria-hidden="true" onClick={open} className="cursor-pointer">
+          <Art opp={opp} shape="banner" />
         </div>
-        {opp.benefits ? <p className="mt-4 line-clamp-2 text-callout text-ink">{opp.benefits}</p> : null}
-        <div className="mt-auto flex items-center gap-2 pt-5">
-          <Countdown variant="text" {...countdownFor(opp)} className="mr-auto" />
-          <RowActions opp={opp} applicationId={applicationId} onShare={onShare} />
+        <div className="flex flex-1 flex-col p-5 sm:p-6">
+          {opp.organization ? <p className="truncate text-footnote text-ink-tertiary">{opp.organization}</p> : null}
+          <h3 className="mt-1.5">
+            <button type="button" onClick={open} className="line-clamp-2 cursor-pointer text-left text-headline text-balance text-ink hover:underline">
+              {opp.title}
+            </button>
+          </h3>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-footnote text-ink-secondary">
+            <span>{meta.join(", ")}</span>
+            <Markers opp={opp} members={false} />
+          </div>
+          {opp.benefits ? <p className="mt-4 line-clamp-2 text-callout text-ink">{opp.benefits}</p> : null}
+          <div className="mt-auto flex items-center gap-2 pt-5">
+            <Countdown variant="text" {...countdownFor(opp)} className="mr-auto" />
+            <TrackButton opp={opp} applicationId={applicationId} />
+            <ActionMenuButton actions={actions} label={`More for ${opp.title}`} />
+          </div>
         </div>
-      </div>
-    </li>
+      </li>
+    </ActionContextMenu>
   )
 }
 
-function OpportunityRow({ opp, applicationId, onOpen, onShare }: ItemProps) {
+function OpportunityRow({ opp, applicationId, index, ...handlers }: ItemProps) {
   const meta = [opp.organization, KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
+  const actions = secondaryActions(opp, handlers)
+  const open = () => handlers.onOpen?.(opp)
   return (
-    <li className="group relative flex flex-col gap-2 px-4 py-3 hover:bg-surface-sunk/50 sm:flex-row sm:items-center sm:gap-4">
-      <div className="flex min-w-0 flex-1 items-center gap-3.5">
-        <div aria-hidden="true" onClick={onOpen} className="shrink-0 cursor-pointer self-start sm:self-center">
-          <Art opp={opp} shape="square" className="size-11 rounded-md" />
+    <ActionContextMenu actions={actions}>
+      <li
+        style={{ "--i": index } as React.CSSProperties}
+        className="bl-enter flex items-center gap-3 px-3 py-3 transition-colors hover:bg-highlight/50 data-[state=open]:bg-highlight/50 sm:gap-4 sm:px-4"
+      >
+        <div aria-hidden="true" onClick={open} className="shrink-0 cursor-pointer">
+          <Art opp={opp} shape="square" className="size-10 rounded-md sm:size-11" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <button
-              type="button"
-              onClick={onOpen}
-              className="min-w-0 cursor-pointer text-left text-callout font-semibold text-ink hover:underline"
-            >
+            <button type="button" onClick={open} className="min-w-0 cursor-pointer text-left text-callout font-semibold text-ink hover:underline">
               {opp.title}
             </button>
             <Markers opp={opp} members={false} />
           </div>
-          <p className="mt-0.5 truncate text-footnote text-ink-tertiary">{meta.join(" · ")}</p>
-          {opp.benefits ? <p className="mt-0.5 hidden truncate text-footnote text-ink-secondary md:block">{opp.benefits}</p> : null}
+          <p className="mt-0.5 truncate text-footnote text-ink-tertiary">{meta.join(", ")}</p>
+          <Countdown variant="text" {...countdownFor(opp)} className="mt-1 sm:hidden" />
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-3 sm:justify-end">
-        <Countdown variant="text" {...countdownFor(opp)} className="mr-auto sm:mr-0 sm:w-24 sm:justify-end" />
-        <RowActions opp={opp} applicationId={applicationId} onShare={onShare} />
-      </div>
-    </li>
+        <Countdown variant="text" {...countdownFor(opp)} className="hidden w-24 justify-end sm:flex" />
+        <TrackButton opp={opp} applicationId={applicationId} className="shrink-0 sm:w-[104px]" />
+        <ActionMenuButton actions={actions} label={`More for ${opp.title}`} className="shrink-0" />
+      </li>
+    </ActionContextMenu>
   )
 }
 
@@ -575,7 +529,6 @@ function OpportunityDetail({
               {shown.eligibility ? <Fact label="Who can apply">{shown.eligibility}</Fact> : null}
               <Fact label="Deadline">
                 {shown.rolling ? "Rolling" : shown.deadline || "Not listed"}
-                {shown.deadline_date && !shown.rolling ? ` (${deadlineLabel(shown).toLowerCase()})` : ""}
               </Fact>
               {shown.countries.length ? <Fact label="Countries">{shown.countries.join(", ")}</Fact> : null}
               {shown.tags.length ? <Fact label="Tags">{shown.tags.join(", ")}</Fact> : null}
@@ -604,15 +557,12 @@ function OpportunityDetail({
               . Confirm the details on the official page before you apply.
             </p>
           </DialogBody>
-          <DialogFooter className="flex-wrap">
-            <Button size="sm" variant="quiet" onClick={() => onTodo(shown)} icon={<ListPlus />}>
-              Add a to-do
-            </Button>
-            <CalendarButtons opp={shown} />
-            <Button size="sm" variant="quiet" onClick={() => onShare(shown)} icon={<Share2 />}>
-              Share
-            </Button>
-            <TrackButton opp={shown} applicationId={applicationId} />
+          <DialogFooter className="flex-row flex-wrap items-center justify-end">
+            <ActionMenuButton
+              actions={secondaryActions(shown, { onTodo, onShare }, false)}
+              label="More actions"
+              className="mr-auto"
+            />
             {shown.link || shown.source_url ? (
               <a
                 href={shown.link || shown.source_url}
@@ -623,6 +573,7 @@ function OpportunityDetail({
                 Official page <ArrowUpRight />
               </a>
             ) : null}
+            <TrackButton opp={shown} applicationId={applicationId} />
           </DialogFooter>
         </DialogContent>
       ) : null}

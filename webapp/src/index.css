@@ -2,6 +2,7 @@
 @import "@blesser/ui/fonts.css";
 @import "@blesser/ui/tokens.css" layer(base);
 @import "@blesser/ui/theme.css";
+@import "@blesser/ui/motion.css";
 
 /* shadcn names some markup still uses, pointed at the Blesser roles. */
 @theme inline {
@@ -15,7 +16,7 @@
   --color-secondary-foreground: var(--link);
   --color-muted: var(--surface-sunk);
   --color-muted-foreground: var(--ink-secondary);
-  --color-accent: var(--surface-sunk);
+  --color-accent: var(--highlight);
   --color-destructive: var(--critical);
   --color-border: var(--separator);
   --color-input: var(--control-border);
@@ -23,7 +24,7 @@
   --color-sidebar: var(--canvas);
   --color-sidebar-border: var(--separator);
   --color-sidebar-foreground: var(--ink);
-  --color-sidebar-accent: var(--surface-sunk);
+  --color-sidebar-accent: var(--highlight);
   --color-sidebar-accent-foreground: var(--ink);
   --color-sidebar-primary: var(--forest);
   --color-sidebar-primary-foreground: var(--on-forest);

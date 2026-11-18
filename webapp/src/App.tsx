@@ -6,7 +6,6 @@ import { LoadingScreen } from "./components/feedback/LoadingScreen"
 import { buttonVariants } from "@blesser/ui"
 import { useAuth } from "./lib/auth"
 import { SITE_URL } from "./lib/site"
-import notFoundArt from "@blesser/ui/illustrations/spot-not-found.webp"
 
 const Shell = React.lazy(() => import("./components/layout/Shell").then((m) => ({ default: m.Shell })))
 const Opportunities = React.lazy(() => import("./pages/Opportunities").then((m) => ({ default: m.Opportunities })))
@@ -56,7 +55,6 @@ function Home() {
 function NotFound() {
   return (
     <EmptyState
-      illustration={notFoundArt}
       title="Page not found"
       description="That link didn't open. Check the address, or head back to the opportunities."
       action={<Link to="/opportunities" className={buttonVariants({ size: "sm", variant: "primary" })}>Browse opportunities</Link>}

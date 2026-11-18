@@ -1,5 +1,5 @@
 ---
-import { Logo } from "@blesser/ui"
+import { Logo, Wordmark } from "@blesser/ui"
 import { CATEGORY_LANDINGS, KIND_LANDINGS } from "../lib/landings"
 import { loginUrl, registerUrl, withBase } from "../lib/config"
 
@@ -29,9 +29,9 @@ const columns = [
 <footer class="mt-20 bg-surface-sunk text-ink">
   <div class="site-container grid gap-10 pt-14 pb-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
     <div class="flex flex-col gap-3">
-      <a href={withBase("/")} class="flex items-center gap-2.5 text-ink no-underline" aria-label="Blesser home">
+      <a href={withBase("/")} class="flex items-center gap-1 no-underline" aria-label="Blesser home">
         <Logo title="" className="size-8" />
-        <span class="font-display text-xl font-bold tracking-[-0.02em]">Blesser</span>
+        <Wordmark />
       </a>
       <p class="m-0 max-w-[34ch] text-callout text-ink-secondary">
         Opportunities, made visible. Grants, fellowships, scholarships and accelerators for Ghana.

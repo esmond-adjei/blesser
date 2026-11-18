@@ -101,6 +101,10 @@ const theme = [
     "}",
   ]),
   `@layer base {
+  :where(.dark, [data-theme="dark"]) {
+    --logo-ink: #ffffff;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

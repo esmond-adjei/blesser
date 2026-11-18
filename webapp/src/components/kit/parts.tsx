@@ -94,7 +94,7 @@ export function SelectField({ label, value, onChange, options, hint, placeholder
       <NativeSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="select-chevron h-control-md w-full min-w-0 cursor-pointer appearance-none rounded-sm border border-control-border bg-surface px-3.5 pr-10 text-body text-ink focus-visible:border-focus focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+        className="select-chevron h-control-md w-full min-w-0 cursor-pointer appearance-none rounded-sm border border-input-border bg-surface px-3.5 pr-10 text-body text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)]"
       >
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
         {options.map((o) => (
@@ -185,7 +185,7 @@ export function TagInput({ label, values, onChange, placeholder, hint, className
   return (
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={id} className="text-sm leading-5 font-semibold text-ink">{label}</label>
-      <div className="flex min-h-control-md flex-wrap items-center gap-1.5 rounded-sm border border-control-border bg-surface px-2 py-1.5 has-[input:focus-visible]:border-focus has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-1 has-[input:focus-visible]:outline-focus">
+      <div className="flex min-h-control-md flex-wrap items-center gap-1.5 rounded-sm border border-input-border bg-surface px-2 py-1.5 transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover has-[input:focus]:border-focus has-[input:focus]:shadow-[0_0_0_3px_var(--focus-soft)]">
         {values.map((v) => (
           <span key={v} className="inline-flex h-6 max-w-full items-center gap-1 rounded-full bg-surface-sunk pr-1 pl-2.5 text-footnote text-ink">
             <span className="truncate">{v}</span>
@@ -252,7 +252,7 @@ export function SecretField({ label, value, masked, revealed, onReveal, onHide, 
           placeholder={revealed ? undefined : "Not added"}
           aria-describedby={hint ? `${id}-hint` : undefined}
           className={cn(
-            "h-control-md w-full min-w-0 rounded-sm border border-control-border bg-surface px-3.5 font-mono text-callout text-ink placeholder:font-sans placeholder:text-ink-tertiary focus-visible:border-focus focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus",
+            "h-control-md w-full min-w-0 rounded-sm border border-input-border bg-surface px-3.5 font-mono text-callout text-ink placeholder:font-sans placeholder:text-ink-tertiary outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)]",
             !revealed && "bg-surface-sunk text-ink-secondary",
           )}
         />
@@ -346,7 +346,7 @@ export function KitRail({ label, completeness, hint, sections }: { label: string
           <ul className="space-y-0.5">
             {sections.map((s) => (
               <li key={s.id}>
-                <a href={`#${s.id}`} className="flex h-8 items-center rounded-sm px-2.5 text-footnote font-medium text-ink-secondary transition-colors duration-160 hover:bg-surface-sunk hover:text-ink">
+                <a href={`#${s.id}`} className="flex h-8 items-center rounded-sm px-2.5 text-footnote font-medium text-ink-secondary transition-colors duration-160 hover:bg-highlight hover:text-ink">
                   {s.label}
                 </a>
               </li>

@@ -47,7 +47,7 @@ export function ConnectedBrowsers() {
             label={session.name}
             description={
               <span title={formatDate(session.created_at)}>
-                Connected {formatAgo(session.created_at)} · {session.last_used_at ? `Last used ${formatAgo(session.last_used_at)}` : "Not used yet"}
+                Connected {formatAgo(session.created_at)}. {session.last_used_at ? `Last used ${formatAgo(session.last_used_at)}` : "Not used yet"}
               </span>
             }
             control={

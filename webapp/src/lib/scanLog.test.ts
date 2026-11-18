@@ -39,7 +39,7 @@ describe("scan log", () => {
   it("times a finished scan from its tasks", () => {
     const scan = { status: "done", created_at: "2026-11-09T09:59:00Z", tasks: [task([])] } as unknown as Scan
     expect(formatDuration(scanElapsedMs(scan))).toBe("23m")
-    expect(formatDuration(null)).toBe("—")
+    expect(formatDuration(null)).toBe("")
     expect(shortUrl("not a url")).toBe("not a url")
   })
 })

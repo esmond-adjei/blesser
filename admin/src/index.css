@@ -97,7 +97,7 @@
   .wordmark {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 4px;
     margin: 0 10px 36px;
     font-family: var(--font-display);
     font-size: 24px;

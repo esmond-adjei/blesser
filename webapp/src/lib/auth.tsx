@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(REFRESH_KEY, next.tokens.refresh_token)
     } catch {
-      /* private mode — the session lasts until reload */
+      /* private mode: the session lasts until reload */
     }
     api.setAccessToken(next.tokens.access_token)
     setUser(next.user)
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await api.logoutSession(stored, pushSub?.endpoint)
       } catch {
-        /* already dead server-side — still sign out locally */
+        /* already dead server-side; still sign out locally */
       }
     }
     await pushSub?.unsubscribe().catch(() => false)

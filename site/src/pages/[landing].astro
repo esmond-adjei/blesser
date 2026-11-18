@@ -1,7 +1,6 @@
 ---
 import { buttonVariants } from "@blesser/ui"
 import { LinkEmptyState } from "../components/States"
-import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 import Base from "../layouts/Base.astro"
 import CardGrid from "../components/CardGrid.astro"
 import ClientListing from "../components/ClientListing.astro"
@@ -64,7 +63,7 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
         {result instanceof ApiError || !result ? (
           <ApiErrorSection />
         ) : result.items.length === 0 ? (
-          <LinkEmptyState illustration={notFound.src} {...emptyState} />
+          <LinkEmptyState {...emptyState} />
         ) : (
           <>
             <h2 id="open-now" class="m-0 mb-4 type-title-2 text-ink">

@@ -10,8 +10,9 @@ export {
   type ApplicationStage,
   type ApplicationStatusProps,
 } from "./components/ApplicationStatus"
-export { EmptyState, type EmptyStateProps } from "./components/EmptyState"
-export { Logo, type LogoProps, type LogoVariant } from "./components/Logo"
+export { EmptyState, Sunrise, type EmptyStateProps } from "./components/EmptyState"
+export { Wordmark } from "./components/Wordmark"
+export { LOGO, Logo, logoSvg, type LogoProps, type LogoVariant } from "./components/Logo"
 export {
   OpportunityArt,
   opportunityArt,

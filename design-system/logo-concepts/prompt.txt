@@ -1,0 +1,18 @@
+Use your image generation tool to create 4 separate logo concept images for 'Blesser', a platform that helps startups, researchers and students in Ghana find and track grants, scholarships, fellowships and accelerators. Its tagline is 'Opportunities, made visible'.
+
+Style reference: the attached reference.png (the Substack logo): a tiny, flat, solid geometric mark beside a bold lowercase wordmark. No gradients, no shading, no outlines, no texture, no mockups.
+
+Requirements for every concept:
+- The mark must be perfectly mirror-symmetric about its vertical axis.
+- Built from 2-4 simple geometric shapes; must read clearly at 16px favicon size.
+- Brand colours only: deep forest green #0f4f3b, sun yellow #ffbe1a, coral #ff7d66, on a plain off-white #f6f7f1 background.
+- Mark on the left, lowercase wordmark 'blesser' on the right in a heavy geometric sans, forest green.
+- Centered, generous padding, 1536x1024 landscape.
+
+Concepts:
+1. concept-1-sunrise.png: a half sun (yellow) rising behind a symmetric stepped base (green), a path up to an opportunity.
+2. concept-2-open-door.png: an arched doorway (green) with a yellow sun disc framed inside it.
+3. concept-3-stack.png: three stacked horizontal bars narrowing upward into a peak, like the Substack bookmark but symmetric, green with a coral top bar.
+4. concept-4-b-monogram.png: a symmetric lowercase-b-inspired monogram made from a vertical stem split into two mirrored rounded halves around a yellow circle.
+
+Save each image into the current directory with exactly those filenames. Do not edit any other files. Reply with the list of files saved.

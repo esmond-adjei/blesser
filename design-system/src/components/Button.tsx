@@ -9,8 +9,8 @@ export const buttonVariants = cva(
       variant: {
         primary: "border-transparent bg-sun text-on-sun hover:bg-sun-hover",
         brand: "border-transparent bg-forest text-on-forest hover:bg-forest-hover",
-        secondary: "border-control-border bg-surface text-ink hover:bg-surface-sunk",
-        quiet: "border-transparent bg-transparent text-ink hover:bg-surface-sunk",
+        secondary: "border-control-border bg-surface text-ink hover:bg-highlight",
+        quiet: "border-transparent bg-transparent text-ink hover:bg-highlight",
         danger: "border-transparent bg-critical text-on-critical hover:bg-critical/90",
       },
       size: {

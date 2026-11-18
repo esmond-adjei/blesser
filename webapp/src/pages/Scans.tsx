@@ -45,7 +45,6 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
-import scanningArt from "@blesser/ui/illustrations/spot-scanning.webp"
 
 type Status = ScanTask["status"] | Scan["status"]
 
@@ -110,7 +109,6 @@ export function Scans() {
         <ErrorState title="Your scans didn't load" description="Try again in a moment." onRetry={() => void scans.refetch()} />
       ) : !scans.data?.length ? (
         <EmptyState
-          illustration={scanningArt}
           title="No scans yet"
           description="A scan sends agents to find new opportunities for startups, researchers or students."
           action={
@@ -150,7 +148,7 @@ function ScanRow({ scan }: { scan: Scan }) {
   return (
     <Link
       to={`/scans/${scan.id}`}
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-surface-sunk focus-visible:-outline-offset-2 md:grid-cols-[minmax(0,1fr)_120px_70px_80px_100px]"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-highlight focus-visible:-outline-offset-2 md:grid-cols-[minmax(0,1fr)_120px_70px_80px_100px]"
     >
       <span className="min-w-0">
         <span className="block truncate text-callout font-semibold text-ink">{scanTitle(scan)}</span>
@@ -158,7 +156,7 @@ function ScanRow({ scan }: { scan: Scan }) {
       </span>
       <StatusLabel status={scan.status} className="justify-self-end md:justify-self-start" />
       <span className="col-span-2 text-footnote text-ink-tertiary md:hidden">
-        {scan.opportunities_added} saved · {duration === "—" ? "" : `${duration} · `}started {formatAgo(scan.created_at)}
+        {[`${scan.opportunities_added} saved`, duration, `started ${formatAgo(scan.created_at)}`].filter(Boolean).join(", ")}
       </span>
       <span className="hidden text-right text-callout text-ink tabular-nums md:block">{scan.opportunities_added}</span>
       <span className="hidden text-right text-footnote text-ink-secondary tabular-nums md:block">{duration}</span>
@@ -204,7 +202,7 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
               <legend className="mb-1.5 text-sm leading-5 font-semibold text-ink">Look for</legend>
               <div className="divide-y divide-separator rounded-sm border border-separator">
                 {CATEGORIES.map((c) => (
-                  <label key={c} className="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-surface-sunk">
+                  <label key={c} className="flex cursor-pointer items-start gap-2.5 px-3 py-2 hover:bg-highlight">
                     <Checkbox
                       className="mt-0.5"
                       checked={categories.includes(c)}
@@ -294,23 +292,16 @@ export function ScanDetail() {
         }
         title={scanTitle(data)}
         description={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <StatusLabel status={data.status} />
-            <span aria-hidden="true">·</span>
             <span>Started {formatAgo(data.created_at)}</span>
             {duration != null ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>
-                  {running ? "Running for" : "Took"} {formatDuration(duration)}
-                </span>
-              </>
+              <span>
+                {running ? "Running for" : "Took"} {formatDuration(duration)}
+              </span>
             ) : null}
             {data.focus ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="min-w-0 truncate">Focus: {data.focus}</span>
-              </>
+              <span className="min-w-0 truncate">Focus: {data.focus}</span>
             ) : null}
           </span>
         }
@@ -462,7 +453,7 @@ function Progress({ tasks }: { tasks: ScanTask[] }) {
                   <span className="text-footnote text-ink-tertiary">
                     {task.status === "pending"
                       ? "Waiting for a free worker"
-                      : `${stats.searches} searches · ${stats.reads} pages read · ${stats.saved} saved`}
+                      : `${stats.searches} searches, ${stats.reads} pages read, ${stats.saved} saved`}
                   </span>
                 </div>
                 {now ? <p className="mt-0.5 truncate text-footnote text-ink-secondary">{now}</p> : null}
@@ -505,7 +496,7 @@ function ActivityLog({ tasks }: { tasks: ScanTask[] }) {
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-4 py-3 text-left hover:bg-surface-sunk"
+        className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-4 py-3 text-left hover:bg-highlight"
       >
         <ChevronRight aria-hidden="true" className={cn("size-4 text-ink-tertiary transition-transform duration-160", open && "rotate-90")} />
         <span className="text-callout font-semibold text-ink">Activity log</span>

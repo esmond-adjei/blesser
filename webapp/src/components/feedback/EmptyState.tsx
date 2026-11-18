@@ -1,17 +1,16 @@
 import * as React from "react"
 import { RefreshCw } from "lucide-react"
-import { Button, cn } from "@blesser/ui"
+import { Button, Sunrise, cn } from "@blesser/ui"
 
 type Props = {
   title: string
   description: string
   action?: React.ReactNode
-  illustration?: string
   compact?: boolean
   className?: string
 }
 
-function Panel({ title, description, action, illustration, compact, className, error }: Props & { error?: boolean }) {
+function Panel({ title, description, action, compact, className, error }: Props & { error?: boolean }) {
   return (
     <div
       role={error ? "alert" : undefined}
@@ -21,7 +20,7 @@ function Panel({ title, description, action, illustration, compact, className, e
         className,
       )}
     >
-      {illustration && !compact ? <img src={illustration} alt="" className="mb-2 h-24 w-auto max-w-full opacity-90" /> : null}
+      {error || compact ? null : <Sunrise className="mb-2" />}
       <h2 className="text-headline text-ink">{title}</h2>
       <p className="max-w-md text-footnote text-ink-secondary">{description}</p>
       {action ? <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
@@ -38,7 +37,6 @@ export function ErrorState({ onRetry, action, ...props }: Props & { onRetry?: ()
   return (
     <Panel
       {...props}
-      illustration={undefined}
       error
       action={
         onRetry || action ? (

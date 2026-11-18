@@ -102,7 +102,7 @@ function CorrectionsBody() {
                       {correctionValue(c)}
                     </p>
                     <p className="mt-1 text-caption font-normal text-ink-tertiary">
-                      {TYPES[c.field_type] ?? "Text"} · {formatAgo(c.updated_at)}
+                      {TYPES[c.field_type] ?? "Text"}, {formatAgo(c.updated_at)}
                     </p>
                   </div>
                   <Button

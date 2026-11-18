@@ -1,0 +1,86 @@
+/* Blesser motion: short, quiet, and gone under prefers-reduced-motion.
+   Radix keeps closing content mounted until its exit animation ends, so every
+   [data-state=closed] rule below needs a matching keyframe, not a transition. */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 260ms;
+}
+
+@keyframes bl-fade-in { from { opacity: 0; } }
+@keyframes bl-fade-out { to { opacity: 0; } }
+@keyframes bl-modal-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+@keyframes bl-modal-out { to { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@keyframes bl-pop-in { from { opacity: 0; transform: scale(0.96) translate(var(--bl-pop-x, 0), var(--bl-pop-y, 0)); } }
+@keyframes bl-pop-out { to { opacity: 0; transform: scale(0.97); } }
+@keyframes bl-rise { from { opacity: 0; transform: translateY(6px); } }
+@keyframes bl-sheet-in-left { from { transform: translateX(-100%); } }
+@keyframes bl-sheet-out-left { to { transform: translateX(-100%); } }
+@keyframes bl-sheet-in-right { from { transform: translateX(100%); } }
+@keyframes bl-sheet-out-right { to { transform: translateX(100%); } }
+@keyframes bl-sheet-in-bottom { from { transform: translateY(100%); } }
+@keyframes bl-sheet-out-bottom { to { transform: translateY(100%); } }
+
+.bl-scrim[data-state="open"] { animation: bl-fade-in var(--dur-base) var(--ease-out); }
+.bl-scrim[data-state="closed"] { animation: bl-fade-out var(--dur-fast) var(--ease-in) forwards; }
+
+.bl-modal[data-state="open"] { animation: bl-modal-in var(--dur-slow) var(--ease-out); }
+.bl-modal[data-state="closed"] { animation: bl-modal-out var(--dur-fast) var(--ease-in) forwards; }
+
+/* Menus, popovers and tooltips grow from their trigger. */
+.bl-pop {
+  transform-origin: var(--radix-popper-transform-origin, var(--radix-context-menu-content-transform-origin, center));
+}
+.bl-pop[data-side="bottom"] { --bl-pop-y: -4px; }
+.bl-pop[data-side="top"] { --bl-pop-y: 4px; }
+.bl-pop[data-side="right"] { --bl-pop-x: -4px; }
+.bl-pop[data-side="left"] { --bl-pop-x: 4px; }
+.bl-pop[data-state="open"], .bl-pop[data-state="delayed-open"], .bl-pop[data-state="instant-open"] {
+  animation: bl-pop-in var(--dur-base) var(--ease-out);
+}
+.bl-pop[data-state="closed"] { animation: bl-pop-out var(--dur-fast) var(--ease-in) forwards; }
+
+.bl-sheet[data-side="left"][data-state="open"] { animation: bl-sheet-in-left var(--dur-slow) var(--ease-out); }
+.bl-sheet[data-side="left"][data-state="closed"] { animation: bl-sheet-out-left var(--dur-base) var(--ease-in) forwards; }
+.bl-sheet[data-side="right"][data-state="open"] { animation: bl-sheet-in-right var(--dur-slow) var(--ease-out); }
+.bl-sheet[data-side="right"][data-state="closed"] { animation: bl-sheet-out-right var(--dur-base) var(--ease-in) forwards; }
+.bl-sheet[data-side="bottom"][data-state="open"] { animation: bl-sheet-in-bottom var(--dur-slow) var(--ease-out); }
+.bl-sheet[data-side="bottom"][data-state="closed"] { animation: bl-sheet-out-bottom var(--dur-base) var(--ease-in) forwards; }
+
+/* Content that mounts in place: a view switch, a tab panel, a new row.
+   --i staggers siblings; it is capped so long lists don't trickle in. */
+.bl-enter {
+  animation: bl-rise var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 8) * 24ms);
+}
+.bl-tab-panel[data-state="active"] { animation: bl-rise var(--dur-base) var(--ease-out); }
+
+/* The sliding pill behind the selected tab or segment; its box comes from JS. */
+.bl-indicator {
+  position: absolute;
+  top: var(--bl-ind-top, 2px);
+  left: 0;
+  height: var(--bl-ind-h, calc(100% - 4px));
+  width: var(--bl-ind-w, 0);
+  translate: var(--bl-ind-x, 0) 0;
+  transition: translate var(--dur-slow) var(--ease-out), width var(--dur-slow) var(--ease-out);
+  pointer-events: none;
+}
+.bl-indicator[data-ready="false"] { transition: none; }
+
+.bl-lift { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+.bl-lift:hover { transform: translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bl-modal[data-state], .bl-pop[data-state], .bl-sheet[data-state], .bl-enter, .bl-tab-panel[data-state="active"] {
+    animation-name: bl-fade-in;
+    animation-duration: var(--dur-fast);
+    animation-delay: 0ms;
+  }
+  .bl-modal[data-state="closed"], .bl-pop[data-state="closed"], .bl-sheet[data-state="closed"] { animation-name: bl-fade-out; }
+  .bl-indicator { transition: none; }
+  .bl-lift:hover { transform: none; }
+}

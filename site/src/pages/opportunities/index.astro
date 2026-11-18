@@ -1,5 +1,4 @@
 ---
-import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 import Base from "../../layouts/Base.astro"
 import CardGrid from "../../components/CardGrid.astro"
 import ClientListing from "../../components/ClientListing.astro"
@@ -54,7 +53,6 @@ const pageNote = filters.page > 1 ? `, page ${filters.page}` : ""
       ) : result.items.length === 0 ? (
         <LinkEmptyState
           className="mt-8"
-          illustration={notFound.src}
           title={filtered ? "Nothing matches those filters" : "Nothing open right now"}
           description={
             filtered

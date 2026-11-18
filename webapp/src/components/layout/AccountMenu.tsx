@@ -21,7 +21,7 @@ export function AccountMenu({ variant = "sidebar" }: { variant?: "sidebar" | "co
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={compact ? `Account menu for ${name}` : undefined} className={cn("cursor-pointer transition-colors duration-160", compact ? "grid size-9 place-items-center rounded-full hover:bg-surface-sunk" : "flex w-full min-w-0 items-center gap-2.5 rounded-sm px-2 py-1.5 text-left hover:bg-surface-sunk data-[state=open]:bg-surface-sunk")}>
+        <button type="button" aria-label={compact ? `Account menu for ${name}` : undefined} className={cn("cursor-pointer transition-colors duration-160", compact ? "grid size-9 place-items-center rounded-full hover:bg-highlight" : "flex w-full min-w-0 items-center gap-2.5 rounded-sm px-2 py-1.5 text-left hover:bg-highlight data-[state=open]:bg-highlight")}>
           <Avatar name={name} className={compact ? "size-7 text-xs" : undefined} />
           {!compact && <><span className="min-w-0 flex-1 truncate text-callout font-semibold text-ink">{name}</span><ChevronsUpDown aria-hidden="true" className="size-4 shrink-0 text-ink-tertiary" /></>}
         </button>

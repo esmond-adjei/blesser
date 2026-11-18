@@ -178,7 +178,7 @@ function Kit({ opp, kit }: { opp: Opportunity; kit: ShareKit | undefined }) {
           <div key={c.key}>
             <div className="flex items-center justify-between gap-2">
               <label htmlFor={`share-${c.key}`} className="text-callout font-semibold text-ink">
-                {c.label} <span className="font-normal text-ink-tertiary">· {c.hint}</span>
+                {c.label} <span className="ml-1 font-normal text-ink-tertiary">{c.hint}</span>
               </label>
               <Button
                 size="sm"

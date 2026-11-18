@@ -14,9 +14,9 @@ export function DialogContent({ className, children, onClose }: {
 }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-scrim data-[state=open]:animate-in" />
+      <DialogPrimitive.Overlay className="bl-scrim fixed inset-0 z-50 bg-scrim" />
       <DialogPrimitive.Content className={cn(
-        "fixed top-[12dvh] left-1/2 z-50 flex max-h-[calc(88dvh-1rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-lg bg-surface-raised p-0 text-ink shadow-elevation-3 focus:outline-none",
+        "bl-modal fixed top-[12dvh] left-1/2 z-50 flex max-h-[calc(88dvh-1rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-lg max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:w-full max-sm:max-w-none! max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)] bg-surface-raised p-0 text-ink shadow-elevation-3 focus:outline-none",
         className,
       )}>
           <button type="button" aria-label="Close" onClick={onClose} className="absolute top-4 right-4 z-20 flex size-8 cursor-pointer items-center justify-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">

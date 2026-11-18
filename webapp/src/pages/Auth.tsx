@@ -8,9 +8,14 @@ import { apiMessage } from "../lib/api"
 import { toastError, toastSuccess } from "../lib/toast"
 import { authHref, trackAfterAuth, trackParam, trackedMessage, trackedTitle } from "../lib/track"
 import { CheckCircle2, MailCheck } from "lucide-react"
-import { Button, Field, Input, Logo } from "@blesser/ui"
+import { Button, Field, Input, LOGO, Logo, Wordmark } from "@blesser/ui"
 import { Alert, AlertDescription } from "../components/ui/feedback"
 import { OAUTH_STATE_KEY, OAuthButtons } from "../components/auth/OAuthButtons"
+import { PasswordInput } from "../components/auth/PasswordInput"
+
+const photoMask = `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><g transform="${LOGO.fill}"><path d="${LOGO.sun_cut}"/><path d="${LOGO.steps}"/></g></svg>`,
+)}")`
 
 function AuthShell({
   title,
@@ -22,15 +27,43 @@ function AuthShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[448px] flex-col justify-center gap-6 px-4 py-8">
-      <div className="flex flex-col items-start gap-4">
-        <Logo className="size-10" />
-        <h1 className="type-title-2 text-ink">{title}</h1>
+    <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-2 lg:gap-4 lg:p-4">
+      <div aria-hidden="true" className="relative hidden overflow-hidden rounded-lg bg-surface-sunk lg:block">
+        <div
+          className="absolute inset-0"
+          style={{
+            maskImage: photoMask,
+            maskSize: "85% 85%",
+            maskPosition: "center",
+            maskRepeat: "no-repeat",
+          }}
+        >
+          <picture>
+            <source media="(min-width: 1024px)" srcSet="/auth/coding-together.webp" type="image/webp" />
+            <img
+              src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+              alt=""
+              width={1200}
+              height={800}
+              className="absolute inset-0 h-full w-full object-cover object-right"
+            />
+          </picture>
+          <div className="absolute inset-0 bg-forest/25" />
+        </div>
       </div>
-      <div className="space-y-4 rounded-lg border border-separator bg-surface p-6 shadow-elevation-1">
-        {children}
+      <div className="mx-auto flex min-h-dvh w-full max-w-[448px] flex-col justify-center gap-6 px-4 py-8 lg:min-h-[calc(100dvh-2rem)]">
+        <div className="flex w-full flex-col items-center gap-4 text-center">
+          <Link to="/" aria-label="Blesser" className="inline-flex items-center gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">
+            <Logo title="" className="size-9" />
+            <Wordmark className="text-[30px]" />
+          </Link>
+          <h1 className="type-title-2 text-ink">{title}</h1>
+        </div>
+        <div className="space-y-4 rounded-lg border border-separator bg-surface p-6 shadow-elevation-1">
+          {children}
+        </div>
+        <p className="text-center text-callout text-ink-secondary">{subtitle}</p>
       </div>
-      <p className="text-center text-callout text-ink-secondary">{subtitle}</p>
     </div>
   )
 }
@@ -137,8 +170,7 @@ export function Login() {
           </Link>
         </div>
         <Field label="Password">
-          <Input
-            type="password"
+          <PasswordInput
             autoComplete="current-password"
             required
             value={password}
@@ -204,8 +236,7 @@ export function Register() {
           <Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
         <Field label="Password">
-          <Input
-            type="password"
+          <PasswordInput
             autoComplete="new-password"
             required
             minLength={8}
@@ -344,10 +375,10 @@ export function ResetPassword() {
       ) : (
         <form onSubmit={onSubmit} className="space-y-3">
           <Field label="New password">
-            <Input type="password" autoComplete="new-password" required minLength={8} autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
+            <PasswordInput autoComplete="new-password" required minLength={8} autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
           </Field>
           <Field label="Confirm new password">
-            <Input type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <PasswordInput autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </Field>
           {mismatch && <p className="text-footnote font-medium text-critical">Passwords don't match.</p>}
           {err && (
@@ -544,7 +575,7 @@ export function OAuthCallback() {
           Enter its password once to link {link.data.provider}; after that you can use either to sign in.
         </p>
         <Field label="Password">
-          <Input type="password" autoComplete="current-password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput autoComplete="current-password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         {err && (
           <Alert variant="destructive">

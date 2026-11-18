@@ -1,6 +1,5 @@
 ---
 import { LinkEmptyState } from "./States"
-import offline from "@blesser/ui/illustrations/spot-offline.webp"
 import { STATIC_BUILD } from "../lib/config"
 
 interface Props {
@@ -16,7 +15,6 @@ const retry = Astro.url.pathname + Astro.url.search
     <section class="site-container py-12">
       <LinkEmptyState
         error
-        illustration={offline.src}
         title={title}
         description="Our listings service didn't answer. Try again in a minute."
         actions={[{ href: retry, label: "Try again" }]}

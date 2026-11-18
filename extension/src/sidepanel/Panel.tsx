@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ArrowUpRight, Check, Flag, Footprints, LogOut, Settings as SettingsIcon, Sparkles } from "lucide-react"
-import { Button, Logo, Select, cn } from "@blesser/ui"
+import { Button, Logo, Select, Wordmark, cn } from "@blesser/ui"
 import { counts } from "../shared/review"
 import type { Prefs, Review, Status } from "../shared/types"
 import { FILL_REQUEST, send } from "../shared/ui"
@@ -190,8 +190,8 @@ export function Panel() {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-separator bg-canvas/95 px-4 py-2.5 backdrop-blur">
         <Logo className="size-6" title="" />
-        <div className="min-w-0 flex-1">
-          <p className="text-callout font-semibold text-ink">Blesser</p>
+        <div className="-ml-1.5 min-w-0 flex-1">
+          <p><Wordmark className="text-[21px]" /></p>
           {me ? <p className="truncate text-[12px] leading-4 text-ink-secondary">{me.user.display_name || me.user.email}</p> : null}
         </div>
         <Button size="sm" variant="quiet" iconOnly icon={<SettingsIcon />} aria-label="Extension options" title="Extension options" className="size-8 [&_svg]:size-4" onClick={() => void chrome.runtime.openOptionsPage()} />

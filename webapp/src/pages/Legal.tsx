@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { Logo } from "@blesser/ui"
+import { Logo, Wordmark } from "@blesser/ui"
 
 /** Bumped with api TERMS_VERSION when either notice changes. */
 export const TERMS_VERSION = "2026-11-07"
@@ -14,9 +14,9 @@ function LegalShell({ title, children }: { title: string; children: React.ReactN
   }, [title])
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <a href="/" className="mb-8 flex items-center gap-2.5">
+      <a href="/" className="mb-8 flex items-center gap-1">
         <Logo title="" className="size-8" />
-        <span className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Blesser</span>
+        <Wordmark />
       </a>
       <h1 className="type-title-2">{title}</h1>
       <p className="mt-1 type-caption text-ink-secondary">Version {TERMS_VERSION}</p>

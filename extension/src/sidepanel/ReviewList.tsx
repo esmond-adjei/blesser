@@ -120,7 +120,7 @@ function Row({ row, tabId, stale, open, onToggle }: { row: ReviewRow; tabId: num
         aria-expanded={open}
         aria-controls={panelId}
         onClick={onToggle}
-        className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors duration-160 hover:bg-surface-sunk/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+        className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors duration-160 hover:bg-highlight/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
       >
         <span className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", DOT[row.status])} aria-hidden="true" />
         <span className="min-w-0 flex-1">
@@ -207,7 +207,7 @@ function Action({ icon, label, onClick, disabled, title }: { icon: React.ReactNo
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full px-2 text-[12px] font-medium text-ink-secondary transition-colors duration-160 hover:bg-surface-sunk hover:text-ink focus-visible:outline-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:size-3.5"
+      className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full px-2 text-[12px] font-medium text-ink-secondary transition-colors duration-160 hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:size-3.5"
     >
       {icon}
       {label}

@@ -160,7 +160,7 @@ function DocumentsBody() {
                 aria-label="Show kind"
                 value={kind}
                 onChange={(e) => setKind(e.target.value)}
-                className="select-chevron h-control-sm cursor-pointer appearance-none rounded-sm border border-control-border bg-surface pr-9 pl-3 text-footnote text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+                className="select-chevron h-control-sm cursor-pointer appearance-none rounded-sm border border-input-border bg-surface pr-9 pl-3 text-footnote text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)]"
               >
                 <option value="">All kinds</option>
                 {kindsPresent.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
@@ -302,17 +302,12 @@ function DocumentRow({ doc, projectNames, onEdit, onDelete }: { doc: KitDocument
             </Chip>
           ) : null}
         </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-footnote text-ink-tertiary">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-footnote text-ink-tertiary">
           <span className="font-medium text-ink-secondary">{kindLabel(doc.kind)}</span>
-          <span aria-hidden="true">·</span>
           <span className="tabular-nums">{formatBytes(doc.size_bytes)}</span>
-          <span aria-hidden="true" className="max-sm:hidden">·</span>
           <span className="max-sm:hidden">Added {formatAgo(doc.created_at)}</span>
           {linked.length ? (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="truncate">{linked.join(", ")}</span>
-            </>
+            <span className="truncate">{linked.join(", ")}</span>
           ) : null}
         </p>
       </div>

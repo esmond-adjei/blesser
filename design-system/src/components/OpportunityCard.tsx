@@ -75,7 +75,7 @@ export function OpportunityCard({
       {amount ? (
         <div className="text-[15px] leading-[22px] font-semibold text-ink">
           {amount}
-          {amountNote ? <span className="font-normal text-ink-tertiary"> · {amountNote}</span> : null}
+          {amountNote ? <span className="ml-1.5 font-normal text-ink-tertiary">{amountNote}</span> : null}
         </div>
       ) : null}
       <div className="flex flex-wrap gap-2">

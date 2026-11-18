@@ -1,7 +1,6 @@
 ---
 import { LinkEmptyState } from "./States"
 import { withBase } from "../lib/config"
-import notFound from "@blesser/ui/illustrations/spot-not-found.webp"
 
 interface Props {
   title?: string
@@ -15,7 +14,6 @@ const {
 
 <section class="site-container py-16">
   <LinkEmptyState
-    illustration={notFound.src}
     title={title}
     description={description}
     actions={[

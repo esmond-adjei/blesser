@@ -1,4 +1,4 @@
-import { opportunityArt, type ArtElement, type ArtShape } from "@blesser/ui"
+import { logoSvg, opportunityArt, type ArtElement, type ArtShape } from "@blesser/ui"
 
 // Light-theme token values: resvg cannot resolve CSS variables.
 export const C = {
@@ -53,14 +53,7 @@ export function artDataUri(seed: string, category: string, kind: string, shape: 
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`
 }
 
-const STEPS = "M7.75 22.5h6.5a2.25 2.25 0 0 1 0 4.5h-6.5a2.25 2.25 0 0 1 0-4.5Zm5 -6h4.5a2.25 2.25 0 0 1 0 4.5h-4.5a2.25 2.25 0 0 1 0-4.5Z"
-const TOP_STEP = "M17.75 10.5h2.5a2.25 2.25 0 0 1 0 4.5h-2.5a2.25 2.25 0 0 1 0-4.5Z"
-
-/** The Path mark, as in Logo variant="mark". */
+/** The logo mark, as in Logo variant="mark". */
 export function markDataUri(size: number): string {
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 32 32">` +
-    `<rect width="32" height="32" rx="10" fill="${C.forest}"/><path d="${STEPS}" fill="#ffffff"/>` +
-    `<path d="${TOP_STEP}" fill="${C.bloom}"/><circle cx="24.5" cy="7.5" r="3.25" fill="${C.sun}"/></svg>`
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`
+  return `data:image/svg+xml;base64,${Buffer.from(logoSvg("mark", size)).toString("base64")}`
 }

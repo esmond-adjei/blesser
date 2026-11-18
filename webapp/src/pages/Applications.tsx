@@ -1,23 +1,23 @@
 import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { ArrowUpRight, Plus, Trash2 } from "lucide-react"
+import { ArrowUpRight, Columns3, List, MoveRight, PanelRightOpen, Plus, Trash2 } from "lucide-react"
 import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useApplications } from "../lib/applications"
 import { toastError, toastSuccess } from "../lib/toast"
 import type { Application, ApplicationStatus as Status, RequirementItem } from "../lib/types"
 import {
-  APPLICATION_STAGES,
   ApplicationStatus,
   Button,
+  Chip,
   Countdown,
   Field,
   Input,
-  Select,
   Textarea,
   buttonVariants,
   cn,
   daysUntil,
   type ApplicationStage,
+  type ChipTone,
 } from "@blesser/ui"
 import {
   Dialog,
@@ -30,30 +30,31 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { PageHeader, Segmented } from "../components/layout/PageHeader"
-import trackedArt from "@blesser/ui/illustrations/spot-empty-tracked.webp"
+import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 
 const stage = (status: Status): ApplicationStage => (status === "rejected" ? "not-this-time" : status)
 
-function Deadline({ app }: { app: Application }) {
-  if (!OPEN_STATUSES.includes(app.status) && app.status !== "submitted") return null
-  if (!app.deadline_date) return app.deadline ? <Countdown variant="text" label={app.deadline} /> : null
-  return <Countdown variant="text" daysLeft={daysUntil(app.deadline_date)} date={app.deadline_date} />
+const STATUS_TONE: Record<Status, ChipTone> = {
+  saved: "neutral",
+  preparing: "sun",
+  submitted: "info",
+  interview: "forest",
+  accepted: "bloom",
+  rejected: "neutral",
 }
 
-/** Five quiet steps; the full stepper lives in the dialog. */
-function StageDots({ status }: { status: Status }) {
-  const index = APPLICATION_STAGES.findIndex((s) => s.id === status)
-  const ended = status === "rejected"
-  return (
-    <span className="hidden items-center gap-1 md:flex" aria-hidden="true">
-      {APPLICATION_STAGES.map((s, i) => (
-        <span
-          key={s.id}
-          className={cn("h-1 w-3 rounded-full", !ended && i <= index ? (status === "accepted" ? "bg-bloom" : "bg-forest") : "bg-separator")}
-        />
-      ))}
-    </span>
-  )
+const COLUMNS: { id: string; label: string; statuses: Status[]; dot: string }[] = [
+  { id: "saved", label: "Saved", statuses: ["saved"], dot: "bg-control-border" },
+  { id: "preparing", label: "Preparing", statuses: ["preparing"], dot: "bg-sun" },
+  { id: "submitted", label: "Submitted", statuses: ["submitted"], dot: "bg-info" },
+  { id: "interview", label: "Interview", statuses: ["interview"], dot: "bg-forest" },
+  { id: "decision", label: "Decision", statuses: ["accepted", "rejected"], dot: "bg-bloom" },
+]
+
+function Deadline({ app, className }: { app: Application; className?: string }) {
+  if (!OPEN_STATUSES.includes(app.status) && app.status !== "submitted") return null
+  if (!app.deadline_date) return app.deadline ? <Countdown variant="text" label={app.deadline} className={className} /> : null
+  return <Countdown variant="text" daysLeft={daysUntil(app.deadline_date)} date={app.deadline_date} className={className} />
 }
 
 const FILTERS = [
@@ -62,15 +63,64 @@ const FILTERS = [
   ...STATUSES,
 ]
 
+type View = "list" | "board"
+const VIEW_KEY = "blesser.applications.view"
+
+function useView(): [View, (view: View) => void] {
+  const [view, setView] = React.useState<View>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list"
+    } catch {
+      return "list"
+    }
+  })
+  return [
+    view,
+    (next) => {
+      setView(next)
+      try {
+        localStorage.setItem(VIEW_KEY, next)
+      } catch {
+        // Storage can be blocked; the choice still holds for this visit.
+      }
+    },
+  ]
+}
+
+function useAppActions(onOpen: (app: Application) => void) {
+  const { update, remove } = useApplicationMutations()
+  const move = (app: Application, status: Status) =>
+    app.status !== status &&
+    update.mutate({ id: app.id, body: { status } }, { onError: (err) => toastError(err, "The status didn't save. Try again.") })
+  const actionsFor = (app: Application): MenuAction[] => [
+    { label: "Open", icon: <PanelRightOpen />, onSelect: () => onOpen(app) },
+    { kind: "radio", label: "Move to", icon: <MoveRight />, value: app.status, options: STATUSES, onChange: (v) => move(app, v as Status) },
+    ...(app.link ? [{ label: "Official page", icon: <ArrowUpRight />, href: app.link } satisfies MenuAction] : []),
+    { kind: "separator" },
+    {
+      label: "Remove",
+      icon: <Trash2 />,
+      danger: true,
+      onSelect: () =>
+        remove.mutate(app.id, {
+          onSuccess: () => toastSuccess("Removed from your applications"),
+          onError: (err) => toastError(err, "Couldn't remove it"),
+        }),
+    },
+  ]
+  return { move, actionsFor }
+}
+
 export function Applications() {
   const { data, isLoading, isError, refetch } = useApplications()
-  const { update } = useApplicationMutations()
   const [filter, setFilter] = React.useState("active")
+  const [view, setView] = useView()
   const [editing, setEditing] = React.useState<Application | null>(null)
   const [adding, setAdding] = React.useState(false)
+  const { move, actionsFor } = useAppActions(setEditing)
 
   const apps = (data ?? []).filter((a) => {
-    if (filter === "all") return true
+    if (view === "board" || filter === "all") return true
     if (filter === "active") return a.status !== "accepted" && a.status !== "rejected"
     return a.status === filter
   })
@@ -94,12 +144,27 @@ export function Applications() {
         }
       />
 
-      <Segmented
-        label="Filter by status"
-        value={filter}
-        onChange={setFilter}
-        options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        {view === "list" ? (
+          <Segmented
+            label="Filter by status"
+            value={filter}
+            onChange={setFilter}
+            className="min-w-0 flex-1 sm:flex-none"
+            options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
+          />
+        ) : null}
+        <Segmented
+          label="View"
+          value={view}
+          onChange={setView}
+          className="ml-auto"
+          options={[
+            { value: "list", label: "List", icon: <List aria-hidden="true" /> },
+            { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
+          ]}
+        />
+      </div>
 
       {isLoading ? (
         <div className="h-48 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
@@ -107,7 +172,6 @@ export function Applications() {
         <ErrorState title="Your applications didn't load" description="Try again in a moment." onRetry={() => void refetch()} />
       ) : apps.length === 0 ? (
         <EmptyState
-          illustration={trackedArt}
           title={data?.length ? "Nothing with this status" : "Nothing tracked yet"}
           description="Track an opportunity from the catalogue, or add one by hand."
           action={
@@ -116,41 +180,37 @@ export function Applications() {
             </Link>
           }
         />
+      ) : view === "board" ? (
+        <Board key="board" apps={apps} onOpen={setEditing} onMove={move} actionsFor={actionsFor} />
       ) : (
-        <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
-          {apps.map((app) => {
+        <ul key="list" className="divide-y divide-separator rounded-lg border border-separator bg-surface">
+          {apps.map((app, i) => {
             const done = app.requirements.filter((r) => r.done).length
-            const meta = [app.organization, app.kind, app.requirements.length ? `${done} of ${app.requirements.length} ready` : ""].filter(Boolean)
+            const meta = [app.organization, app.requirements.length ? `${done} of ${app.requirements.length} ready` : ""].filter(Boolean)
+            const actions = actionsFor(app)
             return (
-              <li key={app.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
-                <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => setEditing(app)}>
-                  <span className="block text-callout font-semibold text-ink hover:underline">{app.title}</span>
-                  <span className="mt-0.5 block truncate text-footnote text-ink-tertiary">{meta.join(" · ")}</span>
-                </button>
-                <div className="flex shrink-0 items-center gap-3">
-                  <StageDots status={app.status} />
-                  <Select
-                    aria-label={`Status of ${app.title}`}
-                    className="h-control-sm w-[140px] pr-8 text-footnote"
-                    value={app.status}
-                    onChange={(e) =>
-                      update.mutate(
-                        { id: app.id, body: { status: e.target.value as Status } },
-                        { onError: (err) => toastError(err, "The status didn't save. Try again.") },
-                      )
-                    }
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <span className="ml-auto w-24 text-right sm:ml-0">
+              <ActionContextMenu key={app.id} actions={actions}>
+                <li
+                  style={{ "--i": i } as React.CSSProperties}
+                  className="bl-enter flex items-center gap-3 px-3 py-3 transition-colors hover:bg-highlight/50 data-[state=open]:bg-highlight/50 sm:gap-4 sm:px-4"
+                >
+                  <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => setEditing(app)}>
+                    <span className="block text-callout font-semibold text-ink hover:underline">{app.title}</span>
+                    {meta.length ? <span className="mt-0.5 block truncate text-footnote text-ink-tertiary">{meta.join(", ")}</span> : null}
+                    <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 sm:hidden">
+                      <Chip tone={STATUS_TONE[app.status]}>{STATUS_LABEL[app.status]}</Chip>
+                      <Deadline app={app} />
+                    </span>
+                  </button>
+                  <Chip tone={STATUS_TONE[app.status]} className="max-sm:hidden">
+                    {STATUS_LABEL[app.status]}
+                  </Chip>
+                  <span className="w-24 justify-end text-right max-sm:hidden sm:flex">
                     <Deadline app={app} />
                   </span>
-                </div>
-              </li>
+                  <ActionMenuButton actions={actions} label={`More for ${app.title}`} className="shrink-0" />
+                </li>
+              </ActionContextMenu>
             )
           })}
         </ul>
@@ -159,6 +219,173 @@ export function Applications() {
       <ApplicationDialog app={editing} onClose={() => setEditing(null)} />
       <AddDialog open={adding} onClose={() => setAdding(false)} />
     </div>
+  )
+}
+
+const DRAG_TYPE = "application/x-blesser-application"
+
+function Board({
+  apps,
+  onOpen,
+  onMove,
+  actionsFor,
+}: {
+  apps: Application[]
+  onOpen: (app: Application) => void
+  onMove: (app: Application, status: Status) => void
+  actionsFor: (app: Application) => MenuAction[]
+}) {
+  const [dragging, setDragging] = React.useState<Application | null>(null)
+  const [over, setOver] = React.useState<string | null>(null)
+  const drop = (status: Status) => (e: React.DragEvent) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData(DRAG_TYPE)
+    const app = apps.find((a) => a.id === id)
+    if (app) onMove(app, status)
+    setDragging(null)
+    setOver(null)
+  }
+  const target = (key: string) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
+      if (over !== key) setOver(key)
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o === key ? null : o))
+    },
+  })
+
+  return (
+    <div className="nice-scroll -mx-4 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8">
+      <div className="grid snap-x snap-mandatory auto-cols-[minmax(248px,85vw)] grid-flow-col gap-3 sm:auto-cols-[minmax(232px,1fr)]">
+        {COLUMNS.map((col) => {
+          const items = apps.filter((a) => col.statuses.includes(a.status))
+          const decision = col.id === "decision"
+          return (
+            <section
+              key={col.id}
+              aria-label={col.label}
+              {...(decision ? {} : { ...target(col.id), onDrop: drop(col.statuses[0]) })}
+              className={cn(
+                "flex min-h-64 snap-start flex-col gap-2 rounded-lg bg-surface-sunk p-2 transition-[box-shadow,background-color] duration-150",
+                over === col.id && "bg-forest-soft/60 shadow-[inset_0_0_0_1.5px_var(--forest)]",
+              )}
+            >
+              <h2 className="flex items-center gap-2 px-1.5 pt-1 pb-0.5 text-footnote font-semibold text-ink">
+                <span aria-hidden="true" className={cn("size-2 rounded-full", col.dot)} />
+                {col.label}
+                <span className="ml-auto text-ink-tertiary tabular-nums">{items.length}</span>
+              </h2>
+              {decision && dragging ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {(["accepted", "rejected"] as const).map((status) => (
+                    <div
+                      key={status}
+                      {...target(status)}
+                      onDrop={drop(status)}
+                      className={cn(
+                        "bl-enter grid h-16 place-items-center rounded-md border border-dashed border-input-border-hover text-center text-footnote text-ink-secondary transition-colors",
+                        over === status && (status === "accepted" ? "border-bloom bg-bloom-soft text-bloom-ink" : "border-control-border bg-surface"),
+                      )}
+                    >
+                      {STATUS_LABEL[status]}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {items.map((app, i) => (
+                <BoardTile
+                  key={app.id}
+                  app={app}
+                  index={i}
+                  actions={actionsFor(app)}
+                  dragging={dragging?.id === app.id}
+                  onOpen={() => onOpen(app)}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(DRAG_TYPE, app.id)
+                    e.dataTransfer.effectAllowed = "move"
+                    setDragging(app)
+                  }}
+                  onDragEnd={() => {
+                    setDragging(null)
+                    setOver(null)
+                  }}
+                />
+              ))}
+              {items.length === 0 && !(decision && dragging) ? (
+                <p className="grid flex-1 place-items-center rounded-md border border-dashed border-input-border px-3 py-6 text-center text-footnote text-ink-tertiary">
+                  Drag an application here
+                </p>
+              ) : null}
+            </section>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function BoardTile({
+  app,
+  index,
+  actions,
+  dragging,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+}: {
+  app: Application
+  index: number
+  actions: MenuAction[]
+  dragging: boolean
+  onOpen: () => void
+  onDragStart: (e: React.DragEvent) => void
+  onDragEnd: () => void
+}) {
+  const total = app.requirements.length
+  const done = app.requirements.filter((r) => r.done).length
+  const outcome = app.status === "accepted" || app.status === "rejected"
+  return (
+    <ActionContextMenu actions={actions}>
+      <article
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        style={{ "--i": index } as React.CSSProperties}
+        className={cn(
+          "bl-enter group flex cursor-grab flex-col gap-2 rounded-md bg-surface p-3 shadow-elevation-1 transition-[box-shadow,opacity,transform] duration-150 active:cursor-grabbing data-[state=open]:shadow-elevation-2",
+          app.status === "accepted" && "bg-bloom-soft",
+          dragging && "opacity-50",
+        )}
+      >
+        <div className="flex items-start gap-1">
+          <button type="button" onClick={onOpen} className="min-w-0 flex-1 cursor-pointer text-left">
+            {app.organization ? <span className="block truncate text-caption text-ink-tertiary">{app.organization}</span> : null}
+            <span className="line-clamp-2 text-callout font-semibold text-ink group-hover:underline">{app.title}</span>
+          </button>
+          <ActionMenuButton actions={actions} label={`More for ${app.title}`} className="-mt-1 -mr-1.5 size-7 shrink-0 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100" />
+        </div>
+        {outcome ? (
+          <span className={cn("text-footnote", app.status === "accepted" ? "font-semibold text-bloom-ink" : "text-ink-secondary")}>
+            {app.status === "accepted" ? "Accepted. Congratulations!" : "Not this time"}
+          </span>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Deadline app={app} className="mr-auto" />
+            {total ? (
+              <span className="flex items-center gap-1.5 text-caption text-ink-tertiary tabular-nums" aria-label={`${done} of ${total} ready`}>
+                <span aria-hidden="true" className="h-1 w-10 overflow-hidden rounded-full bg-surface-sunk">
+                  <span className="block h-full rounded-full bg-forest transition-[width] duration-300" style={{ width: `${(100 * done) / total}%` }} />
+                </span>
+                {done}/{total}
+              </span>
+            ) : null}
+          </div>
+        )}
+      </article>
+    </ActionContextMenu>
   )
 }
 
@@ -186,7 +413,7 @@ function ApplicationDialog({ app, onClose }: { app: Application | null; onClose:
           <DialogHeader>
             <DialogTitle>{shown.title}</DialogTitle>
             <DialogDescription>
-              {[shown.organization, shown.kind, STATUS_LABEL[shown.status]].filter(Boolean).join(" · ")}
+              {[shown.organization, shown.kind].filter(Boolean).join(", ")}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">

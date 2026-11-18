@@ -6,14 +6,12 @@ type Action = { href: string; label: string; primary?: boolean }
 export function LinkEmptyState({
   title,
   description,
-  illustration,
   error,
   actions = [],
   className,
 }: {
   title: string
   description?: string
-  illustration?: string
   error?: boolean
   actions?: Action[]
   className?: string
@@ -22,7 +20,6 @@ export function LinkEmptyState({
     <EmptyState
       title={title}
       description={description}
-      illustration={illustration}
       error={error}
       className={className}
       action={

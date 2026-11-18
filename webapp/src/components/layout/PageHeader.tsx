@@ -1,6 +1,7 @@
 import * as React from "react"
 import { cn } from "@blesser/ui"
 import { RadioGroup, Toggle } from "radix-ui"
+import { useIndicator } from "../ui/indicator"
 
 export function PageHeader({
   title,
@@ -41,21 +42,24 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void
   className?: string
 }) {
+  const { ref, ready } = useIndicator<HTMLDivElement>('[data-state="checked"]', `${value}|${options.length}`)
   return (
     <RadioGroup.Root
+      ref={ref}
       aria-label={label}
       value={value}
       onValueChange={(next) => {
         const option = options.find((item) => item.value === next)
         if (option) onChange(option.value)
       }}
-      className={cn("nice-scroll flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-md bg-surface-sunk p-0.5", className)}
+      className={cn("nice-scroll relative flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-md bg-surface-sunk p-0.5", className)}
     >
+      <span aria-hidden="true" data-ready={ready} className="bl-indicator rounded-[6px] bg-surface-raised shadow-elevation-1" />
       {options.map((o) => (
         <RadioGroup.Item
           key={o.value}
           value={o.value}
-          className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 text-footnote font-medium whitespace-nowrap text-ink-secondary transition-colors duration-160 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus data-[state=checked]:bg-surface data-[state=checked]:text-ink data-[state=checked]:shadow-elevation-1 [&_svg]:size-3.5"
+          className="relative flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 text-footnote font-medium whitespace-nowrap text-ink-secondary transition-colors duration-160 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus data-[state=checked]:text-ink [&_svg]:size-3.5"
         >
           {o.icon}
           {o.icon ? <span className="max-sm:sr-only">{o.label}</span> : o.label}

@@ -136,7 +136,7 @@ export function scanElapsedMs(scan: Scan, now = Date.now()): number | null {
 
 /** "45s", "4m", "1h 12m". */
 export function formatDuration(ms: number | null): string {
-  if (ms == null) return "—"
+  if (ms == null) return ""
   const s = Math.round(ms / 1000)
   if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)

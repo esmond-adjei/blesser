@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as api from "../../lib/api"
 import { browserTimezone } from "../../lib/push"
 import { formatAgo } from "../../lib/format"
-import { Logo, cn } from "@blesser/ui"
+import { Logo, Wordmark, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { AccountMenu } from "./AccountMenu"
@@ -52,13 +52,19 @@ export function Shell() {
         <div className="nice-scroll min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-content px-4 pt-5 pb-12 sm:px-8 md:pt-8">
             <React.Suspense fallback={<LoadingScreen />}>
-              <ErrorBoundary><Outlet /></ErrorBoundary>
+              <ErrorBoundary><RouteFade><Outlet /></RouteFade></ErrorBoundary>
             </React.Suspense>
           </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
   )
+}
+
+/** Replays the enter animation whenever the top-level section changes. */
+function RouteFade({ children }: { children: React.ReactNode }) {
+  const section = useLocation().pathname.split("/")[1]
+  return <div key={section} className="bl-enter">{children}</div>
 }
 
 function ShellTitle() {
@@ -74,9 +80,9 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-separator">
       <SidebarHeader className="h-14 justify-center border-b border-separator">
-        <Link to="/opportunities" aria-label="Blesser home" onClick={() => setOpenMobile(false)} className="flex items-center gap-2 overflow-hidden px-1.5">
+        <Link to="/opportunities" aria-label="Blesser home" onClick={() => setOpenMobile(false)} className="flex items-center gap-1 overflow-hidden px-1.5">
           <Logo title="" className="size-7 shrink-0" />
-          {!compact && <span className="font-display text-base font-semibold tracking-[-0.01em] text-ink">Blesser</span>}
+          {!compact && <Wordmark className="text-[23px]" />}
         </Link>
       </SidebarHeader>
       <SidebarContent className="p-2">
@@ -84,7 +90,7 @@ function AppSidebar() {
           <SidebarMenu>
             {NAV.map((item) => (
               <SidebarMenuItem key={item.to}>
-                <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}>
+                <SidebarMenuButton asChild tooltip={item.label} className="data-[active=true]:bg-forest-soft data-[active=true]:text-link data-[active=true]:[&>svg]:text-link" isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}>
                   <NavLink to={item.to} onClick={() => setOpenMobile(false)} aria-label={item.label}>
                     <item.icon strokeWidth={1.75} /><span>{item.label}</span>
                   </NavLink>
@@ -129,7 +135,7 @@ function NotificationBell({ align = "right" }: { align?: "left" | "right" }) {
         type="button"
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
-        className="relative flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-tertiary hover:bg-surface-sunk hover:text-ink"
+        className="relative flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-tertiary hover:bg-highlight hover:text-ink"
       >
         <Bell className="size-[18px]" strokeWidth={1.75} />
         {unread ? <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-bloom ring-2 ring-canvas" /> : null}
@@ -152,7 +158,7 @@ function NotificationBell({ align = "right" }: { align?: "left" | "right" }) {
                 <li key={n.id}>
                   <button
                     type="button"
-                    className="block w-full px-3 py-2.5 text-left hover:bg-surface-sunk"
+                    className="block w-full px-3 py-2.5 text-left hover:bg-highlight"
                     onClick={async () => {
                       setOpen(false)
                       if (!n.read_at) {

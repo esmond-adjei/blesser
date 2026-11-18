@@ -51,7 +51,7 @@ export function Settings() {
                   className={() =>
                     cn(
                       "flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-callout transition-colors duration-160 [&_svg]:size-4",
-                      s.id === active.id ? "bg-surface-sunk font-semibold text-ink" : "font-medium text-ink-secondary hover:bg-surface-sunk hover:text-ink",
+                      s.id === active.id ? "bg-forest-soft font-semibold text-link" : "font-medium text-ink-secondary hover:bg-highlight hover:text-ink",
                     )
                   }
                   aria-current={s.id === active.id ? "page" : undefined}
@@ -70,8 +70,8 @@ export function Settings() {
             ))}
           </Select>
         </div>
-        <div className="max-w-3xl min-w-0">
-          <SettingsSection key={active.id} id={active.id} title={active.label} description={active.description}>
+        <div key={active.id} className="bl-enter max-w-3xl min-w-0">
+          <SettingsSection id={active.id} title={active.label} description={active.description}>
             {active.id === "profile" ? <ProfileSection /> : null}
             {active.id === "account" ? <AccountSection /> : null}
             {active.id === "notifications" ? <NotificationsPanel /> : null}
@@ -418,7 +418,7 @@ function AppearanceSection() {
               key={value}
               className={cn(
                 "flex cursor-pointer flex-col gap-3 rounded-md border p-3 transition-colors duration-160 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus",
-                on ? "border-link bg-forest-soft/40" : "border-separator hover:bg-surface-sunk",
+                on ? "border-link bg-forest-soft/40" : "border-separator hover:bg-highlight",
               )}
             >
               <input type="radio" name="theme" value={value} checked={on} onChange={() => setTheme(value)} className="sr-only" />

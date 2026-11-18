@@ -213,7 +213,7 @@ function ProjectForm({ initial }: { initial: Project }) {
                 {docs.map((d) => {
                   const on = p.document_ids.includes(d.id)
                   return (
-                    <label key={d.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-surface-sunk/60 sm:px-5">
+                    <label key={d.id} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-highlight/60 sm:px-5">
                       <Checkbox
                         checked={on}
                         onCheckedChange={() => set({ document_ids: on ? p.document_ids.filter((x) => x !== d.id) : [...p.document_ids, d.id] })}
@@ -222,10 +222,9 @@ function ProjectForm({ initial }: { initial: Project }) {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-callout text-ink">{d.title}</span>
                         <span className="flex items-center gap-1.5 text-footnote text-ink-tertiary">
-                          {kindLabel(d.kind)}
+                          <span className="mr-1.5">{kindLabel(d.kind)}</span>
                           {d.is_default ? <><Star className="size-3 fill-current text-sun-ink" aria-hidden="true" /> Default</> : null}
-                          <span aria-hidden="true">·</span>
-                          {formatBytes(d.size_bytes)}
+                          <span className="ml-1.5">{formatBytes(d.size_bytes)}</span>
                         </span>
                       </span>
                     </label>
