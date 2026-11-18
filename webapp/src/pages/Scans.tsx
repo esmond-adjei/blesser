@@ -312,6 +312,23 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
     el.addEventListener("pointerup", onUp)
   }
 
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const remove = useMutation({
+    mutationFn: () => api.deleteScan(scan.id),
+    onSuccess: () => {
+      setConfirmDelete(false)
+      void client.invalidateQueries({ queryKey: ["scans"] })
+      toastSuccess("Scan deleted. What it found stays in the catalog.")
+    },
+    onError: (e) => toastError(e),
+  })
+  const actions: MenuAction[] = [
+    { label: "Open scan", icon: <PanelRightOpen />, onSelect: open },
+    running
+      ? { label: "Stop", icon: <Square />, onSelect: () => cancel.mutate() }
+      : { label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) },
+  ]
+
   const nudge = (e: React.KeyboardEvent) => {
     const step = e.shiftKey ? 64 : 16
     const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]
@@ -321,6 +338,8 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
   }
 
   return (
+    <>
+    <ActionContextMenu actions={actions}>
     <article
       ref={ref}
       data-scan-card={scan.id}
@@ -353,13 +372,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
         >
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
-        <ActionMenuButton
-          label={`More for ${scanTitle(scan)}`}
-          actions={[
-            { label: "Open scan", icon: <PanelRightOpen />, onSelect: open },
-            ...(running ? [{ label: "Stop", icon: <Square />, onSelect: () => cancel.mutate() }] : []),
-          ]}
-        />
+        <ActionMenuButton label={`More for ${scanTitle(scan)}`} actions={actions} />
       </header>
       <p className={cn("line-clamp-2 text-footnote", focus ? "text-ink" : "text-ink-tertiary")}>{focus || "Any open opportunity"}</p>
       <div className="mt-auto space-y-2">
@@ -378,6 +391,20 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
         </div>
       </div>
     </article>
+    </ActionContextMenu>
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialogContent className="max-w-sm">
+        <DialogHeader>
+          <AlertDialogTitle className="type-title-3">Delete this scan?</AlertDialogTitle>
+          <AlertDialogDescription className="text-callout text-ink-secondary">Its activity log goes. The opportunities it saved stay in the catalog.</AlertDialogDescription>
+        </DialogHeader>
+        <DialogFooter className="pt-5">
+          <Button variant="quiet" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+          <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate()}>Delete scan</Button>
+        </DialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
 
