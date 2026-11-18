@@ -1205,3 +1205,9 @@ def test_old_settings_client_preserves_crawler_settings():
     response = staff.put("/api/admin/settings", json=values)
     assert response.status_code == 200
     assert response.json()["crawler"]["max_candidates_per_task"] == 3
+
+
+def test_scan_targets_exactly_one_audience():
+    c = client(user(), "app")
+    assert c.post("/api/app/scans", json={}).status_code == 422
+    assert c.post("/api/app/scans", json={"categories": ["startup", "student"]}).status_code == 422

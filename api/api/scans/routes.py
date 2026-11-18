@@ -18,9 +18,8 @@ router = APIRouter(tags=["scans"])
 
 
 class ScanCreate(BaseModel):
-    categories: list[OpportunityCategory] = Field(
-        default_factory=lambda: list(OpportunityCategory)
-    )
+    # One audience per scan keeps each agent's search precise.
+    categories: list[OpportunityCategory] = Field(min_length=1, max_length=1)
     region: str = Field(default="", max_length=120)
     focus: str = Field(
         default="",
