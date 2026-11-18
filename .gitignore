@@ -21,3 +21,7 @@ site/dist/
 site/.astro/
 extension/dist/
 extension/dist-e2e/
+
+# Design-system artifact download: only tokens and guidelines are tracked.
+design-system/reference/project/components/
+design-system/reference/project/design-system.json
