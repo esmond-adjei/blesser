@@ -52,7 +52,7 @@ export function Segmented<T extends string>({
         const option = options.find((item) => item.value === next)
         if (option) onChange(option.value)
       }}
-      className={cn("nice-scroll relative flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-md bg-surface-sunk p-0.5", className)}
+      className={cn("nice-scroll relative flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-sm bg-surface-sunk p-0.5", className)}
     >
       <span aria-hidden="true" data-ready={ready} className="bl-indicator rounded-[6px] bg-surface-raised shadow-elevation-1" />
       {options.map((o) => (

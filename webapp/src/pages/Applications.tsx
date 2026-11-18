@@ -1,7 +1,7 @@
 import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { ArrowUpRight, Columns3, List, MoveRight, PanelRightOpen, Plus, Trash2 } from "lucide-react"
+import { ArrowUpRight, CalendarDays, Columns3, List, MoveRight, PanelRightOpen, Plus, Trash2 } from "lucide-react"
 import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useApplications } from "../lib/applications"
 import { toastError, toastSuccess } from "../lib/toast"
 import type { Application, ApplicationStatus as Status, RequirementItem } from "../lib/types"
@@ -30,6 +30,7 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { PageHeader, Segmented } from "../components/layout/PageHeader"
+import { DeadlineCalendar } from "../components/applications/DeadlineCalendar"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 
 const stage = (status: Status): ApplicationStage => (status === "rejected" ? "not-this-time" : status)
@@ -63,13 +64,14 @@ const FILTERS = [
   ...STATUSES,
 ]
 
-type View = "list" | "board"
+type View = "list" | "board" | "calendar"
 const VIEW_KEY = "blesser.applications.view"
 
 function useView(): [View, (view: View) => void] {
   const [view, setView] = React.useState<View>(() => {
     try {
-      return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list"
+      const saved = localStorage.getItem(VIEW_KEY)
+      return saved === "board" || saved === "calendar" ? saved : "list"
     } catch {
       return "list"
     }
@@ -120,7 +122,7 @@ export function Applications() {
   const { move, actionsFor } = useAppActions(setEditing)
 
   const apps = (data ?? []).filter((a) => {
-    if (view === "board" || filter === "all") return true
+    if (view !== "list" || filter === "all") return true
     if (filter === "active") return a.status !== "accepted" && a.status !== "rejected"
     return a.status === filter
   })
@@ -162,6 +164,7 @@ export function Applications() {
           options={[
             { value: "list", label: "List", icon: <List aria-hidden="true" /> },
             { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
+            { value: "calendar", label: "Calendar", icon: <CalendarDays aria-hidden="true" /> },
           ]}
         />
       </div>
@@ -180,6 +183,8 @@ export function Applications() {
             </Link>
           }
         />
+      ) : view === "calendar" ? (
+        <DeadlineCalendar key="calendar" apps={apps} onOpen={setEditing} />
       ) : view === "board" ? (
         <Board key="board" apps={apps} onOpen={setEditing} onMove={move} actionsFor={actionsFor} />
       ) : (
