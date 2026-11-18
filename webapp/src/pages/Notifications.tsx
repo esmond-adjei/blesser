@@ -8,7 +8,7 @@ import type { AppNotification } from "../lib/api"
 import { formatAgo } from "../lib/format"
 import { toastError } from "../lib/toast"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
-import { PageHeader, Segmented } from "../components/layout/PageHeader"
+import { Segmented } from "../components/layout/PageHeader"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 
 const KIND: Record<string, { icon: typeof Bell; tile: string }> = {

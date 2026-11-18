@@ -6,6 +6,8 @@ const apiTarget = process.env.API_PROXY_TARGET ?? "http://localhost:8000"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Flags stay separate files so the country picker loads only the ones on screen.
+  build: { assetsInlineLimit: (file: string) => (file.includes("country-flag-icons") ? false : undefined) },
   server: {
     port: 5173,
     proxy: {

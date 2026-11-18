@@ -15,7 +15,6 @@ import {
   Globe,
   LayoutGrid,
   Loader2,
-  MapPin,
   PanelRightOpen,
   Radar,
   MessageSquareText,
@@ -23,6 +22,7 @@ import {
   Search,
   Square,
   Trash2,
+  X,
 } from "lucide-react"
 import * as api from "../lib/api"
 import { formatAgo } from "../lib/format"
@@ -50,6 +50,7 @@ import {
 import { ErrorState } from "../components/feedback/EmptyState"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
 import { useShellHeader } from "../components/layout/shellHeader"
+import { CountrySelect } from "../components/ui/country-select"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 
 type Status = ScanTask["status"] | Scan["status"]
@@ -141,6 +142,7 @@ export function Scans() {
   const [offset, setOffset] = React.useState<Pos>({ x: 0, y: 0 })
   const [front, setFront] = React.useState<string | null>(null)
   const [fresh, setFresh] = React.useState<string | null>(null)
+  const [expanded, setExpanded] = React.useState<{ id: string; from: DOMRect } | null>(null)
   useTick(!!scans.data?.some((s) => s.status === "running"))
 
   // Oldest first, so a new scan takes the next free spot without moving older cards.
@@ -188,6 +190,7 @@ export function Scans() {
 
   const pan = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget || e.button !== 0) return
+    if (expanded) return setExpanded(null)
     const start = { x: e.clientX - offset.x, y: e.clientY - offset.y }
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
@@ -226,6 +229,8 @@ export function Scans() {
               raised={front === scan.id}
               fresh={fresh === scan.id}
               onRaise={() => setFront(scan.id)}
+              hidden={expanded?.id === scan.id}
+              onExpand={(from) => setExpanded({ id: scan.id, from })}
             />
           ) : null)}
         </div>
@@ -241,22 +246,25 @@ export function Scans() {
           </div>
         ) : null}
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {expanded ? <ScanMorph key={expanded.id} id={expanded.id} from={expanded.from} onClosed={() => setExpanded(null)} /> : null}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
         <ScanComposer onStarted={onStarted} className="pointer-events-auto mx-auto max-w-[760px] shadow-elevation-3" />
       </div>
     </div>
   )
 }
 
-function AgentCard({ scan, pos, onMove, raised, fresh, onRaise }: {
+function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand }: {
   scan: Scan
   pos: Pos
   onMove: (id: string, pos: Pos, commit: boolean) => void
   raised: boolean
   fresh: boolean
   onRaise: () => void
+  hidden: boolean
+  onExpand: (from: DOMRect) => void
 }) {
-  const navigate = useNavigate()
+  const ref = React.useRef<HTMLElement>(null)
   const client = useQueryClient()
   const running = scan.status === "running"
   const live = useQuery({
@@ -277,7 +285,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise }: {
   const done = tasks.filter((t) => t.status !== "running" && t.status !== "pending").length
   const now = tasks.map(lastAction).find(Boolean)
   const focus = scanFocus(scan)
-  const open = () => navigate(`/scans/${scan.id}`)
+  const open = () => { if (ref.current) onExpand(ref.current.getBoundingClientRect()) }
 
   const drag = (e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest("button, a, [role=menuitem]")) return
@@ -317,7 +325,10 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise }: {
 
   return (
     <article
+      ref={ref}
+      data-scan-card={scan.id}
       aria-label={scanTitle(scan)}
+      aria-hidden={hidden || undefined}
       onPointerDown={drag}
       style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, width: CARD_W, minHeight: CARD_H }}
       className={cn(
@@ -326,6 +337,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise }: {
         raised ? "z-20" : "z-10",
         dragging && "cursor-grabbing shadow-elevation-3",
         fresh ? "bl-pop border-focus" : "border-separator",
+        hidden && "invisible",
       )}
     >
       <header className="flex items-center gap-2">
@@ -428,11 +440,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
             </button>
           ))}
         </div>
-        <label className="flex h-8 min-w-0 items-center gap-1.5 rounded-full border border-separator px-3 text-footnote text-ink-secondary focus-within:border-focus">
-          <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="sr-only">Where</span>
-          <input value={region} onChange={(e) => setRegion(e.target.value)} maxLength={120} placeholder="Anywhere" className="w-24 min-w-0 bg-transparent text-ink outline-none placeholder:text-ink-tertiary" />
-        </label>
+        <CountrySelect value={region} onChange={setRegion} side="top" />
         {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
         <Button
           type="submit"
@@ -502,46 +510,52 @@ function ScanPanel({ scan, actions }: { scan: Scan; actions?: React.ReactNode })
 export function ScanDetail() {
   const { scanId = "" } = useParams<{ scanId: string }>()
   const navigate = useNavigate()
-  const client = useQueryClient()
-  const [confirmDelete, setConfirmDelete] = React.useState(false)
   const scan = useScan(scanId)
-  const refresh = (next: Scan) => {
-    client.setQueryData(["scan", scanId], next)
-    void client.invalidateQueries({ queryKey: ["scans"] })
-  }
-  const cancel = useMutation({ mutationFn: () => api.cancelScan(scanId), onSuccess: refresh, onError: (e) => toastError(e) })
-  const remove = useMutation({
-    mutationFn: () => api.deleteScan(scanId),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ["scans"] })
-      toastSuccess("Scan deleted. What it found stays in the catalog.")
-      navigate("/scans")
-    },
-    onError: (e) => toastError(e),
-  })
-  const running = scan.data?.status === "running"
-  useTick(running)
-
   if (scan.isLoading) return <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
   if (scan.isError || !scan.data)
     return <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
-  const data = scan.data
   return (
     <div className="bl-enter min-w-0 space-y-5">
       <PageHeader
         back={<Link to="/scans" className="hover:text-ink hover:underline">Scans</Link>}
-        title={scanTitle(data)}
-        description={`Started ${formatAgo(data.created_at)}`}
+        title={scanTitle(scan.data)}
+        description={`Started ${formatAgo(scan.data.created_at)}`}
       />
+      <ScanBody scan={scan.data} onDeleted={() => navigate("/scans")} />
+    </div>
+  )
+}
+
+function ScanBody({ scan, onDeleted }: { scan: Scan; onDeleted: () => void }) {
+  const client = useQueryClient()
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const refresh = (next: Scan) => {
+    client.setQueryData(["scan", scan.id], next)
+    void client.invalidateQueries({ queryKey: ["scans"] })
+  }
+  const cancel = useMutation({ mutationFn: () => api.cancelScan(scan.id), onSuccess: refresh, onError: (e) => toastError(e) })
+  const remove = useMutation({
+    mutationFn: () => api.deleteScan(scan.id),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["scans"] })
+      toastSuccess("Scan deleted. What it found stays in the catalog.")
+      onDeleted()
+    },
+    onError: (e) => toastError(e),
+  })
+  const running = scan.status === "running"
+  useTick(running)
+  return (
+    <div className="space-y-5">
       <ScanPanel
-        scan={data}
+        scan={scan}
         actions={running ? (
           <Button size="sm" variant="quiet" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Square />}>Stop</Button>
         ) : (
           <ActionMenuButton label="Scan actions" actions={[{ label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
         )}
       />
-      <ActivityLog tasks={data.tasks ?? []} />
+      <ActivityLog tasks={scan.tasks ?? []} />
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent className="max-w-sm">
           <DialogHeader>
@@ -554,6 +568,84 @@ export function ScanDetail() {
           </DialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+const MORPH_MS = 320
+const MORPH_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)"
+
+/** The card grows into a panel over the canvas; no scrim, and the composer stays on top. */
+function ScanMorph({ id, from, onClosed }: { id: string; from: DOMRect; onClosed: () => void }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const scan = useScan(id)
+  const closing = React.useRef(false)
+  const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  const frames = React.useCallback((el: HTMLElement, rect: DOMRect) => {
+    const parent = el.offsetParent?.getBoundingClientRect() ?? new DOMRect()
+    const box = { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight }
+    const card = { left: rect.left - parent.left, top: rect.top - parent.top, width: rect.width, height: rect.height }
+    const px = (r: typeof box) => ({ left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` })
+    return [px(card), px(box)]
+  }, [])
+
+  React.useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || reduced) return
+    el.animate(frames(el, from), { duration: MORPH_MS, easing: MORPH_EASE })
+    el.querySelector("[data-morph-body]")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 120, fill: "backwards" })
+  }, [from, frames, reduced])
+
+  const close = React.useCallback(() => {
+    const el = ref.current
+    const card = document.querySelector(`[data-scan-card="${id}"]`)
+    if (!el || !card || reduced || closing.current) return onClosed()
+    closing.current = true
+    el.querySelector("[data-morph-body]")?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, fill: "forwards" })
+    el.animate(frames(el, card.getBoundingClientRect()).reverse(), { duration: MORPH_MS - 60, easing: MORPH_EASE, fill: "forwards" }).finished.then(onClosed, onClosed)
+  }, [id, frames, onClosed, reduced])
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("[role=alertdialog],[role=menu]")) close() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [close])
+
+  React.useEffect(() => { ref.current?.focus() }, [])
+
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-modal="false"
+      aria-label={scan.data ? scanTitle(scan.data) : "Scan"}
+      tabIndex={-1}
+      className="absolute inset-x-3 top-3 bottom-3 z-30 mx-auto flex max-w-[880px] flex-col overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-3 outline-none sm:inset-x-6 sm:top-5 sm:bottom-5"
+    >
+      <div data-morph-body className="flex min-h-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-start gap-3 border-b border-separator px-5 py-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-soft text-link">
+            <Radar className="size-4" strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate type-title-3 text-ink">{scan.data ? scanTitle(scan.data) : "Scan"}</h2>
+            {scan.data ? <p className="text-footnote text-ink-secondary">Started {formatAgo(scan.data.created_at)}</p> : null}
+          </div>
+          <button type="button" aria-label="Close" onClick={close} className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">
+            <X className="size-4" />
+          </button>
+        </header>
+        <div className="nice-scroll min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-44">
+          {scan.isLoading ? (
+            <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
+          ) : scan.isError || !scan.data ? (
+            <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
+          ) : (
+            <ScanBody scan={scan.data} onDeleted={onClosed} />
+          )}
+        </div>
+      </div>
     </div>
   )
 }
