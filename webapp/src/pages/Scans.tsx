@@ -742,25 +742,34 @@ function Finds({ finds, running }: { finds: ScanFind[]; running: boolean }) {
 }
 
 function FindRow({ find, tracking, index }: { find: ScanFind; tracking: boolean; index: number }) {
-  const navigate = useNavigate()
   const track = useTrackOpportunity()
   const fromWeb = find.source === "web"
   const SourceIcon = fromWeb ? Globe : Database
   const actions: MenuAction[] = []
-  if (!find.in_review) {
-    actions.push({ label: "Open details", icon: <PanelRightOpen />, onSelect: () => navigate(`/opportunities/${find.slug || find.opportunity_id}`) })
-  }
   if (find.official_url) actions.push({ label: "Official page", icon: <ArrowUpRight />, href: find.official_url })
 
   return (
     <ActionContextMenu actions={actions}>
       <li
         style={{ "--i": index } as React.CSSProperties}
-        className="bl-enter grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 border-t border-separator py-2.5 first:border-t-0"
+        className={cn(
+          "bl-enter relative grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 border-t border-separator py-2.5 first:border-t-0",
+          !find.in_review && "-mx-2 rounded-sm px-2 hover:bg-highlight",
+        )}
       >
         <OpportunityArt seed={find.slug || find.opportunity_id} category={find.category ?? undefined} kind={find.kind ?? undefined} shape="square" className="size-9 rounded-sm" />
         <div className="min-w-0">
-          <p className="truncate text-callout font-semibold text-ink" title={find.title}>{find.title}</p>
+          {find.in_review ? (
+            <p className="truncate text-callout font-semibold text-ink" title={find.title}>{find.title}</p>
+          ) : (
+            <Link
+              to={`/opportunities/${encodeURIComponent(find.slug || find.opportunity_id)}`}
+              title={find.title}
+              className="block truncate text-callout font-semibold text-ink after:absolute after:inset-0 after:rounded-sm after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-focus"
+            >
+              {find.title}
+            </Link>
+          )}
           <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-caption font-medium text-ink-tertiary">
             <span className="inline-flex min-w-0 items-center gap-1">
               <SourceIcon aria-hidden="true" className="size-3.5 shrink-0" />
@@ -769,8 +778,8 @@ function FindRow({ find, tracking, index }: { find: ScanFind; tracking: boolean;
             {find.deadline_date ? <Countdown variant="text" daysLeft={daysUntil(find.deadline_date)} date={find.deadline_date} /> : null}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
-          {find.is_new && !tracking ? <Chip tone="sun" className="max-sm:hidden">New</Chip> : null}
+        <div className="relative z-10 flex items-center gap-1.5">
+          {find.in_review ? <Chip tone="neutral">In review</Chip> : find.is_new && !tracking ? <Chip tone="sun" className="max-sm:hidden">New</Chip> : null}
           {tracking ? (
             <Link to="/applications" className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "text-link")}>
               <Check aria-hidden="true" /> Tracking
