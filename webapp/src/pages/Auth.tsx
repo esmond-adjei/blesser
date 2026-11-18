@@ -17,6 +17,22 @@ const photoMask = `url("data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><g transform="${LOGO.fill}"><path d="${LOGO.sun_cut}"/><path d="${LOGO.steps}"/></g></svg>`,
 )}")`
 
+// Desktop only: phones never request the photo.
+function AuthPhoto() {
+  return (
+    <picture>
+      <source media="(min-width: 1024px)" srcSet="/auth/coding-together.webp" type="image/webp" />
+      <img
+        src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+        alt=""
+        width={1200}
+        height={800}
+        className="absolute inset-0 h-full w-full object-cover object-right"
+      />
+    </picture>
+  )
+}
+
 function AuthShell({
   title,
   subtitle,
@@ -29,6 +45,8 @@ function AuthShell({
   return (
     <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-2 lg:gap-4 lg:p-4">
       <div aria-hidden="true" className="relative hidden overflow-hidden rounded-lg bg-surface-sunk lg:block">
+        <AuthPhoto />
+        <div className="absolute inset-0 bg-forest/75" />
         <div
           className="absolute inset-0"
           style={{
@@ -38,17 +56,7 @@ function AuthShell({
             maskRepeat: "no-repeat",
           }}
         >
-          <picture>
-            <source media="(min-width: 1024px)" srcSet="/auth/coding-together.webp" type="image/webp" />
-            <img
-              src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
-              alt=""
-              width={1200}
-              height={800}
-              className="absolute inset-0 h-full w-full object-cover object-right"
-            />
-          </picture>
-          <div className="absolute inset-0 bg-forest/25" />
+          <AuthPhoto />
         </div>
       </div>
       <div className="mx-auto flex min-h-dvh w-full max-w-[448px] flex-col justify-center gap-6 px-4 py-8 lg:min-h-[calc(100dvh-2rem)]">
@@ -59,7 +67,7 @@ function AuthShell({
           </Link>
           <h1 className="type-title-2 text-ink">{title}</h1>
         </div>
-        <div className="space-y-4 rounded-lg border border-separator bg-surface p-6 shadow-elevation-1">
+        <div className="space-y-4 rounded-lg border border-separator bg-surface p-6">
           {children}
         </div>
         <p className="text-center text-callout text-ink-secondary">{subtitle}</p>
