@@ -27,7 +27,7 @@ export function KitLayout() {
                     "relative flex h-10 items-center gap-2 rounded-t-sm px-2.5 text-callout whitespace-nowrap transition-colors duration-160 [&_svg]:size-4",
                     "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus",
                     isActive
-                      ? "font-semibold text-ink after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-forest"
+                      ? "font-semibold text-link after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-forest"
                       : "font-medium text-ink-secondary hover:text-ink",
                   )
                 }

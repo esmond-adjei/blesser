@@ -230,15 +230,13 @@ export function Panel() {
               </div>
               {projectChosen ? <p className="text-caption text-ink-tertiary">Personal questions still use your profile.</p> : null}
               {moved ? <Moved moved={moved} /> : null}
-              {review && tabId ? (
+              {review && tabId && (
                 <>
                   {review.rows.some((row) => row.status === "drafted") ? (
                     <p className="text-caption text-ink-tertiary">Drafted answers have a dashed outline on the page. Read them before you submit.</p>
                   ) : null}
                   <ReviewList key={review.at} review={review} tabId={tabId} stale={!!moved} />
                 </>
-              ) : (
-                <p className="text-footnote text-ink-secondary">Fields will appear here after you fill the page.</p>
               )}
               <Button variant="primary" icon={<WandSparkles aria-hidden="true" />} className="w-full" disabled={busy || !tabId} onClick={() => void fill()} title={!moved && filledCount ? "Based on the last fill" : undefined}>
                 {busy ? "Filling…" : fillLabel}
@@ -255,7 +253,7 @@ export function Panel() {
                 </div>
               ) : null}
             </section>
-            <p className="px-2 text-center text-footnote text-ink-tertiary">We never submit for you. Review every field before you send.</p>
+            <p className="px-2 text-center text-footnote text-ink-tertiary">Review every field before you send.</p>
           </>
         )}
         {notice ? (

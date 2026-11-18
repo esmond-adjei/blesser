@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { ArrowUp, MessageCircle, MessagesSquare, Pencil, Plus, Sparkles, Square, Trash2 } from "lucide-react"
+import { ArrowUp, MessageCircle, MessagesSquare, Pencil, Plus, Square, Trash2 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog"
@@ -364,11 +364,10 @@ function AssistantReply({ message, text, status, thinking, live, children }: {
         <span className="sr-only">Assistant said</span>
         {live && !content ? (
           <div className="flex flex-col gap-1" role="status">
-            <span className="inline-flex items-center gap-1.5 self-start text-callout font-medium">
-              <Sparkles className="size-4 text-sun-ink" aria-hidden="true" />
+            <span className="self-start text-callout font-medium">
               <span className="bl-shimmer">{status && !status.startsWith("Opening") ? status : "Thinking"}</span>
             </span>
-            {thinking ? <p className="line-clamp-3 pl-5.5 text-footnote text-ink-tertiary">{thinking}</p> : null}
+            {thinking ? <p className="line-clamp-3 text-footnote text-ink-tertiary">{thinking}</p> : null}
           </div>
         ) : null}
         {content ? (

@@ -20,7 +20,7 @@ export function PageHeader({
     <header className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-3", className)}>
       <div className="min-w-0 flex-1 basis-64">
         {back ? <div className="mb-1 text-footnote text-ink-secondary">{back}</div> : null}
-        <h1 className="font-display text-xl leading-7 font-semibold tracking-[-0.01em] text-ink">{title}</h1>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.01em] text-ink">{title}</h1>
         {description ? <p className="mt-0.5 max-w-2xl text-footnote text-ink-secondary">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

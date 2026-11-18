@@ -19,6 +19,8 @@ export interface OpportunityCardProps {
   children?: React.ReactNode
   /** Extra footer actions, placed before the track button. */
   actions?: React.ReactNode
+  /** A control pinned to the card's top-right corner, above the stretched link. */
+  cornerAction?: React.ReactNode
   /** Full-bleed artwork above the content, such as OpportunityArt. */
   media?: React.ReactNode
   className?: string
@@ -53,6 +55,7 @@ export function OpportunityCard({
   trackDisabled,
   children,
   actions,
+  cornerAction,
   media,
   className,
 }: OpportunityCardProps) {
@@ -63,9 +66,10 @@ export function OpportunityCard({
         className,
       )}
     >
+      {cornerAction ? <div className="absolute top-4 right-4 z-20">{cornerAction}</div> : null}
       {media ? <div className="-mx-5 -mt-5 mb-1">{media}</div> : null}
       {organization ? (
-        <div className="flex min-w-0 items-center gap-2 text-callout text-ink-secondary">
+        <div className={cn("flex min-w-0 items-center gap-2 text-callout text-ink-secondary", cornerAction && "pr-10")}>
           <span
             aria-hidden="true"
             className="grid size-7 shrink-0 place-items-center rounded-full bg-forest-soft font-display text-xs leading-none font-bold text-link"
@@ -75,7 +79,7 @@ export function OpportunityCard({
           <span className="truncate">{organization}</span>
         </div>
       ) : null}
-      <h3 className="m-0 text-title-3 text-balance text-ink">{title}</h3>
+      <h3 className={cn("m-0 text-title-3 text-balance text-ink", cornerAction && "pr-10")}>{title}</h3>
       {amount ? (
         <div className="line-clamp-2 text-[15px] leading-[22px] font-semibold text-ink">
           {amount}

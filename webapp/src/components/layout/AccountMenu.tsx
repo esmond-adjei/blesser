@@ -14,11 +14,9 @@ export function Avatar({ name, className }: { name: string; className?: string }
 
 export function AccountMenu({ variant = "sidebar" }: { variant?: "sidebar" | "compact" }) {
   const { user, signOut } = useAuth()
-  const { mode, setTheme } = useTheme()
   const navigate = useNavigate()
   const name = accountName(user)
   const compact = variant === "compact"
-  const { ref: themeRef, ready: themeReady } = useIndicator<HTMLDivElement>('[data-state="checked"]', mode)
 
   return (
     <DropdownMenu>
@@ -34,31 +32,39 @@ export function AccountMenu({ variant = "sidebar" }: { variant?: "sidebar" | "co
         <DropdownMenuItem onSelect={() => navigate("/settings")}><Settings strokeWidth={1.75} /> Settings</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate("/settings/notifications")}><Bell strokeWidth={1.75} /> Notifications</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <div className="px-2.5 pt-1 text-footnote font-semibold text-ink-secondary">Theme</div>
-        <DropdownMenuRadioGroup
-          ref={themeRef}
-          value={mode}
-          onValueChange={(value) => setTheme(parseTheme(value))}
-          aria-label="Theme"
-          className="relative mx-1 mt-1 mb-1 grid grid-cols-3 gap-0.5 rounded-full bg-surface-sunk p-1"
-        >
-          <span aria-hidden="true" data-ready={themeReady} className="bl-indicator rounded-full bg-surface-raised shadow-elevation-1" />
-          {THEME_MODES.map(({ value, label, Icon }) => (
-            <DropdownMenuRadioItem
-              key={value}
-              value={value}
-              aria-label={label}
-              onSelect={(event) => event.preventDefault()}
-              className="relative h-7 justify-center rounded-full p-0 text-ink-tertiary transition-colors duration-160 hover:text-ink focus:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus data-[state=checked]:text-ink"
-            >
-              <Icon className="size-4" strokeWidth={1.75} aria-hidden="true" />
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        <ThemeToggle />
         {SITE_URL && <DropdownMenuItem asChild><a href={`${SITE_URL}/about`} target="_blank" rel="noopener"><Info strokeWidth={1.75} /> About Blesser</a></DropdownMenuItem>}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => { void signOut().then(() => navigate("/login")) }}><LogOut strokeWidth={1.75} /> Sign out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Mounted with the menu content so the indicator can measure the checked item. */
+function ThemeToggle() {
+  const { mode, setTheme } = useTheme()
+  const { ref, ready } = useIndicator<HTMLDivElement>('[data-state="checked"]', mode)
+  return (
+    <DropdownMenuRadioGroup
+      ref={ref}
+      value={mode}
+      onValueChange={(value) => setTheme(parseTheme(value))}
+      aria-label="Theme"
+      className="relative mx-1 my-1 flex w-full max-w-2xl gap-0.5 rounded-2xl bg-surface-sunk p-1"
+    >
+      <span aria-hidden="true" data-ready={ready} className="bl-indicator rounded-lg bg-surface-raised shadow-elevation-1" />
+      {THEME_MODES.map(({ value, label, Icon }) => (
+        <DropdownMenuRadioItem
+          key={value}
+          value={value}
+          aria-label={label}
+          onSelect={(event) => event.preventDefault()}
+          className="relative h-7 w-9 justify-center rounded-full p-0 text-ink-tertiary transition-colors duration-160 hover:text-ink focus:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus data-[state=checked]:text-ink"
+        >
+          <Icon className="size-4" strokeWidth={1.75} aria-hidden="true" />
+        </DropdownMenuRadioItem>
+      ))}
+    </DropdownMenuRadioGroup>
   )
 }

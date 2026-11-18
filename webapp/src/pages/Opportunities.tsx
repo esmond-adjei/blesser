@@ -95,6 +95,7 @@ function useView(): [View, (view: View) => void] {
 }
 
 const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @xl:gap-6"
+const FLOATING_MENU_BUTTON = "size-8 rounded-full bg-surface-sunk text-ink-secondary hover:bg-separator hover:text-ink"
 
 export function Opportunities() {
   const [query, setQuery] = useUrlParam("q")
@@ -447,7 +448,7 @@ function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) 
           tracked={!!applicationId}
           trackDisabled={pending}
           onTrack={onTrack}
-          actions={<ActionMenuButton actions={actions} label={`More for ${opp.title}`} />}
+          cornerAction={<ActionMenuButton actions={actions} label={`More for ${opp.title}`} className={FLOATING_MENU_BUTTON} />}
         />
       </li>
     </ActionContextMenu>
@@ -512,7 +513,7 @@ function OpportunityDetail({
           <ActionMenuButton
             actions={secondaryActions(shown, { onTodo, onShare }, false)}
             label="More actions"
-            className="absolute top-4 right-14 z-20 size-8"
+            className={cn("absolute top-4 right-14 z-20", FLOATING_MENU_BUTTON)}
           />
           <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-24">
             <Art opp={shown} shape="square" className="size-14 shrink-0 rounded-md" />

@@ -18,7 +18,7 @@ function LegalShell({ title, children }: { title: string; children: React.ReactN
         <Logo title="" className="size-8" />
         <Wordmark />
       </a>
-      <h1 className="type-title-2">{title}</h1>
+      <h1 className="font-display text-3xl font-bold">{title}</h1>
       <p className="mt-1 type-caption text-ink-secondary">Version {TERMS_VERSION}</p>
       <div className="rich-text mt-6 space-y-6">
         {children}

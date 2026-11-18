@@ -55,7 +55,7 @@ function AuthShell({
             <Logo title="" className="size-9" />
             <Wordmark className="text-[30px]" />
           </Link>
-          <h1 className="type-title-2 text-ink">{title}</h1>
+          <h1 className="font-display text-3xl font-bold text-ink">{title}</h1>
         </div>
         <div className="space-y-4 rounded-lg border border-separator bg-surface p-6">
           {children}

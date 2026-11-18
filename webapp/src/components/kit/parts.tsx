@@ -338,7 +338,7 @@ export function KitGroup({ id, title, description, children }: { id: string; tit
 export function KitRail({ label, completeness, hint, sections }: { label: string; completeness: number; hint: string | null; sections: readonly { id: string; label: string }[] }) {
   return (
     <aside className="hidden lg:block">
-      <div className="sticky top-0 space-y-5">
+      <div className="sticky top-10 space-y-5">
         <div className="rounded-lg border border-separator bg-surface p-4">
           <CompletenessMeter value={completeness} hint={hint} />
         </div>

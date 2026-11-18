@@ -50,7 +50,7 @@ export function OpportunityPage() {
           </nav>
           <div className="space-y-1">
             {opp.organization ? <p className="text-callout text-ink-secondary wrap-break-word">{opp.organization}</p> : null}
-            <h1 className="font-display text-title-2 text-ink sm:text-title-1 wrap-break-word">{opp.title}</h1>
+            <h1 className="font-display text-3xl font-bold text-ink wrap-break-word">{opp.title}</h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <Chip>{CATEGORY_LABELS[opp.category]}</Chip>

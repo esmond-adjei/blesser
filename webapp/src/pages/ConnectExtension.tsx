@@ -48,7 +48,7 @@ export function ConnectExtension() {
   if (!params) {
     return (
       <Frame>
-        <h1 className="type-title-2 text-ink">This connect link isn't complete</h1>
+        <h1 className="font-display text-3xl font-bold text-ink">This connect link isn't complete</h1>
         <p className="text-callout text-ink-secondary">Open the Blesser extension from your browser's toolbar and press Connect to start again.</p>
         <Link to="/opportunities" className={buttonVariants({ size: "sm", variant: "secondary" })}>Back to Blesser</Link>
       </Frame>
@@ -79,7 +79,7 @@ export function ConnectExtension() {
       <Frame>
         <CheckCircle2 className="size-8 text-positive" aria-hidden="true" />
         <div className="space-y-1.5">
-          <h1 className="type-title-2 text-ink">Extension connected</h1>
+          <h1 className="font-display text-3xl font-bold text-ink">Extension connected</h1>
           <p className="text-callout text-ink-secondary">
             Open an application form and press <span className="font-semibold text-ink">Fill this page</span> in the extension. You can close this tab.
           </p>
@@ -94,7 +94,7 @@ export function ConnectExtension() {
   return (
     <Frame>
       <div className="space-y-1.5">
-        <h1 className="type-title-2 text-ink">Connect the Blesser extension?</h1>
+        <h1 className="font-display text-3xl font-bold text-ink">Connect the Blesser extension?</h1>
         <p className="text-callout text-ink-secondary">
           Signed in as <span className="font-medium text-ink">{accountName(user)}</span>. The extension fills application forms in this browser from your Apply kit.
         </p>
