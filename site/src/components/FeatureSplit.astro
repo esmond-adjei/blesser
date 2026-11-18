@@ -18,7 +18,7 @@ const tint = { sun: "bg-sun-soft", forest: "bg-forest-soft", sunk: "bg-surface-s
 
 <section aria-labelledby={id} class="site-container py-10 md:py-14">
   <div class="grid items-center gap-10 md:grid-cols-2 lg:gap-16">
-    <div class={cn("relative w-full max-w-[640px] rounded-xl p-6 sm:p-10", tint, reverse ? "md:order-2 md:justify-self-start" : "md:justify-self-end")}>
+    <div class={cn("relative w-full max-w-[640px] rounded-xl", tint, reverse ? "md:order-2 md:justify-self-start" : "md:justify-self-end")}>
       <Illustration full={full} small={small} sizes="(min-width: 768px) 560px, 100vw" class="rounded-lg" />
       <div aria-hidden="true">
         <slot name="chips" />
