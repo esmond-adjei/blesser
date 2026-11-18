@@ -16,11 +16,11 @@ export function cn(...inputs: ClassValue[]) {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-/** "21 Nov 2026" from a yyyy-mm-dd day. */
-export function formatDay(day: string): string {
+/** "21 Nov" from a yyyy-mm-dd day, adding the year only when it isn't this year. */
+export function formatDay(day: string, now: Date = new Date()): string {
   const [y, m, d] = day.split("-").map(Number)
   if (!y || !m || !d) return day
-  return `${d} ${MONTHS[m - 1]} ${y}`
+  return y === now.getFullYear() ? `${d} ${MONTHS[m - 1]}` : `${d} ${MONTHS[m - 1]} ${y}`
 }
 
 /** Whole days from today to a yyyy-mm-dd day, counted in Africa/Accra (UTC, no DST). */

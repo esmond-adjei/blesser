@@ -11,6 +11,7 @@ from api.applicant_kit.schemas import http_url
 from api.applications import service as applications
 from api.assistant.sources import SourceRegistry
 from api.core.exceptions import NotFoundError
+from api.core.time import human_day
 from api.opportunities import service as opportunities
 from api.opportunities.models import OpportunityCategory, OpportunityKind
 from api.todos import service as todos
@@ -309,7 +310,7 @@ async def proposal(session, user_id, name, args):
         opp = await opportunities.get_or_404(session, args.opportunity_id)
         return f"Track {opp.title} in your applications?", {"opportunity_id": opp.id}
     if name == "add_todo":
-        due = f" (due {args.due_date:%d %b %Y})" if args.due_date else ""
+        due = f" (due {human_day(args.due_date)})" if args.due_date else ""
         return f"Add “{args.title}” to your to-dos{due}?", args.model_dump(mode="json")
     raise NotFoundError("Unknown action")
 

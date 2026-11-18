@@ -1,6 +1,6 @@
 """Clock helpers (naive UTC, matching the DB convention)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 
 def utcnow_naive() -> datetime:
@@ -17,3 +17,9 @@ def duration_seconds(start: datetime | None, end: datetime | None) -> float | No
     raw = end if end is not None else start
     e = raw.replace(tzinfo=None) if raw.tzinfo else raw
     return max(0.0, (e - s).total_seconds())
+
+
+def human_day(day: date, today: date | None = None) -> str:
+    """"5 Dec", with the year only when it isn't this year: "5 Dec 2027"."""
+    today = today or utcnow_naive().date()
+    return f"{day.day} {day:%b}" if day.year == today.year else f"{day.day} {day:%b %Y}"

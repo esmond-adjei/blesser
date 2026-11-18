@@ -14,7 +14,7 @@ from api.applications import models as application_models
 from api.auth import models as auth_models
 from api.core import mailer
 from api.core.mail_layout import Footer, Item, compose
-from api.core.time import utcnow_naive
+from api.core.time import human_day, utcnow_naive
 from api.notifications import models as notification_models
 from api.notifications.delivery import app_url, settings_link, unsubscribe_link
 from api.notifications.service import DIGEST, local_now, notify
@@ -78,7 +78,7 @@ async def check_deadlines(session, now: datetime | None = None) -> int:
             user_id=application.user_id,
             kind="deadline",
             title=f"Application deadline {_when(days_left)}",
-            body=f"{name} is due {_when(days_left)} ({application.deadline_date:%d %b %Y}).",
+            body=f"{name} is due {_when(days_left)} ({human_day(application.deadline_date, local.date())}).",
             link=f"/applications/{application.id}",
             entity_id=application.id,
             # The date too: moving a deadline re-arms its reminders.

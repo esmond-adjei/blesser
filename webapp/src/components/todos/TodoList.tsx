@@ -2,7 +2,7 @@ import * as React from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Check, Flag, Pencil, PanelRightOpen, Plus, CalendarClock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { Button, Field, Input, OpportunityArt, Select, Textarea, cn } from "@blesser/ui"
+import { Button, Field, Input, OpportunityArt, Select, Textarea, cn, formatDay } from "@blesser/ui"
 import { useTodoMutations } from "../../lib/opportunities"
 import { toastError } from "../../lib/toast"
 import type { Todo, TodoCreate, TodoPriority } from "../../lib/types"
@@ -46,7 +46,7 @@ function due(dueDate: string, today: string): { text: string; tone: string } {
   if (d === 0) return { text: "Today", tone: "text-sun-ink" }
   if (d === 1) return { text: "Tomorrow", tone: "" }
   if (d <= 7) return { text: `In ${d} days`, tone: "" }
-  return { text: new Date(dueDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }), tone: "" }
+  return { text: formatDay(dueDate), tone: "" }
 }
 
 const PRIORITIES: { value: TodoPriority; label: string }[] = [
