@@ -134,7 +134,15 @@ def _scan_out(scan: m.Scan, added: int, tasks: list[m.ScanTask] | None = None) -
     }
     if tasks is not None:
         out["tasks"] = [task_out(t) for t in sorted(tasks, key=lambda t: t.created_at)]
+        out.update(_timing(scan, tasks))
     return out
+
+
+def _timing(scan: m.Scan, tasks: list[m.ScanTask]) -> dict:
+    starts = [t.started_at for t in tasks if t.started_at]
+    ends = [t.finished_at for t in tasks if t.finished_at]
+    finished = max(ends) if ends and m.status_str(scan.status) != "running" else None
+    return {"started_at": min(starts) if starts else None, "finished_at": finished}
 
 
 def aggregate_metrics(tasks) -> dict:
@@ -186,7 +194,9 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
     result = []
     for scan in scans:
         out = _scan_out(scan, added.get(scan.id, 0))
-        out["metrics"] = aggregate_metrics([t for t in tasks if t.scan_id == scan.id])
+        mine = [t for t in tasks if t.scan_id == scan.id]
+        out["metrics"] = aggregate_metrics(mine)
+        out.update(_timing(scan, mine))
         result.append(out)
     return result
 
@@ -235,6 +245,9 @@ async def _scan_finds(session, scan: m.Scan) -> list[dict]:
             {
                 "opportunity_id": opportunity.id,
                 "title": opportunity.title,
+                "slug": opportunity.slug,
+                "category": opportunity.category,
+                "kind": opportunity.kind,
                 "deadline_date": opportunity.deadline_date,
                 "source": "web" if from_web else "catalog",
                 "source_domain": domain if from_web else None,
@@ -302,3 +315,28 @@ async def prune_traces(session) -> int:
     )
     await session.commit()
     return result.rowcount or 0
+
+
+async def scan_allowance(session, user_id: str) -> dict:
+    from datetime import timedelta
+
+    from api.core.config import settings
+    from api.editorial.service import get_settings
+
+    limits = (await get_settings(session))["member_scan_limits"]
+    now = utcnow_naive()
+    left = {}
+    for key, seconds in (("per_hour", 3600), ("per_day", 86400)):
+        used = await session.scalar(
+            select(func.count())
+            .select_from(m.Scan)
+            .where(m.Scan.user_id == user_id, m.Scan.created_at > now - timedelta(seconds=seconds))
+        )
+        left[key] = max(0, limits[key] - (used or 0))
+    return {
+        "enabled": settings.rate_limits_enabled,
+        "per_hour": limits["per_hour"],
+        "left_this_hour": left["per_hour"],
+        "per_day": limits["per_day"],
+        "left_today": left["per_day"],
+    }

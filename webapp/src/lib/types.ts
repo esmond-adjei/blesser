@@ -96,6 +96,9 @@ export interface ScanTask {
 export type ScanFind = {
   opportunity_id: string
   title: string
+  slug?: string | null
+  category?: OpportunityCategory | null
+  kind?: OpportunityKind | null
   deadline_date: string | null
   official_url: string | null
   is_new: boolean
@@ -110,10 +113,18 @@ export interface Scan {
   status: "running" | "done" | "cancelled"
   created_at: string
   opportunities_added: number
-  /** Not sent by every API version; the UI falls back to task timestamps. */
+  started_at?: string | null
   finished_at?: string | null
   tasks?: ScanTask[] | null
   finds?: ScanFind[] | null
+}
+
+export interface ScanAllowance {
+  enabled: boolean
+  per_hour: number
+  left_this_hour: number
+  per_day: number
+  left_today: number
 }
 
 export interface ScanRequest {

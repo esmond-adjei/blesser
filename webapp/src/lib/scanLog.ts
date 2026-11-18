@@ -87,7 +87,7 @@ export function scanElapsedMs(scan: Scan, now = Date.now()): number | null {
   const tasks = scan.tasks ?? []
   const starts = tasks.map((t) => utcMs(t.started_at)).filter((n) => !Number.isNaN(n))
   const ends = tasks.map((t) => utcMs(t.finished_at)).filter((n) => !Number.isNaN(n))
-  const start = starts.length ? Math.min(...starts) : utcMs(scan.created_at)
+  const start = starts.length ? Math.min(...starts) : utcMs(scan.started_at ?? scan.created_at)
   if (Number.isNaN(start)) return null
   if (scan.status === "running") return Math.max(0, now - start)
   const finished = scan.finished_at ? utcMs(scan.finished_at) : ends.length ? Math.max(...ends) : NaN

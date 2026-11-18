@@ -11,6 +11,7 @@ import type {
   OpportunitySubmit,
   Paged,
   Scan,
+  ScanAllowance,
   ScanRequest,
   ShareKit,
   Todo,
@@ -225,6 +226,7 @@ export const rotateCalendarFeed = () => post<CalendarFeed>("/api/app/calendar/fe
 
 export const listScans = () => get<Scan[]>("/api/app/scans")
 export const getScan = (id: string) => get<Scan>(`/api/app/scans/${id}`)
+export const scanAllowance = () => get<ScanAllowance>("/api/app/scans/allowance")
 export const startScan = (body: ScanRequest) => post<Scan>("/api/app/scans", body)
 export const cancelScan = (id: string) => post<Scan>(`/api/app/scans/${id}/cancel`)
 export const deleteScan = (id: string) => del<{ status: string }>(`/api/app/scans/${id}`)

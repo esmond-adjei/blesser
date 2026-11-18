@@ -49,6 +49,9 @@ class TaskOut(BaseModel):
 class ScanFindOut(BaseModel):
     opportunity_id: str
     title: str
+    slug: str | None = None
+    category: str | None = None
+    kind: str | None = None
     deadline_date: date | None
     source: Literal["catalog", "web"]
     source_domain: str | None
@@ -66,6 +69,8 @@ class ScanOut(BaseModel):
     status: str
     created_at: datetime
     opportunities_added: int
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
     tasks: list[TaskOut] | None = None
     finds: list[ScanFindOut] | None = None
 
@@ -87,6 +92,23 @@ async def start_scan(
         focus=req.focus,
     )
     return await service.scan_detail(session, current.id, scan.id)
+
+
+class ScanAllowanceOut(BaseModel):
+    enabled: bool
+    per_hour: int
+    left_this_hour: int
+    per_day: int
+    left_today: int
+
+
+@router.get("/scans/allowance", response_model=ScanAllowanceOut)
+async def scan_allowance(
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """How many more scans the member can start, by the same windows the limit enforces."""
+    return await service.scan_allowance(session, current.id)
 
 
 @router.get("/scans", response_model=list[ScanOut])
