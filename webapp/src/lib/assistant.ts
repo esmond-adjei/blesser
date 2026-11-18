@@ -2,10 +2,52 @@ import { API_BASE, ApiError, getAccessToken, parseDetail, refreshAccessToken, re
 import type { Opportunity } from "./types"
 
 export interface ToolStep {
+  kind?: "tool"
   tool: string
   label: string
   ok: boolean
   note: string
+}
+
+export interface Commentary {
+  kind: "commentary"
+  text: string
+}
+
+export type TraceEntry = ToolStep | Commentary
+
+const TOOL_SUMMARY: Record<string, { done: string; tried: string }> = {
+  search_catalog: { done: "searched the catalog", tried: "tried to search the catalog" },
+  search_web: { done: "searched the web", tried: "tried to search the web" },
+  get_opportunity: { done: "checked an opportunity", tried: "tried to check an opportunity" },
+  list_applications: { done: "checked your applications", tried: "tried to check your applications" },
+  list_todos: { done: "checked your to-dos", tried: "tried to check your to-dos" },
+  read_apply_kit: { done: "read your apply kit", tried: "tried to read your apply kit" },
+  enable_changes: { done: "prepared a change", tried: "tried to prepare a change" },
+  track_opportunity: { done: "prepared to track an opportunity", tried: "tried to prepare tracking an opportunity" },
+  add_todo: { done: "prepared a to-do", tried: "tried to prepare a to-do" },
+}
+
+export function isToolStep(entry: TraceEntry): entry is ToolStep {
+  return entry.kind !== "commentary"
+}
+
+export function activitySummary(entries: TraceEntry[]): string {
+  const phrases: string[] = []
+  for (const entry of entries) {
+    if (!isToolStep(entry)) continue
+    const summary = TOOL_SUMMARY[entry.tool] ?? { done: "used a tool", tried: "tried a tool" }
+    const phrase = entry.ok ? summary.done : summary.tried
+    if (!phrases.includes(phrase)) phrases.push(phrase)
+  }
+  if (!phrases.length) return ""
+  const [first, ...rest] = phrases
+  const list = !rest.length
+    ? first
+    : rest.length === 1
+      ? `${first} and ${rest[0]}`
+      : `${phrases.slice(0, -1).join(", ")}, and ${phrases.at(-1)}`
+  return list[0].toUpperCase() + list.slice(1)
 }
 
 type RecordKind = "application" | "todo" | "project" | "document" | "answer" | "web" | "opportunity"
@@ -24,7 +66,7 @@ export interface AssistantMessage {
   id: string
   role: "user" | "assistant"
   content: string
-  trace: ToolStep[]
+  trace: TraceEntry[]
   sources: AssistantSource[]
   cited_deadlines: boolean
   created_at: string
@@ -33,7 +75,7 @@ export interface AssistantMessage {
 export interface PendingCall {
   id: string
   summary: string
-  trace: ToolStep[]
+  trace: TraceEntry[]
   note: string
 }
 
@@ -53,6 +95,7 @@ export interface AssistantThread extends AssistantChat {
 export type AssistantEvent =
   | { type: "status"; message: string }
   | { type: "reasoning"; text: string }
+  | { type: "commentary"; text: string }
   | { type: "token"; text: string }
   | { type: "tool_start"; tool: string; label: string; turn: number }
   | { type: "tool_result"; step: ToolStep; turn?: number }

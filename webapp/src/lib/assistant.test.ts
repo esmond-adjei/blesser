@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest"
-import { streamTurn, type AssistantEvent } from "./assistant"
+import { activitySummary, streamTurn, type AssistantEvent, type TraceEntry } from "./assistant"
 import { setAccessToken, setRefreshHandler } from "./api"
 
 afterEach(() => {
@@ -21,16 +21,32 @@ function response(chunks: string[]) {
 it("reads split SSE frames and ignores heartbeat comments", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response([
     ": keep-alive\n\nevent: status\nda",
-    'ta: {"message":"Checking"}\n\nevent: to',
+    'ta: {"message":"Checking"}\n\nevent: commentary\nda',
+    'ta: {"text":"I\'ll check the catalog."}\n\nevent: to',
     'ken\ndata: {"text":"Here is what I found."}\n\nevent: done\ndata: {}\n\n',
   ])))
   const events: AssistantEvent[] = []
   await streamTurn("chat-1", { type: "live" }, (event) => events.push(event), new AbortController().signal)
   expect(events).toEqual([
     { type: "status", message: "Checking" },
+    { type: "commentary", text: "I'll check the catalog." },
     { type: "token", text: "Here is what I found." },
     { type: "done" },
   ])
+})
+
+it("summarises grouped activity and ignores commentary", () => {
+  const entries: TraceEntry[] = [
+    { kind: "commentary", text: "I'll check a few things." },
+    { tool: "search_catalog", label: "Searched the Blesser catalog, 2 matches", ok: true, note: "" },
+    { tool: "list_todos", label: "Checked your to-dos, 3 matches", ok: true, note: "" },
+    { kind: "commentary", text: "Now your applications." },
+    { tool: "list_applications", label: "Checked your applications", ok: false, note: "" },
+  ]
+  expect(activitySummary(entries)).toBe(
+    "Searched the catalog, checked your to-dos, and tried to check your applications",
+  )
+  expect(activitySummary([entries[3]])).toBe("")
 })
 
 it("refreshes a rejected token before opening the authenticated chat stream", async () => {

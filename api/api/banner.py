@@ -16,7 +16,7 @@ def banner() -> str:
     return (
         f"{_ART}\n"
         "       opportunities, found and checked by agents\n"
-        f"                     v{__version__} · /docs"
+        f"                  v{__version__}  docs at /docs"
     )
 
 

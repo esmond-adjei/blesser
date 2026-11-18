@@ -36,8 +36,8 @@ rolling. Use only the key returned by a current tool in this turn. If no deadlin
 confirmed, say so. Never present web snippets as evidence of a deadline.
 Only enable change proposals when explicitly asked to track an opportunity or add a to-do.
 A proposal is not a completed action. Never suggest an action happened before approval.
-Before a tool call you can say what you plan to check in one short, public sentence
-starting with "I'll". Omit dates and facts from that sentence.
+Before a tool call, say briefly what you are about to check in one short, public
+sentence. Omit dates and record details from that sentence.
 Use “Not this time” for unsuccessful application outcomes. Avoid em dashes and middle dots."""
 
 
@@ -49,20 +49,17 @@ def configured():
 
 
 def _step(name, label, ok=True, note=""):
-    return {"tool": name, "label": label, "ok": ok, "note": note}
+    return {"kind": "tool", "tool": name, "label": label, "ok": ok, "note": note}
 
 
-def _public_note(registry, text):
+def _commentary(registry, text):
+    """Public narration before a tool call, with references and ungrounded dates removed."""
     text = text.strip()
-    if (
-        not text.startswith(("I'll ", "I’ll "))
-        or len(text) > 160
-        or "\n" in text
-        or "[" in text
-    ):
+    if not text:
         return ""
     note, _, _ = registry.render(text)
-    return note
+    note = " ".join(note.split())
+    return note[:600].rstrip()
 
 
 def _count(label, count):
@@ -199,6 +196,9 @@ async def _loop(chat_id, user_id, lease, content):
         )
         if response.empty_at_limit and settings.llm_max_tokens < ROOMY_MAX_TOKENS:
             response = await _model_call(provider, history, offered, ROOMY_MAX_TOKENS)
+        thoughts = response.reasoning.strip()
+        if thoughts:
+            yield {"event": "reasoning", "text": thoughts[:4000]}
         if not response.tool_calls:
             reply, sources, cited_deadlines = registry.render(response.text)
             if not reply:
@@ -209,9 +209,10 @@ async def _loop(chat_id, user_id, lease, content):
                 )
             break
         calls = response.tool_calls
-        note = _public_note(registry, response.text)
-        if note:
-            yield {"event": "reasoning", "text": note}
+        commentary = _commentary(registry, response.text)
+        if commentary:
+            trace.append({"kind": "commentary", "text": commentary})
+            yield {"event": "commentary", "text": commentary}
         history.append(
             {
                 "role": "assistant",
@@ -250,7 +251,6 @@ async def _loop(chat_id, user_id, lease, content):
                                 "summary": summary,
                                 "arguments": action,
                                 "trace": trace,
-                                "note": note if index == 0 else "",
                             },
                         )
                         yield {"event": "confirm_required", "call": pending}
@@ -287,7 +287,6 @@ async def _loop(chat_id, user_id, lease, content):
                     name,
                     _count(label, count) if ok else f"{label} unavailable",
                     ok,
-                    note if index == 0 else "",
                 )
             )
             yield {"event": "tool_result", "step": trace[-1], "turn": step}

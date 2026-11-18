@@ -56,30 +56,25 @@ export function Notifications() {
   }
 
   return (
-    <div className="bl-enter min-w-0 space-y-5">
-      <PageHeader
-        title="Notifications"
-        description="Scan results and deadline reminders, newest first."
-        actions={
-          <div className="flex items-center gap-1">
-            {unread ? <Button size="sm" variant="quiet" icon={<CheckCheck />} disabled={readAll.isPending} onClick={() => readAll.mutate()}>Mark all read</Button> : null}
-            <ActionMenuButton
-              label="Notification actions"
-              actions={[
-                { label: "Notification settings", icon: <Settings />, onSelect: () => navigate("/settings/notifications") },
-                { kind: "separator" },
-                { label: "Clear all", icon: <Trash2 />, danger: true, disabled: !inbox.data?.items.length, onSelect: () => clear.mutate() },
-              ]}
-            />
+    <div className="bl-enter min-w-0 max-w-3xl mx-auto space-y-5">
+      <div className="flex items-center justify-between gap-2">
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={setFilter}
+          options={[{ value: "all", label: "All" }, { value: "unread", label: "Unread", count: unread }]}
+        />
+        {unread ? <Button size="sm" variant="quiet" icon={<CheckCheck />} disabled={readAll.isPending} onClick={() => readAll.mutate()}>Mark all read</Button> : null}
+
+          <div>
+            <Button size="sm" variant="quiet" icon={ <Settings />} onClick={() => navigate("/settings/notifications") }>
+              Settings
+            </Button>
+            <Button size="sm" variant="quiet" icon={ <Trash2 />} disabled={!inbox.data?.items.length} onClick={() => () => clear.mutate() }>
+              Clear all
+            </Button>
           </div>
-        }
-      />
-      <Segmented
-        label="Show"
-        value={filter}
-        onChange={setFilter}
-        options={[{ value: "all", label: "All" }, { value: "unread", label: "Unread", count: unread }]}
-      />
+        </div>
       {inbox.isLoading ? (
         <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />)}</div>
       ) : inbox.isError ? (

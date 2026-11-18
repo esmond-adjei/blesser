@@ -51,7 +51,7 @@ function ThemeToggle() {
       value={mode}
       onValueChange={(value) => setTheme(parseTheme(value))}
       aria-label="Theme"
-      className="relative mx-1 my-1 flex w-full max-w-2xl gap-0.5 rounded-2xl bg-surface-sunk p-1"
+      className="relative mx-1 my-1 grid grid-cols-3 gap-0.5 rounded-2xl bg-surface-sunk p-1"
     >
       <span aria-hidden="true" data-ready={ready} className="bl-indicator rounded-lg bg-surface-raised shadow-elevation-1" />
       {THEME_MODES.map(({ value, label, Icon }) => (
@@ -60,7 +60,7 @@ function ThemeToggle() {
           value={value}
           aria-label={label}
           onSelect={(event) => event.preventDefault()}
-          className="relative h-7 w-9 justify-center rounded-full p-0 text-ink-tertiary transition-colors duration-160 hover:text-ink focus:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus data-[state=checked]:text-ink"
+          className="relative h-7 w-full justify-center rounded-full p-0 text-ink-tertiary transition-colors duration-160 hover:text-ink focus:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus data-[state=checked]:text-ink"
         >
           <Icon className="size-4" strokeWidth={1.75} aria-hidden="true" />
         </DropdownMenuRadioItem>

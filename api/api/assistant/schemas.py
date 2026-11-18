@@ -32,10 +32,19 @@ class ConfirmRequest(BaseModel):
 
 
 class ToolStep(BaseModel):
+    kind: Literal["tool"] = "tool"
     tool: str
     label: str
     ok: bool
     note: str = ""
+
+
+class Commentary(BaseModel):
+    kind: Literal["commentary"] = "commentary"
+    text: str
+
+
+TraceEntry = ToolStep | Commentary
 
 
 class Source(BaseModel):
@@ -53,7 +62,7 @@ class Source(BaseModel):
 class PendingCall(BaseModel):
     id: str
     summary: str
-    trace: list[ToolStep]
+    trace: list[TraceEntry]
     note: str = ""
 
 
@@ -63,7 +72,7 @@ class MessageOut(APIModel):
     id: str
     role: Literal["user", "assistant"]
     content: str
-    trace: list[ToolStep]
+    trace: list[TraceEntry]
     sources: list[Source]
     cited_deadlines: bool
     created_at: datetime

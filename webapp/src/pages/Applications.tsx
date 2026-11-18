@@ -212,7 +212,7 @@ export function Applications() {
                   className="bl-enter flex items-center gap-3 px-3 py-3 transition-colors hover:bg-highlight/50 data-[state=open]:bg-highlight/50 sm:gap-4 sm:px-4"
                 >
                   <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => setEditing(app)}>
-                    <span className="block text-callout font-semibold text-ink hover:underline">{app.title}</span>
+                    <span className="block text-callout font-semibold text-ink hover:textlink">{app.title}</span>
                     {meta.length ? <span className="mt-0.5 block truncate text-footnote text-ink-tertiary">{meta.join(", ")}</span> : null}
                     <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 sm:hidden">
                       <Chip tone={STATUS_TONE[app.status]}>{STATUS_LABEL[app.status]}</Chip>
@@ -380,7 +380,7 @@ function BoardTile({
         <div className="flex items-start gap-1">
           <button type="button" onClick={onOpen} className="min-w-0 flex-1 cursor-pointer text-left">
             {app.organization ? <span className="block truncate text-caption text-ink-tertiary">{app.organization}</span> : null}
-            <span className="line-clamp-2 text-callout font-semibold text-ink group-hover:underline">{app.title}</span>
+            <span className="line-clamp-2 text-callout font-semibold text-ink group-hover:text-link">{app.title}</span>
           </button>
           <ActionMenuButton actions={actions} label={`More for ${app.title}`} className="-mt-1 -mr-1.5 size-7 shrink-0 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100" />
         </div>

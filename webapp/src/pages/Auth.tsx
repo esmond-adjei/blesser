@@ -42,7 +42,7 @@ function AuthShell({
     <div className="min-h-dvh bg-canvas lg:grid lg:grid-cols-2 lg:gap-4 lg:p-4">
       <div aria-hidden="true" className="relative hidden overflow-hidden rounded-lg bg-surface-sunk lg:block">
         <AuthPhoto />
-        <svg viewBox="0 0 32 32" className="absolute inset-[7.5%] size-[85%]" fill="none" strokeWidth={4} strokeLinejoin="round">
+        <svg viewBox="0 0 32 32" className="relative inset-[7.5%] size-[85%]" fill="none" strokeWidth={4} strokeLinejoin="round">
           <g transform={LOGO.fill}>
             <path d="M9 17.2a7 7 0 0 1 14 0" stroke="var(--sun)" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             <path d={LOGO.steps} stroke="#ffffff" vectorEffect="non-scaling-stroke" />
@@ -55,7 +55,7 @@ function AuthShell({
             <Logo title="" className="size-9" />
             <Wordmark className="text-[30px]" />
           </Link>
-          <h1 className="font-display text-3xl font-bold text-ink">{title}</h1>
+          <h1 className="type-title-2 text-ink">{title}</h1>
         </div>
         <div className="space-y-4 rounded-lg border border-separator bg-surface p-6">
           {children}

@@ -102,7 +102,7 @@ function useInbox() {
   return inbox.data?.unread ?? 0
 }
 
-const ACTIVE = "data-[active=true]:bg-forest-soft data-[active=true]:font-semibold data-[active=true]:text-link data-[active=true]:[&>svg]:text-link"
+const ACTIVE = "data-[active=true]:bg-forest-soft/33 data-[active=true]:font-semibold data-[active=true]:text-link data-[active=true]:[&>svg]:text-link"
 
 function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar()
@@ -135,18 +135,18 @@ function AppSidebar() {
             <SidebarMenuButton
               tooltip="Search"
               onClick={openSearch}
-              className="border border-input-border bg-surface text-ink-tertiary shadow-elevation-1 hover:border-input-border-hover hover:bg-surface hover:text-ink-secondary group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:shadow-none"
+              className="border border-separator bg-surface text-ink-tertiary hover:bg-surface hover:text-ink-secondary group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:shadow-none"
             >
               <Search strokeWidth={1.75} />
               <span className="flex-1">Search</span>
-              <kbd className="rounded-[5px] border border-separator px-1 font-sans text-caption text-ink-tertiary">{mac ? "⌘K" : "Ctrl K"}</kbd>
+              <kbd className="rounded-[5px] px-1 font-sans text-caption text-ink-tertiary">{mac ? "⌘K" : "Ctrl K"}</kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
         <nav aria-label="App">
           {NAV_GROUPS.map((group) => (
             <SidebarGroup key={group.label} className="px-0 pt-4 pb-0">
-              <SidebarGroupLabel className="h-6 px-2 text-caption text-ink-tertiary">{group.label}</SidebarGroupLabel>
+              <SidebarGroupLabel className="h-6 px-2 text-[10px] text-ink-tertiary uppercase">{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.items.map((item) => {

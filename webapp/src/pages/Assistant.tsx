@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { ArrowUp, MessageCircle, MessagesSquare, Pencil, Plus, Square, Trash2 } from "lucide-react"
+import {
+  ArrowUp, Briefcase, ChevronDown, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
+  MessageCircle, MessagesSquare, Pencil, Plus, Sparkles, Square, Trash2, Wrench,
+} from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
 import {
-  CHAT_PAGE, assistantHref, createChat, deleteChat, getChat, listChats, renameChat, stopTurn, streamTurn,
-  type AssistantChat, type AssistantEvent, type AssistantMessage, type PendingCall, type ToolStep, type TurnRequest,
+  CHAT_PAGE, activitySummary, assistantHref, createChat, deleteChat, getChat, isToolStep, listChats, renameChat,
+  stopTurn, streamTurn,
+  type AssistantChat, type AssistantEvent, type AssistantMessage, type PendingCall, type ToolStep, type TraceEntry,
+  type TurnRequest,
 } from "../lib/assistant"
 import { ApiError, apiMessage } from "../lib/api"
 import { useAuth } from "../lib/auth"
@@ -22,15 +27,39 @@ const CHAT_FOLLOW_UPS = ["What's next on my to-do list?", "What are my upcoming 
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
 const chatsKey = (userId: string) => ["assistant", userId, "chats"]
 
+const TOOL_ICONS: Record<string, typeof Wrench> = {
+  search_catalog: Database,
+  get_opportunity: FileText,
+  list_applications: Briefcase,
+  list_todos: ListChecks,
+  read_apply_kit: FolderOpen,
+  search_web: Globe,
+  enable_changes: Sparkles,
+  track_opportunity: Plus,
+  add_todo: ListPlus,
+}
+
+const TOOL_RUNNING: Record<string, string> = {
+  search_catalog: "Searching the Blesser catalog",
+  get_opportunity: "Checking an opportunity",
+  list_applications: "Checking your applications",
+  list_todos: "Checking your to-dos",
+  read_apply_kit: "Reading your apply kit",
+  search_web: "Searching the web",
+  enable_changes: "Preparing a change",
+  track_opportunity: "Preparing to track the opportunity",
+  add_todo: "Preparing your to-do",
+}
+
 type ChatEdit = { type: "rename" | "delete"; chat: AssistantChat }
 
 interface LiveReply {
   id: string
   type: TurnRequest["type"]
   status: string
-  note: string
+  thoughts: string[]
   text: string
-  steps: ToolStep[]
+  trace: TraceEntry[]
   user: AssistantMessage | null
   answer: AssistantMessage | null
   pending: PendingCall | null
@@ -39,10 +68,19 @@ interface LiveReply {
 function updateReply(reply: LiveReply, event: AssistantEvent): LiveReply {
   switch (event.type) {
     case "status": return { ...reply, status: event.message }
-    case "reasoning": return { ...reply, note: event.text }
+    case "reasoning":
+      return event.text && reply.thoughts.at(-1) !== event.text
+        ? { ...reply, thoughts: [...reply.thoughts, event.text] }
+        : reply
+    case "commentary": {
+      const last = reply.trace.at(-1)
+      return event.text && !(last && !isToolStep(last) && last.text === event.text)
+        ? { ...reply, trace: [...reply.trace, { kind: "commentary", text: event.text }] }
+        : reply
+    }
     case "token": return { ...reply, status: "", text: reply.text + event.text }
-    case "tool_start": return { ...reply, status: event.label }
-    case "tool_result": return { ...reply, status: "", note: "", steps: [...reply.steps, event.step] }
+    case "tool_start": return { ...reply, status: TOOL_RUNNING[event.tool] ?? event.label }
+    case "tool_result": return { ...reply, status: "", trace: [...reply.trace, event.step] }
     case "user_message": return { ...reply, user: event.message }
     case "message": return { ...reply, status: "", answer: event.message }
     case "confirm_required": return { ...reply, status: "", pending: event.call }
@@ -62,7 +100,7 @@ function useLiveReply(userId: string) {
     const controller = new AbortController()
     connection.current = controller
     setError(null)
-    setReply({ id, type: turn.type, status: "Opening your reply…", note: "", text: "", steps: [], user: null, answer: null, pending: null })
+    setReply({ id, type: turn.type, status: "Opening your reply…", thoughts: [], text: "", trace: [], user: null, answer: null, pending: null })
     try {
       await streamTurn(id, turn, (event) => {
         if (controller.signal.aborted) return
@@ -148,7 +186,7 @@ function AssistantWorkspace({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (followScroll.current) end.current?.scrollIntoView({ block: "nearest" })
-  }, [active?.status, active?.text, active?.steps.length, rows.length, pending?.id, chatId])
+  }, [active?.status, active?.text, active?.trace.length, active?.thoughts.length, rows.length, pending?.id, chatId])
 
   function selectChat(id?: string) {
     navigate(id ? assistantHref(id) : "/assistant")
@@ -260,13 +298,12 @@ function AssistantWorkspace({ userId }: { userId: string }) {
             : <AssistantReply key={message.id} message={message} />)}
           {visibleAnswer ? <AssistantReply message={visibleAnswer} /> : null}
           {active && !active.answer && !pending ? (
-            <AssistantReply text={active.text} status={active.status} thinking={active.note} live />
+            <AssistantReply text={active.text} status={active.status} thoughts={active.thoughts.join("\n\n")} entries={active.trace} live />
           ) : null}
           {pending ? (
-            <AssistantReply>
+            <AssistantReply entries={pending.trace}>
               <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
                 <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
-                {pending.note ? <p className="text-footnote text-ink-secondary">{pending.note}</p> : null}
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
                   <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Not now</Button>
@@ -349,25 +386,33 @@ function UserBubble({ content }: { content: string }) {
   )
 }
 
-function AssistantReply({ message, text, status, thinking, live, children }: {
+function AssistantReply({ message, text, status, thoughts, entries = [], live, children }: {
   message?: AssistantMessage
   text?: string
   status?: string
-  thinking?: string
+  thoughts?: string
+  entries?: TraceEntry[]
   live?: boolean
   children?: React.ReactNode
 }) {
   const content = message?.content || text
+  const trace = message?.trace ?? entries
   return (
     <div className="bl-enter flex min-w-0 gap-3">
       <div className="flex min-w-0 flex-1 flex-col gap-2.5 pt-1">
         <span className="sr-only">Assistant said</span>
+        {thoughts ? (
+          <details open={live} className="text-footnote text-ink-secondary">
+            <summary className="cursor-pointer select-none text-ink-tertiary">Thoughts</summary>
+            <p className="mt-1 max-h-48 overflow-y-auto pr-1 whitespace-pre-wrap wrap-anywhere">{thoughts}</p>
+          </details>
+        ) : null}
+        {trace.length ? <ActivityTrace entries={trace} /> : null}
         {live && !content ? (
           <div className="flex flex-col gap-1" role="status">
             <span className="self-start text-callout font-medium">
               <span className="bl-shimmer">{status && !status.startsWith("Opening") ? status : "Thinking"}</span>
             </span>
-            {thinking ? <p className="line-clamp-3 text-footnote text-ink-tertiary">{thinking}</p> : null}
           </div>
         ) : null}
         {content ? (
@@ -379,6 +424,54 @@ function AssistantReply({ message, text, status, thinking, live, children }: {
         ) : null}
         {children}
       </div>
+    </div>
+  )
+}
+
+function ActivityTrace({ entries }: { entries: TraceEntry[] }) {
+  const [open, setOpen] = useState(true)
+  const firstTool = entries.findIndex(isToolStep)
+  const leading = firstTool === -1 ? entries : entries.slice(0, firstTool)
+  const activity = firstTool === -1 ? [] : entries.slice(firstTool)
+  const summary = activitySummary(entries)
+  return (
+    <>
+      {leading.map((entry, index) => !isToolStep(entry) ? (
+        <p key={`commentary-${index}`} className="text-body text-ink wrap-anywhere">{entry.text}</p>
+      ) : null)}
+      {summary ? (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className="flex w-fit max-w-full cursor-pointer items-start gap-1 rounded-sm text-left text-callout font-medium text-ink-secondary transition-colors duration-160 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          >
+            <span className="min-w-0">{summary}</span>
+            <ChevronDown aria-hidden="true" className={cn("mt-px size-4 shrink-0 transition-transform duration-160", !open && "-rotate-90")} />
+          </button>
+          {open ? (
+            <div role="group" aria-label="Activity" className="flex flex-col rounded-md border border-separator bg-surface px-1 py-1">
+              {activity.map((entry, index) => isToolStep(entry)
+                ? <ActivityRow key={`tool-${entry.tool}-${index}`} step={entry} />
+                : <p key={`commentary-${index}`} className="px-2.5 py-2 text-callout text-ink wrap-anywhere">{entry.text}</p>)}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  )
+}
+
+function ActivityRow({ step }: { step: ToolStep }) {
+  const Icon = step.ok ? TOOL_ICONS[step.tool] ?? Wrench : CircleAlert
+  return (
+    <div className={cn(
+      "flex min-w-0 items-start gap-2 rounded-sm px-2.5 py-2 text-callout",
+      step.ok ? "text-ink-secondary" : "text-critical",
+    )}>
+      <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <span className="min-w-0 wrap-anywhere">{step.label}</span>
     </div>
   )
 }

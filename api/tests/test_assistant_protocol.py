@@ -38,6 +38,30 @@ def test_deadline_markers_resolve_only_against_current_tool_data():
     assert deadlines
 
 
+def test_stored_trace_without_kind_still_parses_as_tool_steps():
+    from api.assistant.schemas import MessageOut
+    from api.core.time import utcnow_naive
+
+    message = MessageOut(
+        id="message-id",
+        role="assistant",
+        content="A reply",
+        trace=[
+            {
+                "tool": "search_catalog",
+                "label": "Searched the Blesser catalog",
+                "ok": True,
+                "note": "I'll look.",
+            }
+        ],
+        sources=[],
+        cited_deadlines=False,
+        created_at=utcnow_naive(),
+    )
+    assert message.trace[0].kind == "tool"
+    assert message.model_dump(mode="json")["trace"][0]["kind"] == "tool"
+
+
 def test_tools_only_offer_web_after_catalog_and_writes_after_enable():
     def offered(**flags):
         return {d["name"] for d in tools.definitions(**flags)}
@@ -136,6 +160,7 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
             if messages[-1]["role"] == "user":
                 return LLMResponse(
                     text="I'll check the catalog.",
+                    reasoning="I should look in the catalog before answering.",
                     tool_calls=[
                         ToolCall("lookup", "search_catalog", {"query": "seed fund"})
                     ],
@@ -165,6 +190,7 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
         "user_message",
         "status",
         "reasoning",
+        "commentary",
         "tool_start",
         "tool_result",
         "status",
@@ -172,9 +198,22 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
         "message",
         "done",
     ]
+    assert events[2] == {
+        "event": "reasoning",
+        "text": "I should look in the catalog before answering.",
+    }
+    assert events[3] == {
+        "event": "commentary",
+        "text": "I'll check the catalog.",
+    }
     assert events[-3]["text"] == "Seed Fund closes on 8 Sep 2040."
     reply = events[-2]["message"]
-    assert reply["trace"][0]["note"] == "I'll check the catalog."
+    assert reply["trace"][0] == {
+        "kind": "commentary",
+        "text": "I'll check the catalog.",
+    }
+    assert reply["trace"][1]["kind"] == "tool"
+    assert reply["trace"][1]["label"] == "Searched the Blesser catalog, 1 match"
     assert reply["sources"][0]["id"] == "record"
     assert reply["cited_deadlines"]
 

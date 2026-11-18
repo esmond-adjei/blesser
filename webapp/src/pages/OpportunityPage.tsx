@@ -63,7 +63,7 @@ export function OpportunityPage() {
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-10">
-        <aside className="space-y-3 lg:col-start-2 lg:row-start-1" aria-label="Deadline and actions">
+        <aside className="space-y-3 lg:sticky lg:top-10 lg:col-start-2 lg:row-start-1" aria-label="Deadline and actions">
           <div className="space-y-3 rounded-xl border border-separator bg-surface p-4 sm:p-5">
             <h2 className="text-headline text-ink">Deadline</h2>
             <Countdown {...countdownFor(opp)} className="max-w-full whitespace-normal wrap-anywhere" />
