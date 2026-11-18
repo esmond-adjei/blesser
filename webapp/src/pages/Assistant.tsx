@@ -1,31 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { ArrowUp, ArrowUpRight, History, MessageCircle, Pencil, Plus, Square, Trash2 } from "lucide-react"
-import { Button, Chip, Countdown, EmptyState, Field, Logo, Textarea, cn, daysUntil } from "@blesser/ui"
+import { ArrowUp, MessageCircle, MessagesSquare, Pencil, Plus, Sparkles, Square, Trash2 } from "lucide-react"
+import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
 import {
   CHAT_PAGE, assistantHref, createChat, deleteChat, getChat, listChats, renameChat, stopTurn, streamTurn,
-  type AssistantChat, type AssistantEvent, type AssistantMessage, type AssistantSource, type PendingCall, type ToolStep, type TurnRequest,
+  type AssistantChat, type AssistantEvent, type AssistantMessage, type PendingCall, type ToolStep, type TurnRequest,
 } from "../lib/assistant"
 import { ApiError, apiMessage } from "../lib/api"
 import { useAuth } from "../lib/auth"
-import { countdownFor, useTrackedOpportunities } from "../lib/opportunities"
-import { Art, TrackButton } from "./Opportunities"
+import { useShellHeader } from "../components/layout/shellHeader"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const FOLLOW_UPS = ["Who can apply?", "What should I prepare?"]
 const CHAT_FOLLOW_UPS = ["What's next on my to-do list?", "What are my upcoming deadlines?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
 const chatsKey = (userId: string) => ["assistant", userId, "chats"]
-const RECORD_LINKS = {
-  application: "/applications",
-  todo: "/todos",
-  project: "/kit/projects",
-  document: "/kit/documents",
-  answer: "/kit/answers",
-}
 
 type ChatEdit = { type: "rename" | "delete"; chat: AssistantChat }
 
@@ -230,101 +225,102 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   const replyError = error?.id === chatId ? error?.message : null
   const disabled = working || !!pending || (!!chatId && thread.isError)
 
-  return (
-    <div className="-mb-12 grid h-[calc(100dvh-4.75rem)] min-h-0 min-w-0 gap-5 md:h-[calc(100dvh-5.5rem)] lg:grid-cols-[minmax(12rem,15rem)_minmax(0,1fr)]">
-      <aside className="hidden min-h-0 flex-col gap-3 border-r border-separator pr-4 pb-4 lg:flex" aria-label="Saved chats">
-        <h2 className="text-headline text-ink">Saved chats</h2>
-        {list}
-      </aside>
+  const title = thread.data?.title || "Assistant"
+  const header = useMemo(() => ({
+    title,
+    actions: (
+      <>
+        <Button size="sm" variant="quiet" icon={<MessagesSquare />} onClick={() => setHistoryOpen(true)}>Chats</Button>
+        {chatId ? <Button size="sm" variant="quiet" icon={<Plus />} onClick={() => navigate("/assistant")}>New chat</Button> : null}
+      </>
+    ),
+  }), [title, chatId, navigate])
+  useShellHeader(header)
 
-      <section aria-label="Assistant chat" className="mx-auto flex min-h-0 w-full max-w-[760px] min-w-0 flex-col">
-        <div className="flex min-w-0 shrink-0 items-center gap-2 pb-3 lg:hidden">
-          <Button size="sm" variant="secondary" icon={<History />} onClick={() => setHistoryOpen(true)}>Saved chats</Button>
-          {thread.data ? <p className="min-w-0 truncate text-callout text-ink-secondary">{thread.data.title}</p> : null}
-        </div>
-        <div className="nice-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="Messages" onScroll={(event) => {
-          const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
-          followScroll.current = scrollHeight - scrollTop - clientHeight < 64
-        }}>
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+
+      <div className="nice-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="Messages" onScroll={(event) => {
+        const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
+        followScroll.current = scrollHeight - scrollTop - clientHeight < 64
+      }}>
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5 px-4 py-6 sm:px-6" aria-live="polite">
           {chatId && thread.isPending && !active ? (
-            <p className="text-callout text-ink-secondary" role="status">Loading chat…</p>
+            <p className="text-callout text-ink-secondary" role="status">Loading chat</p>
           ) : chatId && thread.isError ? (
             <EmptyState title="Couldn't open this chat" description={apiMessage(thread.error)} error
               action={<Button variant="secondary" size="sm" onClick={() => selectChat()}>New chat</Button>} />
           ) : !visibleRows.length && !working ? (
-            <EmptyState className="mt-8" title="What can I help you with?" description="Find opportunities, check deadlines, or plan your next application."
-              action={<Prompts prompts={STARTERS} onPick={(prompt) => void send(prompt)} />} />
+            <EmptyState className="mt-[8vh]" title="What can I help you with?" description="Find opportunities, check deadlines, or plan your next application."
+              action={<Prompts prompts={STARTERS} onPick={(prompt) => void send(prompt)} className="justify-center" />} />
           ) : null}
 
-          <div className="space-y-5 pb-4" aria-live="polite">
-            {visibleRows.map((message) => message.role === "user" ? (
-              <div key={message.id} className="flex justify-end">
-                <p className="max-w-[88%] rounded-lg bg-surface-sunk px-4 py-2.5 text-body whitespace-pre-wrap text-ink wrap-anywhere">
-                  <span className="sr-only">You said </span>{message.content}
-                </p>
-              </div>
-            ) : <AssistantReply key={message.id} steps={message.trace} message={message} />)}
-            {visibleAnswer ? <AssistantReply steps={visibleAnswer.trace} message={visibleAnswer} /> : null}
-            {active && !active.answer && !pending ? (
-              <AssistantReply steps={active.steps} text={active.text} status={active.status} note={active.note} />
-            ) : null}
-            {pending ? (
-              <AssistantReply steps={pending.trace} note={pending.note}>
-                <div className="space-y-3 rounded-lg bg-surface-sunk p-3">
-                  <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
-                    <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Decline</Button>
-                  </div>
+          {visibleRows.map((message) => message.role === "user"
+            ? <UserBubble key={message.id} content={message.content} />
+            : <AssistantReply key={message.id} message={message} />)}
+          {visibleAnswer ? <AssistantReply message={visibleAnswer} /> : null}
+          {active && !active.answer && !pending ? (
+            <AssistantReply text={active.text} status={active.status} thinking={active.note} live />
+          ) : null}
+          {pending ? (
+            <AssistantReply>
+              <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
+                <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
+                {pending.note ? <p className="text-footnote text-ink-secondary">{pending.note}</p> : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
+                  <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Not now</Button>
                 </div>
-              </AssistantReply>
-            ) : null}
-            {last?.role === "assistant" && !disabled ? (
-              <div className="pl-10">
-                <Prompts prompts={last.sources.some((source) => source.kind === "opportunity") ? FOLLOW_UPS : CHAT_FOLLOW_UPS}
-                  onPick={(prompt) => void send(prompt)} />
               </div>
-            ) : null}
-          </div>
+            </AssistantReply>
+          ) : null}
+          {last?.role === "assistant" && !disabled ? (
+            <Prompts className="pl-11" prompts={last.sources.some((source) => source.kind === "opportunity") ? FOLLOW_UPS : CHAT_FOLLOW_UPS}
+              onPick={(prompt) => void send(prompt)} />
+          ) : null}
           <div ref={end} />
         </div>
+      </div>
 
-        <form className="shrink-0 space-y-2 border-t border-separator bg-canvas pt-3 pb-3" onSubmit={(event) => { event.preventDefault(); void send(draft) }}>
-          {replyError || (problem && !edit) ? <p role="alert" className="text-footnote text-critical">{replyError || problem}</p> : null}
-          <div className="flex items-end gap-2">
-            <Textarea
-              aria-label="Ask the Assistant"
-              placeholder="Ask about an opportunity…"
-              className="max-h-32 min-h-11 resize-none"
-              rows={1}
-              maxLength={4000}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault()
-                  void send(draft)
-                }
-              }}
-            />
-            {working && chatId ? (
-              <Button type="button" variant="secondary" iconOnly aria-label="Stop reply" icon={<Square />}
-                onClick={() => void stopTurn(chatId).catch((err) => setProblem(apiMessage(err)))} />
-            ) : (
-              <Button type="submit" variant="primary" disabled={disabled || !draft.trim()} iconOnly aria-label="Send message" icon={<ArrowUp />} />
-            )}
+      <form className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]" onSubmit={(event) => { event.preventDefault(); void send(draft) }}>
+        {replyError || (problem && !edit) ? <p role="alert" className="mb-2 text-footnote text-critical">{replyError || problem}</p> : null}
+        <div className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2.5 pr-2.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--focus-soft)]">
+          <textarea
+            aria-label="Ask the Assistant"
+            placeholder="Ask about opportunities, deadlines or your applications"
+            className="max-h-40 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-body text-ink outline-none [field-sizing:content] placeholder:text-ink-tertiary"
+            rows={1}
+            maxLength={4000}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                void send(draft)
+              }
+            }}
+          />
+          {working && chatId ? (
+            <Button type="button" size="sm" variant="secondary" iconOnly aria-label="Stop reply" icon={<Square />} className="size-9"
+              onClick={() => void stopTurn(chatId).catch((err) => setProblem(apiMessage(err)))} />
+          ) : (
+            <Button type="submit" size="sm" variant="primary" disabled={disabled || !draft.trim()} iconOnly aria-label="Send message" icon={<ArrowUp />} className="size-9" />
+          )}
+        </div>
+      </form>
+
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent side="right" className="w-full gap-0 sm:max-w-sm">
+          <SheetHeader className="border-b border-separator p-5 pr-14">
+            <SheetTitle>Chats</SheetTitle>
+            <SheetDescription>Pick up a conversation or start a new one.</SheetDescription>
+          </SheetHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
+            {list}
           </div>
-        </form>
-      </section>
-
-      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        {historyOpen ? (
-          <DialogContent className="max-lg:top-auto max-lg:bottom-0 max-lg:w-full max-lg:max-w-none max-lg:rounded-b-none" onClose={() => setHistoryOpen(false)}>
-            <DialogHeader><DialogTitle>Saved chats</DialogTitle><DialogDescription>Pick up a conversation or start a new one.</DialogDescription></DialogHeader>
-            <DialogBody>{list}</DialogBody>
-          </DialogContent>
-        ) : null}
-      </Dialog>
+        </SheetContent>
+      </Sheet>
       <Dialog open={!!edit} onOpenChange={(open) => { if (!open && !editing) setEdit(null) }}>
         {edit ? <EditChat key={edit.chat.id + edit.type} edit={edit} problem={problem} saving={editing} onClose={() => { if (!editing) setEdit(null) }}
           onSave={(title) => void saveEdit(title)} /> : null}
@@ -333,9 +329,9 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   )
 }
 
-function Prompts({ prompts, onPick }: { prompts: string[]; onPick: (prompt: string) => void }) {
+function Prompts({ prompts, onPick, className }: { prompts: string[]; onPick: (prompt: string) => void; className?: string }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={cn("flex flex-wrap gap-1.5", className)}>
       {prompts.map((prompt) => (
         <Chip key={prompt} className="h-auto min-h-8 max-w-full whitespace-normal" onClick={() => onPick(prompt)}>{prompt}</Chip>
       ))}
@@ -343,80 +339,48 @@ function Prompts({ prompts, onPick }: { prompts: string[]; onPick: (prompt: stri
   )
 }
 
-function AssistantReply({ steps, message, text, status, note, children }: {
-  steps: ToolStep[]
-  message?: AssistantMessage
-  text?: string
-  status?: string
-  note?: string
-  children?: React.ReactNode
-}) {
-  const notes = [...new Set([...steps.map((step) => step.note), note].filter(Boolean))]
+function UserBubble({ content }: { content: string }) {
   return (
-    <div className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-start gap-2">
-      <Logo variant="color" title="Assistant" />
-      <div className="min-w-0 space-y-3">
-        {steps.length ? (
-          <div className="flex flex-wrap gap-1.5" aria-label="Tool steps">
-            {steps.map((step, index) => <Chip className="h-auto min-h-6 max-w-full whitespace-normal" key={`${step.tool}-${index}`}>{step.label}</Chip>)}
-          </div>
-        ) : null}
-        {notes.length ? (
-          <details className="text-footnote text-ink-secondary">
-            <summary className="cursor-pointer">How I checked</summary>
-            <ul className="mt-1 list-disc space-y-1 pl-5">
-              {notes.map((entry) => <li className="wrap-anywhere" key={entry}>{entry}</li>)}
-            </ul>
-          </details>
-        ) : null}
-        {status ? <p className="text-footnote text-ink-secondary" role="status">{status}</p> : null}
-        {message?.content || text ? <p className="text-body whitespace-pre-wrap text-ink wrap-anywhere">{message?.content || text}</p> : null}
-        {message?.sources.length ? <CitedRecords sources={message.sources} /> : null}
-        {message && (message.cited_deadlines || message.sources.some(({ opportunity }) =>
-          opportunity && (opportunity.deadline_date || opportunity.rolling || opportunity.deadline)
-        )) ? (
-          <p className="rounded-md bg-forest-soft p-3 text-footnote text-link">Confirm the details on the official page before you apply.</p>
-        ) : null}
-        {children}
-      </div>
+    <div className="bl-enter flex justify-end">
+      <p className="max-w-[85%] rounded-[20px_20px_6px_20px] bg-surface-sunk px-4 py-2.5 text-body whitespace-pre-wrap text-ink wrap-anywhere sm:max-w-[70%]">
+        <span className="sr-only">You said </span>{content}
+      </p>
     </div>
   )
 }
 
-function CitedRecords({ sources }: { sources: AssistantSource[] }) {
-  const tracked = useTrackedOpportunities()
+function AssistantReply({ message, text, status, thinking, live, children }: {
+  message?: AssistantMessage
+  text?: string
+  status?: string
+  thinking?: string
+  live?: boolean
+  children?: React.ReactNode
+}) {
+  const content = message?.content || text
   return (
-    <ul className="space-y-2" aria-label="Cited records">
-      {sources.map((source) => {
-        const opp = source.opportunity
-        if (opp) {
-          const daysLeft = opp.deadline_date ? daysUntil(opp.deadline_date) : opp.days_left
-          const countdown = countdownFor({ ...opp, days_left: daysLeft, is_open: !opp.closed && (daysLeft === null || daysLeft >= 0) })
-          return (
-            <li key={source.key} className="flex flex-wrap items-center gap-2 rounded-lg border border-separator bg-surface p-2.5">
-              <Link to={`/opportunities/${encodeURIComponent(opp.slug || opp.id)}`}
-                className="flex min-w-0 flex-[1_1_12rem] items-center gap-2 rounded-sm hover:bg-highlight">
-                <Art opp={opp} shape="square" className="size-9 shrink-0 rounded-sm" />
-                <span className="min-w-0">
-                  <span className="block text-callout font-medium text-ink wrap-anywhere">{opp.title}</span>
-                  {opp.organization ? <span className="block text-footnote text-ink-secondary wrap-anywhere">{opp.organization}</span> : null}
-                </span>
-              </Link>
-              <Countdown {...countdown} variant="text" className="max-w-full whitespace-normal wrap-anywhere" />
-              <TrackButton opp={opp} applicationId={tracked.data?.[opp.id]} />
-            </li>
-          )
-        }
-        const className = "flex min-w-0 items-center gap-2 rounded-md bg-surface-sunk px-3 py-2 text-callout text-link wrap-anywhere hover:bg-highlight"
-        const content = <><span className="min-w-0 flex-1">{source.title}{source.detail ? <span className="block text-footnote text-ink-secondary">{source.detail}</span> : null}</span><ArrowUpRight className="size-4 shrink-0" aria-hidden="true" /></>
-        if (source.kind === "web" && source.url) {
-          return <li key={source.key}><a className={className} href={source.url} target="_blank" rel="noopener noreferrer">{content}</a></li>
-        }
-        if (source.kind === "web" || source.kind === "opportunity") return null
-        const href = source.kind === "project" ? `${RECORD_LINKS.project}/${encodeURIComponent(source.id)}` : RECORD_LINKS[source.kind]
-        return <li key={source.key}><Link className={className} to={href}>{content}</Link></li>
-      })}
-    </ul>
+    <div className="bl-enter flex min-w-0 gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 pt-1">
+        <span className="sr-only">Assistant said</span>
+        {live && !content ? (
+          <div className="flex flex-col gap-1" role="status">
+            <span className="inline-flex items-center gap-1.5 self-start text-callout font-medium">
+              <Sparkles className="size-4 text-sun-ink" aria-hidden="true" />
+              <span className="bl-shimmer">{status && !status.startsWith("Opening") ? status : "Thinking"}</span>
+            </span>
+            {thinking ? <p className="line-clamp-3 pl-5.5 text-footnote text-ink-tertiary">{thinking}</p> : null}
+          </div>
+        ) : null}
+        {content ? (
+          <div className="text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+              table: ({ children }) => <div className="overflow-x-auto"><table>{children}</table></div>,
+            }}>{content}</ReactMarkdown>
+          </div>
+        ) : null}
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -432,9 +396,8 @@ function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, on
   onRetry: () => void
 }) {
   return (
-    <div className="nice-scroll min-h-0 space-y-2 overflow-y-auto">
-      <Button size="sm" variant="secondary" icon={<Plus />} onClick={() => onSelect()}>New chat</Button>
-      {loading ? <p className="text-footnote text-ink-secondary">Loading chats…</p> : null}
+    <div className="nice-scroll min-h-0 flex-1 space-y-2 overflow-y-auto">
+      {loading ? <p className="text-footnote text-ink-secondary">Loading chats</p> : null}
       {error ? <p role="alert" className="text-footnote text-critical">Couldn't load chats. <button type="button" className="cursor-pointer underline" onClick={onRetry}>Try again</button></p> : null}
       {!loading && !error && !rows.length ? <p className="text-footnote text-ink-secondary">No saved chats yet.</p> : null}
       <ul className="space-y-1">

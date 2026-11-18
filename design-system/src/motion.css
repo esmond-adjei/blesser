@@ -71,6 +71,16 @@
 }
 .bl-indicator[data-ready="false"] { transition: none; }
 
+/* Text that is still being worked on, like the Assistant's thinking label. */
+@keyframes bl-shimmer { to { background-position: -200% 0; } }
+.bl-shimmer {
+  background: linear-gradient(90deg, var(--ink-tertiary) 30%, var(--ink) 50%, var(--ink-tertiary) 70%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bl-shimmer 1.6s linear infinite;
+}
+
 .bl-lift { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
 .bl-lift:hover { transform: translateY(-2px); }
 
@@ -82,5 +92,6 @@
   }
   .bl-modal[data-state="closed"], .bl-pop[data-state="closed"], .bl-sheet[data-state="closed"] { animation-name: bl-fade-out; }
   .bl-indicator { transition: none; }
+  .bl-shimmer { animation: none; color: var(--ink-secondary); }
   .bl-lift:hover { transform: none; }
 }
