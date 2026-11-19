@@ -2,8 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
-  ArrowUp, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
-  MessageCircle, MessagesSquare, Pencil, Plus, Square, Trash2, Wrench,
+  ArrowDown, ArrowUp, ArrowUpRight, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
+  MessageCircle, MessagesSquare, Pencil, Plus, RotateCcw, Square, Trash2, Wrench,
 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import {
   CHAT_PAGE, activitySummary, assistantHref, createChat, deleteChat, getChat, isToolStep, listChats, renameChat,
   stopTurn, streamTurn,
-  type AssistantChat, type AssistantEvent, type AssistantMessage, type PendingCall, type TraceEntry,
+  type AssistantChat, type AssistantEvent, type AssistantMessage, type AssistantSource, type AssistantThread, type PendingCall, type TraceEntry,
   type TurnRequest,
 } from "../lib/assistant"
 import { ApiError, apiMessage } from "../lib/api"
@@ -21,6 +21,7 @@ import { useShellHeader } from "../components/layout/shellHeader"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import guideArt from "../assets/illustrations/guide.webp"
+import { ChatSkeleton } from "../components/assistant/ChatSkeleton"
 
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
@@ -167,6 +168,8 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   const followed = useRef<string | undefined>(undefined)
   const followScroll = useRef(true)
   const end = useRef<HTMLDivElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
+  const [farFromEnd, setFarFromEnd] = useState(false)
   const active = reply?.id === chatId ? reply : null
   const rows = thread.data?.messages ?? []
   const pending = active?.type === "confirm" ? null : active?.pending ?? thread.data?.pending_call
@@ -185,9 +188,18 @@ function AssistantWorkspace({ userId }: { userId: string }) {
     followScroll.current = true
   }, [chatId])
 
+  const measure = useCallback(() => {
+    const el = scroller.current
+    if (!el) return
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight
+    followScroll.current = gap < 64
+    setFarFromEnd(gap > Math.max(240, el.clientHeight / 2))
+  }, [])
+
   useEffect(() => {
     if (followScroll.current) end.current?.scrollIntoView({ block: "nearest" })
-  }, [active?.status, active?.text, active?.trace.length, rows.length, pending?.id, chatId])
+    else measure()
+  }, [measure, active?.status, active?.text, active?.trace.length, rows.length, pending?.id, chatId])
 
   function selectChat(id?: string) {
     navigate(id ? assistantHref(id) : "/assistant")
@@ -218,6 +230,18 @@ function AssistantWorkspace({ userId }: { userId: string }) {
       setCreating(false)
       submitLock.current = false
     }
+  }
+
+  function retry() {
+    if (!chatId || pending || working) return
+    followScroll.current = true
+    setProblem("")
+    cache.setQueryData<AssistantThread>(chatKey(userId, chatId), (data) => {
+      if (!data) return data
+      const last = data.messages.findLastIndex((row) => row.role === "user")
+      return last < 0 ? data : { ...data, messages: data.messages.slice(0, last + 1) }
+    })
+    void start(chatId, { type: "retry" })
   }
 
   async function saveEdit(title: string) {
@@ -278,12 +302,17 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   const empty = !chatId && !visibleRows.length && !working
   const composer = (
       <form className={cn("mx-auto w-full max-w-[760px] shrink-0 px-4 sm:px-6", empty ? "" : "pb-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]")} onSubmit={(event) => { event.preventDefault(); void send(draft) }}>
-        {replyError || (problem && !edit) ? <p role="alert" className="mb-2 text-footnote text-critical">{replyError || problem}</p> : null}
+        {replyError || (problem && !edit) ? (
+          <p role="alert" className="mb-2 flex flex-wrap items-center gap-x-2 text-footnote text-critical">
+            {replyError || problem}
+            {replyError && !working ? <button type="button" onClick={retry} className="cursor-pointer font-semibold text-link hover:underline">Try again</button> : null}
+          </p>
+        ) : null}
         <div className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2.5 pr-2.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150">
           <textarea
             aria-label="Ask the Assistant"
             placeholder="Ask about opportunities, deadlines or your applications"
-            className="max-h-40 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-body text-ink outline-none [field-sizing:content] placeholder:text-ink-tertiary"
+            className="max-h-40 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-body text-ink outline-none [field-sizing:content] placeholder:text-ink-tertiary/60"
             rows={1}
             maxLength={4000}
             value={draft}
@@ -319,21 +348,20 @@ function AssistantWorkspace({ userId }: { userId: string }) {
           <Prompts prompts={STARTERS} onPick={(prompt) => void send(prompt)} className="justify-center px-4" />
         </div>
       ) : null}
-      <div hidden={empty} className="nice-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="Messages" onScroll={(event) => {
-        const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
-        followScroll.current = scrollHeight - scrollTop - clientHeight < 64
-      }}>
+      <div hidden={empty} className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={scroller} className="nice-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="Messages" onScroll={measure}>
         <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5 px-4 py-6 sm:px-6" aria-live="polite">
           {chatId && thread.isPending && !active ? (
-            <p className="text-callout text-ink-secondary" role="status">Loading chat</p>
+            <ChatSkeleton />
           ) : chatId && thread.isError ? (
             <EmptyState title="Couldn't open this chat" description={apiMessage(thread.error)} error
               action={<Button variant="secondary" size="sm" onClick={() => selectChat()}>New chat</Button>} />
           ) : null}
 
-          {visibleRows.map((message) => message.role === "user"
+          {visibleRows.map((message, index) => message.role === "user"
             ? <UserBubble key={message.id} content={message.content} />
-            : <AssistantReply key={message.id} message={message} />)}
+            : <AssistantReply key={message.id} message={message}
+                onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined} />)}
           {visibleAnswer ? <AssistantReply message={visibleAnswer} /> : null}
           {active && !active.answer && !pending ? (
             <AssistantReply text={active.text} status={active.status} entries={active.trace} live />
@@ -351,6 +379,20 @@ function AssistantWorkspace({ userId }: { userId: string }) {
           ) : null}
           <div ref={end} />
         </div>
+      </div>
+      {farFromEnd ? (
+        <button
+          type="button"
+          aria-label="Jump to latest message"
+          onClick={() => {
+            followScroll.current = true
+            scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" })
+          }}
+          className="bl-pop absolute bottom-3 left-1/2 grid size-9 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-separator bg-surface text-ink-secondary shadow-elevation-2 transition-colors hover:text-ink"
+        >
+          <ArrowDown className="size-4" aria-hidden="true" />
+        </button>
+      ) : null}
       </div>
 
       {empty ? null : composer}
@@ -406,6 +448,42 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   )
 }
 
+function TurnAction({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onClick}
+      className="grid size-7 cursor-pointer place-items-center rounded-sm text-ink-tertiary transition-colors hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">
+      {children}
+    </button>
+  )
+}
+
+const PREVIEW_LINKS: Partial<Record<AssistantSource["kind"], (id: string) => string>> = {
+  application: (id) => `/applications/${encodeURIComponent(id)}`,
+  todo: (id) => `/calendar?todo=${encodeURIComponent(id)}`,
+}
+
+/** A record the turn created, opening its detail page. */
+function RecordPreview({ source }: { source: AssistantSource }) {
+  const href = PREVIEW_LINKS[source.kind]?.(source.id)
+  const Icon = source.kind === "todo" ? ListChecks : Briefcase
+  const body = (
+    <>
+      <span className={cn("grid size-10 shrink-0 place-items-center rounded-md", source.kind === "todo" ? "bg-sun-soft text-ink" : "bg-forest-soft/40 text-link")}>
+        <Icon className="size-[18px]" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-callout font-semibold text-ink">{source.title}</span>
+        {source.detail ? <span className="block truncate text-footnote text-ink-secondary">{source.detail}</span> : null}
+      </span>
+      {href ? <ArrowUpRight className="size-4 shrink-0 text-ink-tertiary transition-transform group-hover/preview:translate-x-0.5 group-hover/preview:-translate-y-0.5 group-hover/preview:text-ink" aria-hidden="true" /> : null}
+    </>
+  )
+  const card = "group/preview bl-pop flex max-w-md items-center gap-3 rounded-lg border border-separator bg-surface p-3 shadow-elevation-1"
+  return href ? (
+    <Link to={href} className={cn(card, "transition-[box-shadow,border-color] hover:border-input-border-hover hover:shadow-elevation-2 focus-visible:outline-2 focus-visible:outline-focus")}>{body}</Link>
+  ) : <div className={card}>{body}</div>
+}
+
 // Hover reveals turn actions on pointers; touch screens always show them.
 const TURN_ACTIONS = "flex opacity-0 transition-opacity duration-150 group-hover/turn:opacity-100 group-focus-within/turn:opacity-100 [@media(hover:none)]:opacity-100"
 
@@ -420,8 +498,9 @@ function UserBubble({ content }: { content: string }) {
   )
 }
 
-function AssistantReply({ message, text, status, entries = [], live, children }: {
+function AssistantReply({ message, text, status, entries = [], live, onRetry, children }: {
   message?: AssistantMessage
+  onRetry?: () => void
   text?: string
   status?: string
   entries?: TraceEntry[]
@@ -431,6 +510,7 @@ function AssistantReply({ message, text, status, entries = [], live, children }:
   const content = message?.content || text
   const trace = message?.trace ?? entries
   const working = live && !content
+  const previews = message?.sources.filter((source) => source.preview) ?? []
   return (
     <div className="group/turn bl-enter flex min-w-0 flex-col gap-3">
       <span className="sr-only">Assistant said</span>
@@ -442,8 +522,14 @@ function AssistantReply({ message, text, status, entries = [], live, children }:
           }}>{content}</ReactMarkdown>
         </div>
       ) : null}
+      {previews.length ? <div className="flex flex-col gap-2">{previews.map((source) => <RecordPreview key={source.key} source={source} />)}</div> : null}
       {children}
-      {content && !live ? <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}><CopyButton text={content} label="Copy reply" /></div> : null}
+      {content && !live ? (
+        <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}>
+          <CopyButton text={content} label="Copy reply" />
+          {onRetry ? <TurnAction label="Retry" onClick={onRetry}><RotateCcw className="size-3.5" aria-hidden="true" /></TurnAction> : null}
+        </div>
+      ) : null}
     </div>
   )
 }

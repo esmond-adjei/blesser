@@ -65,6 +65,7 @@ export interface AssistantSource {
   detail: string
   url: string | null
   opportunity: Opportunity | null
+  preview?: boolean
 }
 
 export interface AssistantMessage {
@@ -126,6 +127,7 @@ export type TurnRequest =
   | { type: "chat"; content: string }
   | { type: "confirm"; call_id: string; approved: boolean }
   | { type: "live" }
+  | { type: "retry" }
 
 export async function streamTurn(
   id: string,

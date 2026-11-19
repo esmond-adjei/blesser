@@ -7,6 +7,7 @@ import { browserTimezone } from "../../lib/push"
 import { Logo, Wordmark, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
+import { ChatSkeleton } from "../assistant/ChatSkeleton"
 import { AccountMenu } from "./AccountMenu"
 import { ShellHeaderContext, type ShellHeader } from "./shellHeader"
 import { NAV_GROUPS } from "./nav"
@@ -57,7 +58,7 @@ export function Shell() {
         <ShellHeaderContext.Provider value={setPageHeader}>
         {fullBleed ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <React.Suspense fallback={<LoadingScreen />}>
+            <React.Suspense fallback={pathname.startsWith("/assistant/") ? <ChatSkeleton /> : <LoadingScreen />}>
               <ErrorBoundary className="min-h-0 flex-1"><RouteFade className="flex min-h-0 flex-1 flex-col"><Outlet /></RouteFade></ErrorBoundary>
             </React.Suspense>
           </div>
