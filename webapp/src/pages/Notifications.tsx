@@ -64,9 +64,8 @@ export function Notifications() {
           onChange={setFilter}
           options={[{ value: "all", label: "All" }, { value: "unread", label: "Unread", count: unread }]}
         />
-        {unread ? <Button size="sm" variant="quiet" icon={<CheckCheck />} disabled={readAll.isPending} onClick={() => readAll.mutate()}>Mark all read</Button> : null}
-
           <div>
+            {unread ? <Button size="sm" variant="quiet" icon={<CheckCheck />} disabled={readAll.isPending} onClick={() => readAll.mutate()}>Mark all read</Button> : null}
             <Button size="sm" variant="quiet" icon={ <Settings />} onClick={() => navigate("/settings/notifications") }>
               Settings
             </Button>
