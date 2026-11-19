@@ -273,47 +273,9 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   }), [title, chatId, navigate])
   useShellHeader(header)
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-
-      <div className="nice-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="Messages" onScroll={(event) => {
-        const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
-        followScroll.current = scrollHeight - scrollTop - clientHeight < 64
-      }}>
-        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5 px-4 py-6 sm:px-6" aria-live="polite">
-          {chatId && thread.isPending && !active ? (
-            <p className="text-callout text-ink-secondary" role="status">Loading chat</p>
-          ) : chatId && thread.isError ? (
-            <EmptyState title="Couldn't open this chat" description={apiMessage(thread.error)} error
-              action={<Button variant="secondary" size="sm" onClick={() => selectChat()}>New chat</Button>} />
-          ) : !visibleRows.length && !working ? (
-            <EmptyState className="mt-[8vh]" title="What can I help you with?" description="Find opportunities, check deadlines, or plan your next application."
-              action={<Prompts prompts={STARTERS} onPick={(prompt) => void send(prompt)} className="justify-center" />} />
-          ) : null}
-
-          {visibleRows.map((message) => message.role === "user"
-            ? <UserBubble key={message.id} content={message.content} />
-            : <AssistantReply key={message.id} message={message} />)}
-          {visibleAnswer ? <AssistantReply message={visibleAnswer} /> : null}
-          {active && !active.answer && !pending ? (
-            <AssistantReply text={active.text} status={active.status} entries={active.trace} live />
-          ) : null}
-          {pending ? (
-            <AssistantReply entries={pending.trace}>
-              <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
-                <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
-                  <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Not now</Button>
-                </div>
-              </div>
-            </AssistantReply>
-          ) : null}
-          <div ref={end} />
-        </div>
-      </div>
-
-      <form className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]" onSubmit={(event) => { event.preventDefault(); void send(draft) }}>
+  const empty = !chatId && !visibleRows.length && !working
+  const composer = (
+      <form className={cn("mx-auto w-full max-w-[760px] shrink-0 px-4 sm:px-6", empty ? "" : "pb-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]")} onSubmit={(event) => { event.preventDefault(); void send(draft) }}>
         {replyError || (problem && !edit) ? <p role="alert" className="mb-2 text-footnote text-critical">{replyError || problem}</p> : null}
         <div className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2.5 pr-2.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--focus-soft)]">
           <textarea
@@ -339,6 +301,56 @@ function AssistantWorkspace({ userId }: { userId: string }) {
           )}
         </div>
       </form>
+  )
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+
+      {empty ? (
+        <div className="nice-scroll flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-0 py-8">
+          <div className="px-4 text-center">
+            <h2 className="type-title-2 text-ink">What can I help you with?</h2>
+            <p className="mt-1.5 text-callout text-ink-secondary">Find opportunities, check deadlines, or plan your next application.</p>
+          </div>
+          {composer}
+          <Prompts prompts={STARTERS} onPick={(prompt) => void send(prompt)} className="justify-center px-4" />
+        </div>
+      ) : null}
+      <div hidden={empty} className="nice-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="Messages" onScroll={(event) => {
+        const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
+        followScroll.current = scrollHeight - scrollTop - clientHeight < 64
+      }}>
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5 px-4 py-6 sm:px-6" aria-live="polite">
+          {chatId && thread.isPending && !active ? (
+            <p className="text-callout text-ink-secondary" role="status">Loading chat</p>
+          ) : chatId && thread.isError ? (
+            <EmptyState title="Couldn't open this chat" description={apiMessage(thread.error)} error
+              action={<Button variant="secondary" size="sm" onClick={() => selectChat()}>New chat</Button>} />
+          ) : null}
+
+          {visibleRows.map((message) => message.role === "user"
+            ? <UserBubble key={message.id} content={message.content} />
+            : <AssistantReply key={message.id} message={message} />)}
+          {visibleAnswer ? <AssistantReply message={visibleAnswer} /> : null}
+          {active && !active.answer && !pending ? (
+            <AssistantReply text={active.text} status={active.status} entries={active.trace} live />
+          ) : null}
+          {pending ? (
+            <AssistantReply entries={pending.trace}>
+              <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
+                <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
+                  <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Not now</Button>
+                </div>
+              </div>
+            </AssistantReply>
+          ) : null}
+          <div ref={end} />
+        </div>
+      </div>
+
+      {empty ? null : composer}
 
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent side="right" className="w-full gap-0 sm:max-w-sm">
