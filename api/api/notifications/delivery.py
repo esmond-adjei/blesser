@@ -43,7 +43,7 @@ def read_unsubscribe(token: str) -> tuple[str, str] | None:
 
 
 def settings_link() -> str:
-    return app_url("/new?settings=notifications")
+    return app_url("/settings/notifications")
 
 
 def email_for(user: auth_models.User, notification: notification_models.Notification) -> mailer.Mail:

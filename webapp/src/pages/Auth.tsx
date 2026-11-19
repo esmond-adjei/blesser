@@ -467,7 +467,7 @@ export function UnsubscribeEmail() {
   return (
     <AuthShell
       title="Email notifications"
-      subtitle={<Link to={user ? "/new?settings=notifications" : "/login"} className="font-semibold text-link hover:underline">{user ? "Notification settings" : "Sign in"}</Link>}
+      subtitle={<Link to={user ? "/settings/notifications" : "/login"} className="font-semibold text-link hover:underline">{user ? "Notification settings" : "Sign in"}</Link>}
     >
       {state === "done" ? (
         <div className="space-y-2 text-center">

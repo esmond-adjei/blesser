@@ -166,7 +166,7 @@ async def send_test(
         kind="test",
         title="Test notification",
         body="Notifications from Blesser reach this device.",
-        link="/new?settings=notifications",
+        link="/settings/notifications",
         dedupe_key=f"test:{uuid.uuid4().hex}",
     )
     row = (
