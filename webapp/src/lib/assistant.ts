@@ -102,6 +102,7 @@ export type AssistantEvent =
   | { type: "reasoning"; text: string }
   | { type: "commentary"; text: string }
   | { type: "token"; text: string }
+  | { type: "retract" }
   | { type: "tool_start"; tool: string; label: string; turn: number }
   | { type: "tool_result"; step: ToolStep; turn?: number }
   | { type: "user_message" | "message"; message: AssistantMessage }

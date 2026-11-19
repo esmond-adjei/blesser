@@ -56,6 +56,8 @@
   animation: bl-rise var(--dur-slow) var(--ease-out) both;
   animation-delay: calc(min(var(--i, 0), 8) * 24ms);
 }
+/* Each paragraph of a streaming reply rises in as it lands. */
+.bl-stream > * { animation: bl-rise var(--dur-base) var(--ease-out) both; }
 .bl-tab-panel[data-state="active"] { animation: bl-rise var(--dur-base) var(--ease-out); }
 
 /* The sliding pill behind the selected tab or segment; its box comes from JS. */

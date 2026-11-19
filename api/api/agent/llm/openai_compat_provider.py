@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import AsyncIterator
 from typing import Any
 
 from api.agent.llm.base import (
@@ -220,6 +221,18 @@ class OpenAICompatProvider(BaseLLMProvider):
                 native.append({"role": "user", "content": str(m.get("content", ""))})
         return native
 
+    def _request(self, messages, system, tools, max_tokens) -> dict:
+        limit = max_tokens or self.max_tokens
+        reasoning_model = self.name == "openai" and self.model.startswith(("gpt-5", "o1", "o3", "o4"))
+        return {
+            "model": self.model,
+            **({"max_completion_tokens": limit} if reasoning_model else {"max_tokens": limit}),
+            **({"reasoning_effort": self.effort} if self.effort else {}),
+            **self._thinking(),
+            "messages": self._to_native_messages(messages, system),
+            **({"tools": to_openai_tools(tools)} if tools else {}),
+        }
+
     async def chat(
         self,
         messages: list[dict],
@@ -228,14 +241,7 @@ class OpenAICompatProvider(BaseLLMProvider):
         max_tokens: int = 4096,
     ) -> LLMResponse:
         client = self._client_or_raise()
-        response = await client.chat.completions.create(
-            model=self.model,
-            **({"max_completion_tokens": max_tokens or self.max_tokens} if self.name == "openai" and self.model.startswith(("gpt-5", "o1", "o3", "o4")) else {"max_tokens": max_tokens or self.max_tokens}),
-            **({"reasoning_effort": self.effort} if self.effort else {}),
-            **self._thinking(),
-            messages=self._to_native_messages(messages, system),
-            **({"tools": to_openai_tools(tools)} if tools else {}),
-        )
+        response = await client.chat.completions.create(**self._request(messages, system, tools, max_tokens))
         finish = getattr(response.choices[0], "finish_reason", None)
         choice = response.choices[0].message
         inline_thought, text = split_thinking(choice.content or "")
@@ -265,4 +271,67 @@ class OpenAICompatProvider(BaseLLMProvider):
             },
             truncated=finish == "length",
             reasoning=_reasoning(choice) or inline_thought,
+        )
+
+    async def stream(
+        self,
+        messages: list[dict],
+        system: str,
+        tools: list[dict],
+        max_tokens: int = 4096,
+    ) -> AsyncIterator[tuple[str, Any]]:
+        client = self._client_or_raise()
+        chunks = await client.chat.completions.create(
+            **self._request(messages, system, tools, max_tokens),
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        splitter = ThinkSplitter()
+        text: list[str] = []
+        reasoning: list[str] = []
+        calls: dict[int, dict] = {}
+        finish = None
+        usage = None
+        async for chunk in chunks:
+            usage = getattr(chunk, "usage", None) or usage
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            finish = getattr(choice, "finish_reason", None) or finish
+            delta = choice.delta
+            if thought := _reasoning(delta):
+                reasoning.append(thought)
+            for kind, piece in splitter.feed(getattr(delta, "content", None) or ""):
+                if kind == "reasoning":
+                    reasoning.append(piece)
+                else:
+                    text.append(piece)
+                    yield "text", piece
+            for tc in getattr(delta, "tool_calls", None) or []:
+                call = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": "", "extra": {}})
+                call["id"] = tc.id or call["id"]
+                function = getattr(tc, "function", None)
+                if function is not None:
+                    call["name"] += function.name or ""
+                    call["arguments"] += function.arguments or ""
+                call["extra"].update(_tool_call_extra(tc))
+        for kind, piece in splitter.flush():
+            if kind == "reasoning":
+                reasoning.append(piece)
+            else:
+                text.append(piece)
+                yield "text", piece
+        tool_calls: list[ToolCall] = []
+        for _, call in sorted(calls.items()):
+            try:
+                args = json.loads(call["arguments"] or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append(ToolCall(id=call["id"], name=call["name"], arguments=args, extra_content=call["extra"]))
+        yield "done", LLMResponse(
+            text="".join(text),
+            tool_calls=tool_calls,
+            usage={**_usage(usage), "output_tokens": getattr(usage, "completion_tokens", 0) or 0},
+            truncated=finish == "length",
+            reasoning="".join(reasoning),
         )

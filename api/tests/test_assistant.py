@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from api.agent.llm.base import LLMResponse, ToolCall
+from api.agent.llm.base import BaseLLMProvider, LLMResponse, ToolCall
 from api.assistant import service
 from api.auth.models import User
 from api.auth.security import issue_access_token
@@ -35,7 +35,7 @@ def _model(monkeypatch, *replies):
     remaining = iter(replies)
     calls = []
 
-    class Provider:
+    class Provider(BaseLLMProvider):
         async def chat(self, **kwargs):
             calls.append(kwargs)
             return next(remaining)

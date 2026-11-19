@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import AsyncIterator
 from typing import Any
 
 from api.agent.llm.base import (
@@ -79,6 +80,39 @@ def _current_thinking(native: list[Any], replay: bool) -> list[Any]:
             m = {**m, "content": content or "..."}
         out.append(m)
     return out
+
+
+def _response(response: Any) -> LLMResponse:
+    text_parts: list[str] = []
+    thought_parts: list[str] = []
+    thinking: list[dict] = []
+    tool_calls: list[ToolCall] = []
+    for block in response.content:
+        if block.type == "text":
+            text_parts.append(block.text)
+        elif block.type == "thinking":
+            thought_parts.append(block.thinking)
+            thinking.append({"type": "thinking", "thinking": block.thinking, "signature": block.signature})
+        elif block.type == "redacted_thinking":
+            thinking.append({"type": "redacted_thinking", "data": block.data})
+        elif block.type == "tool_use":
+            tool_calls.append(
+                ToolCall(
+                    id=block.id, name=block.name, arguments=dict(block.input or {})
+                )
+            )
+    _keep_thinking(tool_calls, thinking)
+    usage = getattr(response, "usage", None)
+    return LLMResponse(
+        text="".join(text_parts),
+        tool_calls=tool_calls,
+        usage={
+            **_usage(usage),
+            "output_tokens": getattr(usage, "output_tokens", 0) or 0,
+        },
+        truncated=getattr(response, "stop_reason", None) == "max_tokens",
+        reasoning="".join(thought_parts),
+    )
 
 
 class AnthropicProvider(BaseLLMProvider):
@@ -244,33 +278,30 @@ class AnthropicProvider(BaseLLMProvider):
             self.replay_thinking = False
             logger.warning("Anthropic refused replayed thinking; asking without it: %s", exc)
             response = await client.messages.create(**self._request(messages, system, tools, max_tokens, False))
-        text_parts: list[str] = []
-        thought_parts: list[str] = []
-        thinking: list[dict] = []
-        tool_calls: list[ToolCall] = []
-        for block in response.content:
-            if block.type == "text":
-                text_parts.append(block.text)
-            elif block.type == "thinking":
-                thought_parts.append(block.thinking)
-                thinking.append({"type": "thinking", "thinking": block.thinking, "signature": block.signature})
-            elif block.type == "redacted_thinking":
-                thinking.append({"type": "redacted_thinking", "data": block.data})
-            elif block.type == "tool_use":
-                tool_calls.append(
-                    ToolCall(
-                        id=block.id, name=block.name, arguments=dict(block.input or {})
-                    )
-                )
-        _keep_thinking(tool_calls, thinking)
-        usage = getattr(response, "usage", None)
-        return LLMResponse(
-            text="".join(text_parts),
-            tool_calls=tool_calls,
-            usage={
-                **_usage(usage),
-                "output_tokens": getattr(usage, "output_tokens", 0) or 0,
-            },
-            truncated=getattr(response, "stop_reason", None) == "max_tokens",
-            reasoning="".join(thought_parts),
-        )
+        return _response(response)
+
+    async def stream(
+        self,
+        messages: list[dict],
+        system: str,
+        tools: list[dict],
+        max_tokens: int = 4096,
+    ) -> AsyncIterator[tuple[str, Any]]:
+        import anthropic
+
+        client = self._client_or_raise()
+        replay = self.replay_thinking
+        while True:
+            try:
+                async with client.messages.stream(**self._request(messages, system, tools, max_tokens, replay)) as events:
+                    async for event in events:
+                        if event.type == "text":
+                            yield "text", event.text
+                    final = await events.get_final_message()
+                break
+            except anthropic.BadRequestError as exc:
+                if not replay or not _thinking_refused(exc, messages):
+                    raise
+                self.replay_thinking = replay = False
+                logger.warning("Anthropic refused replayed thinking; asking without it: %s", exc)
+        yield "done", _response(final)

@@ -55,9 +55,26 @@ class SourceRegistry:
         return key
 
     def render(self, text):
-        text = re.sub(r"\brejected\b", "Not this time", text, flags=re.IGNORECASE)
-        text = re.sub(r"[ \t]*[—·][ \t]*", ", ", text)
         used = {}
+        parts = []
+        cited_deadlines = False
+        for paragraph in text.strip().splitlines():
+            line, cited = self.render_line(paragraph, used)
+            cited_deadlines = cited_deadlines or cited
+            if line is not None:
+                parts.append(line)
+        reply = "\n".join(parts).strip()
+        return (
+            reply,
+            [source.model_dump(mode="json") for source in used.values()],
+            cited_deadlines,
+        )
+
+    def render_line(self, paragraph, used=None):
+        """(grounded line or None when dropped, whether it cited a deadline)."""
+        used = {} if used is None else used
+        paragraph = re.sub(r"\brejected\b", "Not this time", paragraph, flags=re.IGNORECASE)
+        paragraph = re.sub(r"[ \t]*[—·][ \t]*", ", ", paragraph)
         cited_deadlines = False
 
         def cite(match):
@@ -74,24 +91,16 @@ class SourceRegistry:
                 return self.deadlines[match[1]]
             return "No deadline confirmed"
 
-        parts = []
-        for paragraph in text.strip().splitlines():
-            prose = _DEADLINE_REFERENCE.sub("", paragraph)
-            has_deadline = _DEADLINE_REFERENCE.search(paragraph)
-            if _UNGROUNDED_TIME.search(prose) or (
-                not has_deadline and _DATE_CLAIM.search(prose)
-            ):
-                for match in _REFERENCE.finditer(paragraph):
-                    cite(match)
-                for match in _DEADLINE_REFERENCE.finditer(paragraph):
-                    cite(match)
-                continue
-            paragraph = _DEADLINE_REFERENCE.sub(cite_deadline, paragraph)
-            clean = _REFERENCE.sub(cite, paragraph).rstrip()
-            parts.append(re.sub(r"[ \t]+([.,!?])", r"\1", clean))
-        reply = "\n".join(parts).strip()
-        return (
-            reply,
-            [source.model_dump(mode="json") for source in used.values()],
-            cited_deadlines,
-        )
+        prose = _DEADLINE_REFERENCE.sub("", paragraph)
+        has_deadline = _DEADLINE_REFERENCE.search(paragraph)
+        if _UNGROUNDED_TIME.search(prose) or (
+            not has_deadline and _DATE_CLAIM.search(prose)
+        ):
+            for match in _REFERENCE.finditer(paragraph):
+                cite(match)
+            for match in _DEADLINE_REFERENCE.finditer(paragraph):
+                cite(match)
+            return None, False
+        paragraph = _DEADLINE_REFERENCE.sub(cite_deadline, paragraph)
+        clean = _REFERENCE.sub(cite, paragraph).rstrip()
+        return re.sub(r"[ \t]+([.,!?])", r"\1", clean), cited_deadlines

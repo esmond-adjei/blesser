@@ -118,7 +118,7 @@ async def _test_stop_emits_a_terminal_event_and_does_cleanup():
 async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
     monkeypatch,
 ):
-    from api.agent.llm.base import LLMResponse, ToolCall
+    from api.agent.llm.base import BaseLLMProvider, LLMResponse, ToolCall
     from api.assistant import service
     from api.assistant.schemas import MessageOut
     from api.core.time import utcnow_naive
@@ -155,7 +155,7 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
     async def release(chat_id, lease):
         assert (chat_id, lease) == ("chat-id", "lease-id")
 
-    class Provider:
+    class Provider(BaseLLMProvider):
         async def chat(self, *, messages, **kwargs):
             if messages[-1]["role"] == "user":
                 return LLMResponse(
@@ -171,7 +171,7 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
                 == "lookup"
             )
             return LLMResponse(
-                text="Seed Fund closes on [deadline:s1].\nAnother deadline is tomorrow."
+                text="Seed Fund closes on [deadline:s1].\nAnother deadline is tomorrow.\n\nAsk me any time [s1]."
             )
 
     monkeypatch.setattr(service, "_begin", begin)
@@ -195,6 +195,7 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
         "tool_result",
         "status",
         "token",
+        "token",
         "message",
         "done",
     ]
@@ -206,7 +207,11 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
         "event": "commentary",
         "text": "I'll check the catalog.",
     }
-    assert events[-3]["text"] == "Seed Fund closes on 8 Sep 2040."
+    assert [e["text"] for e in events if e["event"] == "token"] == [
+        "Seed Fund closes on 8 Sep 2040.",
+        "\n\nAsk me any time.",
+    ]
+    assert events[-2]["message"]["content"] == "Seed Fund closes on 8 Sep 2040.\n\nAsk me any time."
     reply = events[-2]["message"]
     assert reply["trace"][0] == {
         "kind": "thought",
@@ -232,3 +237,64 @@ def test_stop_emits_a_terminal_event_and_does_cleanup():
 
 def test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(monkeypatch):
     asyncio.run(_test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(monkeypatch))
+
+
+async def _test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch):
+    from api.agent.llm.base import LLMResponse, ToolCall
+    from api.assistant import service
+
+    class Provider:
+        def __init__(self):
+            self.calls = 0
+
+        async def stream(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                for piece in ["Let me look.\n", "Checking"]:
+                    yield "text", piece
+                yield "done", LLMResponse(text="Let me look.\nChecking", tool_calls=[ToolCall("t", "nope", {})])
+                return
+            for piece in ["First", " line.\nSec", "ond line."]:
+                yield "text", piece
+            yield "done", LLMResponse(text="First line.\nSecond line.")
+
+    async def begin(chat_id, user_id, lease, content):
+        return _message("user", content), [], False
+
+    async def save(chat_id, user_id, lease, content, *rest):
+        return _message("assistant", content)
+
+    async def release(chat_id, lease):
+        pass
+
+    provider = Provider()
+    monkeypatch.setattr(service, "_begin", begin)
+    monkeypatch.setattr(service, "_save_reply", save)
+    monkeypatch.setattr(service.conversations, "release", release)
+    monkeypatch.setattr(service, "get_provider", lambda: provider)
+    events = [
+        (e["event"], e.get("text"))
+        async for e in service.chat_turn("chat-id", "member-id", "lease-id", "Hi")
+        if e["event"] in {"token", "retract", "commentary", "message"}
+    ]
+    assert events == [
+        ("token", "Let me look."),
+        ("retract", None),
+        ("commentary", "Let me look. Checking"),
+        ("token", "First line."),
+        ("token", "\nSecond line."),
+        ("message", None),
+    ]
+
+
+def _message(role, content):
+    from api.assistant.schemas import MessageOut
+    from api.core.time import utcnow_naive
+
+    return MessageOut(
+        id=role, role=role, content=content, trace=[], sources=[], cited_deadlines=False, created_at=utcnow_naive()
+    )
+
+
+def test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch):
+    asyncio.run(_test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch))

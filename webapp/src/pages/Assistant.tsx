@@ -79,6 +79,7 @@ function updateReply(reply: LiveReply, event: AssistantEvent): LiveReply {
         : reply
     }
     case "token": return { ...reply, status: "", text: reply.text + event.text }
+    case "retract": return { ...reply, text: "" }
     case "tool_start": return { ...reply, status: TOOL_RUNNING[event.tool] ?? event.label }
     case "tool_result": return { ...reply, status: "", trace: [...reply.trace, event.step] }
     case "user_message": return { ...reply, user: event.message }
@@ -435,7 +436,7 @@ function AssistantReply({ message, text, status, entries = [], live, children }:
       <span className="sr-only">Assistant said</span>
       {trace.length || working ? <AgentSteps entries={trace} live={!!working} status={status} /> : null}
       {content ? (
-        <div className="text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2">
+        <div className={cn(live && "bl-stream", "text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2")}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
             table: ({ children }) => <div className="overflow-x-auto"><table>{children}</table></div>,
           }}>{content}</ReactMarkdown>

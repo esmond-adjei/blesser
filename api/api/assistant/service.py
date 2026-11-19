@@ -134,18 +134,53 @@ async def _save_reply(chat_id, user_id, lease, reply, trace, sources, cited_dead
     return message
 
 
-async def _model_call(provider, history, definitions, max_tokens):
+async def _model_stream(provider, history, definitions, max_tokens):
     call_deadline = settings.llm_call_deadline_seconds
     async with (
         model_slot(provider),
         asyncio.timeout(call_deadline if call_deadline > 0 else None),
+        aclosing(
+            provider.stream(
+                messages=history,
+                system=SYSTEM + f"\nToday's catalog date is {today():%Y-%m-%d}.",
+                tools=definitions,
+                max_tokens=max_tokens,
+            )
+        ) as pieces,
     ):
-        return await provider.chat(
-            messages=history,
-            system=SYSTEM + f"\nToday's catalog date is {today():%Y-%m-%d}.",
-            tools=definitions,
-            max_tokens=max_tokens,
-        )
+        async for piece in pieces:
+            yield piece
+
+
+class _Draft:
+    """Grounds a streaming reply one finished line at a time, holding back blank lines."""
+
+    def __init__(self, registry):
+        self.registry = registry
+        self.buffer = ""
+        self.blank = 0
+        self.shown = ""
+
+    def feed(self, delta):
+        self.buffer += delta
+        *lines, self.buffer = self.buffer.split("\n")
+        return "".join(self._line(line) for line in lines)
+
+    def flush(self):
+        rest, self.buffer = self.buffer, ""
+        return self._line(rest)
+
+    def _line(self, line):
+        text, _ = self.registry.render_line(line)
+        if text is None:
+            return ""
+        if not text.strip():
+            self.blank += bool(self.shown)
+            return ""
+        piece = "\n" * (1 + self.blank) + text if self.shown else text.lstrip()
+        self.blank = 0
+        self.shown += piece
+        return piece
 
 
 async def _read(user_id, tool, arguments, registry):
@@ -155,8 +190,11 @@ async def _read(user_id, tool, arguments, registry):
         return await tools.read(session, user_id, tool, arguments, registry)
 
 
-async def _finish(message):
-    yield {"event": "token", "text": message.content}
+async def _finish(message, streamed=""):
+    if streamed != message.content:
+        if streamed:
+            yield {"event": "retract"}
+        yield {"event": "token", "text": message.content}
     yield {"event": "message", "message": message.model_dump(mode="json")}
 
 
@@ -176,6 +214,8 @@ async def _loop(chat_id, user_id, lease, content):
     changes_enabled = False
     web_configured = any(item["configured"] for item in web.search_chain())
     reply = "I reached my lookup limit. Try a more specific question."
+    reply_streamed = False
+    draft = None
     sources, cited_deadlines = [], False
     for step in range(1, MAX_STEPS + 1):
         web_allowed = web_configured and not private_context and not history_has_contact
@@ -191,16 +231,24 @@ async def _loop(chat_id, user_id, lease, content):
             if step == 1
             else "Reviewing what I found",
         }
-        response = await _model_call(
-            provider, history, offered, settings.llm_max_tokens
-        )
-        if response.empty_at_limit and settings.llm_max_tokens < ROOMY_MAX_TOKENS:
-            response = await _model_call(provider, history, offered, ROOMY_MAX_TOKENS)
+        draft = _Draft(registry)
+        response = None
+        for limit in (settings.llm_max_tokens, ROOMY_MAX_TOKENS):
+            async for kind, value in _model_stream(provider, history, offered, limit):
+                if kind == "done":
+                    response = value
+                elif piece := draft.feed(value):
+                    yield {"event": "token", "text": piece}
+            if not response.empty_at_limit or limit >= ROOMY_MAX_TOKENS:
+                break
+        if not response.tool_calls and (piece := draft.flush()):
+            yield {"event": "token", "text": piece}
         thoughts = response.reasoning.strip()
         if thoughts:
             trace.append({"kind": "thought", "text": thoughts[:4000]})
             yield {"event": "reasoning", "text": thoughts[:4000]}
         if not response.tool_calls:
+            reply_streamed = True
             reply, sources, cited_deadlines = registry.render(response.text)
             if not reply:
                 reply = (
@@ -209,6 +257,8 @@ async def _loop(chat_id, user_id, lease, content):
                     else "I couldn't find a confirmed answer. Try asking in a different way."
                 )
             break
+        if draft.shown:
+            yield {"event": "retract"}
         calls = response.tool_calls
         commentary = _commentary(registry, response.text)
         if commentary:
@@ -302,7 +352,7 @@ async def _loop(chat_id, user_id, lease, content):
     message = await _save_reply(
         chat_id, user_id, lease, reply, trace, sources, cited_deadlines
     )
-    async for event in _finish(message):
+    async for event in _finish(message, draft.shown if reply_streamed else ""):
         yield event
 
 

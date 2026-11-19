@@ -9,6 +9,7 @@ Message history:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -62,6 +63,19 @@ class BaseLLMProvider:
         max_tokens: int = 4096,
     ) -> LLMResponse:
         raise NotImplementedError
+
+    async def stream(
+        self,
+        messages: list[dict],
+        system: str,
+        tools: list[dict],
+        max_tokens: int = 4096,
+    ) -> AsyncIterator[tuple[str, Any]]:
+        """Yields ("text", delta) as the reply is written, then ("done", LLMResponse)."""
+        response = await self.chat(messages=messages, system=system, tools=tools, max_tokens=max_tokens)
+        if response.text:
+            yield "text", response.text
+        yield "done", response
 
 
 def to_anthropic_tools(tools: list[dict]) -> list[Any]:
