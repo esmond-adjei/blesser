@@ -237,11 +237,20 @@ async def mark_read(session, user_id: str, notification_id: str | None = None) -
     return result.rowcount or 0
 
 
-async def dismiss(session, user_id: str, notification_id: str | None = None) -> int:
-    """Remove one or all inbox entries without losing delivery or dedupe history."""
+async def dismiss(
+    session,
+    user_id: str,
+    notification_id: str | None = None,
+    notification_ids: list[str] | None = None,
+) -> int:
+    """Remove one, some, or all inbox entries without losing delivery or dedupe history."""
+    if notification_ids is not None and not notification_ids:
+        return 0
     stmt = update(notification_models.Notification).where(*_inbox(user_id))
     if notification_id is not None:
         stmt = stmt.where(notification_models.Notification.id == notification_id)
+    elif notification_ids is not None:
+        stmt = stmt.where(notification_models.Notification.id.in_(notification_ids))
     result = await session.execute(stmt.values(in_inbox=False))
     await session.commit()
     return result.rowcount or 0

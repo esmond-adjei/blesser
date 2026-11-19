@@ -281,6 +281,10 @@ export interface PushDevice {
 }
 export const listNotifications = () => get<NotificationInbox>("/api/app/notifications")
 export const deleteNotification = (id: string) => del<{ removed: number }>(`/api/app/notifications/${encodeURIComponent(id)}`)
+export const deleteNotifications = (ids: string[]) =>
+  ids.length
+    ? del<{ removed: number }>(`/api/app/notifications?${new URLSearchParams(ids.map((id) => ["ids", id]))}`)
+    : Promise.resolve({ removed: 0 })
 export const clearNotifications = () => del<{ removed: number }>("/api/app/notifications")
 export const markNotificationRead = (id: string) => post<{ marked: number }>(`/api/app/notifications/${id}/read`)
 export const markAllNotificationsRead = () => post<{ marked: number }>("/api/app/notifications/read-all")

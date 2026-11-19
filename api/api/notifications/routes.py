@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -246,11 +246,16 @@ async def unsubscribe_email(
 
 @router.delete("/notifications")
 async def clear_notifications(
+    ids: list[str] | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
     current: auth_schemas.UserOut = Depends(get_current_user),
 ):
-    """Clear the whole account inbox, including entries beyond its newest 30."""
-    return {"removed": await notification_service.dismiss(session, current.id)}
+    """Clear the whole account inbox, or only the entries named by `ids`."""
+    return {
+        "removed": await notification_service.dismiss(
+            session, current.id, notification_ids=ids
+        )
+    }
 
 
 @router.delete("/notifications/{notification_id}")

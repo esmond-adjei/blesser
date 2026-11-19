@@ -739,6 +739,38 @@ def test_delete_notification_is_scoped_idempotent_and_preserves_delivery(monkeyp
     assert _rows(bob)[0].in_inbox is True
 
 
+def test_delete_selected_notifications_is_scoped_and_ignores_unknown_ids(monkeypatch):
+    from api.auth import schemas as auth_schemas
+    from api.auth.routes import get_current_user
+
+    alice, bob = _new_user(), _new_user()
+    for key in ("keep", "remove-a", "remove-b"):
+        _notify(alice, key)
+    _notify(bob, "other-account")
+    own = {row.dedupe_key: row for row in _rows(alice)}
+    other = _rows(bob)[0]
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        get_current_user,
+        lambda: auth_schemas.UserOut(
+            id=alice, email=f"{alice}@example.com", created_at=_at(2026, 1, 1)
+        ),
+    )
+    client = TestClient(app)
+    response = client.delete(
+        "/api/notifications",
+        params={"ids": [own["remove-a"].id, own["remove-b"].id, other.id]},
+    )
+    assert response.json() == {"removed": 2}
+    inbox = client.get("/api/notifications").json()
+    assert [item["id"] for item in inbox["items"]] == [own["keep"].id]
+    assert _rows(bob)[0].in_inbox is True
+    assert client.delete("/api/notifications", params={"ids": "missing"}).json() == {
+        "removed": 0
+    }
+    assert len(client.get("/api/notifications").json()["items"]) == 1
+
+
 def test_clear_notifications_includes_older_read_and_unread_entries(monkeypatch):
     from api.auth import schemas as auth_schemas
     from api.auth.routes import get_current_user

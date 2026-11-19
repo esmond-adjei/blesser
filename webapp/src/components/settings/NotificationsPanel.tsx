@@ -34,7 +34,6 @@ export function NotificationsPanel() {
         {!prefs.data ? (
           <SkeletonStack aria-label="Loading notification settings" aria-busy="true" className="space-y-3 p-4" blocks={["h-10", "h-10", "h-10"]} />
         ) : (
-          <>
             <table className="w-full text-callout">
               <thead>
                 <tr className="text-left text-footnote text-ink-secondary">
@@ -63,10 +62,6 @@ export function NotificationsPanel() {
                 ))}
               </tbody>
             </table>
-            <p className="px-4 py-3 text-footnote text-ink-secondary sm:px-5">
-              Push and email carry a short update and a link back here. Your notes and application details stay private. Email goes to verified addresses only.
-            </p>
-          </>
         )}
       </SettingsGroup>
 

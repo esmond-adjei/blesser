@@ -523,7 +523,7 @@ function ScanPanel({ scan, actions }: { scan: Scan; actions?: React.ReactNode })
         </Chip>
         {actions}
       </div>
-      <Tasks tasks={scan.tasks ?? []} />
+      {/* <Tasks tasks={scan.tasks ?? []} /> */}
       <Finds finds={scan.finds ?? []} running={running} />
     </section>
   )
@@ -537,9 +537,9 @@ export function ScanDetail() {
   if (scan.isError || !scan.data)
     return <ErrorState title="This scan didn't load" description="It may have been deleted." onRetry={() => void scan.refetch()} />
   return (
-    <div className="bl-enter min-w-0 space-y-5">
+    <div className="bl-enter min-w-0 max-w-3xl mx-auto space-y-5">
       <PageHeader
-        back={<Link to="/scans" className="hover:text-ink hover:underline">Scans</Link>}
+        back={<Link to="/scans" className="hover:text-ink hover:underline">Back to Scans</Link>}
         title={scanTitle(scan.data)}
         description={`Started ${formatAgo(scan.data.created_at)}`}
       />
