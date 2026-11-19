@@ -252,6 +252,9 @@ def test_scan_finds_keep_web_and_catalog_provenance_without_logs():
         {
             "opportunity_id": opportunity_id,
             "title": data["title"],
+            "slug": "accra-ventures-climate-fund",
+            "category": data["category"],
+            "kind": data["kind"],
             "deadline_date": None,
             "source": "web",
             "source_domain": "accraventures.example",

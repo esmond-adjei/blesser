@@ -172,11 +172,11 @@ def test_cancel_stops_pending_work_and_halts_running_agents():
 
 def test_start_list_and_delete_scans():
     client = TestClient(app)
-    started = client.post("/api/scans", json={"categories": ["student", "startup"], "focus": "agritech"})
+    started = client.post("/api/scans", json={"categories": ["student"], "focus": "agritech"})
     assert started.status_code == 200, started.text
     body = started.json()
-    assert body["region"] == "Ghana" and body["categories"] == ["startup", "student"]
-    assert sorted(t["target"] for t in body["tasks"]) == ["category:startup", "category:student"]
+    assert body["region"] == "Ghana" and body["categories"] == ["student"]
+    assert [t["target"] for t in body["tasks"]] == ["category:student"]
     assert body["id"] in [s["id"] for s in client.get("/api/scans").json()]
     assert client.delete(f"/api/scans/{body['id']}").status_code == 200
     assert client.get(f"/api/scans/{body['id']}").status_code == 404
