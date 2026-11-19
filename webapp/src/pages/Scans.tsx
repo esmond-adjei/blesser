@@ -32,6 +32,7 @@ import {
   type LogLine,
 } from "../lib/scanLog"
 import { toastError, toastSuccess } from "../lib/toast"
+import { LINEAR_OK, springEasing } from "../lib/motion"
 import type { OpportunityCategory, Scan, ScanFind, ScanTask } from "../lib/types"
 import { Button, Chip, Countdown, OpportunityArt, buttonVariants, cn, daysUntil } from "@blesser/ui"
 import {
@@ -93,7 +94,7 @@ function AllowanceNote() {
   const a = allowance.data
   if (!a?.enabled) return null
   const left = Math.min(a.left_this_hour, a.left_today)
-  const text = a.left_today === 0 ? "No scans left today" : left === 0 ? "No scans left this hour" : `${a.left_this_hour} of ${a.per_hour} scans left this hour`
+  const text = a.left_today === 0 ? "No scans left today" : left === 0 ? "No scans left this hour" : `You have ${a.left_this_hour} / ${a.per_hour} scans left for this hour`
   return <span className="text-footnote text-ink-secondary tabular-nums">{text}</span>
 }
 
@@ -174,7 +175,7 @@ export function Scans() {
     actions: (
       <div className="flex items-center gap-3">
         <AllowanceNote />
-        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Arrange</Button>
+        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto Arrange</Button>
       </div>
     ),
   }), [arrange])
@@ -593,19 +594,6 @@ function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () =
   )
 }
 
-/** Samples a critically damped-ish spring into a CSS linear() easing. */
-function springEasing(damping: number, points = 48): string {
-  const w = 9
-  const wd = w * Math.sqrt(1 - damping * damping)
-  const stops = Array.from({ length: points + 1 }, (_, i) => {
-    const t = i / points
-    const x = 1 - Math.exp(-damping * w * t) * (Math.cos(wd * t) + ((damping * w) / wd) * Math.sin(wd * t))
-    return (i === points ? 1 : x).toFixed(4)
-  })
-  return `linear(${stops.join(", ")})`
-}
-
-const LINEAR_OK = typeof CSS !== "undefined" && CSS.supports("transition-timing-function", "linear(0, 1)")
 const OPEN = { duration: 380, easing: LINEAR_OK ? springEasing(0.78) : "cubic-bezier(0.2, 0.9, 0.25, 1.05)" }
 const CLOSE = { duration: 300, easing: LINEAR_OK ? springEasing(0.92) : "cubic-bezier(0.3, 0.8, 0.3, 1)" }
 const RADIUS = 20

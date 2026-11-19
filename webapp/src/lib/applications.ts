@@ -24,10 +24,21 @@ export function useApplications() {
   return useQuery({ queryKey: ["applications"], queryFn: api.listApplications })
 }
 
+/** One application, fetched when its drawer or page opens. */
+export function useApplication(id: string | undefined) {
+  return useQuery({
+    queryKey: ["application", id],
+    queryFn: () => api.getApplication(id as string),
+    enabled: !!id,
+    staleTime: 60_000,
+  })
+}
+
 export function useApplicationMutations() {
   const client = useQueryClient()
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["applications"] })
+    void client.invalidateQueries({ queryKey: ["application"] })
     void client.invalidateQueries({ queryKey: ["opportunities", "tracked"] })
   }
   const create = useMutation({
@@ -39,6 +50,7 @@ export function useApplicationMutations() {
     // Optimistic: status changes and ticks move at once.
     onMutate: async ({ id, body }) => {
       await client.cancelQueries({ queryKey: ["applications"] })
+      await client.cancelQueries({ queryKey: ["application", id] })
       const before = client.getQueryData<Application[]>(["applications"])
       if (before) {
         client.setQueryData<Application[]>(
@@ -46,10 +58,13 @@ export function useApplicationMutations() {
           before.map((a) => (a.id === id ? ({ ...a, ...body } as Application) : a)),
         )
       }
-      return { before }
+      const beforeOne = client.getQueryData<Application>(["application", id])
+      if (beforeOne) client.setQueryData<Application>(["application", id], { ...beforeOne, ...body } as Application)
+      return { before, beforeOne }
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, { id }, context) => {
       if (context?.before) client.setQueryData(["applications"], context.before)
+      if (context?.beforeOne) client.setQueryData(["application", id], context.beforeOne)
     },
     onSettled: refresh,
   })

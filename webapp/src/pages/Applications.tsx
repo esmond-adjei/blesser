@@ -1,27 +1,28 @@
 import { useIsMobile } from "../hooks/use-mobile"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
-import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { ArrowUpRight, CalendarDays, Columns3, List, MoveRight, PanelRightOpen, Plus, Trash2 } from "lucide-react"
-import { OPEN_STATUSES, STATUSES, STATUS_LABEL, useApplicationMutations, useApplications } from "../lib/applications"
-import { toastError, toastSuccess } from "../lib/toast"
-import { useUrlParam } from "../lib/urlParams"
-import { useTodos } from "../lib/opportunities"
-import { TodoAdd, TodoRow, todayIso } from "../components/todos/TodoList"
-import type { Application, ApplicationStatus as Status, RequirementItem } from "../lib/types"
+import { ArrowUpRight, Columns3, List, MoveRight, PanelRightOpen, Plus, Trash2 } from "lucide-react"
 import {
-  ApplicationStatus,
+  OPEN_STATUSES,
+  STATUSES,
+  STATUS_LABEL,
+  useApplication,
+  useApplicationMutations,
+  useApplications,
+} from "../lib/applications"
+import { toastError, toastSuccess } from "../lib/toast"
+import { useDrawerParam } from "../lib/urlParams"
+import type { Application, ApplicationStatus as Status } from "../lib/types"
+import {
   Button,
   Chip,
   Countdown,
   Field,
   Input,
-  Textarea,
   buttonVariants,
   cn,
   daysUntil,
-  type ApplicationStage,
   type ChipTone,
 } from "@blesser/ui"
 import {
@@ -34,11 +35,10 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { Skeleton, SkeletonStack } from "../components/ui/feedback"
 import { PageHeader, Segmented } from "../components/layout/PageHeader"
-import { DeadlineCalendar } from "../components/applications/DeadlineCalendar"
+import { ApplicationDetail } from "../components/applications/ApplicationDetail"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
-
-const stage = (status: Status): ApplicationStage => (status === "rejected" ? "not-this-time" : status)
 
 const STATUS_TONE: Record<Status, ChipTone> = {
   saved: "neutral",
@@ -69,14 +69,14 @@ const FILTERS = [
   ...STATUSES,
 ]
 
-type View = "list" | "board" | "calendar"
+type View = "list" | "board"
 const VIEW_KEY = "blesser.applications.view"
 
 function useView(): [View, (view: View) => void] {
   const [view, setView] = React.useState<View>(() => {
     try {
       const saved = localStorage.getItem(VIEW_KEY)
-      return saved === "board" || saved === "calendar" ? saved : "list"
+      return saved === "board" ? saved : "list"
     } catch {
       return "list"
     }
@@ -122,16 +122,11 @@ export function Applications() {
   const { data, isLoading, isError, refetch } = useApplications()
   const [filter, setFilter] = React.useState("active")
   const [view, setView] = useView()
-  const [editing, setEditing] = React.useState<Application | null>(null)
   const [adding, setAdding] = React.useState(false)
   // ?open=<id> opens that application, e.g. from a to-do's link.
-  const [openId, setOpenId] = useUrlParam("open")
-  const linked = openId ? data?.find((a) => a.id === openId) : undefined
-  if (linked && editing?.id !== linked.id) {
-    setEditing(linked)
-    setOpenId("")
-  }
-  const { move, actionsFor } = useAppActions(setEditing)
+  const drawer = useDrawerParam()
+  const openApplication = (app: Application) => drawer.open(app.id)
+  const { move, actionsFor } = useAppActions(openApplication)
 
   const apps = (data ?? []).filter((a) => {
     if (view !== "list" || filter === "all") return true
@@ -176,7 +171,6 @@ export function Applications() {
           options={[
             { value: "list", label: "List", icon: <List aria-hidden="true" /> },
             { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
-            { value: "calendar", label: "Calendar", icon: <CalendarDays aria-hidden="true" /> },
           ]}
         />
       </div>
@@ -195,10 +189,8 @@ export function Applications() {
             </Link>
           }
         />
-      ) : view === "calendar" ? (
-        <DeadlineCalendar key="calendar" apps={apps} onOpen={setEditing} />
       ) : view === "board" ? (
-        <Board key="board" apps={apps} onOpen={setEditing} onMove={move} actionsFor={actionsFor} />
+        <Board key="board" apps={apps} onOpen={openApplication} onMove={move} actionsFor={actionsFor} />
       ) : (
         <ul key="list" className="divide-y divide-separator rounded-lg border border-separator bg-surface">
           {apps.map((app, i) => {
@@ -211,7 +203,7 @@ export function Applications() {
                   style={{ "--i": i } as React.CSSProperties}
                   className="bl-enter flex items-center gap-3 px-3 py-3 transition-colors hover:bg-highlight/50 data-[state=open]:bg-highlight/50 sm:gap-4 sm:px-4"
                 >
-                  <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => setEditing(app)}>
+                  <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => openApplication(app)}>
                     <span className="block text-callout font-semibold text-ink hover:textlink">{app.title}</span>
                     {meta.length ? <span className="mt-0.5 block truncate text-footnote text-ink-tertiary">{meta.join(", ")}</span> : null}
                     <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 sm:hidden">
@@ -233,7 +225,7 @@ export function Applications() {
         </ul>
       )}
 
-      <ApplicationSheet app={editing} onClose={() => setEditing(null)} />
+      <ApplicationSheet id={drawer.id} onClose={drawer.close} />
       <AddDialog open={adding} onClose={() => setAdding(false)} />
     </div>
   )
@@ -406,123 +398,96 @@ function BoardTile({
   )
 }
 
-function ApplicationSheet({ app, onClose }: { app: Application | null; onClose: () => void }) {
-  const { update, remove } = useApplicationMutations()
+export function ApplicationSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const { remove } = useApplicationMutations()
+  const detail = useApplication(id ?? undefined)
   const phone = useIsMobile()
-  const [shown, setShown] = React.useState<Application | null>(app)
-  const [notes, setNotes] = React.useState("")
-  const [deadline, setDeadline] = React.useState("")
-  const [requirements, setRequirements] = React.useState<RequirementItem[]>([])
-  const [newItem, setNewItem] = React.useState("")
-  if (app && app !== shown) {
-    setShown(app)
-    setNotes(app.notes)
-    setDeadline(app.deadline_date ?? "")
-    setRequirements(app.requirements)
-    setNewItem("")
-  }
-  const save = (body: Parameters<typeof update.mutate>[0]["body"]) =>
-    shown && update.mutate({ id: shown.id, body }, { onError: (err) => toastError(err, "Couldn't save") })
+  // Keep the last record while the sheet animates out.
+  const [shown, setShown] = React.useState<Application | null>(null)
+  const current = id ? detail.data : undefined
+  if (current && current !== shown) setShown(current)
+  const app = current ?? (id ? null : shown)
+  const failed = !!id && detail.isError
 
   return (
-    <Sheet open={!!app} onOpenChange={(open) => !open && onClose()}>
-      {shown ? (
+    <Sheet open={!!id} onOpenChange={(open) => !open && onClose()}>
+      {id || shown ? (
         <SheetContent side={phone ? "bottom" : "right"} className="gap-0 max-sm:h-[92dvh] sm:w-full sm:max-w-xl">
-          <SheetHeader className="border-b border-separator p-5 pr-14">
-            <SheetTitle>{shown.title}</SheetTitle>
-            <SheetDescription>
-              {[shown.organization, shown.kind].filter(Boolean).join(", ")}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-            <ApplicationStatus status={stage(shown.status)} />
-            {shown.benefits ? <p className="text-callout font-semibold text-ink">{shown.benefits}</p> : null}
-            <Field label="Deadline">
-              <Input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                onBlur={() => deadline !== (shown.deadline_date ?? "") && save({ deadline_date: deadline || null })}
-              />
-            </Field>
-            <div>
-              <p className="mb-1.5 text-headline text-ink">What to prepare</p>
-              <ul className="space-y-1.5">
-                {requirements.map((r, i) => (
-                  <li key={`${r.label}-${i}`} className="flex items-center gap-2 text-callout">
-                    <Checkbox
-                      checked={r.done}
-                      aria-label={r.label}
-                      onCheckedChange={() => {
-                        const next = requirements.map((x, j) => (j === i ? { ...x, done: !x.done } : x))
-                        setRequirements(next)
-                        save({ requirements: next })
-                      }}
-                    />
-                    <span className={cn(r.done && "text-ink-tertiary line-through")}>{r.label}</span>
-                  </li>
-                ))}
-              </ul>
-              <form
-                className="mt-2 flex gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (!newItem.trim()) return
-                  const next = [...requirements, { label: newItem.trim(), done: false }]
-                  setRequirements(next)
-                  setNewItem("")
-                  save({ requirements: next })
-                }}
-              >
-                <Input
-                  aria-label="Add an item"
-                  placeholder="Add an item, e.g. Two references"
-                  value={newItem}
-                  onChange={(e) => setNewItem(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="submit" size="sm" variant="secondary" disabled={!newItem.trim()}>
-                  Add
+          {app ? (
+            <>
+              <SheetHeader className="border-b border-separator p-5 pr-14">
+                <SheetTitle>{app.title}</SheetTitle>
+                <SheetDescription>
+                  {[app.organization, app.kind].filter(Boolean).join(", ")}
+                </SheetDescription>
+              </SheetHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                <ApplicationDetail key={app.id} app={app} />
+              </div>
+              <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  className="mr-auto text-critical hover:bg-critical-soft"
+                  onClick={() =>
+                    remove.mutate(app.id, {
+                      onSuccess: () => {
+                        toastSuccess("Removed from your applications")
+                        onClose()
+                      },
+                      onError: (err) => toastError(err, "Couldn't remove it"),
+                    })
+                  }
+                  icon={<Trash2 />}
+                >
+                  Remove
                 </Button>
-              </form>
-            </div>
-            <ApplicationTodos app={shown} />
-            <Field label="Notes">
-              <Textarea
-                rows={4}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                onBlur={() => notes !== shown.notes && save({ notes })}
-              />
-            </Field>
-          </div>
-          <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <Button
-              size="sm"
-              variant="quiet"
-              className="mr-auto text-critical hover:bg-critical-soft"
-              onClick={() =>
-                remove.mutate(shown.id, {
-                  onSuccess: () => {
-                    toastSuccess("Removed from your applications")
-                    onClose()
-                  },
-                  onError: (err) => toastError(err, "Couldn't remove it"),
-                })
-              }
-              icon={<Trash2 />}
-            >
-              Remove
-            </Button>
-            {shown.link ? (
-              <a href={shown.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "secondary" })}>
-                Open <ArrowUpRight />
-              </a>
-            ) : null}
-            <Button size="sm" variant="primary" onClick={onClose}>
-              Done
-            </Button>
-          </SheetFooter>
+                {app.link ? (
+                  <a href={app.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "secondary" })}>
+                    Open <ArrowUpRight />
+                  </a>
+                ) : null}
+                <Link to={`/applications/${encodeURIComponent(app.id)}`} className={buttonVariants({ size: "sm", variant: "quiet" })}>
+                  Open full page
+                </Link>
+                <Button size="sm" variant="primary" onClick={onClose}>
+                  Done
+                </Button>
+              </SheetFooter>
+            </>
+          ) : (
+            <>
+              <SheetHeader className="border-b border-separator p-5 pr-14">
+                <SheetTitle className="sr-only">Application</SheetTitle>
+                <SheetDescription className="sr-only">
+                  {failed ? "Couldn't load application details" : "Loading application details"}
+                </SheetDescription>
+                {failed ? null : (
+                  <>
+                    <Skeleton className="h-6 w-2/3" />
+                    <Skeleton className="mt-2 h-4 w-1/3" />
+                  </>
+                )}
+              </SheetHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto p-5" aria-busy={failed ? undefined : true}>
+                {failed ? (
+                  <ErrorState
+                    compact
+                    title="That application didn't load"
+                    description="Check your connection and try again."
+                    onRetry={() => void detail.refetch()}
+                  />
+                ) : (
+                  <SkeletonStack
+                    role="status"
+                    aria-label="Loading application details"
+                    className="space-y-3"
+                    blocks={["h-6 w-1/3", "h-9 w-full", "h-4 w-2/3", "h-4 w-1/2", "h-28 w-full"]}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </SheetContent>
       ) : null}
     </Sheet>
@@ -581,22 +546,5 @@ function AddDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
         </form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function ApplicationTodos({ app }: { app: Application }) {
-  const todos = useTodos("open")
-  const today = todayIso()
-  const mine = (todos.data ?? []).filter((t) => t.application_id === app.id)
-  return (
-    <section aria-labelledby="app-todos-heading" className="space-y-2">
-      <h3 id="app-todos-heading" className="text-headline text-ink">To-dos</h3>
-      {mine.length ? (
-        <ul className="overflow-hidden rounded-lg border border-separator bg-surface">
-          {mine.map((todo, i) => <TodoRow key={todo.id} todo={todo} today={today} index={i} showLink={false} />)}
-        </ul>
-      ) : null}
-      <TodoAdd link={{ application_id: app.id }} placeholder="Add a step, e.g. Ask for two references" />
-    </section>
   )
 }

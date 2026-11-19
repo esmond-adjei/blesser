@@ -35,7 +35,7 @@ import {
   useTrackedOpportunities,
 } from "../lib/opportunities"
 import { formatAgo } from "../lib/format"
-import { useUrlParam } from "../lib/urlParams"
+import { useDrawerParam, useUrlParam } from "../lib/urlParams"
 import { toastError, toastSuccess } from "../lib/toast"
 import type { Opportunity, OpportunityCategory, OpportunityKind } from "../lib/types"
 import {
@@ -60,6 +60,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
+import { Skeleton, SkeletonStack } from "../components/ui/feedback"
 import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
 import { ShareDialog } from "../components/share/ShareDialog"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
@@ -106,7 +107,7 @@ export function Opportunities() {
   const [soonParam, setSoon] = useUrlParam("soon")
   const [closedParam, setClosed] = useUrlParam("closed")
   const [newParam, setNew] = useUrlParam("new")
-  const [openParam, setOpenParam] = useUrlParam("open")
+  const drawer = useDrawerParam()
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
   const sort = sortParam === "new" ? "new" : "deadline"
@@ -139,14 +140,15 @@ export function Opportunities() {
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
   const counts = new Map(facets.data?.categories.map((c) => [c.key, c.count]))
 
-  const [detail, setDetail] = React.useState<Opportunity | null>(null)
-  const linked = useOpportunity(openParam && !detail ? openParam : undefined)
-  const shownDetail = detail ?? (openParam ? linked.data ?? null : null)
   const [todoFor, setTodoFor] = React.useState<Opportunity | null>(null)
   const [scanOpen, setScanOpen] = React.useState(false)
   const [submitOpen, setSubmitOpen] = React.useState(false)
   const [shareFor, setShareFor] = React.useState<Opportunity | null>(null)
-  const handlers: OpportunityHandlers = { onOpen: setDetail, onTodo: setTodoFor, onShare: setShareFor }
+  const handlers: OpportunityHandlers = {
+    onOpen: (opp) => drawer.open(opp.id),
+    onTodo: setTodoFor,
+    onShare: setShareFor,
+  }
   const filtered = !!(query || category || kind || soonParam || newParam || closedParam)
 
   return (
@@ -172,7 +174,10 @@ export function Opportunities() {
             label="Audience"
             value={category ?? ""}
             onChange={(v) => setCategory(v)}
-            options={CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 }))}
+            options={[
+              { value: "", label: "All", count: facets.data?.total },
+              ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 })),
+            ]}
           />
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-tertiary" />
@@ -299,12 +304,9 @@ export function Opportunities() {
       )}
 
       <OpportunityDetail
-        opp={shownDetail}
-        applicationId={shownDetail ? tracked.data?.[shownDetail.id] : undefined}
-        onClose={() => {
-          setDetail(null)
-          if (openParam) setOpenParam("")
-        }}
+        id={drawer.id}
+        tracked={tracked.data}
+        onClose={drawer.close}
         onTodo={setTodoFor}
         onShare={setShareFor}
       />
@@ -487,96 +489,139 @@ function OpportunityRow({ opp, applicationId, index, ...handlers }: ItemProps) {
 }
 
 function OpportunityDetail({
-  opp,
-  applicationId,
+  id,
+  tracked,
   onClose,
   onTodo,
   onShare,
 }: {
-  opp: Opportunity | null
-  applicationId: string | undefined
+  id: string | null
+  tracked: Record<string, string> | undefined
   onClose: () => void
   onTodo: (opp: Opportunity) => void
   onShare: (opp: Opportunity) => void
 }) {
+  const detail = useOpportunity(id ?? undefined)
   // Keep the last row while the sheet animates out.
-  const [shown, setShown] = React.useState<Opportunity | null>(opp)
-  if (opp && opp !== shown) setShown(opp)
+  const [shown, setShown] = React.useState<Opportunity | null>(null)
+  const current = id ? detail.data : undefined
+  if (current && current !== shown) setShown(current)
+  const opp = current ?? (id ? null : shown)
+  const failed = !!id && detail.isError
   const phone = useIsMobile()
   return (
-    <Sheet open={!!opp} onOpenChange={(open) => !open && onClose()}>
-      {shown ? (
+    <Sheet open={!!id} onOpenChange={(open) => !open && onClose()}>
+      {id || shown ? (
         <SheetContent
           side={phone ? "bottom" : "right"}
           className="gap-0 max-sm:h-[92dvh] sm:w-full sm:max-w-xl"
         >
-          <ActionMenuButton
-            actions={secondaryActions(shown, { onTodo, onShare }, false)}
-            label="More actions"
-            className={cn("absolute top-4 right-14 z-20", FLOATING_MENU_BUTTON)}
-          />
-          <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-24">
-            <Art opp={shown} shape="square" className="size-14 shrink-0 rounded-md" />
-            <div className="min-w-0 space-y-1.5">
-              <SheetTitle>{shown.title}</SheetTitle>
-              {shown.organization ? <SheetDescription>{shown.organization}</SheetDescription> : null}
-            </div>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-            <OpportunityMeta opp={shown} />
-            {shown.summary ? <p className="max-w-reading text-body text-ink">{shown.summary}</p> : null}
-            <dl className="grid gap-3 text-callout sm:grid-cols-[140px_1fr]">
-              {shown.benefits ? <Fact label="What you get">{shown.benefits}</Fact> : null}
-              {shown.eligibility ? <Fact label="Who can apply">{shown.eligibility}</Fact> : null}
-              <Fact label="Deadline">
-                {shown.rolling ? "Rolling" : shown.deadline || "Not listed"}
-              </Fact>
-              {shown.countries.length ? <Fact label="Countries">{shown.countries.join(", ")}</Fact> : null}
-              {shown.tags.length ? <Fact label="Tags">{shown.tags.join(", ")}</Fact> : null}
-            </dl>
-            {shown.requirements.length ? (
-              <div>
-                <h3 className="mb-1.5 text-headline text-ink">What to prepare</h3>
-                <ul className="list-disc space-y-1 pl-5 text-callout text-ink-secondary">
-                  {shown.requirements.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                </ul>
+          {opp ? (
+            <>
+              <ActionMenuButton
+                actions={secondaryActions(opp, { onTodo, onShare }, false)}
+                label="More actions"
+                className={cn("absolute top-4 right-14 z-20", FLOATING_MENU_BUTTON)}
+              />
+              <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-24">
+                <Art opp={opp} shape="square" className="size-14 shrink-0 rounded-md" />
+                <div className="min-w-0 space-y-1.5">
+                  <SheetTitle>{opp.title}</SheetTitle>
+                  {opp.organization ? <SheetDescription>{opp.organization}</SheetDescription> : null}
+                </div>
+              </SheetHeader>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+                <OpportunityMeta opp={opp} />
+                {opp.summary ? <p className="max-w-reading text-body text-ink">{opp.summary}</p> : null}
+                <dl className="grid gap-3 text-callout sm:grid-cols-[140px_1fr]">
+                  {opp.benefits ? <Fact label="What you get">{opp.benefits}</Fact> : null}
+                  {opp.eligibility ? <Fact label="Who can apply">{opp.eligibility}</Fact> : null}
+                  <Fact label="Deadline">
+                    {opp.rolling ? "Rolling" : opp.deadline || "Not listed"}
+                  </Fact>
+                  {opp.countries.length ? <Fact label="Countries">{opp.countries.join(", ")}</Fact> : null}
+                  {opp.tags.length ? <Fact label="Tags">{opp.tags.join(", ")}</Fact> : null}
+                </dl>
+                {opp.requirements.length ? (
+                  <div>
+                    <h3 className="mb-1.5 text-headline text-ink">What to prepare</h3>
+                    <ul className="list-disc space-y-1 pl-5 text-callout text-ink-secondary">
+                      {opp.requirements.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <p className="text-footnote text-ink-tertiary">
+                  {FOUND_BY[opp.found_by] ?? FOUND_BY.community}
+                  {opp.verified_at ? `, checked ${formatAgo(opp.verified_at)}` : ""}
+                  {opp.source_url ? (
+                    <>
+                      {" from "}
+                      <a href={opp.source_url} target="_blank" rel="noopener noreferrer" className="underline">
+                        the official page
+                      </a>
+                    </>
+                  ) : null}
+                  . Confirm the details on the official page before you apply.
+                </p>
               </div>
-            ) : null}
-            <p className="text-footnote text-ink-tertiary">
-              {FOUND_BY[shown.found_by] ?? FOUND_BY.community}
-              {shown.verified_at ? `, checked ${formatAgo(shown.verified_at)}` : ""}
-              {shown.source_url ? (
-                <>
-                  {" from "}
-                  <a href={shown.source_url} target="_blank" rel="noopener noreferrer" className="underline">
-                    the official page
+              <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
+                {opp.link || opp.source_url ? (
+                  <a
+                    href={opp.link || opp.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonVariants({ size: "sm", variant: "secondary" })}
+                  >
+                    Official page <ArrowUpRight />
                   </a>
-                </>
-              ) : null}
-              . Confirm the details on the official page before you apply.
-            </p>
-          </div>
-          <SheetFooter className="mt-0 flex-row flex-wrap items-center justify-end border-t border-separator p-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {shown.link || shown.source_url ? (
-              <a
-                href={shown.link || shown.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonVariants({ size: "sm", variant: "secondary" })}
-              >
-                Official page <ArrowUpRight />
-              </a>
-            ) : null}
-            <Link
-              to={`/opportunities/${encodeURIComponent(shown.slug || shown.id)}`}
-              className={buttonVariants({ size: "sm", variant: "quiet" })}
-            >
-              Open full page
-            </Link>
-            <TrackButton opp={shown} applicationId={applicationId} />
-          </SheetFooter>
+                ) : null}
+                <Link
+                  to={`/opportunities/${encodeURIComponent(opp.slug || opp.id)}`}
+                  className={buttonVariants({ size: "sm", variant: "quiet" })}
+                >
+                  Open full page
+                </Link>
+                <TrackButton opp={opp} applicationId={tracked?.[opp.id]} />
+              </SheetFooter>
+            </>
+          ) : (
+            <>
+              <SheetHeader className="flex-row items-start gap-4 border-b border-separator p-5 pr-24">
+                {failed ? null : <Skeleton className="size-14 shrink-0 rounded-md" />}
+                <div className="min-w-0 flex-1 space-y-2">
+                  <SheetTitle className="sr-only">Opportunity</SheetTitle>
+                  <SheetDescription className="sr-only">
+                    {failed ? "Couldn't load opportunity details" : "Loading opportunity details"}
+                  </SheetDescription>
+                  {failed ? null : (
+                    <>
+                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </>
+                  )}
+                </div>
+              </SheetHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto p-5" aria-busy={failed ? undefined : true}>
+                {failed ? (
+                  <ErrorState
+                    compact
+                    title="That opportunity didn't load"
+                    description="Check your connection and try again."
+                    onRetry={() => void detail.refetch()}
+                  />
+                ) : (
+                  <SkeletonStack
+                    role="status"
+                    aria-label="Loading opportunity details"
+                    className="space-y-3"
+                    blocks={["h-5 w-1/2", "h-4 w-full", "h-4 w-5/6", "h-4 w-2/3", "h-24 w-full"]}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </SheetContent>
       ) : null}
     </Sheet>

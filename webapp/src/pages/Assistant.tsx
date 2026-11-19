@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
-  ArrowDown, ArrowUp, ArrowUpRight, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
+  ArrowDown, ArrowUp, ArrowUpRight, Award, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
   MessageCircle, MessagesSquare, Pencil, Plus, RotateCcw, Square, Trash2, Wrench,
 } from "lucide-react"
-import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
+import { Button, Chip, EmptyState, Field, cn, formatDay } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
@@ -17,6 +17,7 @@ import {
 } from "../lib/assistant"
 import { ApiError, apiMessage } from "../lib/api"
 import { useAuth } from "../lib/auth"
+import { LINEAR_OK, springEasing } from "../lib/motion"
 import { useShellHeader } from "../components/layout/shellHeader"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -26,6 +27,7 @@ import { ChatSkeleton } from "../components/assistant/ChatSkeleton"
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
 const chatsKey = (userId: string) => ["assistant", userId, "chats"]
+const MORPH_EASE = LINEAR_OK ? springEasing(0.9) : "cubic-bezier(0.2, 0.9, 0.25, 1.05)"
 
 const TOOL_ICONS: Record<string, typeof Wrench> = {
   search_catalog: Database,
@@ -197,8 +199,21 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   }, [])
 
   useEffect(() => {
-    if (followScroll.current) end.current?.scrollIntoView({ block: "nearest" })
-    else measure()
+    if (!followScroll.current) {
+      measure()
+      return
+    }
+    end.current?.scrollIntoView({ block: "nearest" })
+    // The turn's height settles over a spring; keep the latest line in view while it does.
+    const until = performance.now() + 320
+    let frame = 0
+    const hold = () => {
+      if (!followScroll.current || performance.now() > until) return
+      end.current?.scrollIntoView({ block: "nearest" })
+      frame = requestAnimationFrame(hold)
+    }
+    frame = requestAnimationFrame(hold)
+    return () => cancelAnimationFrame(frame)
   }, [measure, active?.status, active?.text, active?.trace.length, rows.length, pending?.id, chatId])
 
   function selectChat(id?: string) {
@@ -457,15 +472,58 @@ function TurnAction({ label, onClick, children }: { label: string; onClick: () =
   )
 }
 
-const PREVIEW_LINKS: Partial<Record<AssistantSource["kind"], (id: string) => string>> = {
-  application: (id) => `/applications/${encodeURIComponent(id)}`,
-  todo: (id) => `/calendar?todo=${encodeURIComponent(id)}`,
+const RECORD_LINKS: Record<AssistantSource["kind"], (source: AssistantSource) => string | null> = {
+  opportunity: (s) => `/opportunities/${encodeURIComponent(s.opportunity?.slug || s.id)}`,
+  application: (s) => `/applications/${encodeURIComponent(s.id)}`,
+  todo: (s) => `/calendar?todo=${encodeURIComponent(s.id)}`,
+  project: (s) => `/kit/projects/${encodeURIComponent(s.id)}`,
+  document: () => "/kit/documents",
+  answer: () => "/kit/answers",
+  web: (s) => s.url,
 }
 
-/** A record the turn created, opening its detail page. */
-function RecordPreview({ source }: { source: AssistantSource }) {
-  const href = PREVIEW_LINKS[source.kind]?.(source.id)
-  const Icon = source.kind === "todo" ? ListChecks : Briefcase
+const RECORD_ICONS: Record<AssistantSource["kind"], typeof Briefcase> = {
+  opportunity: Award,
+  application: Briefcase,
+  todo: ListChecks,
+  project: FolderOpen,
+  document: FileText,
+  answer: MessageSquareText,
+  web: Globe,
+}
+
+function recordDetail(source: AssistantSource) {
+  const opp = source.opportunity
+  if (!opp) return source.detail
+  const due = opp.rolling ? "Rolling" : opp.deadline_date ? `Due ${formatDay(opp.deadline_date)}` : ""
+  return [opp.organization, due].filter(Boolean).join(", ")
+}
+
+const SHOWN_RECORDS = 4
+
+/** Records a turn cited or created, each opening where it lives. */
+function RecordCards({ sources }: { sources: AssistantSource[] }) {
+  const [all, setAll] = useState(false)
+  const shown = all ? sources : sources.slice(0, SHOWN_RECORDS)
+  return (
+    <div className="flex flex-col gap-2">
+      <ul className="grid gap-2 sm:grid-cols-2" aria-label="Records">
+        {shown.map((source) => <li key={source.key} className="min-w-0"><RecordCard source={source} /></li>)}
+      </ul>
+      {sources.length > SHOWN_RECORDS && !all ? (
+        <button type="button" onClick={() => setAll(true)} className="cursor-pointer self-start text-footnote font-semibold text-link hover:underline">
+          Show {sources.length - SHOWN_RECORDS} more
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function RecordCard({ source }: { source: AssistantSource }) {
+  const href = RECORD_LINKS[source.kind](source)
+  const Icon = RECORD_ICONS[source.kind]
+  const detail = recordDetail(source)
+  const external = source.kind === "web"
   const body = (
     <>
       <span className={cn("grid size-10 shrink-0 place-items-center rounded-md", source.kind === "todo" ? "bg-sun-soft text-ink" : "bg-forest-soft/40 text-link")}>
@@ -473,19 +531,81 @@ function RecordPreview({ source }: { source: AssistantSource }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-callout font-semibold text-ink">{source.title}</span>
-        {source.detail ? <span className="block truncate text-footnote text-ink-secondary">{source.detail}</span> : null}
+        {detail ? <span className="block truncate text-footnote text-ink-secondary">{detail}</span> : null}
       </span>
       {href ? <ArrowUpRight className="size-4 shrink-0 text-ink-tertiary transition-transform group-hover/preview:translate-x-0.5 group-hover/preview:-translate-y-0.5 group-hover/preview:text-ink" aria-hidden="true" /> : null}
     </>
   )
-  const card = "group/preview bl-pop flex max-w-md items-center gap-3 rounded-lg border border-separator bg-surface p-3 shadow-elevation-1"
-  return href ? (
-    <Link to={href} className={cn(card, "transition-[box-shadow,border-color] hover:border-input-border-hover hover:shadow-elevation-2 focus-visible:outline-2 focus-visible:outline-focus")}>{body}</Link>
-  ) : <div className={card}>{body}</div>
+  const card = "group/preview bl-pop flex h-full items-center gap-3 rounded-lg border border-separator bg-surface p-3 shadow-elevation-1"
+  const interactive = "transition-[box-shadow,border-color] hover:border-input-border-hover hover:shadow-elevation-2 focus-visible:outline-2 focus-visible:outline-focus"
+  if (!href) return <div className={card}>{body}</div>
+  return external
+    ? <a href={href} target="_blank" rel="noreferrer noopener" className={cn(card, interactive)}>{body}</a>
+    : <Link to={href} className={cn(card, interactive)}>{body}</Link>
 }
 
 // Hover reveals turn actions on pointers; touch screens always show them.
 const TURN_ACTIONS = "flex opacity-0 transition-opacity duration-150 group-hover/turn:opacity-100 group-focus-within/turn:opacity-100 [@media(hover:none)]:opacity-100"
+
+/**
+ * Keeps an explicit pixel height that follows its content, so a turn settles into
+ * its new size as steps, thoughts and previews arrive instead of snapping taller.
+ */
+function Morph({ className, children }: { className?: string; children: React.ReactNode }) {
+  const shell = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const outer = shell.current
+    const inner = body.current
+    if (!outer || !inner) return
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)")
+    let height = inner.offsetHeight
+    let width = inner.offsetWidth
+    let animation: Animation | null = null
+    outer.style.height = `${height}px`
+    const sync = () => {
+      const next = inner.offsetHeight
+      const nextWidth = inner.offsetWidth
+      const from = animation ? outer.getBoundingClientRect().height : height
+      // A width change reflows every line, so snap instead of springing the whole turn.
+      const resized = nextWidth !== width
+      height = next
+      width = nextWidth
+      if (next === from) return
+      animation?.cancel()
+      animation = null
+      if (resized || reduce.matches) {
+        outer.style.overflow = ""
+        outer.style.height = `${next}px`
+        return
+      }
+      outer.style.height = `${from}px`
+      const morph = outer.animate(
+        [{ height: `${from}px` }, { height: `${next}px` }],
+        { duration: 260, easing: MORPH_EASE },
+      )
+      animation = morph
+      outer.style.overflow = "clip"
+      morph.onfinish = () => {
+        if (animation !== morph) return
+        animation = null
+        outer.style.overflow = ""
+        outer.style.height = ""
+      }
+    }
+    const observer = new ResizeObserver(sync)
+    observer.observe(inner)
+    return () => {
+      observer.disconnect()
+      animation?.cancel()
+    }
+  }, [])
+  return (
+    <div ref={shell} className="min-w-0">
+      <div ref={body} className={className}>{children}</div>
+    </div>
+  )
+}
 
 function UserBubble({ content }: { content: string }) {
   return (
@@ -510,26 +630,28 @@ function AssistantReply({ message, text, status, entries = [], live, onRetry, ch
   const content = message?.content || text
   const trace = message?.trace ?? entries
   const working = live && !content
-  const previews = message?.sources.filter((source) => source.preview) ?? []
+  const records = message?.sources ?? []
   return (
-    <div className="group/turn bl-enter flex min-w-0 flex-col gap-3">
-      <span className="sr-only">Assistant said</span>
-      {trace.length || working ? <AgentSteps entries={trace} live={!!working} status={status} /> : null}
-      {content ? (
-        <div className={cn(live && "bl-stream", "text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2")}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-            table: ({ children }) => <div className="overflow-x-auto"><table>{children}</table></div>,
-          }}>{content}</ReactMarkdown>
-        </div>
-      ) : null}
-      {previews.length ? <div className="flex flex-col gap-2">{previews.map((source) => <RecordPreview key={source.key} source={source} />)}</div> : null}
-      {children}
-      {content && !live ? (
-        <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}>
-          <CopyButton text={content} label="Copy reply" />
-          {onRetry ? <TurnAction label="Retry" onClick={onRetry}><RotateCcw className="size-3.5" aria-hidden="true" /></TurnAction> : null}
-        </div>
-      ) : null}
+    <div className="group/turn bl-enter min-w-0">
+      <Morph className="flex min-w-0 flex-col gap-3">
+        <span className="sr-only">Assistant said</span>
+        {trace.length || working ? <AgentSteps entries={trace} live={!!working} status={status} /> : null}
+        {content ? (
+          <div className={cn(live && "bl-stream", "text-body text-ink wrap-anywhere [&>*+*]:mt-3 [&_h1]:text-title-3 [&_h2]:text-title-3 [&_h3]:text-headline [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li+li]:mt-1 [&_li>p+p]:mt-2 [&_a]:text-link [&_a]:underline [&_strong]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-separator [&_blockquote]:pl-4 [&_blockquote]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:bg-surface-sunk [&_pre]:p-3 [&_code]:font-mono [&_code]:text-[0.875em] [&_table]:w-full [&_table]:text-callout [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_td]:border-b [&_td]:border-separator [&_td]:p-2")}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+              table: ({ children }) => <div className="overflow-x-auto"><table>{children}</table></div>,
+            }}>{content}</ReactMarkdown>
+          </div>
+        ) : null}
+        {records.length ? <RecordCards sources={records} /> : null}
+        {children}
+        {content && !live ? (
+          <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}>
+            <CopyButton text={content} label="Copy reply" />
+            {onRetry ? <TurnAction label="Retry" onClick={onRetry}><RotateCcw className="size-3.5" aria-hidden="true" /></TurnAction> : null}
+          </div>
+        ) : null}
+      </Morph>
     </div>
   )
 }
@@ -573,22 +695,7 @@ function StepIcon({ children, tone }: { children: React.ReactNode; tone?: string
 }
 
 function AgentStep({ entry }: { entry: TraceEntry }) {
-  const [more, setMore] = useState(false)
-  if (entry.kind === "thought") {
-    const long = entry.text.length > 320
-    return (
-      <li className="relative min-w-0">
-        <StepIcon><Brain className="size-3.5" /></StepIcon>
-        <p className="text-caption font-medium text-ink-tertiary">Thought</p>
-        <p className={cn("mt-0.5 text-footnote whitespace-pre-wrap text-ink-secondary wrap-anywhere", long && !more && "line-clamp-4")}>{entry.text}</p>
-        {long ? (
-          <button type="button" onClick={() => setMore((v) => !v)} className="mt-0.5 cursor-pointer text-caption font-semibold text-link hover:underline">
-            {more ? "Show less" : "Show more"}
-          </button>
-        ) : null}
-      </li>
-    )
-  }
+  if (entry.kind === "thought") return <Thought text={entry.text} />
   if (entry.kind === "commentary") {
     return (
       <li className="relative min-w-0">
@@ -602,6 +709,41 @@ function AgentStep({ entry }: { entry: TraceEntry }) {
     <li className="relative min-w-0">
       <StepIcon tone={entry.ok ? undefined : "text-critical"}><Icon className="size-3.5" /></StepIcon>
       <p className={cn("text-callout wrap-anywhere", entry.ok ? "text-ink-secondary" : "text-critical")}>{entry.label}</p>
+    </li>
+  )
+}
+
+/** A thought, clamped to four lines. The toggle only appears when the text is actually cut off. */
+function Thought({ text }: { text: string }) {
+  const [more, setMore] = useState(false)
+  const [clamped, setClamped] = useState(false)
+  const id = useId()
+  const body = useRef<HTMLParagraphElement>(null)
+  useLayoutEffect(() => {
+    const el = body.current
+    if (!el || more) return
+    const measure = () => setClamped(el.scrollHeight > el.clientHeight + 1)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [more, text])
+  return (
+    <li className="relative min-w-0">
+      <StepIcon><Brain className="size-3.5" /></StepIcon>
+      <p className="text-caption font-medium text-ink-tertiary">Thought</p>
+      <p id={id} ref={body} className={cn("mt-0.5 text-footnote whitespace-pre-wrap text-ink-secondary wrap-anywhere", !more && "line-clamp-4")}>{text}</p>
+      {clamped ? (
+        <button
+          type="button"
+          aria-expanded={more}
+          aria-controls={id}
+          onClick={() => setMore((v) => !v)}
+          className="mt-0.5 cursor-pointer text-caption font-semibold text-link hover:underline"
+        >
+          {more ? "Show less" : "Show more"}
+        </button>
+      ) : null}
     </li>
   )
 }

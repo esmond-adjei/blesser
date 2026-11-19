@@ -17,7 +17,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupConte
 const TITLES: Record<string, string> = {
   "/opportunities": "Opportunities",
   "/applications": "Applications",
-  "/todos": "To-dos",
+  "/calendar": "Calendar",
   "/kit": "Apply kit",
   "/scans": "Scans",
   "/assistant": "Assistant",
@@ -35,7 +35,7 @@ function useDocumentTitle() {
 
 // Pages that manage their own scrolling, like the Assistant's pinned composer.
 const FULL_BLEED = ["/assistant"]
-const FULL_BLEED_EXACT = ["/scans"]
+const FULL_BLEED_EXACT = ["/scans", "/calendar"]
 
 export function Shell() {
   useDocumentTitle()

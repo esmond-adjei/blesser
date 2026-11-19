@@ -34,34 +34,35 @@ export function useUrlParam(key: string, initial = ""): [string, (next: string) 
   return [value, set]
 }
 
-/** Rail selection for listing pages: `?preview=<id>` opens the shell detail rail.
- * Pushes on open (so back closes) and replaces on close. Full detail pages live
- * at `/:id`; the preview param never navigates away from the listing. */
-export function usePreviewParam(): {
-  previewId: string | null
-  openPreview: (id: string) => void
-  closePreview: () => void
+/** Drawer selection for listing pages: `?open=<id>` opens that record's sheet.
+ * Opening pushes a history entry so Back closes the sheet; closing replaces the
+ * entry, so dismissing it does not stack another one. Full detail pages live at
+ * `/:id`; the param never navigates away from the listing. */
+export function useDrawerParam(key = "open"): {
+  id: string | null
+  open: (id: string) => void
+  close: () => void
 } {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
-  const previewId = searchParams.get("preview") || null
+  const id = searchParams.get(key) || null
 
-  const openPreview = React.useCallback(
-    (id: string) => {
-      if (searchParams.get("preview") === id) return
+  const open = React.useCallback(
+    (next: string) => {
+      if (searchParams.get(key) === next) return
       const search = new URLSearchParams(searchParams)
-      search.set("preview", id)
+      search.set(key, next)
       navigate({ pathname, search: search.toString() })
     },
-    [navigate, pathname, searchParams],
+    [key, navigate, pathname, searchParams],
   )
 
-  const closePreview = React.useCallback(() => {
+  const close = React.useCallback(() => {
     const search = new URLSearchParams(searchParams)
-    search.delete("preview")
+    search.delete(key)
     navigate({ pathname, search: search.toString() }, { replace: true })
-  }, [navigate, pathname, searchParams])
+  }, [key, navigate, pathname, searchParams])
 
-  return { previewId, openPreview, closePreview }
+  return { id, open, close }
 }

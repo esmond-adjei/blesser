@@ -13,7 +13,8 @@ const Assistant = React.lazy(() => import("./pages/Assistant").then((m) => ({ de
 const OpportunityPage = React.lazy(() => import("./pages/OpportunityPage").then((m) => ({ default: m.OpportunityPage })))
 const Notifications = React.lazy(() => import("./pages/Notifications").then((m) => ({ default: m.Notifications })))
 const Applications = React.lazy(() => import("./pages/Applications").then((m) => ({ default: m.Applications })))
-const Todos = React.lazy(() => import("./pages/Todos").then((m) => ({ default: m.Todos })))
+const ApplicationPage = React.lazy(() => import("./pages/ApplicationPage").then((m) => ({ default: m.ApplicationPage })))
+const Calendar = React.lazy(() => import("./pages/Calendar").then((m) => ({ default: m.Calendar })))
 const Scans = React.lazy(() => import("./pages/Scans").then((m) => ({ default: m.Scans })))
 const ScanDetail = React.lazy(() => import("./pages/Scans").then((m) => ({ default: m.ScanDetail })))
 const KitLayout = React.lazy(() => import("./pages/kit/KitLayout").then((m) => ({ default: m.KitLayout })))
@@ -55,6 +56,11 @@ function Home() {
   return <Navigate to={user ? "/opportunities" : "/login"} replace />
 }
 
+function TodosRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/calendar${search}`} replace />
+}
+
 function NotFound() {
   return (
     <EmptyState
@@ -77,8 +83,10 @@ export default function App() {
               <Route path="opportunities/:id" element={<OpportunityPage />} />
               <Route path="assistant/:chatId?" element={<Assistant />} />
               <Route path="applications" element={<Applications />} />
+              <Route path="applications/:id" element={<ApplicationPage />} />
               <Route path="notifications" element={<Notifications />} />
-              <Route path="todos" element={<Todos />} />
+              <Route path="calendar" element={<Calendar />} />
+              <Route path="todos" element={<TodosRedirect />} />
               <Route path="kit" element={<KitLayout />}>
                 <Route index element={<Navigate to="profile" replace />} />
                 <Route path="profile" element={<KitProfile />} />

@@ -49,7 +49,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
     for (const a of (apps.data ?? []).filter((a) => match(a.title, q) || match(a.organization, q)).slice(0, 4))
       results.push({ id: `app:${a.id}`, group: "Applications", label: a.title, detail: a.organization ?? undefined, to: `/applications?open=${a.id}`, icon: <ClipboardList className="size-4" strokeWidth={1.75} /> })
     for (const t of (todos.data ?? []).filter((t) => match(t.title, q)).slice(0, 4))
-      results.push({ id: `todo:${t.id}`, group: "To-dos", label: t.title, detail: t.application_label ?? undefined, to: "/todos", icon: <ListTodo className="size-4" strokeWidth={1.75} /> })
+      results.push({ id: `todo:${t.id}`, group: "To-dos", label: t.title, detail: t.application_label ?? undefined, to: `/calendar?todo=${t.id}`, icon: <ListTodo className="size-4" strokeWidth={1.75} /> })
     for (const s of (scans.data ?? []).filter((s) => match(s.focus, q) || s.categories.some((c) => match(CATEGORY_LABELS[c], q))).slice(0, 3))
       results.push({ id: `scan:${s.id}`, group: "Scans", label: s.focus || s.categories.map((c) => CATEGORY_LABELS[c]).join(", "), detail: s.region, to: `/scans/${s.id}`, icon: <Radar className="size-4" strokeWidth={1.75} /> })
   }
