@@ -484,12 +484,11 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   const navigate = useNavigate()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl" onClose={() => onOpenChange(false)}>
+      <DialogContent className="max-w-3xl rounded-xl" onClose={() => onOpenChange(false)}>
         <DialogHeader>
-          <DialogTitle>New scan</DialogTitle>
-          <DialogDescription>One agent looks for one audience, in the catalog first and then across the web.</DialogDescription>
+          <DialogTitle>Describe What Your're Looking for</DialogTitle>
         </DialogHeader>
-        <DialogBody>
+        <DialogBody className="pb-6">
           <ScanComposer showAllowance onStarted={() => { onOpenChange(false); navigate("/scans") }} />
         </DialogBody>
       </DialogContent>

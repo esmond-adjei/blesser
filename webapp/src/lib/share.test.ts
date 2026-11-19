@@ -13,6 +13,13 @@ describe("quickLinks", () => {
   it("encodes each network's caption or link", () => {
     const links = Object.fromEntries(quickLinks(kit, "Seed Fund & more").map((l) => [l.label, l.href]))
     expect(Object.keys(links)).toEqual(["WhatsApp", "X", "LinkedIn", "Facebook", "Email"])
+    expect(quickLinks(kit, "Seed Fund & more").map((l) => l.icon)).toEqual([
+      "whatsapp",
+      "x",
+      "linkedin",
+      "facebook",
+      "email",
+    ])
     expect(links.X).toBe(`https://x.com/intent/tweet?text=${encodeURIComponent(kit.captions.short)}`)
     expect(links.WhatsApp).toContain("Offered%20by%20Accra%20%26%20Co")
     expect(links.LinkedIn).toContain(encodeURIComponent(kit.share_url))

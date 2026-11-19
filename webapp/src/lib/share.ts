@@ -1,14 +1,22 @@
 import type { ShareKit } from "./types"
 
+export type ShareNetwork = "whatsapp" | "x" | "linkedin" | "facebook" | "email"
+
+export interface ShareLink {
+  label: string
+  href: string
+  icon: ShareNetwork
+}
+
 /** Prefilled share links; each network gets the caption that suits it. */
-export function quickLinks(kit: ShareKit, title: string) {
+export function quickLinks(kit: ShareKit, title: string): ShareLink[] {
   const e = encodeURIComponent
   return [
-    { label: "WhatsApp", href: `https://wa.me/?text=${e(kit.captions.standard)}` },
-    { label: "X", href: `https://x.com/intent/tweet?text=${e(kit.captions.short)}` },
-    { label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${e(kit.share_url)}` },
-    { label: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${e(kit.share_url)}` },
-    { label: "Email", href: `mailto:?subject=${e(title)}&body=${e(kit.captions.standard)}` },
+    { label: "WhatsApp", href: `https://wa.me/?text=${e(kit.captions.standard)}`, icon: "whatsapp" },
+    { label: "X", href: `https://x.com/intent/tweet?text=${e(kit.captions.short)}`, icon: "x" },
+    { label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${e(kit.share_url)}`, icon: "linkedin" },
+    { label: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${e(kit.share_url)}`, icon: "facebook" },
+    { label: "Email", href: `mailto:?subject=${e(title)}&body=${e(kit.captions.standard)}`, icon: "email" },
   ]
 }
 

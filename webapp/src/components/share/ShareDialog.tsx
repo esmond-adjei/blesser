@@ -10,6 +10,7 @@ import type { Opportunity, ShareFormat, ShareKit } from "../../lib/types"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Segmented } from "../layout/PageHeader"
 import { ErrorState } from "../feedback/EmptyState"
+import { NetworkIcon } from "./NetworkIcon"
 
 const FORMATS: { value: ShareFormat; label: string; hint: string }[] = [
   { value: "square", label: "Square", hint: "Instagram, WhatsApp, Facebook" },
@@ -127,6 +128,7 @@ function Kit({ opp, kit }: { opp: Opportunity; kit: ShareKit | undefined }) {
   }
 
   return (
+    <>
     <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="min-w-0 space-y-3">
         <div className="relative grid h-[300px] place-items-center overflow-hidden rounded-md bg-surface-sunk p-4">
@@ -162,15 +164,36 @@ function Kit({ opp, kit }: { opp: Opportunity; kit: ShareKit | undefined }) {
           ) : null}
         </div>
         {kit ? (
-          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-callout">
-            <span className="text-ink-tertiary">Post to</span>
-            {quickLinks(kit, opp.title).map((l) => (
-              <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" className="font-medium text-link hover:underline">
-                {l.label}
-              </a>
-            ))}
+          <div className="flex flex-wrap items-center gap-1 text-callout">
+            <span className="mr-1.5 text-ink-tertiary">Post to</span>
+            {quickLinks(kit, opp.title).map((l) => {
+              const action = l.icon === "email" ? "Share by email" : `Share on ${l.label}`
+              return (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={action}
+                  data-tooltip={action}
+                  className="grid size-10 place-items-center rounded-full text-ink-secondary transition-colors hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                >
+                  <NetworkIcon name={l.icon} className="size-5" />
+                </a>
+              )
+            })}
           </div>
         ) : null}
+
+        <p className="mt-8 text-footnote text-ink-tertiary">
+          {opp.audience === "members" ? (
+            <span className="mb-1.5 flex items-start gap-1.5">
+              <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+              Members only: people without an account see a short preview and would have to sign up to getthe official link.
+            </span>
+          ) : null}
+          {kit?.disclaimer ?? ""} The image and text show Blesser as where you found it, not as the funder.
+        </p>
       </div>
 
       <div className="min-w-0 space-y-4">
@@ -199,16 +222,8 @@ function Kit({ opp, kit }: { opp: Opportunity; kit: ShareKit | undefined }) {
             />
           </div>
         ))}
-        <p className="text-footnote text-ink-tertiary">
-          {opp.audience === "members" ? (
-            <span className="mb-1.5 flex items-start gap-1.5">
-              <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-              Members only: people without an account see a short preview and sign up to get the official link.
-            </span>
-          ) : null}
-          {kit?.disclaimer ?? ""} The image and text show Blesser as where you found it, not as the funder.
-        </p>
       </div>
     </div>
+    </>
   )
 }

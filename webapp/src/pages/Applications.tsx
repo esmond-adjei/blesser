@@ -147,8 +147,8 @@ export function Applications() {
         title="Applications"
         description="Everything you're applying for. Saved and preparing applications get reminders 14, 7 and 1 days before the deadline."
         actions={
-          <Button size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
-            Add by hand
+          <Button data-tooltip="You can also use the assistant to add applications" size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
+            Add Manually
           </Button>
         }
       />
@@ -268,7 +268,7 @@ function Board({
 
   return (
     <div className="nice-scroll -mx-4 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8">
-      <div className="grid snap-x snap-mandatory auto-cols-[minmax(248px,85vw)] grid-flow-col gap-3 sm:auto-cols-[minmax(232px,1fr)]">
+      <div className="grid snap-x snap-mandatory auto-cols-[minmax(248px,85vw)] grid-flow-col items-start gap-3 sm:auto-cols-[minmax(232px,1fr)]">
         {COLUMNS.map((col) => {
           const items = apps.filter((a) => col.statuses.includes(a.status))
           const decision = col.id === "decision"
