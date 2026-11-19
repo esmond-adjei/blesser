@@ -169,6 +169,23 @@ def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
             if todo["title"] == title
         ]
         assert len(todos) == int(approved)
+        receipt = next(e["message"] for e in events if e["event"] == "message")
+        assert receipt["sources"] == (
+            [
+                {
+                    "key": "s1",
+                    "kind": "todo",
+                    "id": todos[0]["id"],
+                    "title": title,
+                    "detail": "",
+                    "url": None,
+                    "opportunity": None,
+                    "preview": True,
+                }
+            ]
+            if approved
+            else []
+        )
 
 
 def test_private_context_cannot_reach_web_search(monkeypatch):
@@ -313,7 +330,36 @@ def test_track_confirmation_uses_catalog_record_and_updates_only_current_member(
                 f"{path}/confirm", json={"call_id": pending["id"], "approved": True}
             )
         )
-        assert (
-            completed[-2]["message"]["content"] == f"“{title}” is in your applications."
-        )
+        receipt = completed[-2]["message"]
+        assert receipt["content"] == "Saved to your applications."
+        assert [(c["kind"], c["title"], c["preview"]) for c in receipt["sources"]] == [
+            ("application", title, True)
+        ]
         assert opp_id in client.get("/api/app/opportunities/tracked").json()
+
+
+def test_retry_answers_the_last_question_again(monkeypatch):
+    _model(
+        monkeypatch,
+        LLMResponse(text="First answer."),
+        LLMResponse(text="Second answer."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        _events(client.post(f"{path}/chat", json={"content": "Which grant first?"}))
+        events = _events(client.post(f"{path}/retry"))
+        assert events[0]["event"] == "user_message"
+        assert events[0]["message"]["content"] == "Which grant first?"
+        messages = client.get(path).json()["messages"]
+        assert [(m["role"], m["content"]) for m in messages] == [
+            ("user", "Which grant first?"),
+            ("assistant", "Second answer."),
+        ]
+
+
+def test_retry_needs_a_question(monkeypatch):
+    _model(monkeypatch)
+    with TestClient(app) as client:
+        path = _chat(client)
+        assert client.post(f"{path}/retry").status_code == 404
+        assert client.get(path).json()["running"] is False

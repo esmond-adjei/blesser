@@ -131,6 +131,25 @@ async def chat(
     )
 
 
+@router.post("/{chat_id}/retry", dependencies=[Depends(rate_limit("assistant"))])
+async def retry(
+    chat_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: UserOut = Depends(get_current_user),
+):
+    await conversations.owned(session, chat_id, current.id)
+    if not service.configured():
+        raise HTTPException(503, "Assistant isn't set up yet")
+    if not await conversations.last_question(session, chat_id):
+        raise NotFoundError("There's no question to answer again.")
+    lease = await conversations.claim(session, chat_id, current.id)
+    return _response(
+        live.start(
+            chat_id, current.id, service.chat_turn(chat_id, current.id, lease, None)
+        )
+    )
+
+
 @router.post("/{chat_id}/confirm", dependencies=[Depends(rate_limit("assistant"))])
 async def confirm(
     chat_id: str,

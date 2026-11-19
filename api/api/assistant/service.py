@@ -11,7 +11,7 @@ from api.agent.llm.base import ROOMY_MAX_TOKENS
 from api.agent.llm.factory import SUPPORTED_PROVIDERS, get_provider
 from api.agent.llm.slots import model_slot
 from api.assistant import conversations, tools
-from api.assistant.schemas import PendingCall
+from api.assistant.schemas import PendingCall, Source
 from api.assistant.sources import SourceRegistry
 from api.core.config import settings
 from api.core.db import SessionLocal
@@ -198,11 +198,26 @@ async def _finish(message, streamed=""):
     yield {"event": "message", "message": message.model_dump(mode="json")}
 
 
+async def _rewind(chat_id, user_id, lease):
+    async with SessionLocal() as session:
+        chat = await conversations.held(session, chat_id, user_id, lease)
+        message, previous = await conversations.rewind(session, chat_id)
+        private_context = chat.private_context
+        await session.commit()
+    return message, _model_history(previous), private_context
+
+
 async def _loop(chat_id, user_id, lease, content):
     provider = get_provider()
-    user_message, history, private_context = await _begin(
-        chat_id, user_id, lease, content
-    )
+    if content is None:
+        user_message, history, private_context = await _rewind(
+            chat_id, user_id, lease
+        )
+        content = user_message.content
+    else:
+        user_message, history, private_context = await _begin(
+            chat_id, user_id, lease, content
+        )
     history.append({"role": "user", "content": content})
     history_has_contact = any(
         _CONTACT.search(item["content"]) for item in history if item["role"] == "user"
@@ -357,6 +372,7 @@ async def _loop(chat_id, user_id, lease, content):
 
 
 async def chat_turn(chat_id, user_id, lease, content):
+    """A new question, or None to answer the last one again."""
     try:
         async with (
             asyncio.timeout(TURN_TIMEOUT),
@@ -377,15 +393,28 @@ async def confirm_turn(chat_id, user_id, lease, approved):
             pending = chat.pending
             name = pending["tool"]
             label = tools.LABELS[name]
+            preview = []
             if approved:
                 try:
                     result = await tools.apply_change(
                         session, user_id, name, pending["arguments"]
                     )
-                    if name == "track_opportunity":
-                        receipt = f"“{result['title']}” is in your applications."
+                    if result.get("already_tracked"):
+                        receipt = "You were already tracking this one."
+                    elif name == "track_opportunity":
+                        receipt = "Saved to your applications."
                     else:
-                        receipt = f"Added “{result['title']}” to your to-dos."
+                        receipt = "Added to your to-dos."
+                    preview = [
+                        Source(
+                            key="s1",
+                            kind=result["kind"],
+                            id=result["id"],
+                            title=result["title"],
+                            detail=result["detail"],
+                            preview=True,
+                        ).model_dump(mode="json")
+                    ]
                 except DomainError:
                     approved = False
                     receipt = "That action is no longer available."
@@ -404,6 +433,7 @@ async def confirm_turn(chat_id, user_id, lease, approved):
                 "assistant",
                 receipt,
                 trace=[*pending["trace"], step],
+                sources=preview,
             )
             await session.commit()
         yield {"event": "tool_result", "step": step}

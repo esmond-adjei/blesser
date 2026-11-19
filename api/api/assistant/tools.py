@@ -320,10 +320,27 @@ async def apply_change(session, user_id, name, arguments):
         app, created = await opportunities.track(
             session, user_id, arguments["opportunity_id"], commit=False
         )
-        return {"title": app["title"], "already_tracked": not created}
+        due = app["deadline_date"]
+        return {
+            "kind": "application",
+            "id": app["id"],
+            "title": app["title"],
+            "detail": ", ".join(
+                part
+                for part in (app["organization"], due and f"Due {human_day(due)}")
+                if part
+            ),
+            "already_tracked": not created,
+        }
     if name == "add_todo":
         todo = await todos.create_todo(
             session, user_id, TodoCreate.model_validate(arguments), commit=False
         )
-        return {"title": todo["title"]}
+        due = todo["due_date"]
+        return {
+            "kind": "todo",
+            "id": todo["id"],
+            "title": todo["title"],
+            "detail": f"Due {human_day(due)}" if due else "",
+        }
     raise NotFoundError("Unknown action")

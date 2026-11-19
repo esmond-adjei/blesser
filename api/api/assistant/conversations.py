@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 from api.assistant.models import AssistantConversation, AssistantMessage
 from api.assistant.schemas import ChatOut, MessageOut, PendingCall
@@ -79,6 +79,33 @@ async def append(
     await session.flush()
     await session.refresh(row)
     return MessageOut.model_validate(row)
+
+
+async def last_question(session, chat_id):
+    return await session.scalar(
+        select(AssistantMessage)
+        .where(
+            AssistantMessage.conversation_id == chat_id,
+            AssistantMessage.role == "user",
+        )
+        .order_by(AssistantMessage.position.desc())
+        .limit(1)
+    )
+
+
+async def rewind(session, chat_id):
+    """Drops everything after the last question; returns it and the messages before it."""
+    last = await last_question(session, chat_id)
+    if last is None:
+        raise NotFoundError("There's no question to answer again.")
+    await session.execute(
+        delete(AssistantMessage).where(
+            AssistantMessage.conversation_id == chat_id,
+            AssistantMessage.position > last.position,
+        )
+    )
+    previous = await messages(session, chat_id, limit=16, before=last.position)
+    return MessageOut.model_validate(last), previous
 
 
 async def claim(session, chat_id, user_id, *, call_id=None):

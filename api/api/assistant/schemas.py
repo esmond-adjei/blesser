@@ -62,6 +62,8 @@ class Source(BaseModel):
     detail: str = ""
     url: str | None = None
     opportunity: MemberOpportunity | None = None
+    # A record this turn created, shown as a card that opens it.
+    preview: bool = False
 
 
 class PendingCall(BaseModel):
