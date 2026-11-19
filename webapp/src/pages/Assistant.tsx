@@ -20,6 +20,7 @@ import { useAuth } from "../lib/auth"
 import { useShellHeader } from "../components/layout/shellHeader"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import guideArt from "../assets/illustrations/guide.webp"
 
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
@@ -308,8 +309,9 @@ function AssistantWorkspace({ userId }: { userId: string }) {
 
       {empty ? (
         <div className="nice-scroll flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-0 py-8">
-          <div className="px-4 text-center">
-            <h2 className="type-title-2 text-ink">What can I help you with?</h2>
+          <div className="flex flex-col items-center px-4 text-center">
+            <img src={guideArt} alt="" width={622} height={480} className="bl-pop mb-5 h-28 w-auto sm:h-36" />
+            <h2 className="type-title-1 text-ink">What can I help you with?</h2>
             <p className="mt-1.5 text-callout text-ink-secondary">Find opportunities, check deadlines, or plan your next application.</p>
           </div>
           {composer}

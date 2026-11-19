@@ -1,0 +1,17 @@
+Use your image generation tool to create 3 separate spot-illustration concepts for the empty state of the Assistant page in Blesser, a platform that helps startups, researchers and students in Ghana find and track grants, scholarships, fellowships and accelerators. The Assistant is a chat agent that searches opportunities, checks deadlines and plans applications. The illustration sits small (about 160px tall) above the heading "What can I help you with?" and must work on both a light (#f6f7f1) and a dark (#191919) page.
+
+Style reference: the attached reference-logo.png, Blesser's mark: a golden sun arch over a stepped pyramid. Match its language: flat, solid geometric shapes, rounded corners, no gradients, no shading, no outlines, no texture, no 3D, no mockups, no people's faces.
+
+Requirements for every concept:
+- Fully transparent background (PNG with alpha). No background colour, no frame, no drop shadow.
+- Brand colours only: deep forest green #0f4f3b, mid green #13704f, sun yellow #ffbe1a, coral #ff7d66, soft mint #dcebe2. Use a mid tone where a shape must read on both light and dark pages; avoid pure black and pure white.
+- No text, letters, numbers or logos anywhere.
+- Simple enough to read at 160px: 4 to 8 shapes, one clear focal point, generous empty space.
+- Centered, square 1024x1024.
+
+Concepts:
+1. assistant-1-guide.png: a small rounded chat bubble (mint) whose tail points to a stepped path (greens) leading up to a rising sun (yellow): the assistant guiding the way to an opportunity.
+2. assistant-2-lens.png: a round magnifying lens (green ring) over a few floating rounded cards (mint, one coral, one yellow), suggesting searching and finding opportunities.
+3. assistant-3-compass.png: a sun-arch shaped compass (yellow arch, green needle) sitting on a stepped base, with two small sparkle-free dots for depth; calm and friendly.
+
+Save each image into the current directory with exactly those filenames. Do not create any other files.
