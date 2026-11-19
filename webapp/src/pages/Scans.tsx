@@ -430,7 +430,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); submit() }}
-      className={cn("rounded-lg border border-input-border bg-surface p-2.5 pl-4 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--focus-soft)]", className)}
+      className={cn("rounded-lg border border-input-border bg-surface p-2.5 pl-4 transition-[border-color,box-shadow] duration-150", className)}
     >
       <label htmlFor="scan-focus" className="sr-only">What should this agent look for?</label>
       <textarea

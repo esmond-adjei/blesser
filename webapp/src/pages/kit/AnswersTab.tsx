@@ -86,7 +86,7 @@ function AnswersBody() {
             aria-label="Filter by project"
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="select-chevron h-control-sm w-full cursor-pointer appearance-none rounded-sm border border-input-border bg-surface pr-9 pl-3 text-footnote text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)]"
+            className="select-chevron h-control-sm w-full cursor-pointer appearance-none rounded-sm border border-input-border bg-surface pr-9 pl-3 text-footnote text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover"
           >
             <option value="">All projects</option>
             {projectList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

@@ -2,7 +2,7 @@ import * as React from "react"
 import { cn } from "../lib"
 
 export const controlClass =
-  "w-full min-w-0 rounded-sm border border-input-border bg-surface px-3.5 text-body text-ink transition-[border-color,box-shadow] duration-150 outline-none placeholder:text-ink-tertiary hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-critical aria-invalid:focus:shadow-[0_0_0_3px_var(--critical-soft)]"
+  "w-full min-w-0 rounded-sm border border-input-border bg-surface px-3.5 text-body text-ink transition-[border-color,box-shadow] duration-150 outline-none placeholder:text-ink-tertiary hover:border-input-border-hover disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-critical"
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => <input ref={ref} className={cn(controlClass, "h-control-md", className)} {...props} />,

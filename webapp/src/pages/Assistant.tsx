@@ -278,7 +278,7 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   const composer = (
       <form className={cn("mx-auto w-full max-w-[760px] shrink-0 px-4 sm:px-6", empty ? "" : "pb-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]")} onSubmit={(event) => { event.preventDefault(); void send(draft) }}>
         {replyError || (problem && !edit) ? <p role="alert" className="mb-2 text-footnote text-critical">{replyError || problem}</p> : null}
-        <div className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2.5 pr-2.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--focus-soft)]">
+        <div className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2.5 pr-2.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150">
           <textarea
             aria-label="Ask the Assistant"
             placeholder="Ask about opportunities, deadlines or your applications"

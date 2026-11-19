@@ -160,7 +160,7 @@ function DocumentsBody() {
                 aria-label="Show kind"
                 value={kind}
                 onChange={(e) => setKind(e.target.value)}
-                className="select-chevron h-control-sm cursor-pointer appearance-none rounded-sm border border-input-border bg-surface pr-9 pl-3 text-footnote text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover focus:border-focus focus:shadow-[0_0_0_3px_var(--focus-soft)]"
+                className="select-chevron h-control-sm cursor-pointer appearance-none rounded-sm border border-input-border bg-surface pr-9 pl-3 text-footnote text-ink outline-none transition-[border-color,box-shadow] duration-150 hover:border-input-border-hover"
               >
                 <option value="">All kinds</option>
                 {kindsPresent.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}

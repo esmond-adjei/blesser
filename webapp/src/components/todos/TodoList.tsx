@@ -215,7 +215,7 @@ export function TodoAdd({ link, placeholder = "Add a to-do, e.g. Ask two referee
   const [priority, setPriority] = React.useState<TodoPriority>("normal")
   return (
     <form
-      className={cn("flex flex-wrap items-center gap-2 rounded-md border border-input-border bg-surface py-1.5 pr-1.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[0_0_0_3px_var(--focus-soft)]", className)}
+      className={cn("flex flex-wrap items-center gap-2 rounded-md border border-input-border bg-surface py-1.5 pr-1.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150", className)}
       onSubmit={(e) => {
         e.preventDefault()
         if (!title.trim()) return

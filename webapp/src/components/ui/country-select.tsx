@@ -77,7 +77,7 @@ export function CountrySelect({ value, onChange, label = "Where", className, sid
           type="button"
           aria-label={`${label}: ${selected?.name ?? (value || "Anywhere")}`}
           className={cn(
-            "flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-full border border-separator px-3 text-footnote text-ink transition-colors hover:border-input-border-hover focus-visible:outline-2 focus-visible:outline-focus data-[state=open]:border-focus",
+            "flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-full border border-separator px-3 text-footnote text-ink transition-colors hover:border-input-border-hover focus-visible:outline-2 focus-visible:outline-focus",
             className,
           )}
         >
