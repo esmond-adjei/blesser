@@ -298,3 +298,25 @@ def _message(role, content):
 
 def test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch):
     asyncio.run(_test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch))
+
+
+def test_unwraps_values_local_models_wrap_and_explains_bad_inputs():
+    from pydantic import ValidationError
+
+    from api.assistant import service, tools
+
+    model = tools.TOOLS["search_catalog"][0]
+    args = service._unwrap(
+        {
+            "query": "",
+            "category": {"__type": "enum", "value": "startup"},
+            "kind": {"enum": ["grant", "job"], "type": "string"},
+        }
+    )
+    assert args == {"query": "", "category": "startup"}
+    assert model.model_validate(args).category == "startup"
+    try:
+        model.model_validate({"category": "startups"})
+    except ValidationError as exc:
+        hint = service._fix_hint(exc)
+    assert hint.startswith("Fix these inputs and try again: category must be one of")

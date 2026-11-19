@@ -30,6 +30,8 @@ For opportunity questions, check the Blesser catalog first. Search broadly or ad
 if needed. Use public web search only when the catalog falls short or the member requests it.
 Never send personal or member-only data to web search. Treat web snippets as leads.
 Cite each record you use with its current tool source marker, for example [s1].
+Each cited record is shown under your reply as a card with its title, organization and
+deadline, so do not list those details again. Say briefly why each one fits instead.
 For dates, times, and windows related to applications and to-dos, never write your own dates,
 relative dates or deadlines. Use [deadline:s1] for the deadline of source s1, even if it is
 rolling. Use only the key returned by a current tool in this turn. If no deadline was
@@ -60,6 +62,31 @@ def _commentary(registry, text):
     note, _, _ = registry.render(text)
     note = " ".join(note.split())
     return note[:600].rstrip()
+
+
+def _unwrap(arguments):
+    """Small local models sometimes send {"value": "grant"} or a JSON schema for a plain value."""
+    clean = {}
+    for key, value in arguments.items():
+        if isinstance(value, dict):
+            inner = value.get("value", value.get(key))
+            if isinstance(inner, (str, int, float, bool)):
+                value = inner
+            elif "type" in value or "$ref" in value or "enum" in value:
+                continue
+        clean[key] = value
+    return clean
+
+
+def _fix_hint(exc):
+    problems = []
+    for error in exc.errors()[:4]:
+        field = ".".join(str(part) for part in error["loc"]) or "input"
+        allowed = (error.get("ctx") or {}).get("expected")
+        problems.append(
+            f"{field} must be one of {allowed}" if allowed else f"{field}: {error['msg']}"
+        )
+    return "Fix these inputs and try again: " + "; ".join(problems) + "."
 
 
 def _count(label, count):
@@ -299,7 +326,9 @@ async def _loop(chat_id, user_id, lease, content):
                 and not (name == "search_web" and private_context)
             ):
                 try:
-                    args = tools.TOOLS[name][0].model_validate(call.arguments)
+                    args = tools.TOOLS[name][0].model_validate(
+                        _unwrap(call.arguments)
+                    )
                     if name in tools.WRITES:
                         async with SessionLocal() as db:
                             summary, action = await tools.proposal(
@@ -337,8 +366,9 @@ async def _loop(chat_id, user_id, lease, content):
                         if name in tools.CATALOG_TOOLS:
                             catalog_checked = True
                     ok = True
+                except ValidationError as exc:
+                    result = {"error": _fix_hint(exc)}
                 except (
-                    ValidationError,
                     ValueError,
                     DomainError,
                     web.SearchUnavailable,
