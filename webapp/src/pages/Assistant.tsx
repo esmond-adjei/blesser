@@ -385,6 +385,7 @@ function AssistantWorkspace({ userId }: { userId: string }) {
             <AssistantReply entries={pending.trace}>
               <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
                 <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
+                {pending.note ? <p className="text-body-sm whitespace-pre-wrap text-ink-secondary wrap-anywhere">{pending.note}</p> : null}
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
                   <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Not now</Button>

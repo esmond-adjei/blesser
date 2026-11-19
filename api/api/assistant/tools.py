@@ -9,6 +9,7 @@ from api.applicant_kit import models as kit_models
 from api.applicant_kit import service as kit
 from api.applicant_kit.schemas import http_url
 from api.applications import service as applications
+from api.applications.schemas import ApplicationUpdate
 from api.assistant.sources import SourceRegistry
 from api.core.exceptions import NotFoundError
 from api.core.time import human_day
@@ -40,6 +41,18 @@ class OpportunityLookup(ToolInput):
     opportunity_id: RequiredQuery
 
 
+class ApplicationLookup(ToolInput):
+    application_id: RequiredQuery
+
+
+class ApplicationChanges(ApplicationUpdate):
+    model_config = ConfigDict(extra="forbid")
+
+
+class UpdateApplication(ApplicationLookup):
+    changes: ApplicationChanges
+
+
 class MemberLookup(ToolInput):
     query: Query = ""
 
@@ -63,8 +76,10 @@ class AddTodo(ToolInput):
     due_date: date | None = None
 
 
-PRIVATE_TOOLS = frozenset({"list_applications", "list_todos", "read_apply_kit"})
-WRITES = frozenset({"track_opportunity", "add_todo"})
+PRIVATE_TOOLS = frozenset(
+    {"list_applications", "get_application", "list_todos", "read_apply_kit"}
+)
+WRITES = frozenset({"track_opportunity", "add_todo", "update_application"})
 CATALOG_TOOLS = frozenset({"search_catalog", "get_opportunity"})
 TOOLS = {
     "search_catalog": (
@@ -78,6 +93,14 @@ TOOLS = {
     "list_applications": (
         MemberLookup,
         "Read the current member's applications, optionally by title, organization or status.",
+    ),
+    "get_application": (
+        ApplicationLookup,
+        "Read the authenticated member's saved application details by application_id, including notes, link, benefits and requirements. Saved details remain readable even when the linked catalog record is unavailable. This does not grant access to unpublished catalog content.",
+    ),
+    "update_application": (
+        UpdateApplication,
+        "Propose editing the member's own application. Only supplied fields change. Requirements replace the entire checklist, so read the application first and preserve existing completion states. Requires member approval before saving.",
     ),
     "list_todos": (
         TodoLookup,
@@ -108,6 +131,8 @@ LABELS = {
     "search_catalog": "Searched the Blesser catalog",
     "get_opportunity": "Checked an opportunity",
     "list_applications": "Checked your applications",
+    "get_application": "Checked an application",
+    "update_application": "Update application",
     "list_todos": "Checked your to-dos",
     "read_apply_kit": "Checked your apply kit",
     "search_web": "Searched the web",
@@ -233,6 +258,15 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
             limit=12,
         )
         page["items"] = [_opportunity(registry, row) for row in page["items"]]
+        page["scope"] = (
+            "Published catalog records only, not saved applications or unpublished records."
+        )
+        page["returned"] = len(page["items"])
+        page["truncated"] = page["total"] > len(page["items"])
+        if not page["items"]:
+            page["message"] = (
+                "No published records matched these filters. This does not mean the member has no matching saved application. Use list_applications or get_application for their saved details."
+            )
         return page, page["total"]
     if name == "get_opportunity":
         row = opportunities.to_out(
@@ -255,6 +289,7 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
                     **_record(
                         row,
                         (
+                            "id",
                             "title",
                             "organization",
                             "kind",
@@ -267,7 +302,24 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
                     "deadline": registry.deadlines.get(key),
                 }
             )
-        return {"items": records, "total": len(rows)}, len(rows)
+        return {
+            "items": records,
+            "total": len(rows),
+            "returned": len(records),
+            "truncated": len(rows) > len(records),
+            "scope": "The authenticated member's saved applications. Status is application progress, not catalog moderation. Use id as application_id with get_application or update_application. opportunity_id refers to a separate catalog record, which may be unavailable. Empty requirements mean no saved checklist, not that the opportunity has no requirements.",
+        }, len(rows)
+    if name == "get_application":
+        row = applications.to_out(
+            await applications.get_or_404(session, user_id, args.application_id)
+        )
+        key = registry.register("application", row, detail=row["status"])
+        return {
+            **row,
+            "source": key,
+            "deadline": registry.deadlines.get(key),
+            "scope": "The authenticated member's saved application details. These are saved values, not newly verified catalog or web facts.",
+        }, None
     if name == "list_todos":
         rows = await todos.list_todos(session, user_id, status=args.status)
         rows = _matching(
@@ -306,6 +358,15 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
 
 
 async def proposal(session, user_id, name, args):
+    if name == "update_application":
+        app = await applications.get_or_404(session, user_id, args.application_id)
+        patch = args.changes.model_dump(exclude_unset=True, mode="json")
+        if not patch:
+            raise ValueError("Supply at least one field to update.")
+        return f"Update “{app.title}”?", {
+            "application_id": app.id,
+            "changes": patch,
+        }
     if name == "track_opportunity":
         opp = await opportunities.get_or_404(session, args.opportunity_id)
         return f"Track {opp.title} in your applications?", {"opportunity_id": opp.id}
@@ -316,6 +377,20 @@ async def proposal(session, user_id, name, args):
 
 
 async def apply_change(session, user_id, name, arguments):
+    if name == "update_application":
+        app = await applications.update_application(
+            session,
+            user_id,
+            arguments["application_id"],
+            ApplicationUpdate.model_validate(arguments["changes"]),
+            commit=False,
+        )
+        return {
+            "kind": "application",
+            "id": app["id"],
+            "title": app["title"],
+            "detail": "Application details updated",
+        }
     if name == "track_opportunity":
         app, created = await opportunities.track(
             session, user_id, arguments["opportunity_id"], commit=False

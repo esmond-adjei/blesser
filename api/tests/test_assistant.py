@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from api.agent.llm.base import BaseLLMProvider, LLMResponse, ToolCall
+from api.applications.models import Application
 from api.assistant import service
 from api.auth.models import User
 from api.auth.security import issue_access_token
@@ -86,6 +87,136 @@ def _seed(*, user=False, opportunities=False):
             return owner, title
 
     return asyncio.run(add())
+
+
+def _saved_application(owner=TEST_USER_ID):
+    async def add():
+        async with SessionLocal() as session:
+            opp = Opportunity(
+                title="Unreviewed scholarship",
+                organization="Fund",
+                category="research",
+                kind="grant",
+                status="in_review",
+                source="staff",
+                dedupe_key=new_id(),
+                summary="Unpublished editorial content",
+            )
+            session.add(opp)
+            await session.flush()
+            application = Application(
+                user_id=owner,
+                title="My saved scholarship",
+                opportunity_id=opp.id,
+                notes="My saved research notes",
+                benefits="Saved benefit",
+                requirements=[{"label": "Existing reference", "done": True}],
+            )
+            session.add(application)
+            await session.commit()
+            return application.id, opp.id
+
+    return asyncio.run(add())
+
+
+def test_owned_application_details_do_not_require_catalog_publication(monkeypatch):
+    application_id, opportunity_id = _saved_application()
+    calls = _model(
+        monkeypatch,
+        _tool("get_opportunity", opportunity_id=opportunity_id),
+        _tool("get_application", application_id=application_id),
+        LLMResponse(text="Your saved notes are available. [s1]"),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(f"{path}/chat", json={"content": "Read my saved details."})
+        )
+        error = json.loads(calls[1]["messages"][2]["content"])
+        assert error["code"] == "not_found_or_inaccessible"
+        assert error["retryable"] is False
+        saved = json.loads(calls[2]["messages"][-1]["content"])
+        assert saved["id"] == application_id
+        assert saved["notes"] == "My saved research notes"
+        assert saved["benefits"] == "Saved benefit"
+        assert saved["requirements"] == [{"label": "Existing reference", "done": True}]
+        assert "Unpublished editorial content" not in json.dumps(saved)
+        assert events[-2]["message"]["sources"][0]["id"] == application_id
+
+
+def test_application_tool_does_not_expose_another_members_record(monkeypatch):
+    other, _ = _seed(user=True)
+    application_id, _ = _saved_application(other)
+    calls = _model(
+        monkeypatch,
+        _tool("get_application", application_id=application_id),
+        LLMResponse(text="I cannot access that application."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(f"{path}/chat", json={"content": "Read that application."})
+        )
+        error = json.loads(calls[1]["messages"][-1]["content"])
+        assert error["code"] == "not_found_or_inaccessible"
+        assert "My saved research notes" not in json.dumps(error)
+        assert not events[-2]["message"]["sources"]
+
+
+@pytest.mark.parametrize("approved", [True, False])
+def test_application_update_is_owned_and_requires_approval(monkeypatch, approved):
+    application_id, _ = _saved_application()
+    _model(
+        monkeypatch,
+        _tool("enable_changes"),
+        _tool(
+            "update_application",
+            application_id=application_id,
+            changes={"benefits": "Verified benefit"},
+        ),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(f"{path}/chat", json={"content": "Update the saved benefit."})
+        )
+        pending = next(e["call"] for e in events if e["event"] == "confirm_required")
+        assert pending["note"] == "Benefits: Verified benefit"
+        endpoint = f"/api/app/applications/{application_id}"
+        assert client.get(endpoint).json()["benefits"] == "Saved benefit"
+        _events(
+            client.post(
+                f"{path}/confirm", json={"call_id": pending["id"], "approved": approved}
+            )
+        )
+        saved = client.get(endpoint).json()
+        assert saved["benefits"] == (
+            "Verified benefit" if approved else "Saved benefit"
+        )
+        assert saved["requirements"] == [{"label": "Existing reference", "done": True}]
+
+
+def test_lookup_budget_reserves_a_final_answer_round(monkeypatch):
+    monkeypatch.setattr(service, "MAX_STEPS", 2)
+    calls = _model(
+        monkeypatch,
+        _tool("search_catalog", query="absent-record"),
+        _tool("search_catalog", query="another-absent-record"),
+        LLMResponse(
+            text="No published catalog matches were found. Your saved records may still be available."
+        ),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(f"{path}/chat", json={"content": "Look for these records."})
+        )
+        assert calls[-1]["tools"] == []
+        assert "tool budget is exhausted" in calls[-1]["system"]
+        assert (
+            events[-2]["message"]["content"]
+            == "No published catalog matches were found. Your saved records may still be available."
+        )
 
 
 def test_catalog_turn_streams_and_persists_grounded_citations(monkeypatch):
@@ -363,3 +494,70 @@ def test_retry_needs_a_question(monkeypatch):
         path = _chat(client)
         assert client.post(f"{path}/retry").status_code == 404
         assert client.get(path).json()["running"] is False
+
+
+def test_application_update_cannot_propose_changes_to_another_members_record(
+    monkeypatch,
+):
+    owner, _ = _seed(user=True)
+    application_id, _ = _saved_application(owner)
+    calls = _model(
+        monkeypatch,
+        _tool("enable_changes"),
+        _tool(
+            "update_application",
+            application_id=application_id,
+            changes={"notes": "Changed"},
+        ),
+        LLMResponse(text="I cannot update that application."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(f"{path}/chat", json={"content": "Update this application."})
+        )
+        assert not any(e["event"] == "confirm_required" for e in events)
+        error = json.loads(calls[-1]["messages"][-1]["content"])
+        assert error["ok"] is False
+        assert error["code"] == "not_found_or_inaccessible"
+        assert "My saved research notes" not in json.dumps(error)
+
+
+def test_application_ownership_is_rechecked_when_approving(monkeypatch):
+    application_id, _ = _saved_application()
+    other, _ = _seed(user=True)
+    _model(
+        monkeypatch,
+        _tool("enable_changes"),
+        _tool(
+            "update_application",
+            application_id=application_id,
+            changes={"benefits": "Changed"},
+        ),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(f"{path}/chat", json={"content": "Update this application."})
+        )
+        pending = next(e["call"] for e in events if e["event"] == "confirm_required")
+
+        async def change_owner():
+            async with SessionLocal() as session:
+                record = await session.get(Application, application_id)
+                record.user_id = other
+                await session.commit()
+
+        asyncio.run(change_owner())
+        events = _events(
+            client.post(
+                f"{path}/confirm", json={"call_id": pending["id"], "approved": True}
+            )
+        )
+        assert events[-2]["message"]["content"] == "That action is no longer available."
+
+        async def saved_benefits():
+            async with SessionLocal() as session:
+                return (await session.get(Application, application_id)).benefits
+
+        assert asyncio.run(saved_benefits()) == "Saved benefit"

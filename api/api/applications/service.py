@@ -33,7 +33,10 @@ async def list_applications(session, user_id: str) -> list[dict]:
     rows = await session.execute(
         select(m.Application)
         .where(m.Application.user_id == user_id)
-        .order_by(m.Application.deadline_date.asc().nulls_last(), m.Application.created_at.asc())
+        .order_by(
+            m.Application.deadline_date.asc().nulls_last(),
+            m.Application.created_at.asc(),
+        )
     )
     return [to_out(a) for a in rows.scalars()]
 
@@ -45,7 +48,9 @@ async def get_or_404(session, user_id: str, application_id: str) -> m.Applicatio
     return app
 
 
-async def create_application(session, user_id: str, data: schemas.ApplicationCreate) -> dict:
+async def create_application(
+    session, user_id: str, data: schemas.ApplicationCreate
+) -> dict:
     fields = data.model_dump()
     fields["requirements"] = [r.model_dump() for r in data.requirements]
     fields["status"] = data.status.value
@@ -58,7 +63,12 @@ async def create_application(session, user_id: str, data: schemas.ApplicationCre
 
 
 async def update_application(
-    session, user_id: str, application_id: str, data: schemas.ApplicationUpdate
+    session,
+    user_id: str,
+    application_id: str,
+    data: schemas.ApplicationUpdate,
+    *,
+    commit: bool = True,
 ) -> dict:
     app = await get_or_404(session, user_id, application_id)
     patch = data.model_dump(exclude_unset=True, mode="json")
@@ -70,7 +80,10 @@ async def update_application(
         app.deadline_date = data.deadline_date
     elif "deadline" in patch:
         app.deadline_date = parse_deadline(app.deadline)
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
     await session.refresh(app)
     return to_out(app)
 

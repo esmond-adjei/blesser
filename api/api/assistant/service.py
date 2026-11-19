@@ -15,7 +15,7 @@ from api.assistant.schemas import PendingCall, Source
 from api.assistant.sources import SourceRegistry
 from api.core.config import settings
 from api.core.db import SessionLocal
-from api.core.exceptions import DomainError
+from api.core.exceptions import DomainError, NotFoundError
 from api.core.ids import new_id
 from api.core.time import utcnow_naive
 from api.opportunities.service import today
@@ -36,8 +36,15 @@ For dates, times, and windows related to applications and to-dos, never write yo
 relative dates or deadlines. Use [deadline:s1] for the deadline of source s1, even if it is
 rolling. Use only the key returned by a current tool in this turn. If no deadline was
 confirmed, say so. Never present web snippets as evidence of a deadline.
-Only enable change proposals when explicitly asked to track an opportunity or add a to-do.
+Act with the authenticated member's permissions. Read their own saved records through member
+tools. Ownership of an application does not grant access to an unpublished catalog record.
+Treat empty search results as no matches within the stated scope, not proof a record does not exist.
+Use get_application for saved application details and update_application to propose edits.
+Only enable change proposals when explicitly asked to change a supported member record.
 A proposal is not a completed action. Never suggest an action happened before approval.
+Never retry an unchanged lookup that returned a non-retryable error. Explain the limitation
+and use the suggested member tool or answer with what is known. Never claim to have searched
+the web when search_web is unavailable. Never offer an unavailable tool or unsupported action.
 Before a tool call, say briefly what you are about to check in one short, public
 sentence. Omit dates and record details from that sentence.
 Use “Not this time” for unsuccessful application outcomes. Avoid em dashes and middle dots."""
@@ -84,7 +91,9 @@ def _fix_hint(exc):
         field = ".".join(str(part) for part in error["loc"]) or "input"
         allowed = (error.get("ctx") or {}).get("expected")
         problems.append(
-            f"{field} must be one of {allowed}" if allowed else f"{field}: {error['msg']}"
+            f"{field} must be one of {allowed}"
+            if allowed
+            else f"{field}: {error['msg']}"
         )
     return "Fix these inputs and try again: " + "; ".join(problems) + "."
 
@@ -93,6 +102,22 @@ def _count(label, count):
     if count is None:
         return label
     return f"{label}, {count} {'match' if count == 1 else 'matches'}"
+
+
+def _change_note(action):
+    lines = []
+    for field, value in action["changes"].items():
+        label = field.replace("_", " ").capitalize()
+        if field == "requirements" and value is not None:
+            items = [
+                f"{'Done' if item['done'] else 'Open'}: {item['label']}"
+                for item in value
+            ]
+            value = "\n" + "\n".join(items) if items else "Empty checklist"
+        elif value is None:
+            value = "Clear date" if field == "deadline_date" else "No change"
+        lines.append(f"{label}: {value}")
+    return "\n".join(lines)
 
 
 def _is_private(registry):
@@ -163,13 +188,25 @@ async def _save_reply(chat_id, user_id, lease, reply, trace, sources, cited_dead
 
 async def _model_stream(provider, history, definitions, max_tokens):
     call_deadline = settings.llm_call_deadline_seconds
+    names = {definition["name"] for definition in definitions}
+    boundaries = (
+        "\nAvailable tools for this round: "
+        + (", ".join(sorted(names)) or "none")
+        + "."
+    )
+    if "search_web" not in names:
+        boundaries += " Public web search is unavailable in this round. It requires configured search, a catalog check, and a conversation without private context or contact data. User approval does not override this restriction."
+    if not definitions:
+        boundaries += " The tool budget is exhausted. Give a final answer using results already obtained, state unresolved limits, and do not request more tools."
     async with (
         model_slot(provider),
         asyncio.timeout(call_deadline if call_deadline > 0 else None),
         aclosing(
             provider.stream(
                 messages=history,
-                system=SYSTEM + f"\nToday's catalog date is {today():%Y-%m-%d}.",
+                system=SYSTEM
+                + boundaries
+                + f"\nToday's catalog date is {today():%Y-%m-%d}.",
                 tools=definitions,
                 max_tokens=max_tokens,
             )
@@ -237,9 +274,7 @@ async def _rewind(chat_id, user_id, lease):
 async def _loop(chat_id, user_id, lease, content):
     provider = get_provider()
     if content is None:
-        user_message, history, private_context = await _rewind(
-            chat_id, user_id, lease
-        )
+        user_message, history, private_context = await _rewind(chat_id, user_id, lease)
         content = user_message.content
     else:
         user_message, history, private_context = await _begin(
@@ -255,17 +290,21 @@ async def _loop(chat_id, user_id, lease, content):
     catalog_checked = False
     changes_enabled = False
     web_configured = any(item["configured"] for item in web.search_chain())
-    reply = "I reached my lookup limit. Try a more specific question."
+    reply = (
+        "I couldn't complete the remaining lookups. Some details are still unconfirmed."
+    )
     reply_streamed = False
     draft = None
     sources, cited_deadlines = [], False
-    for step in range(1, MAX_STEPS + 1):
+    for step in range(1, MAX_STEPS + 2):
         web_allowed = web_configured and not private_context and not history_has_contact
         offered = tools.definitions(
             catalog_checked=catalog_checked,
             changes_enabled=changes_enabled,
             web_allowed=web_allowed,
         )
+        if step > MAX_STEPS:
+            offered = []
         allowed = {definition["name"] for definition in offered}
         yield {
             "event": "status",
@@ -302,6 +341,9 @@ async def _loop(chat_id, user_id, lease, content):
         if draft.shown:
             yield {"event": "retract"}
         calls = response.tool_calls
+        if step > MAX_STEPS:
+            reply = "I couldn't complete the remaining lookups within this reply. Some details are still unconfirmed."
+            break
         commentary = _commentary(registry, response.text)
         if commentary:
             trace.append({"kind": "commentary", "text": commentary})
@@ -318,7 +360,11 @@ async def _loop(chat_id, user_id, lease, content):
             label = tools.LABELS.get(name, "Unavailable tool")
             yield {"event": "tool_start", "tool": name, "label": label, "turn": step}
             ok = False
-            result = {"error": "That tool isn't available for this turn."}
+            result = {
+                "error": "That tool isn't available for this round. Use an offered tool or explain the limitation.",
+                "code": "tool_unavailable",
+                "retryable": False,
+            }
             count = None
             if (
                 name in allowed
@@ -326,9 +372,7 @@ async def _loop(chat_id, user_id, lease, content):
                 and not (name == "search_web" and private_context)
             ):
                 try:
-                    args = tools.TOOLS[name][0].model_validate(
-                        _unwrap(call.arguments)
-                    )
+                    args = tools.TOOLS[name][0].model_validate(_unwrap(call.arguments))
                     if name in tools.WRITES:
                         async with SessionLocal() as db:
                             summary, action = await tools.proposal(
@@ -346,6 +390,9 @@ async def _loop(chat_id, user_id, lease, content):
                                 "summary": summary,
                                 "arguments": action,
                                 "trace": trace,
+                                "note": _change_note(action)
+                                if name == "update_application"
+                                else "",
                             },
                         )
                         yield {"event": "confirm_required", "call": pending}
@@ -367,7 +414,18 @@ async def _loop(chat_id, user_id, lease, content):
                             catalog_checked = True
                     ok = True
                 except ValidationError as exc:
-                    result = {"error": _fix_hint(exc)}
+                    result = {
+                        "error": _fix_hint(exc),
+                        "code": "invalid_input",
+                        "retryable": False,
+                    }
+                except NotFoundError:
+                    result = {
+                        "error": "This record was not found within your permitted access. This does not distinguish a missing record from an inaccessible one. Do not retry the same identifier.",
+                        "code": "not_found_or_inaccessible",
+                        "retryable": False,
+                        "next_action": "For a saved application, use list_applications and get_application with its application id. Catalog tools only expose published records.",
+                    }
                 except (
                     ValueError,
                     DomainError,
@@ -376,13 +434,19 @@ async def _loop(chat_id, user_id, lease, content):
                     result = {
                         "error": "Web search is unavailable."
                         if isinstance(exc, web.SearchUnavailable)
-                        else "The lookup couldn't be completed with those inputs."
+                        else str(exc),
+                        "code": "search_unavailable"
+                        if isinstance(exc, web.SearchUnavailable)
+                        else "request_rejected",
+                        "retryable": False,
                     }
+            result["ok"] = ok
             trace.append(
                 _step(
                     name,
                     _count(label, count) if ok else f"{label} unavailable",
                     ok,
+                    result.get("error", "") if not ok else "",
                 )
             )
             yield {"event": "tool_result", "step": trace[-1], "turn": step}
@@ -433,6 +497,8 @@ async def confirm_turn(chat_id, user_id, lease, approved):
                         receipt = "You were already tracking this one."
                     elif name == "track_opportunity":
                         receipt = "Saved to your applications."
+                    elif name == "update_application":
+                        receipt = "Updated your application details."
                     else:
                         receipt = "Added to your to-dos."
                     preview = [
