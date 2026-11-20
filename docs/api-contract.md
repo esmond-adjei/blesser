@@ -85,7 +85,8 @@ Every member route that exists today under `/api/*` moves here unchanged (`/api/
 
 Changes:
 
-- `GET /api/app/opportunities` and `GET /api/app/opportunities/{id_or_slug}` return `MemberOpportunity`: published rows of either audience. New query param `new=true` (last 7 days) and `audience=members|public`.
+- `GET /api/app/opportunities` and `GET /api/app/opportunities/{id_or_slug}` return `MemberOpportunity`: published rows of either audience. New query param `new=true` (last 7 days) and `audience=members|public`. `sort=for_you` orders by the member's match profile and fills `match_score` and `match_terms`; `sort=relevance` ranks search words by match quality.
+- `GET`/`PUT`/`DELETE /api/app/match-profile` and `/api/app/saved-searches` (see [Opportunities](opportunities.md#search-and-matching)).
 - `GET /api/app/opportunities/facets` counts what members see.
 - `POST /api/app/opportunities` (share) lands `in_review`.
 - `GET /api/opportunities/pending` and `PATCH /api/opportunities/{id}/status` are removed (moved to admin).

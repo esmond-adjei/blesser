@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -14,10 +15,23 @@ from sqlalchemy import (
     event,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from api.core.db import Base
 from api.core.ids import new_id
+
+#: Full-text document for search and matching. Title weighs most, then the funder,
+#: kind and tags, then the summary and place, then eligibility. Kept by Postgres.
+SEARCH_VECTOR_SQL = (
+    "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+    "setweight(to_tsvector('english', coalesce(organization, '')), 'B') || "
+    "setweight(to_tsvector('english', replace(coalesce(kind, ''), '_', ' ')), 'B') || "
+    "setweight(to_tsvector('english', coalesce(tags::text, '')), 'B') || "
+    "setweight(to_tsvector('english', coalesce(summary, '')), 'C') || "
+    "setweight(to_tsvector('english', coalesce(location, '')), 'C') || "
+    "setweight(to_tsvector('english', coalesce(eligibility, '')), 'D')"
+)
 
 
 class OpportunityCategory(str, enum.Enum):
@@ -73,6 +87,12 @@ class Opportunity(Base):
             "review_reason IS NULL OR review_reason IN ('new_submission','agent_find','reported','source_changed')",
             name="ck_opportunity_review_reason",
         ),
+        Index(
+            "ix_opportunities_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
+        Index("ix_opportunities_published_at", "published_at"),
     )
 
     slug: Mapped[str] = mapped_column(String, unique=True, default=lambda: new_id())
@@ -136,6 +156,10 @@ class Opportunity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    # Never loaded with the row: only queries read it (service.search_clause).
+    search_vector: Mapped[str] = deferred(
+        mapped_column(TSVECTOR, Computed(SEARCH_VECTOR_SQL, persisted=True))
     )
 
 

@@ -92,6 +92,8 @@ EXPECTED_TABLES = sorted(
         "scan_finds",
         "organization_aliases",
         "duplicate_dismissals",
+        "match_profiles",
+        "saved_searches",
         "collections",
         "collection_items",
         "opportunity_reports",
