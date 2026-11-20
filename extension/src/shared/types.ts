@@ -157,9 +157,37 @@ export interface WriteResult {
   value: string | string[] | null
 }
 
+/** One field's place in the progress count; labels only, never the value. */
+export interface ProgressField {
+  key: string
+  label: string
+  section: string
+  required: boolean
+  filled: boolean
+}
+
+/** Live progress on one tab, kept per frame because each frame reports on its own. */
+export interface FormProgress {
+  tabId: number
+  url: string
+  frames: Record<string, ProgressField[]>
+}
+
+/** A field with what it holds now, for the Word export. Read on the device and never sent to Blesser. */
+export interface ExportField extends FieldDescriptor {
+  value: string | string[] | null
+}
+
+export interface FormExport {
+  title: string
+  url: string
+  fields: ExportField[]
+}
+
 export type PageMessage =
   | { type: "blesser.edited"; key: string; value: string | string[] | null }
   | { type: "blesser.step"; added: number }
+  | { type: "blesser.progress"; fields: ProgressField[] }
 
 export interface Settings {
   apiUrl: string
@@ -197,5 +225,7 @@ export type PanelMessage =
   | { type: "reportPreview"; tabId: number }
   | { type: "report"; tabId: number; report: ProblemReport }
   | { type: "settings"; settings: Settings }
+  | { type: "progress"; tabId: number }
+  | { type: "exportForm"; tabId: number }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }

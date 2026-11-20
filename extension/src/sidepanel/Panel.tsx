@@ -4,9 +4,11 @@ import { Button, Logo, Select, Wordmark, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../../../webapp/src/components/ui/menu"
 import type { Prefs, Review, Status } from "../shared/types"
 import { FILL_REQUEST, send } from "../shared/ui"
+import { FormProgressCard } from "./FormProgress"
 import { Opportunity } from "./Opportunity"
 import { ReportDialog } from "./ReportDialog"
 import { ReviewList } from "./ReviewList"
+import { useFormProgress } from "./useFormProgress"
 import { usePanelTab } from "./usePanelTab"
 
 function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; disabled?: boolean }) {
@@ -42,6 +44,7 @@ function Moved({ moved }: { moved: NonNullable<Review["moved"]> }) {
 export function Panel() {
   const [status, setStatus] = React.useState<Status | null>(null)
   const { tabId, pageTitle, review } = usePanelTab()
+  const progress = useFormProgress(tabId, review?.at ?? null)
   const [busy, setBusy] = React.useState(false)
   const [failure, setFailure] = React.useState<{ tabId: number | null; text: string } | null>(null)
   const error = failure && (failure.tabId === null || failure.tabId === tabId) ? failure.text : null
@@ -195,7 +198,9 @@ export function Panel() {
           <>
             <Opportunity key={`${tabId}:${currentReview?.matchedOpportunityId ?? ""}`} tabId={tabId} pageTitle={pageTitle} review={currentReview} />
 
-            <section aria-labelledby="fill-title" aria-busy={busy} className="bl-enter space-y-4 rounded-lg border border-separator bg-surface p-3.5 [--i:1]">
+            {progress && tabId ? <FormProgressCard tabId={tabId} progress={progress} onSaved={(name) => setNotice(`Saved ${name}`)} /> : null}
+
+            <section aria-labelledby="fill-title" aria-busy={busy} className="bl-enter space-y-4 rounded-lg border border-separator bg-surface p-3.5 [--i:2]">
               <h2 id="fill-title" className="type-title-3 text-ink">Fill this form</h2>
               <div className="divide-y divide-separator rounded-md bg-surface-sunk">
                 <label className="flex items-center gap-3 px-3 py-2">

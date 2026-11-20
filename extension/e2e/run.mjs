@@ -156,7 +156,7 @@ try {
   const app = await connectTab
   await app.waitForURL(/\/login\?next=/)
   await app.getByLabel("Email").fill(email)
-  await app.getByLabel("Password").fill(password)
+  await app.getByLabel("Password", { exact: true }).fill(password)
   await app.getByRole("button", { name: /sign in/i }).click()
   await app.waitForURL(/\/connect\/extension\?ext=/)
   await app.getByRole("button", { name: "Allow" }).click()
@@ -203,6 +203,44 @@ try {
   assert.equal(values.cv, "Ama-Mensah-CV.pdf")
   assert.notEqual(values.title, "SUBMITTED", "the form must never be submitted")
   results.steps.push("filled")
+
+  // Progress follows the page live, across the main page and the referee frame.
+  const progressBar = panel.getByRole("progressbar", { name: "Form progress" })
+  await progressBar.waitFor()
+  const filledNow = async () => Number(await progressBar.getAttribute("aria-valuenow"))
+  await panel.waitForFunction(() => Number(document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")) > 0, null, { timeout: 10_000 })
+  const filledAfterFill = await filledNow()
+  const total = Number(await progressBar.getAttribute("aria-valuemax"))
+  assert(filledAfterFill > 0 && filledAfterFill < total, `progress after the fill: ${filledAfterFill} of ${total}`)
+  const empty = await tabPage.evaluate(() => ["pronouns", "amount", "site", "traction", "mentor"].find((id) => !document.getElementById(id).value))
+  assert(empty, "the fixture has an empty field to type into")
+  await tabPage.locator(`#${empty}`).fill("42")
+  await panel.waitForFunction((n) => Number(document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")) === n, filledAfterFill + 1, { timeout: 10_000 })
+  await tabPage.locator(`#${empty}`).fill("")
+  await panel.waitForFunction((n) => Number(document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")) === n, filledAfterFill, { timeout: 10_000 })
+  assert(await panel.getByRole("list", { name: "Sections" }).getByText("Referee", { exact: true }).count(), "the frame's fields count under the frame's name")
+  results.progress = { filled: filledAfterFill, total }
+  await shot(panel, "04a-progress-light.png")
+  await panel.emulateMedia({ colorScheme: "dark" })
+  await shot(panel, "04b-progress-dark.png")
+  await panel.emulateMedia({ colorScheme: "light" })
+  results.steps.push("progress counted filled fields and followed typing on the page")
+
+  const download = panel.waitForEvent("download")
+  await panel.getByRole("button", { name: "Download as Word" }).click()
+  const docx = await download
+  assert.equal(docx.suggestedFilename(), "kumasi-founders-fund-application.docx")
+  const docxPath = join(OUT, "form-export.docx")
+  await docx.saveAs(docxPath)
+  const bytes = readFileSync(docxPath)
+  assert.equal(bytes.readUInt32LE(0), 0x04034b50, "the export is a ZIP package")
+  const text = bytes.toString("utf8")
+  for (const part of ["word/document.xml", "word/styles.xml", "[Content_Types].xml"]) assert(text.includes(part), `the package has ${part}`)
+  for (const expected of ["Kumasi Founders Fund: application", "First name", "Ama", "Founder CV", "City of residence"])
+    assert(text.includes(expected), `the document has ${expected}`)
+  assert(!text.includes("Card number"), "fields Blesser never fills stay out of the export")
+  await panel.getByText("Saved kumasi-founders-fund-application.docx").waitFor()
+  results.steps.push("exported the form to a Word document")
 
   const row = (label) => panel.getByRole("region", { name: "Review" }).locator("li").filter({ has: panel.getByText(label, { exact: true }) })
 

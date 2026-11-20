@@ -11,6 +11,7 @@ import {
 import type { Corrected, FieldDescriptor, PageMessage, ProblemReport, Review, ReviewRow } from "../shared/types"
 import type { Api } from "./api"
 import { cleanDescriptor, collectPage, split, type Scripting, type TabInfo } from "./fill"
+import { cleanProgress } from "./progress"
 import type { Store } from "./store"
 
 type Value = string | string[] | null
@@ -105,6 +106,7 @@ export class Actions {
   async fromPage(tabId: number, frameId: number, msg: PageMessage) {
     if (msg.type === "blesser.edited") await this.store.updateReview(tabId, (r) => notePageEdit(r, `${frameId}:${msg.key}`, msg.value))
     else if (msg.type === "blesser.step" && msg.added > 0) await this.store.updateReview(tabId, (r) => markMoved(r, "step"))
+    else if (msg.type === "blesser.progress") await this.store.updateProgress(tabId, frameId, cleanProgress(msg.fields))
   }
 
   async navigated(tabId: number) {
