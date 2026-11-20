@@ -39,11 +39,11 @@ The dedupe key is the normalized organization plus the normalized title, without
 
 So "Mastercard Foundation Scholars Program 2027" refreshes the "Mastercard Foundation Scholars Program" row instead of adding a second one. Two genuinely different schemes whose names differ only by those words also share a key; staff can split them by editing the title.
 
-Organizations written in unrelated ways ("DAAD" and "German Academic Exchange Service") are mapped by the `organization_aliases` table, which migration `0009` seeds with a few common Ghana funders. Editors manage it on the admin Duplicates page; a change re-keys existing listings unless another listing already holds the new key.
+Organizations written in unrelated ways ("DAAD" and "German Academic Exchange Service") are mapped by the `organization_aliases` table, which migration `0011` seeds with a few common Ghana funders. Editors manage it on the admin Duplicates page; a change re-keys existing listings unless another listing already holds the new key.
 
 The Duplicates page lists pairs that the key did not catch: titles with trigram similarity of 0.5 or more (`pg_trgm`) from the same or a similar organization, and listings that share a source page. Editors keep one listing of a pair or mark the pair as different, which hides it from the list for good. Keeping one merges the other into it: tracking, to-dos, reports, scan results, collection places and crawl candidates move over, empty fields are filled, tags, countries and requirements are combined, the later `verified_at` is kept, and the merged listing's public link redirects to the kept one. The merged listing is hidden, not deleted.
 
-Migration `0009` re-keys the existing catalogue. Where two rows now share a key, the published (then most recently verified) row takes it and the others keep `<key>#<id>`, so they appear on the Duplicates page for an editor to merge.
+Migration `0011` re-keys the existing catalogue. Where two rows now share a key, the published (then most recently verified) row takes it and the others keep `<key>#<id>`, so they appear on the Duplicates page for an editor to merge.
 
 These checks establish where the facts came from. They do not establish whether a source is trustworthy. Members should confirm details on the official page before applying.
 
