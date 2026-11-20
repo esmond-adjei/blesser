@@ -48,6 +48,7 @@ import { PageHeader } from "../components/layout/PageHeader"
 import { useShellHeader } from "../components/layout/shellHeader"
 import { CountrySelect } from "../components/ui/country-select"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
+import { SourcesDialog } from "../components/scans/SourcesDialog"
 
 type Status = ScanTask["status"] | Scan["status"]
 
@@ -66,11 +67,14 @@ function audiences(scan: Scan): string {
 }
 
 function scanTitle(scan: Scan): string {
+  if (scan.kind === "sources") return `Your sources for ${audiences(scan).toLowerCase()}`
   return scan.region ? `${audiences(scan)} in ${scan.region}` : audiences(scan)
 }
 
 // Early scans stored the agents' default instruction as their focus; it isn't something the member typed.
+// Scheduled source checks write their own focus; the sites line says the same thing.
 function scanFocus(scan: Scan): string {
+  if (scan.kind === "sources") return ""
   const focus = scan.focus.trim()
   return focus.startsWith("Find open opportunities eligible") ? "" : focus
 }
@@ -145,6 +149,7 @@ export function Scans() {
   const [front, setFront] = React.useState<string | null>(null)
   const [fresh, setFresh] = React.useState<string | null>(null)
   const [expanded, setExpanded] = React.useState<{ id: string; from: DOMRect } | null>(null)
+  const [sourcesOpen, setSourcesOpen] = React.useState(false)
   const closeMorph = React.useRef<(() => Promise<void>) | null>(null)
   const collapse = () => closeMorph.current?.() ?? Promise.resolve()
   useTick(!!scans.data?.some((s) => s.status === "running"))
@@ -180,6 +185,7 @@ export function Scans() {
     actions: (
       <div className="flex items-center gap-3">
         <AllowanceNote />
+        <Button size="sm" variant="quiet" icon={<Link2 />} aria-label="My sources" onClick={() => setSourcesOpen(true)}><span className="max-sm:sr-only">My sources</span></Button>
         <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto arrange</Button>
       </div>
     ),
@@ -260,6 +266,7 @@ export function Scans() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
         <ScanComposer onStarted={onStarted} className="pointer-events-auto mx-auto max-w-[760px] shadow-elevation-3" />
       </div>
+      <SourcesDialog open={sourcesOpen} onOpenChange={setSourcesOpen} />
     </div>
   )
 }

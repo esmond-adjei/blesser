@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     extraction_min_confidence: float = 0.85
     discovery_no_yield_turns: int = 5
     discovery_max_turns: int = 12
+    # "My sources": sites a member saves for scheduled checks.
+    member_sources_max: int = 10
+    member_source_check_days: int = 7
+    # Members whose sources the worker checks per hourly pass; 0 pauses checks.
+    member_source_checks_per_hour: int = 20
 
     # --- Web search and page fetches (api/web.py) ---
     # Ordered search chain, e.g. "tavily,brave"; empty = [SEARCH_PROVIDER].

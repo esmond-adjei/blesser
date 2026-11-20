@@ -154,6 +154,8 @@ async def enforce_scan_limit(
             .select_from(Scan)
             .where(
                 Scan.user_id == current.id,
+                # Scheduled source checks and sweeps never use a member's quota.
+                Scan.kind == "member",
                 Scan.created_at > now - timedelta(seconds=seconds),
             )
         )

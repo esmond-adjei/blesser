@@ -105,6 +105,7 @@ EXPECTED_TABLES = sorted(
         "auth_email_tokens",
         "auth_refresh_tokens",
         "calendar_feeds",
+        "member_sources",
         "notification_preferences",
         "notifications",
         "opportunities",

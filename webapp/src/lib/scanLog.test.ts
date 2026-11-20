@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { describeEvent, errorReason, formatDuration, parseSites, scanElapsedMs, shortUrl, siteLabel } from "./scanLog"
-import type { Scan, ScanTask } from "./types"
+import { describeEvent, errorReason, formatDuration, parseSites, scanElapsedMs, shortUrl, siteLabel, sourceStatus } from "./scanLog"
+import type { MemberSource, Scan, ScanTask } from "./types"
 
 const task = (log: ScanTask["log"]): ScanTask => ({
   id: "t1", task_type: "discover", target: "category:student", status: "done", error: null, final_text: null,
@@ -66,5 +66,30 @@ describe("scan sites and catalog steps", () => {
       ok: true,
     })
     expect(matched).toMatchObject({ kind: "save", text: "Matched Volta Grant", opportunityId: "o1" })
+  })
+})
+
+describe("source status", () => {
+  const base: MemberSource = {
+    id: "s1",
+    url: "https://ug.edu.gh/scholarships",
+    category: "student",
+    note: "",
+    paused: false,
+    next_check_at: "2026-11-25T10:00:00",
+    last_checked_at: "2026-11-18T10:00:00",
+    last_scan_id: "scan1",
+    finds: 3,
+    created_at: "2026-11-01T10:00:00",
+  }
+  const now = Date.UTC(2026, 10, 20, 10, 0, 0)
+
+  it("says when it was checked, what it found and when it runs next", () => {
+    expect(sourceStatus(base, now)).toBe("Checked 2d ago, 3 found, next in 5 days")
+  })
+
+  it("covers new and paused sources", () => {
+    expect(sourceStatus({ ...base, last_checked_at: null }, now)).toBe("First check within the hour")
+    expect(sourceStatus({ ...base, paused: true }, now)).toBe("Paused")
   })
 })
