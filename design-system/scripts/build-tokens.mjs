@@ -148,6 +148,25 @@ const theme = [
 `,
 ].join("\n")
 
+// Email clients read neither CSS variables nor stylesheets, so the API's mail layout
+// gets the light theme as Python constants.
+const pyName = (name) => name.toUpperCase().replace(/-/g, "_")
+const pyString = (value) => JSON.stringify(value)
+const mailTokens = [
+  '"""Generated from design-system/tokens.json by scripts/build-tokens.mjs (npm run tokens). Do not edit.',
+  "",
+  "Light theme only: email clients cannot follow the reader's theme reliably.",
+  '"""',
+  "",
+  ...tokens.color.tokens.map((t) => `${pyName(t.name)} = ${pyString(t.value.light)}`),
+  "",
+  ...tokens.radius.tokens.map((t) => `${pyName(t.name)} = ${pyString(t.value)}`),
+  "",
+  ...Object.entries(tokens.type.families).map(([key, value]) => `FONT_${pyName(key)} = ${pyString(value.replace(/"/g, "'"))}`),
+  "",
+].join("\n")
+
 writeFileSync(new URL("src/tokens.css", root), tokensCss)
 writeFileSync(new URL("src/theme.css", root), theme)
-console.log("Wrote src/tokens.css and src/theme.css")
+writeFileSync(new URL("../api/api/core/mail_tokens.py", root), mailTokens)
+console.log("Wrote src/tokens.css, src/theme.css and api/api/core/mail_tokens.py")
