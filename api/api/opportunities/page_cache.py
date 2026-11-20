@@ -80,6 +80,10 @@ async def get_page(url: str) -> Page:
                 if response.status_code == 304
                 else await asyncio.to_thread(parse_page, raw, key)
             )
+            final = str(getattr(response, "url", "") or "")
+            if page is not None and final and normalized_url(final) != key:
+                # Redirected: scheduled checks treat a move to a homepage as a lost page.
+                page.metadata["final_url"] = final
         except (
             httpx.HTTPError,
             egress.EgressBlocked,

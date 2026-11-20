@@ -14,6 +14,7 @@ from api.editorial.service import get_settings
 from api.opportunities import service
 from api.opportunities.crawl_models import CrawlCandidate, Source
 from api.opportunities.crawler import crawl_due, record_candidate
+from api.opportunities.dedupe import key_for
 from api.opportunities.extraction import extract_page
 from api.opportunities.page_cache import get_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
@@ -168,14 +169,14 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                     add_reason(metrics, "region_excluded")
                 else:
                     data = result.opportunity
-                    candidate.dedupe_key = service.dedupe_key(
-                        data.organization, data.title
+                    candidate.dedupe_key = await key_for(
+                        session, data.organization, data.title
                     )
                     if data.category.value not in scan.categories:
                         candidate.status, candidate.reason = "new", "category_deferred"
                         candidate.category_hints = [data.category.value]
                         add_reason(metrics, "category_deferred")
-                    elif await service.find_by_key(session, candidate.dedupe_key):
+                    elif await service.blocks_save(session, candidate.dedupe_key):
                         candidate.status, candidate.reason = "duplicate", "dedupe_key"
                         add_reason(metrics, "dedupe_key")
                     elif data.source_url != page.url:
