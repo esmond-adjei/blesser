@@ -16,3 +16,4 @@
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.
 - The web app builds on Node 26 LTS.
+- The crawler reads the newest pages first: feed items by publish date, sitemaps by last-updated date, then sources that have produced saves. Duplicate URL checks use a stored, indexed normalized URL.

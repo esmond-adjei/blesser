@@ -2,7 +2,7 @@ import time
 from datetime import timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import cast, or_, select, update
+from sqlalchemy import cast, func, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.agent.orchestrator import TaskHalted, _halt_reason
@@ -33,6 +33,21 @@ async def lock_claim(session, candidate, token) -> bool:
     return False
 
 
+def claim_order():
+    """Newest items first, then sources that have yielded saves, then newest found.
+
+    Yield is smoothed ((saved + 1) / (found + 2)) so a new source starts at one half.
+    """
+    source_yield = (func.coalesce(Source.opportunities_saved, 0) + 1.0) / (
+        func.coalesce(Source.candidates_found, 0) + 2.0
+    )
+    return (
+        CrawlCandidate.published_date.desc().nulls_last(),
+        source_yield.desc(),
+        CrawlCandidate.created_at.desc(),
+    )
+
+
 async def claim_candidate(session, category: str, region: str):
     now = utcnow_naive()
     query = (
@@ -56,8 +71,9 @@ async def claim_candidate(session, category: str, region: str):
                 cast(CrawlCandidate.category_hints, JSONB).contains([category]),
             ),
         )
-        .order_by(CrawlCandidate.created_at)
-        .with_for_update(skip_locked=True)
+        .outerjoin(Source, Source.id == CrawlCandidate.source_id)
+        .order_by(*claim_order())
+        .with_for_update(skip_locked=True, of=CrawlCandidate)
         .limit(1)
     )
     row = (await session.execute(query)).scalar_one_or_none()
