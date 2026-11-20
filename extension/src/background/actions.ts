@@ -8,9 +8,9 @@ import {
   notePageEdit,
   sameValue,
 } from "../shared/review"
-import type { Corrected, FieldDescriptor, PageMessage, ProblemReport, Review, ReviewRow } from "../shared/types"
-import type { Api } from "./api"
-import { cleanDescriptor, collectPage, split, type Scripting, type TabInfo } from "./fill"
+import type { Corrected, FieldDescriptor, PageMatch, PageMessage, ProblemReport, Review, ReviewRow, TrackedApplication } from "../shared/types"
+import type { Api, Application } from "./api"
+import { blockedReason, cleanDescriptor, collectPage, split, type Scripting, type TabInfo } from "./fill"
 import { cleanProgress } from "./progress"
 import type { Store } from "./store"
 
@@ -23,6 +23,7 @@ export interface ActionResult {
 }
 
 const MAX_NOTE = 2000
+const APPLIED = new Set(["submitted", "interview", "accepted", "rejected"])
 const message = (err: unknown) => (err instanceof Error ? err.message : "Blesser didn't answer.")
 
 /** Review actions from the panel and events from the page; every change goes through the stored review. */
@@ -126,12 +127,38 @@ export class Actions {
     await this.api.report({ page, fields, note: report.note.trim().slice(0, MAX_NOTE) })
   }
 
-  async markApplied(tabId: number): Promise<Review> {
-    const review = await this.store.review(tabId)
-    if (!review?.matchedOpportunityId) throw new Error("This page isn't linked to an application you track.")
-    const match = (await this.api.applications()).find((a) => a.opportunity_id === review.matchedOpportunityId)
-    if (!match) throw new Error("This page isn't linked to an application you track.")
-    await this.api.markSubmitted(match.id)
-    return this.save(tabId, (r) => ({ ...r, applied: true }))
+  /** The member's application for this page: from the last fill, or asked of Blesser when there's none yet. */
+  private async application(tab: TabInfo): Promise<Application | null> {
+    const review = await this.store.review(tab.id)
+    let match: PageMatch | null =
+      review && review.moved !== "navigated" ? { application_id: review.matchedApplicationId ?? null, opportunity_id: review.matchedOpportunityId } : null
+    if (!match?.application_id && !match?.opportunity_id) {
+      if (blockedReason(tab.url)) return null
+      // An API without the match route answers 404; the panel then just shows no match.
+      match = await this.api.match(tab.url, tab.title).catch(() => null)
+    }
+    if (!match?.application_id && !match?.opportunity_id) return null
+    const apps = await this.api.applications()
+    return (
+      apps.find((a) => match.application_id !== null && a.id === match.application_id) ??
+      apps.find((a) => match.opportunity_id !== null && a.opportunity_id === match.opportunity_id) ??
+      null
+    )
+  }
+
+  async tracked(tab: TabInfo): Promise<TrackedApplication | null> {
+    const app = await this.application(tab)
+    if (!app) return null
+    const { title, deadline, deadline_date, status } = app
+    return { title, deadline, deadline_date, applied: APPLIED.has(status) }
+  }
+
+  async markApplied(tab: TabInfo): Promise<TrackedApplication> {
+    const app = await this.application(tab)
+    if (!app) throw new Error("This page isn't linked to an application you track.")
+    if (!APPLIED.has(app.status)) await this.api.markSubmitted(app.id)
+    await this.store.updateReview(tab.id, (r) => ({ ...r, applied: true }))
+    const { title, deadline, deadline_date } = app
+    return { title, deadline, deadline_date, applied: true }
   }
 }

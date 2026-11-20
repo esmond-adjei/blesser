@@ -51,6 +51,8 @@ export interface FillResponse {
   fills: Fill[]
   unfilled: { key: string; reason: string }[]
   matched_opportunity_id: string | null
+  /** Newer APIs also match applications added by hand, which have no opportunity. */
+  matched_application_id?: string | null
   usage: { drafted_fields: number; remaining_today: number }
 }
 
@@ -124,6 +126,8 @@ export interface Review {
   at: string
   rows: ReviewRow[]
   matchedOpportunityId: string | null
+  /** Absent on reviews stored before the API matched applications directly. */
+  matchedApplicationId?: string | null
   applied: boolean
   remainingToday: number | null
   /** "navigated": the tab loaded another page; "step": new fields appeared on the same page. */
@@ -134,6 +138,13 @@ export interface TrackedApplication {
   title: string
   deadline: string
   deadline_date: string | null
+  /** Submitted or further along in the member's records. */
+  applied: boolean
+}
+
+export interface PageMatch {
+  application_id: string | null
+  opportunity_id: string | null
 }
 
 export type Corrected = { value: string | string[] | null } | { wrong_field: true }

@@ -483,6 +483,151 @@ def test_url_matching_only_owned_tracked_opportunities(saved_kit):
         run(cleanup())
 
 
+def test_page_matches_tracked_applications_without_exact_links(saved_kit):
+    kit, _ = saved_kit
+    client, other, ids, _ = kit
+    opportunity_id = uuid.uuid4().hex
+    created = []
+
+    async def setup():
+        async with SessionLocal() as session:
+            session.add(
+                Opportunity(
+                    id=opportunity_id,
+                    title="Kumasi Founders Fund 2026",
+                    category="startup",
+                    link="https://founders.example.org/fund",
+                    source_url="https://news.example.net/2026/11/kumasi-fund",
+                    dedupe_key=opportunity_id,
+                )
+            )
+            await session.flush()
+            apps = [
+                Application(
+                    user_id=ids[0],
+                    opportunity_id=opportunity_id,
+                    title="Kumasi Founders Fund 2026",
+                ),
+                # Added by hand: no catalog opportunity behind it.
+                Application(
+                    user_id=ids[0],
+                    title="Accra Women in Tech Fellowship",
+                    link="https://fellows.example.com/",
+                ),
+                Application(
+                    user_id=ids[0],
+                    title="Siwa Green Grant",
+                    link="https://docs.google.com/forms/d/e/FORM1/viewform",
+                ),
+                Application(
+                    user_id=ids[0],
+                    title="Jobs board role one",
+                    link="https://jobs.example.io/apply?job=1",
+                ),
+                Application(
+                    user_id=ids[0],
+                    title="Jobs board role two",
+                    link="https://jobs.example.io/apply?job=2",
+                ),
+            ]
+            session.add_all(apps)
+            await session.commit()
+            created.extend(app.id for app in apps)
+
+    def match(url, title="", who=client):
+        response = who.get(
+            "/api/app/autofill/match", params={"url": url, "title": title}
+        )
+        assert response.status_code == 200
+        return response.json()
+
+    run(setup())
+    founders, fellows, green, _, job_two = created
+    try:
+        # A form page under the opportunity's link.
+        assert match("https://founders.example.org/fund/apply/step-1") == {
+            "application_id": founders,
+            "opportunity_id": opportunity_id,
+        }
+        # A hand-added application, matched on its own link's site.
+        assert match("https://apply.fellows.example.com/x")["application_id"] is None
+        assert (
+            match("https://fellows.example.com/2026/form?utm_source=x")[
+                "application_id"
+            ]
+            == fellows
+        )
+        # Shared form hosts need the form's own address; tracking noise is ignored.
+        assert (
+            match("https://docs.google.com/forms/d/e/FORM1/viewform?usp=sf_link")[
+                "application_id"
+            ]
+            == green
+        )
+        assert (
+            match("https://docs.google.com/forms/d/e/FORM1/formResponse")[
+                "application_id"
+            ]
+            == green
+        )
+        assert (
+            match("https://docs.google.com/forms/d/e/OTHER/viewform")["application_id"]
+            is None
+        )
+        # Two applications on one site: only the matching job id counts.
+        assert (
+            match("https://jobs.example.io/apply?job=2&ref=blesser")["application_id"]
+            == job_two
+        )
+        assert match("https://jobs.example.io/apply?job=3")["application_id"] is None
+        assert match("https://jobs.example.io/careers")["application_id"] is None
+        # An aggregator's article is not the funder's site.
+        assert (
+            match("https://news.example.net/2026/11/other-story")["application_id"]
+            is None
+        )
+        # A form elsewhere, recognised by its title.
+        assert (
+            match(
+                "https://forms.office.com/r/abc",
+                "Kumasi Founders Fund 2026: application",
+            )["application_id"]
+            == founders
+        )
+        assert (
+            match("https://forms.office.com/r/abc", "Kumasi")["application_id"] is None
+        )
+        # Another member's applications never match.
+        assert (
+            match("https://founders.example.org/fund/apply", who=other)[
+                "application_id"
+            ]
+            is None
+        )
+
+        body = request([], allow_drafting=False)
+        body["page"]["url"] = "https://fellows.example.com/apply"
+        filled = client.post("/api/app/autofill/fill", json=body).json()
+        assert filled["matched_application_id"] == fellows
+        assert filled["matched_opportunity_id"] is None
+        assert client.get(
+            "/api/app/autofill/match", params={"url": "javascript:alert(1)"}
+        ).json() == {"application_id": None, "opportunity_id": None}
+    finally:
+
+        async def cleanup():
+            async with SessionLocal() as session:
+                await session.execute(
+                    delete(Application).where(Application.id.in_(created))
+                )
+                await session.execute(
+                    delete(Opportunity).where(Opportunity.id == opportunity_id)
+                )
+                await session.commit()
+
+        run(cleanup())
+
+
 @pytest.mark.rate_limits
 def test_fill_rate_limit_runs_before_validation_and_is_per_member(
     saved_kit, monkeypatch

@@ -105,6 +105,7 @@ def normalize_url(value):
                 "source",
                 "mc_cid",
                 "mc_eid",
+                "usp",
             }
         ]
         return (
@@ -116,20 +117,151 @@ def normalize_url(value):
         return None
 
 
-async def matched_opportunity(session, user_id, url):
-    normalized = normalize_url(url)
+# Form builders host many organisations' forms on one host, so only a near-exact address matches there.
+SHARED_FORM_HOSTS = {
+    "docs.google.com",
+    "forms.gle",
+    "forms.office.com",
+    "forms.microsoft.com",
+    "form.typeform.com",
+    "typeform.com",
+    "airtable.com",
+    "form.jotform.com",
+    "jotform.com",
+    "tally.so",
+    "surveymonkey.com",
+    "wufoo.com",
+    "zoho.com",
+    "forms.zohopublic.com",
+    "submittable.com",
+    "fluxx.io",
+}
+
+
+def _url_parts(value):
+    normalized = normalize_url(value or "")
     if normalized is None:
         return None
-    rows = await session.execute(
-        select(Opportunity.id, Opportunity.link, Opportunity.source_url)
-        .join(Application, Application.opportunity_id == Opportunity.id)
-        .where(Application.user_id == user_id)
-        .order_by(Application.created_at.desc(), Application.id)
+    rest, _, query = normalized.partition("?")
+    host, _, path = rest.partition("/")
+    segments = [part for part in path.lower().split("/") if part]
+    return host, segments, dict(parse_qsl(query, keep_blank_values=True))
+
+
+# The same Google form is viewed, submitted and closed at sibling addresses.
+FORM_ACTIONS = {"viewform", "formresponse", "closedform", "prefill", "edit"}
+
+
+def _form_path(segments):
+    return segments[:-1] if segments and segments[-1] in FORM_ACTIONS else segments
+
+
+def _conflicts(a, b):
+    return any(key in b and b[key] != val for key, val in a.items())
+
+
+def _shared(host):
+    return host in SHARED_FORM_HOSTS or any(
+        host.endswith("." + h) for h in SHARED_FORM_HOSTS
     )
-    for opportunity_id, link, source in rows:
-        if normalized in {normalize_url(link), normalize_url(source)}:
-            return opportunity_id
-    return None
+
+
+def _title_words(value):
+    return " ".join(normalize(value or "").split())
+
+
+def _unique(candidates):
+    ids = {candidate[0] for candidate in candidates}
+    return candidates[0] if len(ids) == 1 else None
+
+
+async def matched_ids(session, user_id, url, title=""):
+    match = await match_application(session, user_id, url, title)
+    return {
+        "matched_application_id": match and match["application_id"],
+        "matched_opportunity_id": match and match["opportunity_id"],
+    }
+
+
+async def match_application(session, user_id, url, title=""):
+    """The member's tracked application this page belongs to, or None.
+
+    Tries, in order: the same address; an address under (or above) a tracked link on the
+    same site; the only tracked application on that site; the only one whose title the
+    page title contains. Ambiguous steps match nothing rather than guess.
+    """
+    page = _url_parts(url)
+    if page is None:
+        return None
+    rows = (
+        await session.execute(
+            select(
+                Application.id,
+                Application.opportunity_id,
+                Application.title,
+                Application.link,
+                Opportunity.link,
+                Opportunity.source_url,
+            )
+            .outerjoin(Opportunity, Opportunity.id == Application.opportunity_id)
+            .where(Application.user_id == user_id)
+            .order_by(Application.created_at.desc(), Application.id)
+        )
+    ).all()
+    host, segments, query = page
+    normalized = normalize_url(url)
+    exact, nested, same_site, titled = [], [], [], []
+    page_title = _title_words(title)
+    for app_id, opportunity_id, app_title, app_link, opp_link, source in rows:
+        found = (app_id, opportunity_id)
+        for kind, link in (("own", app_link), ("own", opp_link), ("source", source)):
+            parts = _url_parts(link)
+            if parts is None:
+                continue
+            if normalize_url(link) == normalized:
+                exact.append(found)
+                continue
+            link_host, link_segments, link_query = parts
+            if link_host != host or _conflicts(query, link_query):
+                continue
+            shared = _shared(host)
+            mine, theirs = (
+                (_form_path(segments), _form_path(link_segments))
+                if shared
+                else (segments, link_segments)
+            )
+            shorter, longer = sorted((mine, theirs), key=len)
+            depth = len(shorter)
+            if longer[:depth] == shorter and (
+                depth >= 3 or (depth >= 1 and not shared)
+            ):
+                nested.append((depth, found))
+            elif kind == "own" and not shared:
+                same_site.append(found)
+        name = _title_words(app_title)
+        padded_page, padded_name = f" {page_title} ", f" {name} "
+        if (
+            page_title
+            and len(name) >= 12
+            and (
+                padded_name in padded_page
+                or (len(page_title) >= 12 and padded_page in padded_name)
+            )
+        ):
+            titled.append(found)
+    if exact:
+        app_id, opportunity_id = exact[0]
+    elif nested:
+        deepest = max(depth for depth, _ in nested)
+        best = _unique([found for depth, found in nested if depth == deepest])
+        if best is None:
+            return None
+        app_id, opportunity_id = best
+    elif (best := _unique(same_site) or _unique(titled)) is not None:
+        app_id, opportunity_id = best
+    else:
+        return None
+    return {"application_id": app_id, "opportunity_id": opportunity_id}
 
 
 async def answer_matches(session, user_id, fields, project_id, sensitive):
@@ -425,9 +557,7 @@ async def fill(session, user_id, req):
     return FillResponse(
         fills=[fills[field.key] for field in req.fields if field.key in fills],
         unfilled=unfilled,
-        matched_opportunity_id=await matched_opportunity(
-            session, user_id, req.page.url
-        ),
+        **await matched_ids(session, user_id, req.page.url, req.page.title),
         usage=Usage(
             drafted_fields=sum(item.source == "drafted" for item in fills.values()),
             remaining_today=remaining,

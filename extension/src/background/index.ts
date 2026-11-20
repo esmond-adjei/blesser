@@ -1,4 +1,4 @@
-import type { CollectedField, ExportField, FillInstruction, FillOutcome, PageMessage, PanelMessage, ProgressField, Reply, Status, TrackedApplication, WriteResult } from "../shared/types"
+import type { CollectedField, ExportField, FillInstruction, FillOutcome, PageMessage, PanelMessage, ProgressField, Reply, Status, WriteResult } from "../shared/types"
 import { Actions } from "./actions"
 import { Api, SignedOut } from "./api"
 import { acceptConnect, connectUrl, newState } from "./connect"
@@ -98,14 +98,8 @@ async function handle(message: PanelMessage): Promise<unknown> {
       return store.saveSettings(message.settings)
     case "review":
       return (await store.review(message.tabId)) ?? null
-    case "trackedApplication": {
-      const review = await store.review(message.tabId)
-      if (!review?.matchedOpportunityId || review.moved === "navigated") return null
-      const match = (await api.applications()).find((app) => app.opportunity_id === review.matchedOpportunityId)
-      if (!match) return null
-      const { title, deadline, deadline_date } = match
-      return { title, deadline, deadline_date } satisfies TrackedApplication
-    }
+    case "trackedApplication":
+      return actions.tracked(await tabInfo(message.tabId))
     case "fill": {
       const review = await runFill(api, scripting, await tabInfo(message.tabId), await store.prefs()).catch(explain)
       await store.saveReview(review)
@@ -122,7 +116,7 @@ async function handle(message: PanelMessage): Promise<unknown> {
       return true
     }
     case "markApplied":
-      return actions.markApplied(message.tabId)
+      return actions.markApplied(await tabInfo(message.tabId))
     case "edit":
       return actions.edit(message.tabId, message.key, message.value)
     case "clear":

@@ -196,7 +196,7 @@ export function Panel() {
           </section>
         ) : (
           <>
-            <Opportunity key={`${tabId}:${currentReview?.matchedOpportunityId ?? ""}`} tabId={tabId} pageTitle={pageTitle} review={currentReview} />
+            <Opportunity key={tabId ?? "none"} tabId={tabId} pageTitle={pageTitle} review={currentReview} />
 
             {progress && tabId ? <FormProgressCard tabId={tabId} progress={progress} onSaved={(name) => setNotice(`Saved ${name}`)} /> : null}
 

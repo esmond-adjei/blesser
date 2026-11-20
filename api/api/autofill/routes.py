@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.applicant_kit.routes import private_response
@@ -27,6 +27,22 @@ async def fill(
     current: Annotated[UserOut, Depends(get_current_user)],
 ):
     return await service.fill(session, current.id, req)
+
+
+@router.get(
+    "/match",
+    response_model=schemas.PageMatch,
+    dependencies=[Depends(rate_limit("autofill"))],
+)
+async def match(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current: Annotated[UserOut, Depends(get_current_user)],
+    url: Annotated[str, Query(max_length=2048)],
+    title: Annotated[str, Query(max_length=500)] = "",
+):
+    """Which tracked application the page in the member's tab belongs to."""
+    found = await service.match_application(session, current.id, url, title)
+    return found or {"application_id": None, "opportunity_id": None}
 
 
 @router.post(

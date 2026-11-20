@@ -88,6 +88,10 @@ const session = await call("POST", "/api/app/auth/register", null, { email, pass
 const token = session.tokens.access_token
 const results = { email, backend: V2 ? "real v2 routes" : "feedback and reports mocked by the e2e proxy", steps: [] }
 async function shot(page, name, full = false) {
+  // Let entrance animations and colour-scheme transitions finish, or the shot catches a half-drawn frame.
+  // The theme follows a media-query listener, so give it a frame to start its transition before waiting it out.
+  await page.waitForTimeout(100)
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"), null, { timeout: 3000 }).catch(() => {})
   if (!full) return page.screenshot({ path: join(OUT, name) })
   // Sized to the content rather than fullPage, which crops a page laid out with a scrollbar.
   const size = page.viewportSize()
@@ -114,6 +118,8 @@ try {
   form.append("title", "Ama Mensah CV")
   form.append("is_default", "true")
   await call("POST", "/api/app/documents", token, form)
+  // Added by hand, with the funder's site as its link: the form page lives elsewhere on that site.
+  const tracked = await call("POST", "/api/app/applications", token, { title: "Kumasi Founders Fund 2026", link: `${SITE}/apply`, deadline: "30 Nov 2030" })
   results.steps.push("kit seeded")
 
   const profileDir = mkdtempSync(join(tmpdir(), "blesser-e2e-"))
@@ -173,6 +179,9 @@ try {
   await panel.getByRole("button", { name: "Fill this page" }).waitFor()
   await panel.getByRole("combobox").first().selectOption({ label: "Siwa" })
   if (process.env.E2E_DRAFTING === "0") await panel.getByRole("switch", { name: "Draft answers I haven't saved" }).click()
+  const opportunity = panel.getByRole("region", { name: "Opportunity on this page" })
+  await opportunity.getByText("Tracked", { exact: true }).waitFor({ timeout: 10_000 })
+  results.steps.push("recognised a tracked application before any fill")
   await shot(panel, "02-panel-ready-light.png")
   await panel.emulateMedia({ colorScheme: "dark" })
   await shot(panel, "03-panel-ready-dark.png")
@@ -241,6 +250,12 @@ try {
   assert(!text.includes("Card number"), "fields Blesser never fills stay out of the export")
   await panel.getByText("Saved kumasi-founders-fund-application.docx").waitFor()
   results.steps.push("exported the form to a Word document")
+
+  await opportunity.getByRole("button", { name: "Opportunity actions" }).click()
+  await panel.getByRole("menuitem", { name: "Mark as applied" }).click()
+  await opportunity.getByText("Marked as applied").waitFor()
+  assert.equal((await call("GET", `/api/app/applications/${tracked.id}`, token)).status, "submitted")
+  results.steps.push("marked the tracked application as applied")
 
   const row = (label) => panel.getByRole("region", { name: "Review" }).locator("li").filter({ has: panel.getByText(label, { exact: true }) })
 
