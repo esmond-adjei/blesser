@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Button, Field, Logo } from "@blesser/ui";
+import { Button, Field, Logo, Wordmark } from "@blesser/ui";
 import { useMutation } from "@tanstack/react-query";
 import * as api from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -33,8 +33,11 @@ export default function SignIn() {
   return (
     <main className="signin">
       <div className="signin-intro">
-        <Logo className="size-12" />
-        <p className="eyebrow">Blesser admin</p>
+        <span className="wordmark">
+          <Logo title="" />
+          <Wordmark />
+          <span className="wordmark-tag">Admin</span>
+        </span>
         <h1>
           Good finds.
           <br />
@@ -44,6 +47,7 @@ export default function SignIn() {
           Review discoveries, curate the catalogue and help the right
           opportunities reach people.
         </p>
+        <span className="signin-sun" aria-hidden="true" />
       </div>
       <form
         className="signin-form"
@@ -73,7 +77,11 @@ export default function SignIn() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <MutationError error={signIn.error} />
-        <Button type="submit" variant="primary" disabled={signIn.isPending}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          disabled={signIn.isPending}>
           {signIn.isPending ? "Signing in…" : "Sign in"}
         </Button>
       </form>

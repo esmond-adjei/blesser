@@ -501,7 +501,7 @@ function EditorForm({
                     >
                       <strong>{entry.action}</strong>
                       <span>
-                        {entry.actor_email} · {formatDate(entry.at)}
+                        {entry.actor_email}, {formatDate(entry.at)}
                       </span>
                     </button>
                   ))

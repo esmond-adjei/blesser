@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, useEffect, useState, type ReactNode } from "react";
 import {
   BrowserRouter,
   NavLink,
@@ -6,6 +6,7 @@ import {
   Outlet,
   Route,
   Routes,
+  useLocation,
 } from "react-router-dom";
 import {
   ClipboardCheck,
@@ -19,9 +20,11 @@ import {
   History,
   Settings,
   LogOut,
+  Menu,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { Button, Chip, EmptyState, Logo, Wordmark } from "@blesser/ui";
+import { Button, EmptyState, Logo, Wordmark } from "@blesser/ui";
 import { toast } from "sonner";
 import { Protected, useAuth } from "./lib/auth";
 import * as api from "./lib/api";
@@ -37,62 +40,130 @@ import Audit from "./pages/Audit";
 import SettingsPage from "./pages/Settings";
 
 const navigation: {
-  path: string;
-  label: string;
-  icon: LucideIcon;
+  group: string;
   admin?: boolean;
+  items: { path: string; label: string; icon: LucideIcon }[];
 }[] = [
-  { path: "/review", label: "Review queue", icon: ClipboardCheck },
-  { path: "/opportunities", label: "Opportunities", icon: Rows3 },
-  { path: "/duplicates", label: "Duplicates", icon: CopyCheck },
-  { path: "/curation", label: "Curation", icon: Layers },
-  { path: "/scans", label: "Scans", icon: Radar },
-  { path: "/sources", label: "Sources", icon: Rss },
-  { path: "/reports", label: "Reports", icon: Flag },
-  { path: "/people", label: "People", icon: Users, admin: true },
-  { path: "/audit", label: "Audit log", icon: History, admin: true },
-  { path: "/settings", label: "Settings", icon: Settings, admin: true },
+  {
+    group: "Editorial",
+    items: [
+      { path: "/review", label: "Review queue", icon: ClipboardCheck },
+      { path: "/opportunities", label: "Opportunities", icon: Rows3 },
+      { path: "/duplicates", label: "Duplicates", icon: CopyCheck },
+      { path: "/curation", label: "Curation", icon: Layers },
+      { path: "/scans", label: "Scans", icon: Radar },
+      { path: "/sources", label: "Sources", icon: Rss },
+      { path: "/reports", label: "Reports", icon: Flag },
+    ],
+  },
+  {
+    group: "Manage",
+    admin: true,
+    items: [
+      { path: "/people", label: "People", icon: Users },
+      { path: "/audit", label: "Audit log", icon: History },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
+const initials = (name: string) =>
+  name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 function Shell() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menuOpen]);
+  const name = user?.display_name || user?.email || "";
+  const brand = (
+    <NavLink to="/review" className="wordmark" aria-label="Blesser admin home">
+      <Logo title="" />
+      <Wordmark />
+    </NavLink>
+  );
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
         Skip to content
       </a>
-      <aside className="sidebar">
-        <NavLink to="/review" className="wordmark">
-          <Logo title="" />
-          <span>
-            <Wordmark className="block" />
-            <span className="wordmark-sub">Admin console</span>
-          </span>
-        </NavLink>
+      <header className="mobile-bar">
+        {brand}
+        <Button
+          variant="quiet"
+          icon={<Menu />}
+          aria-label="Open navigation"
+          aria-expanded={menuOpen}
+          aria-controls="admin-sidebar"
+          onClick={() => setMenuOpen(true)}
+        />
+      </header>
+      <button
+        type="button"
+        className="sidebar-scrim"
+        data-open={menuOpen}
+        aria-hidden="true"
+        tabIndex={-1}
+        onClick={() => setMenuOpen(false)}
+      />
+      <aside id="admin-sidebar" className="sidebar" data-open={menuOpen}>
+        <div className="sidebar-header">
+          {brand}
+          <Button
+            className="sidebar-close min-[861px]:hidden"
+            variant="quiet"
+            size="sm"
+            icon={<X />}
+            aria-label="Close navigation"
+            onClick={() => setMenuOpen(false)}
+          />
+        </div>
         <nav aria-label="Main navigation">
           {navigation
-            .filter((item) => !item.admin || user?.role === "admin")
-            .map(({ path, label, icon: Icon }) => (
-              <NavLink
-                key={path}
-                to={path}
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? "active" : ""}`
-                }
-              >
-                <Icon size={18} strokeWidth={1.7} />
-                {label}
-              </NavLink>
+            .filter((group) => !group.admin || user?.role === "admin")
+            .map((group) => (
+              <div key={group.group} className="nav-group">
+                <p className="nav-group-label">{group.group}</p>
+                {group.items.map(({ path, label, icon: Icon }) => (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    className={({ isActive }) =>
+                      `nav-link ${isActive ? "active" : ""}`
+                    }
+                  >
+                    <Icon size={18} strokeWidth={1.75} />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
             ))}
         </nav>
         <div className="sidebar-user">
-          <Chip tone="forest">
-            {user?.role === "admin" ? "Admin" : "Editor"}
-          </Chip>
-          <p>{user?.display_name || user?.email}</p>
+          <span className="avatar" aria-hidden="true">
+            {initials(name)}
+          </span>
+          <span className="sidebar-user-text">
+            <strong>{name}</strong>
+            <span>{user?.role === "admin" ? "Admin" : "Editor"}</span>
+          </span>
           <Button
             size="sm"
             variant="quiet"
             icon={<LogOut />}
+            aria-label="Sign out"
+            title="Sign out"
             onClick={() => {
               void api
                 .logout()
@@ -102,13 +173,13 @@ function Shell() {
                   ),
                 );
             }}
-          >
-            Sign out
-          </Button>
+          />
         </div>
       </aside>
       <main id="main" className="main-content">
-        <Outlet />
+        <div key={pathname.split("/")[1]} className="page-enter">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

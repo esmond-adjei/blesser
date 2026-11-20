@@ -68,7 +68,7 @@ jobs:
         run: npm ci
 
       - name: Design tokens are up to date
-        run: npm run tokens && git diff --exit-code design-system/src
+        run: npm run tokens && git diff --exit-code design-system/src api/api/core/mail_tokens.py
 
       - name: Oxlint
         run: |

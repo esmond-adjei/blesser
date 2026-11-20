@@ -60,7 +60,6 @@ def email_for(user: auth_models.User, notification: notification_models.Notifica
     return compose(
         to=user.email,
         subject=notification.title,
-        eyebrow=kind.label if kind else None,
         heading=notification.title,
         paragraphs=[notification.body] if notification.body else [],
         items=_items(notification.items),

@@ -215,7 +215,6 @@ async def send_test_email(
         compose(
             to=user.email,
             subject="Test email from Blesser",
-            eyebrow="Test",
             heading="Email notifications work",
             paragraphs=["This address receives Blesser notifications. Choose which events email you in your notification settings."],
             action=("Open notification settings", delivery.settings_link()),

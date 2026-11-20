@@ -11,6 +11,7 @@ import {
   Panel,
   QueryState,
   useAction,
+  Segmented,
 } from "../components/shared";
 
 const emptyCollection: api.CollectionInput = {
@@ -24,7 +25,9 @@ const emptyCollection: api.CollectionInput = {
   published: false,
 };
 export default function Curation() {
-  const [tab, setTab] = useState("collections");
+  const [tab, setTab] = useState<"collections" | "featured" | "homepage">(
+    "collections",
+  );
   const [editing, setEditing] = useState<api.Collection | "new" | null>(null);
   const collections = useQuery({
     queryKey: ["collections"],
@@ -48,22 +51,16 @@ export default function Curation() {
           ) : undefined
         }
       />
-      <div className="tabs" role="group" aria-label="Curation sections">
-        {[
+      <Segmented
+        label="Curation sections"
+        value={tab}
+        onChange={setTab}
+        options={[
           ["collections", "Collections"],
           ["featured", "Featured order"],
           ["homepage", "Homepage content"],
-        ].map(([key, label]) => (
-          <Button
-            key={key}
-            variant={tab === key ? "brand" : "quiet"}
-            aria-pressed={tab === key}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+        ]}
+      />
       {tab === "collections" && (
         <QueryState query={collections} empty={!collections.data?.length}>
           <div className="table-wrap">
