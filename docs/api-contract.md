@@ -14,7 +14,7 @@ Defaults (stored in `site_settings`, editable in admin):
 
 - `agent_default`: `{"status": "published", "audience": "members"}`. Agent finds go live to members; editors promote them to public.
 - `community_default`: `{"status": "in_review"}`.
-- `auto_archive`: `true`. The worker archives `published` rows the day after `deadline_date` unless `rolling`.
+- `auto_archive`: `true`. The worker archives `published` rows the day after `deadline_date` unless `rolling`, and undated or rolling rows that nothing has confirmed for `freshness.stale_days`.
 
 `OPPORTUNITY_AUTO_PUBLISH` is removed.
 
@@ -45,6 +45,10 @@ type AdminOpportunity = MemberOpportunity & {
   featured_rank: number | null; source: string; scan_id: string | null;
   created_by: string | null; published_by: string | null; updated_at: string;
   dedupe_key: string;
+  // Scheduled checks: when the source was last looked at and what that found
+  // (unchanged, verified, queued, changed, missing, moved, closed, open, unreachable,
+  // unconfirmed, reopened, stale), or "" before the first check.
+  checked_at: string | null; check_outcome: string;
 }
 
 type Page<T> = { items: T[]; total: number };
@@ -259,7 +263,12 @@ The extension audience is accepted only for `POST /autofill/fill`, `POST /autofi
 | `POST /opportunities` | editor | all editable fields | `AdminOpportunity` (`source = staff`, `status = draft` unless given) |
 | `PATCH /opportunities/{id}` | editor | any editable field incl. `status, audience, featured_rank, editor_note, slug` | `AdminOpportunity` |
 | `POST /opportunities/bulk` | editor | `{ids: string[], action: "publish_public"\|"publish_members"\|"archive"\|"hide"\|"to_review"}` | `{updated: number}` |
-| `POST /opportunities/{id}/merge` | editor | `{into_id}` | target `AdminOpportunity`; source hidden, tracked applications re-pointed |
+| `GET /opportunities/duplicates` | editor | `limit` (1 to 200, default 50) | `{first, second: AdminOpportunity, score: number, reason: "similar_title"\|"same_page"}[]`, best match first; hidden listings and dismissed pairs excluded |
+| `POST /opportunities/duplicates/dismiss` | editor | `{first_id, second_id}` | `204`; the pair stops appearing |
+| `GET /organization-aliases` | editor | | `{alias, canonical}[]` |
+| `PUT /organization-aliases` | editor | `{alias, canonical}` | `{alias, canonical}`, both normalized; existing listings are re-keyed. 400 when the names match or `canonical` is itself an alias |
+| `DELETE /organization-aliases/{alias}` | editor | | `204`; listings are re-keyed |
+| `POST /opportunities/{id}/merge` | editor | `{into_id}` | target `AdminOpportunity`; source hidden. Tracking, to-dos, reports, scan results, collection places and crawl candidates move to the target, empty target fields are filled from the source, and the source's slug redirects to the target. 400 when the target is hidden |
 | `POST /opportunities/{id}/reverify` | editor | | `202 {scan_id}` |
 | `GET /reports` / `PATCH /reports/{id}` | editor | `{resolved: true}` | reports list / one |
 | `GET/POST /collections`, `PATCH/DELETE /collections/{id}` | editor | `Collection` fields | `Collection` |
@@ -335,3 +344,5 @@ type Source = SourceInput & {
 URLs must be public HTTP(S) addresses; normalized duplicates return 409. Source writes append `source.create`, `source.update`, `source.delete` or `source.crawl` audit entries in the same transaction. Agent domain proposals are disabled listings with `proposed=true`; staff decides whether to enable them.
 
 Admin settings add `crawler: {hours, max_sources, max_items_per_source, max_candidates_per_task, host_interval_seconds, page_cache_seconds}`. Omitting `crawler` on an existing settings client preserves its stored values. Bounds are 0 to 8760 hours, 1 to 100 sources, 1 to 200 items per source, 0 to 100 extractions per task, 0.5 to 60 seconds between host requests and 60 to 604800 seconds of page-cache lifetime.
+
+Admin settings also add `freshness: {recheck_days, closing_days, closing_recheck_days, cycle_days, stale_days, max_checks, max_agent_checks}` for scheduled listing checks (defaults 30, 7, 14, 30, 120, 10 and 20). Omitting `freshness` preserves its stored values. Bounds are 1 to 365 days for the recheck and cycle intervals, 0 to 60 days for `closing_days`, 7 to 1095 days for `stale_days`, 0 to 200 pages per pass and 0 to 1000 agent checks a day.

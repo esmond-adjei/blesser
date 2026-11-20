@@ -72,6 +72,13 @@ def expired(text: str, metadata: dict, today: date) -> bool:
     return bool(deadlines) and max(deadlines) < today and not _ROLLING.search(text)
 
 
+def shows_open_cycle(text: str, metadata: dict, today: date) -> bool:
+    """The page states a deadline still ahead, or says applications are rolling."""
+    return any(d >= today for d in deadline_dates(text, metadata)) or bool(
+        _ROLLING.search(text)
+    )
+
+
 @dataclass
 class Page:
     url: str

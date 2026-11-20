@@ -11,8 +11,8 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision = "0009_member_matching"
-down_revision = "0008_assistant"
+revision = "0012_member_matching"
+down_revision = "0011_listing_freshness"
 branch_labels = None
 depends_on = None
 
