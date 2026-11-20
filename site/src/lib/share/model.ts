@@ -11,7 +11,7 @@ export const SIZES: Record<ShareFormat, { width: number; height: number }> = {
 export const isFormat = (v: string | undefined): v is ShareFormat => !!v && Object.hasOwn(SIZES, v)
 
 export type ShareCard = {
-  eyebrow: string
+  label: string
   title: string
   offer: string
   organization: string
@@ -43,10 +43,18 @@ function deadlineLabel(t: Pick<SharedTeaser, "status" | "rolling" | "deadline_da
   return raw && raw.length <= 40 ? `Deadline: ${raw}` : ""
 }
 
+/** "Scholarship for students"; just the kind when the audience is unknown. */
+export function shareLabel(kind: string, category: string): string {
+  const k = kindLabel(kind)
+  const c = category ? categoryLabel(category) : ""
+  if (!k) return c
+  return c ? `${k} for ${c.toLowerCase()}` : k
+}
+
 export function cardFromTeaser(t: SharedTeaser, host: string, now = new Date()): ShareCard {
   const deadline = deadlineLabel(t, now)
   return {
-    eyebrow: [kindLabel(t.kind), categoryLabel(t.category)].filter(Boolean).join(" · "),
+    label: shareLabel(t.kind, t.category),
     title: clip(t.title, 160),
     offer: clip(t.benefits.split("\n")[0] ?? "", 220),
     organization: clip(t.organization, 120),

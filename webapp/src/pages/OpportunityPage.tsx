@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ArrowUpRight, ChevronRight, Lock, MapPin } from "lucide-react"
-import { Chip, Countdown, buttonVariants, formatDay } from "@blesser/ui"
+import { Chip, Countdown, buttonVariants, cn, formatDay } from "@blesser/ui"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { ShareDialog } from "../components/share/ShareDialog"
 import { ActionMenuButton } from "../components/ui/menu"
@@ -75,10 +75,10 @@ export function OpportunityPage() {
                 <time dateTime={opp.deadline_date}>{formatDay(opp.deadline_date)}</time>
               </p>
             ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <TrackButton opp={opp} applicationId={tracked.data?.[opp.id]} />
+            <div className="grid gap-2">
+              <TrackButton opp={opp} applicationId={tracked.data?.[opp.id]} className="w-full" />
               {official ? (
-                <a href={official} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "secondary" })}>
+                <a href={official} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ size: "sm", variant: "secondary" }), "w-full")}>
                   Official page <ArrowUpRight aria-hidden="true" />
                 </a>
               ) : null}

@@ -36,7 +36,6 @@ const pageNote = filters.page > 1 ? `, page ${filters.page}` : ""
   noindex={filtered || filters.page > 1 || filters.sort === "new"}
 >
   <PageHeader
-    eyebrow="Browse"
     title={heading}
     description="Everything here is checked against the official page. Track any of them with a free account."
   >
@@ -65,7 +64,7 @@ const pageNote = filters.page > 1 ? `, page ${filters.page}` : ""
         <section aria-labelledby="results" class="mt-8">
           <h2 id="results" class="m-0 mb-4 text-callout text-ink-secondary" aria-live="polite">
             <span data-count>{plural(result.total, "opportunity", "opportunities")}</span>
-            <span data-page-note>{filters.page > 1 && ` · page ${filters.page}`}</span>
+            <span data-page-note>{filters.page > 1 && `, page ${filters.page}`}</span>
           </h2>
           {STATIC_BUILD ? (
             <ClientListing

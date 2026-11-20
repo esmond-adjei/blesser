@@ -79,6 +79,22 @@ Opportunities, made visible. Blesser helps startups, researchers and students in
 - **Member app**: calm and dense. `title-2` page titles, cards and lists on `canvas`, sidebar with the forest selected state, countdowns everywhere a deadline appears.
 - **Admin console**: the same tokens at higher density. Tables over cards, `callout` cell text, `code` for ids and traces, `critical` for hide and delete. Publication state uses chips: Draft (neutral), In review (`sun`), Published (`forest`), Hidden (`critical`).
 
+## Restraint
+
+Lessons from the Frontier Design critique rubric and its list of patterns that make a page read as machine-made. Check every screen against them before shipping.
+
+- No label above a heading. A small all-caps line over a section title only repeats it; let the heading speak. Uppercase text with wide tracking is not part of the type scale.
+- No emphasis tricks in headlines: no italic or serif word, no coloured span, no glow or blur behind a hero.
+- Arrows only where they mean something: the external-link arrow on links that leave Blesser. Links and buttons do not get a trailing arrow, and a link is not wrapped in an icon disc.
+- Not everything is a card. Use a card for an object people act on (an opportunity, a collection, an application). Lists, steps and prose sit on the surface with spacing or a rule between them.
+- Decoration earns its place. The logo's geometry appears in the logo, the opportunity art and empty states, not as loose suns and pills scattered round a section. Nothing decorative is cropped by its container.
+- Section headings are left-aligned with their content, and the section's link sits beside the heading on the right.
+- Floating "product moment" chips over an illustration: one at most, inside its bounds.
+- One action, one label. When the same action appears in several places it uses the same words ("Create account", not also "Join for free"), and a page does not repeat it in every section.
+- Sections are not numbered (01, 02). A numbered list is fine for real steps.
+- Show a fact once. A date printed twice in different formats, a country as both a chip and a section, or a category chip on a page already filtered to that category is noise.
+- Nothing below `caption` (12px), including sidebar group labels and confidence hints.
+
 ## Menus
 
 - Rows and cards carry one action menu: right-click, long-press on touch, or the "More" button all open the same list. The row shows only its primary action (Track, or the status) beside it.

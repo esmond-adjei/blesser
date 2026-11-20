@@ -4,10 +4,10 @@ import Base from "../../layouts/Base.astro"
 import NotFound from "../../components/NotFound.astro"
 import ApiErrorSection from "../../components/ApiError.astro"
 import ShareBox from "../../components/ShareBox.astro"
-import { ArrowRightIcon, CalendarIcon, CheckCircleIcon, ExternalIcon, PlusIcon, ShieldIcon } from "../../components/icons"
+import { CalendarIcon, CheckCircleIcon, ExternalIcon, PlusIcon, ShieldIcon } from "../../components/icons"
 import { ApiError, allOpportunities, api, movedSlug, settle, type PublicOpportunity } from "../../lib/api"
 import { STATIC_BUILD, registerUrl, siteUrl, withBase } from "../../lib/config"
-import { categoryLabel, checkedAgo, countdownFor, hostname, isHttpUrl, kindLabel } from "../../lib/format"
+import { categoryLabel, checkedAgo, countdownFor, countryName, hostname, isHttpUrl, kindLabel, sameDay } from "../../lib/format"
 import { landingForKind } from "../../lib/landings"
 import { opportunityLd } from "../../lib/seo"
 
@@ -54,6 +54,11 @@ const deadlineText = opp
       ? formatDay(opp.deadline_date)
       : opp.deadline || "No deadline listed"
   : ""
+// The header already names the location; list countries only when they add to it.
+const countries = opp ? opp.countries.map(countryName).filter(Boolean) : []
+const showCountries = countries.length > 0 && countries.join(", ") !== opp?.location.trim()
+const sourceWording =
+  opp?.deadline && opp.deadline_date && opp.deadline !== deadlineText && !sameDay(opp.deadline, opp.deadline_date) ? opp.deadline : ""
 ---
 
 <Base
@@ -135,10 +140,10 @@ const deadlineText = opp
               {opp.requirements.length > 0 && (
                 <section aria-labelledby="requirements">
                   <h2 id="requirements" class="m-0 type-title-2 text-ink">What you'll need</h2>
-                  <ul class="m-0 mt-4 flex max-w-reading list-none flex-col gap-3 p-0">
+                  <ul class="m-0 mt-3 flex max-w-reading list-none flex-col gap-2.5 p-0">
                     {opp.requirements.map((r) => (
-                      <li class="flex gap-3 rounded-sm bg-surface p-3 shadow-elevation-1">
-                        <span class="mt-0.5 text-link [&_svg]:size-5">
+                      <li class="flex gap-3 leading-7">
+                        <span class="mt-1 text-link [&_svg]:size-5">
                           <CheckCircleIcon />
                         </span>
                         <span class="text-ink">{r}</span>
@@ -147,14 +152,10 @@ const deadlineText = opp
                   </ul>
                 </section>
               )}
-              {opp.countries.length > 0 && (
+              {showCountries && (
                 <section aria-labelledby="countries">
                   <h2 id="countries" class="m-0 type-title-2 text-ink">Where</h2>
-                  <ul class="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
-                    {opp.countries.map((c) => (
-                      <li><Chip>{c}</Chip></li>
-                    ))}
-                  </ul>
+                  <p class="m-0 mt-3 max-w-reading leading-7 text-ink">{countries.join(", ")}</p>
                 </section>
               )}
               {related.length > 0 && (
@@ -163,9 +164,8 @@ const deadlineText = opp
                   <ul class="m-0 mt-3 flex list-none flex-col gap-2 p-0">
                     {related.map((c) => (
                       <li>
-                        <a href={withBase(`/collections/${c.slug}`)} class="inline-flex items-center gap-1.5 font-semibold text-link no-underline hover:underline [&_svg]:size-[18px]">
+                        <a href={withBase(`/collections/${c.slug}`)} class="font-semibold text-link underline decoration-1 underline-offset-4 hover:decoration-2">
                           {c.title}
-                          <ArrowRightIcon />
                         </a>
                       </li>
                     ))}
@@ -187,9 +187,7 @@ const deadlineText = opp
                     deadlineText
                   )}
                 </p>
-                {opp.deadline && opp.deadline_date && opp.deadline !== opp.deadline_date && opp.deadline !== deadlineText && (
-                  <p class="m-0 mt-1 text-footnote text-ink-tertiary">As the source puts it: {opp.deadline}</p>
-                )}
+                {sourceWording && <p class="m-0 mt-1 text-footnote text-ink-tertiary">As the source puts it: {sourceWording}</p>}
 
                 <div class="mt-5 flex flex-col gap-2">
                   {!opp.closed && (
