@@ -256,6 +256,44 @@ export function formatBytes(bytes: number): string {
 
 export const fileExtension = (name: string) => (name.includes(".") ? name.split(".").pop()!.toLowerCase() : "")
 
+export type FileFormat = "pdf" | "word" | "slides" | "sheet" | "image" | "file"
+
+const FORMAT_BY_TYPE: [RegExp, FileFormat][] = [
+  [/^application\/pdf$/, "pdf"],
+  [/^image\//, "image"],
+  [/wordprocessingml|msword/, "word"],
+  [/presentationml|powerpoint/, "slides"],
+  [/spreadsheetml|ms-excel|^text\/csv$/, "sheet"],
+]
+const FORMAT_BY_EXTENSION: Record<string, FileFormat> = {
+  pdf: "pdf", doc: "word", docx: "word", ppt: "slides", pptx: "slides", xls: "sheet", xlsx: "sheet", csv: "sheet", png: "image", jpg: "image", jpeg: "image", webp: "image",
+}
+
+/** The file's format from the stored content type, falling back to its extension. */
+export function fileFormat(contentType: string, filename: string): FileFormat {
+  for (const [pattern, format] of FORMAT_BY_TYPE) if (pattern.test(contentType)) return format
+  return FORMAT_BY_EXTENSION[fileExtension(filename)] ?? "file"
+}
+
+/** A short name for the format, shown where no preview exists: "Word document", "CSV". */
+export function formatLabel(contentType: string, filename: string): string {
+  const format = fileFormat(contentType, filename)
+  if (format === "sheet") return /csv/.test(contentType) || fileExtension(filename) === "csv" ? "CSV" : "Excel sheet"
+  return { pdf: "PDF", word: "Word document", slides: "PowerPoint", image: "Image", file: "File" }[format]
+}
+
+export type DocumentExcerpt = { type: "text"; paragraphs: string[] } | { type: "table"; rows: string[][] }
+
+/** Checks the excerpt the preview endpoint returns; anything unexpected is treated as no preview. */
+export function parseExcerpt(value: unknown): DocumentExcerpt | null {
+  if (!value || typeof value !== "object") return null
+  const v = value as Record<string, unknown>
+  const strings = (list: unknown): list is string[] => Array.isArray(list) && list.every((x) => typeof x === "string")
+  if (v.type === "text" && strings(v.paragraphs) && v.paragraphs.length) return { type: "text", paragraphs: v.paragraphs }
+  if (v.type === "table" && Array.isArray(v.rows) && v.rows.length && v.rows.every(strings)) return { type: "table", rows: v.rows }
+  return null
+}
+
 /** Why a file can't be uploaded before it leaves the browser, or null. The server checks again by content. */
 export function uploadProblem(file: { name: string; size: number }, usage?: { used_bytes: number; limit_bytes: number }): string | null {
   if (!UPLOAD_EXTENSIONS.includes(fileExtension(file.name))) return "That file type isn't supported. Use PDF, Word, PowerPoint, Excel, CSV or an image."

@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { API_BASE, ApiError, getAccessToken, parseDetail, refreshAccessToken, request } from "./api"
+import { parseExcerpt, type DocumentExcerpt } from "./kit"
 import type { Answer, AnswerInput, Correction, DocumentPatch, KitDocument, Profile, ProfileInput, Project, ProjectInput, StorageUsage } from "./kitTypes"
 
 const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) })
@@ -72,19 +73,27 @@ export function uploadDocument(input: UploadInput, onProgress: (fraction: number
   })()
 }
 
-/** Fetches the file with the member token and hands it to the browser as a download. */
-export async function downloadDocument(doc: Pick<KitDocument, "id" | "filename">): Promise<void> {
-  const url = `${API_BASE}/api/app/documents/${encodeURIComponent(doc.id)}/download`
+/** GET with the member token, retried once after a token refresh. Files are never public. */
+async function authedGet(path: string): Promise<Response> {
+  const url = `${API_BASE}${path}`
   const send = () => {
     const token = getAccessToken()
     return fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
   }
-  let res = await send()
-  if (res.status === 401 && (await refreshAccessToken())) res = await send()
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new ApiError(res.status, text, parseDetail(text).message.slice(0, 500) || "Couldn't download that file")
-  }
+  const res = await send()
+  if (res.status === 401 && (await refreshAccessToken())) return send()
+  return res
+}
+
+async function failure(res: Response, fallback: string): Promise<ApiError> {
+  const text = await res.text().catch(() => "")
+  return new ApiError(res.status, text, parseDetail(text).message.slice(0, 500) || fallback)
+}
+
+/** Fetches the file with the member token and hands it to the browser as a download. */
+export async function downloadDocument(doc: Pick<KitDocument, "id" | "filename">): Promise<void> {
+  const res = await authedGet(`/api/app/documents/${encodeURIComponent(doc.id)}/download`)
+  if (!res.ok) throw await failure(res, "Couldn't download that file")
   const href = URL.createObjectURL(await res.blob())
   const link = document.createElement("a")
   link.href = href
@@ -93,11 +102,27 @@ export async function downloadDocument(doc: Pick<KitDocument, "id" | "filename">
   window.setTimeout(() => URL.revokeObjectURL(href), 1000)
 }
 
+/** `url` is an object URL owned by the query cache: it is revoked when the cached preview is dropped. */
+export type DocumentPreview = { type: "image"; url: string } | DocumentExcerpt | { type: "none" }
+
+/** A thumbnail (images, PDFs, some Office files) or a text or table excerpt, built and cached by the API. */
+export async function getDocumentPreview(id: string): Promise<DocumentPreview> {
+  const res = await authedGet(`/api/app/documents/${encodeURIComponent(id)}/preview`)
+  if (res.status === 204) return { type: "none" }
+  if (!res.ok) throw await failure(res, "Couldn't load the preview")
+  const type = res.headers.get("content-type") ?? ""
+  if (type.startsWith("image/")) return { type: "image", url: URL.createObjectURL(await res.blob()) }
+  if (type.startsWith("application/json")) return parseExcerpt(await res.json().catch(() => null)) ?? { type: "none" }
+  return { type: "none" }
+}
+
 export const kitKeys = {
   profile: ["kit", "profile"] as const,
   projects: ["kit", "projects"] as const,
   project: (id: string) => ["kit", "projects", id] as const,
   documents: ["kit", "documents"] as const,
+  // Outside the documents key so refreshing the list doesn't refetch every preview.
+  preview: (id: string) => ["kit", "document-preview", id] as const,
   usage: ["kit", "documents", "usage"] as const,
   answers: (q: string, projectId: string) => ["kit", "answers", q, projectId] as const,
   corrections: ["kit", "corrections"] as const,
@@ -107,6 +132,29 @@ export const useKitProfile = () => useQuery({ queryKey: kitKeys.profile, queryFn
 export const useProjects = () => useQuery({ queryKey: kitKeys.projects, queryFn: listProjects })
 export const useProject = (id: string) => useQuery({ queryKey: kitKeys.project(id), queryFn: () => getProject(id), staleTime: Infinity })
 export const useDocuments = () => useQuery({ queryKey: kitKeys.documents, queryFn: () => listDocuments() })
+/** Stored files never change, so a preview is fetched once per session, and only once its card is near the viewport. */
+export function useDocumentPreview(id: string, enabled: boolean) {
+  revokeDroppedPreviews(useQueryClient())
+  return useQuery({
+    queryKey: kitKeys.preview(id),
+    queryFn: () => getDocumentPreview(id),
+    enabled,
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    retry: (count, err) => count < 2 && !(err instanceof ApiError && err.status === 404),
+  })
+}
+
+const watched = new WeakSet<QueryClient>()
+function revokeDroppedPreviews(client: QueryClient) {
+  if (watched.has(client)) return
+  watched.add(client)
+  client.getQueryCache().subscribe((event) => {
+    if (event.type !== "removed" || event.query.queryKey[1] !== "document-preview") return
+    const data = event.query.state.data as DocumentPreview | undefined
+    if (data?.type === "image") URL.revokeObjectURL(data.url)
+  })
+}
 export const useUsage = () => useQuery({ queryKey: kitKeys.usage, queryFn: documentUsage })
 export const useAnswers = (q: string, projectId: string) =>
   useQuery({ queryKey: kitKeys.answers(q, projectId), queryFn: () => listAnswers({ q, project_id: projectId }), placeholderData: (prev) => prev })

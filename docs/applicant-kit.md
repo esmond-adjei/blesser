@@ -10,13 +10,23 @@ Profiles, projects, documents, and answers belong to a user through cascading fo
 
 ## Storage
 
-`DocumentStorage` in `api/applicant_kit/storage.py` defines save, delete, member cleanup, and authenticated download operations. `LocalDocumentStorage` stores files on disk. An object-storage implementation can replace it later.
+`DocumentStorage` in `api/applicant_kit/storage.py` defines save, delete, member cleanup, authenticated download and preview operations. `LocalDocumentStorage` stores files on disk. An object-storage implementation can replace it later.
 
 `UPLOAD_DIR` defaults to `api/uploads`. Relative values resolve under `api/`. Docker mounts the `blesser_applicant_uploads` volume at `/app/uploads` in both the API and worker. The directory must be writable by both processes. Files use generated keys inside a directory derived from the member ID. Original filenames are metadata, never disk paths. New directories have mode 0700 and files have mode 0600.
 
 Multipart parsing spools larger uploads to temporary disk. The storage implementation reads and writes 64 KiB chunks. Files never need to be loaded into memory as a whole. Upload authentication and throttling run before multipart parsing.
 
 Downloads require the owner's member token and send `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`. No upload directory is mounted as a public web directory. JSON kit responses also use private, no-store caching.
+
+### Previews
+
+The Documents page shows each file as a card with a preview. `GET /documents/{id}/preview` builds it on first request and caches it next to the file as `KEY.previewN.webp`, `.json` or `.none` (N is `previews.VERSION`; bump it when the output changes). Deleting the document deletes the cache.
+
+- Images (EXIF rotation applied) and the first page of a PDF become a WebP thumbnail up to 640px wide.
+- Word, PowerPoint and Excel files use the thumbnail Office embeds when there is one. Otherwise Word gives its opening paragraphs, PowerPoint the first slide's text, and Excel and CSV the first 10 rows and 6 columns, as a JSON excerpt.
+- Legacy `.doc`, `.ppt` and `.xls` files, encrypted PDFs and files that fail to parse return 204, and the page shows the format's icon and name.
+
+`preview_render` runs in a child process that caps its own CPU time (20 s), address space (1 GiB) and output size (4 MiB) before touching the upload, with a 30 s wall clock limit from the parent. Office XML is read through an 8 MiB decompression budget. At most two previews build at once per API process. A timeout returns 503 and is not cached. The response is `private, max-age=86400`, so the member's browser keeps it and nothing shared caches it. The web app loads a preview only when its card nears the viewport.
 
 ## Encryption
 

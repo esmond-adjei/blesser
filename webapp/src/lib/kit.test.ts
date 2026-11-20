@@ -21,6 +21,9 @@ import {
   titleFromFilename,
   uploadProblem,
   wordCount,
+  fileFormat,
+  formatLabel,
+  parseExcerpt,
 } from "./kit"
 import type { Profile } from "./kitTypes"
 
@@ -227,5 +230,29 @@ describe("corrections", () => {
     expect(correctionValue(list[2])).toMatch(/Wrong field/)
     expect(correctionValue(list[3])).toBe("English, Twi")
     expect(correctionValue({ value: "", wrong_field: false })).toBe("Leave empty")
+  })
+})
+
+describe("document formats and previews", () => {
+  it("names the format from the stored type, then the extension", () => {
+    expect(fileFormat("application/pdf", "cv.docx")).toBe("pdf")
+    expect(fileFormat("image/jpeg", "ghana card")).toBe("image")
+    expect(fileFormat("application/vnd.openxmlformats-officedocument.presentationml.presentation", "deck")).toBe("slides")
+    expect(fileFormat("application/vnd.ms-excel", "budget")).toBe("sheet")
+    expect(fileFormat("", "notes.DOC")).toBe("word")
+    expect(fileFormat("application/octet-stream", "mystery")).toBe("file")
+    expect(formatLabel("text/csv", "budget.csv")).toBe("CSV")
+    expect(formatLabel("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "b.xlsx")).toBe("Excel sheet")
+    expect(formatLabel("application/msword", "cv.doc")).toBe("Word document")
+  })
+
+  it("accepts only well formed excerpts", () => {
+    expect(parseExcerpt({ type: "text", paragraphs: ["Esmond Adjei", "Accra"] })).toEqual({ type: "text", paragraphs: ["Esmond Adjei", "Accra"] })
+    expect(parseExcerpt({ type: "table", rows: [["Item", "Cost"], ["Laptop", "4200"]] })).toEqual({ type: "table", rows: [["Item", "Cost"], ["Laptop", "4200"]] })
+    expect(parseExcerpt({ type: "text", paragraphs: [] })).toBeNull()
+    expect(parseExcerpt({ type: "table", rows: [["ok", 3]] })).toBeNull()
+    expect(parseExcerpt({ type: "image" })).toBeNull()
+    expect(parseExcerpt(null)).toBeNull()
+    expect(parseExcerpt("text")).toBeNull()
   })
 })
