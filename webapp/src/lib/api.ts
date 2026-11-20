@@ -147,7 +147,6 @@ export const refreshSession = (refreshToken: string) =>
   post<AuthSession>("/api/app/auth/refresh", { refresh_token: refreshToken })
 export const logoutSession = (refreshToken: string, pushEndpoint?: string | null) =>
   post<{ status: string }>("/api/app/auth/logout", { refresh_token: refreshToken, push_endpoint: pushEndpoint ?? null })
-export const getMe = () => get<AuthUser>("/api/app/auth/me")
 export interface OAuthProvider { id: string; label: string }
 export interface OAuthLinkRequired { provider: string; email: string; link_token: string }
 export type OAuthCallbackResult =

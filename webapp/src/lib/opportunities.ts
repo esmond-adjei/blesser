@@ -18,12 +18,6 @@ export const CATEGORY_LABELS: Record<OpportunityCategory, string> = {
   student: "Students",
 }
 
-export const CATEGORY_DESCRIPTIONS: Record<OpportunityCategory, string> = {
-  startup: "Accelerators, grants, competitions and funding for founders",
-  research: "Research grants, calls for proposals and fellowships",
-  student: "Scholarships, internships, exchanges and competitions",
-}
-
 export const KIND_LABELS: Record<OpportunityKind, string> = {
   grant: "Grant",
   fellowship: "Fellowship",
