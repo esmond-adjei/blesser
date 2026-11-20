@@ -156,7 +156,7 @@ try {
   const app = await connectTab
   await app.waitForURL(/\/login\?next=/)
   await app.getByLabel("Email").fill(email)
-  await app.getByLabel("Password").fill(password)
+  await app.getByLabel("Password", { exact: true }).fill(password)
   await app.getByRole("button", { name: /sign in/i }).click()
   await app.waitForURL(/\/connect\/extension\?ext=/)
   await app.getByRole("button", { name: "Allow" }).click()

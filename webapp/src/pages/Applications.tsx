@@ -148,7 +148,7 @@ export function Applications() {
         description="Everything you're applying for. Saved and preparing applications get reminders 14, 7 and 1 days before the deadline."
         actions={
           <Button data-tooltip="You can also use the assistant to add applications" size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
-            Add Manually
+            Add manually
           </Button>
         }
       />

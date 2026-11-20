@@ -13,7 +13,7 @@ const clamp = (lines: number): CSSProperties => ({ display: "block", lineClamp: 
 type Layout = {
   pad: number
   gap: number
-  eyebrow: number
+  label: number
   title: number
   titleLines: number
   offer: number
@@ -33,7 +33,7 @@ function layout(format: ShareFormat, card: ShareCard): Layout {
     return {
       pad: 56,
       gap: 18,
-      eyebrow: 22,
+      label: 22,
       title: fit(t, [[34, 58], [60, 50], [90, 42], [999, 38]]),
       titleLines: 3,
       offer: 26,
@@ -50,7 +50,7 @@ function layout(format: ShareFormat, card: ShareCard): Layout {
     return {
       pad: 88,
       gap: 30,
-      eyebrow: 34,
+      label: 34,
       title: fit(t, [[30, 100], [60, 86], [90, 74], [999, 64]]),
       titleLines: 5,
       offer: 42,
@@ -66,7 +66,7 @@ function layout(format: ShareFormat, card: ShareCard): Layout {
   return {
     pad: 64,
     gap: 20,
-    eyebrow: 26,
+    label: 26,
     title: fit(t, [[30, 74], [56, 64], [84, 56], [999, 50]]),
     titleLines: 3,
     offer: 32,
@@ -88,7 +88,7 @@ function textHeight(card: ShareCard, l: Layout, width: number): number {
   const title = lines(card.title, l.title, 0.56, l.titleLines) * l.title * 1.04
   const offer = lines(card.offer, l.offer, 0.52, l.offerLines) * l.offer * 1.3
   const org = lines(`Offered by ${card.organization}`, l.org, 0.5, l.orgLines) * l.org * 1.3
-  const blocks = [l.eyebrow * 1.2, title, offer, card.organization ? org : 0].filter(Boolean)
+  const blocks = [l.label * 1.2, title, offer, card.organization ? org : 0].filter(Boolean)
   return blocks.reduce((a, b) => a + b, 0) + l.gap * (blocks.length - 1)
 }
 
@@ -121,8 +121,8 @@ function Pill({ card, size }: { card: ShareCard; size: number }) {
 function Text({ card, l }: { card: ShareCard; l: Layout }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: l.gap, minWidth: 0 }}>
-      <div style={{ display: "flex", fontFamily: TEXT, fontWeight: 700, fontSize: l.eyebrow, color: C.link, letterSpacing: l.eyebrow * 0.04, textTransform: "uppercase" }}>
-        {card.eyebrow}
+      <div style={{ display: "flex", fontFamily: TEXT, fontWeight: 700, fontSize: l.label, color: C.link }}>
+        {card.label}
       </div>
       <div style={{ ...clamp(l.titleLines), fontFamily: DISPLAY, fontWeight: 800, fontSize: l.title, lineHeight: 1.04, letterSpacing: -l.title * 0.02, color: C.ink }}>
         {card.title}

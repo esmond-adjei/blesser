@@ -8,7 +8,6 @@ import Pagination from "../components/Pagination.astro"
 import NotFound from "../components/NotFound.astro"
 import PageHeader from "../components/PageHeader.astro"
 import ApiErrorSection from "../components/ApiError.astro"
-import { ArrowRightIcon } from "../components/icons"
 import { ApiError, allOpportunities, api, settle } from "../lib/api"
 import { STATIC_BUILD, registerUrl, withBase } from "../lib/config"
 import { plural } from "../lib/format"
@@ -47,7 +46,6 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
     <Base title={landing.title} description={`${landing.intro} Open now in Ghana, checked against the official page.`} path={`/${landing.slug}`} noindex={page > 1}>
       <PageHeader
         big
-        eyebrow={"category" in landing.filter ? "Who it's for" : "Opportunities"}
         title={landing.title}
         description={landing.intro}
         tone={"category" in landing.filter ? "forest" : "sun"}
@@ -66,14 +64,17 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
           <LinkEmptyState {...emptyState} />
         ) : (
           <>
-            <h2 id="open-now" class="m-0 mb-4 type-title-2 text-ink">
-              Open now <span class="text-ink-tertiary">· <span data-count>{plural(result.total, "opportunity", "opportunities")}</span></span>
-            </h2>
+            <div class="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 id="open-now" class="m-0 type-title-2 text-ink">Open now</h2>
+              <p class="m-0 text-callout text-ink-secondary tabular-nums">
+                <span data-count>{plural(result.total, "opportunity", "opportunities")}</span>
+              </p>
+            </div>
             {STATIC_BUILD ? (
-              <ClientListing items={result.items} empty={emptyState} />
+              <ClientListing items={result.items} empty={emptyState} showCategory={!("category" in landing.filter)} />
             ) : (
               <>
-                <CardGrid items={result.items} />
+                <CardGrid items={result.items} showCategory={!("category" in landing.filter)} />
                 <Pagination total={result.total} page={page} pageSize={PAGE_SIZE} />
               </>
             )}
@@ -89,7 +90,6 @@ const siblings = landing ? ("category" in landing.filter ? CATEGORY_LANDINGS : K
               <li>
                 <a href={withBase(`/${l.slug}`)} class={buttonVariants({ variant: "secondary", size: "sm" })}>
                   {l.title}
-                  <ArrowRightIcon />
                 </a>
               </li>
             ))}

@@ -1,5 +1,5 @@
 ---
-import { ApplicationStatus, Chip, Countdown, buttonVariants, cn } from "@blesser/ui"
+import { Chip, Countdown, buttonVariants, cn } from "@blesser/ui"
 import hero from "@blesser/ui/illustrations/site-hero.webp"
 import hero768 from "@blesser/ui/illustrations/site-hero-768.webp"
 import startups768 from "@blesser/ui/illustrations/site-startups-768.webp"
@@ -10,17 +10,12 @@ import path768 from "@blesser/ui/illustrations/site-path-768.webp"
 import community from "@blesser/ui/illustrations/site-community.webp"
 import community768 from "@blesser/ui/illustrations/site-community-768.webp"
 import scanning from "@blesser/ui/illustrations/spot-scanning.webp"
-import accepted from "@blesser/ui/illustrations/spot-accepted.webp"
-import tracked from "@blesser/ui/illustrations/spot-empty-tracked.webp"
 import Base from "../layouts/Base.astro"
 import CardGrid from "../components/CardGrid.astro"
 import Panel from "../components/Panel.astro"
-import Decor from "../components/Decor.astro"
-import ArrowLink from "../components/ArrowLink.astro"
 import FeatureSplit from "../components/FeatureSplit.astro"
 import Illustration from "../components/Illustration.astro"
 import ApiErrorSection from "../components/ApiError.astro"
-import { ChecklistChip, FloatChip, Panelled } from "../components/FloatChip"
 import { ApiError, api, settle, type Announcement } from "../lib/api"
 import { STATIC_BUILD, loginUrl, registerUrl, siteUrl, withBase } from "../lib/config"
 import { plural } from "../lib/format"
@@ -153,13 +148,10 @@ const steps = [
       featured.length > 0 && (
         <Panel
           id="featured"
-          eyebrow="Featured"
           title="Picked by our editors"
           description="Open opportunities our team has checked against the official page this week."
           link={{ href: withBase("/opportunities"), label: "See all opportunities" }}
         >
-          <Decor slot="decor" kind="sun" class="-top-8 right-16 size-20" />
-          <Decor slot="decor" kind="steps" class="top-20 left-12" />
           <CardGrid items={featured} rows />
         </Panel>
       )
@@ -169,13 +161,11 @@ const steps = [
       closingSoon.length > 0 && (
         <Panel
           id="closing-soon"
-          eyebrow="Closing soon"
           title="There's still time"
           description="Deadlines in the next two weeks."
           tone="sun"
           link={{ href: withBase("/opportunities?closing_within=14"), label: "See everything closing soon" }}
         >
-          <Decor slot="decor" kind="spot" src={tracked.src} class="-top-10 left-10 w-36" />
           <CardGrid items={closingSoon} rows />
         </Panel>
       )
@@ -183,17 +173,15 @@ const steps = [
 
     <Panel
       id="who"
-      eyebrow="Who it's for"
       title="Opportunities for every stage"
       description="Whether you're founding, researching or studying, start with what fits you."
       tone="forest"
     >
-      <Decor slot="decor" kind="sun" class="top-12 right-14 size-14" />
       <ul class="m-0 grid list-none gap-6 p-0 md:grid-cols-3">
         {
           audiences.map((a) => (
             <li class="min-w-0">
-              <article class="relative flex h-full flex-col rounded-lg bg-surface p-4 shadow-elevation-1">
+              <article class="group relative flex h-full flex-col rounded-lg bg-surface p-4 shadow-elevation-1 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0">
                 <img
                   src={a.image.src}
                   width={a.image.width}
@@ -203,12 +191,15 @@ const steps = [
                   class="block h-auto w-full rounded-md"
                 />
                 <div class="flex flex-1 flex-col gap-2 px-1 pt-4">
-                  <p class="m-0 eyebrow text-link">For {a.slug}</p>
-                  <h3 class="m-0 type-title-2 text-ink">{a.title}</h3>
+                  <h3 class="m-0 type-title-2 text-ink">
+                    <a href={withBase(`/${a.slug}`)} class="text-ink no-underline after:absolute after:inset-0 after:rounded-lg after:content-['']">
+                      {a.title}
+                    </a>
+                  </h3>
                   <p class="m-0 text-ink-secondary">{a.body}</p>
-                  <div class="mt-auto border-t border-separator pt-3">
-                    <ArrowLink href={withBase(`/${a.slug}`)}>See opportunities</ArrowLink>
-                  </div>
+                  <span aria-hidden="true" class="mt-auto border-t border-separator pt-3 text-callout font-semibold text-link group-hover:underline">
+                    See opportunities
+                  </span>
                 </div>
               </article>
             </li>
@@ -218,13 +209,11 @@ const steps = [
     </Panel>
   </div>
 
-  <FeatureSplit id="how" eyebrow="How it works" title="From found to submitted, in one place" full={path} small={path768} tone="sun">
+  <FeatureSplit id="how" title="From found to submitted, in one place" full={path} small={path768} tone="sun">
     <Fragment slot="chips">
-      <span class="absolute top-4 left-4 rounded-full bg-surface p-1 shadow-elevation-2 md:-left-6 md:top-10">
+      <span class="absolute top-4 left-4 rounded-full bg-surface p-1 shadow-elevation-2">
         <Countdown daysLeft={12} date="2026-11-21" />
       </span>
-      <ChecklistChip done={3} total={5} className="absolute right-4 bottom-20 hidden w-56 sm:block md:-right-8" />
-      <FloatChip check className="absolute bottom-4 left-4 md:-left-4 md:bottom-8">Synced to Google Calendar</FloatChip>
     </Fragment>
     <ol class="m-0 grid list-none gap-4 p-0 text-base leading-6">
       {
@@ -246,26 +235,20 @@ const steps = [
         ))
       }
     </ol>
-    <a slot="cta" href={registerUrl()} class={buttonVariants({ variant: "brand", size: "lg" })}>Create account</a>
-    <span slot="cta" class="text-callout text-ink-tertiary">It's free</span>
   </FeatureSplit>
 
-  <FeatureSplit id="members" eyebrow="For members" title="Members see new finds first" full={scanning} small={scanning} tone="forest" reverse>
+  <FeatureSplit id="members" title="Members see new finds first" full={scanning} small={scanning} tone="forest" reverse>
     <Fragment slot="chips">
-      <span class="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-surface py-1.5 pr-3 pl-1.5 shadow-elevation-2 md:-right-6 md:top-10">
+      <span class="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-surface py-1.5 pr-3 pl-1.5 shadow-elevation-2">
         <Chip tone="sun">New</Chip>
         <span class="text-callout font-semibold text-ink">Found 2 days ago</span>
       </span>
-      <Panelled className="absolute bottom-20 left-4 hidden w-60 sm:block md:-left-8">
-        <ApplicationStatus status="submitted" />
-      </Panelled>
-      <FloatChip check className="absolute right-4 bottom-4 md:-right-4 md:bottom-8">Members-only finds</FloatChip>
     </Fragment>
     <p class="m-0">
       Our discovery agent searches funders' and universities' pages on a regular schedule. Members see what it finds first, before our editors
       bring it to this site, and can follow each application from saved to submitted.
     </p>
-    <a slot="cta" href={registerUrl()} class={buttonVariants({ variant: "brand", size: "lg" })}>Join for free</a>
+    <a slot="cta" href={registerUrl()} class={buttonVariants({ variant: "brand", size: "lg" })}>Create account</a>
     <a slot="cta" href={loginUrl()} class="px-2 font-semibold text-ink underline">Sign in</a>
   </FeatureSplit>
 
@@ -273,22 +256,19 @@ const steps = [
     publicCollections.length > 0 && (
       <Panel
         id="collections"
-        eyebrow="Collections"
         title="Lists our editors keep up to date"
         description="Hand-picked sets of opportunities around a theme or a deadline."
       >
-        <Decor slot="decor" kind="steps" class="top-16 right-14" />
         <ul class="m-0 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 lg:grid-cols-3">
           {publicCollections.map((c, i) => (
             <li class="min-w-0">
               <article class="group relative flex h-full flex-col rounded-lg bg-surface p-4 shadow-elevation-1 transition-[box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0">
                 <div
                   class={cn(
-                    "relative flex h-28 items-end overflow-hidden rounded-md p-4",
+                    "flex h-28 items-end rounded-md p-4",
                     ["bg-sun-soft text-sun-ink", "bg-forest-soft text-link", "bg-surface-sunk text-forest"][i % 3],
                   )}
                 >
-                  <span aria-hidden="true" class="absolute -top-5 -right-5 size-16 rounded-full bg-sun" />
                   <span class="type-numeral">{c.items.length}</span>
                   <span class="ml-2 pb-1 text-callout font-semibold">open</span>
                 </div>
@@ -314,7 +294,6 @@ const steps = [
   <section aria-labelledby="join" class="site-container pt-16 md:pt-20">
     <div class="grid items-center gap-10 md:grid-cols-2 lg:gap-16">
       <div>
-        <p class="m-0 mb-3 eyebrow text-ink">Community</p>
         <h2 id="join" class="m-0 type-title-1 text-ink md:type-hero">Keep every deadline in view</h2>
         <p class="m-0 mt-4 max-w-[44ch] text-lg leading-7 text-ink-secondary">
           Track opportunities, plan what each application needs and get reminded before anything closes.
@@ -326,8 +305,6 @@ const steps = [
       </div>
       <div class="relative">
         <Illustration full={community} small={community768} />
-        <Decor kind="sun" class="-top-6 -right-4 size-16" />
-        <Decor kind="spot" src={accepted.src} class="-bottom-10 -left-12 w-32" />
       </div>
     </div>
   </section>

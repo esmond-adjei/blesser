@@ -171,7 +171,7 @@ export function Scans() {
     actions: (
       <div className="flex items-center gap-3">
         <AllowanceNote />
-        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto Arrange</Button>
+        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto arrange</Button>
       </div>
     ),
   }), [arrange])

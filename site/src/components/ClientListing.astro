@@ -11,8 +11,9 @@ interface Props {
   /** Apply the /opportunities query filters (q, category, kind, closing_within, sort). */
   filters?: boolean
   empty: { title: string; description: string; actions: { href: string; label: string }[] }
+  showCategory?: boolean
 }
-const { items, filters = false, empty } = Astro.props
+const { items, filters = false, empty, showCategory = true } = Astro.props
 const pill = (active: boolean) => cn(buttonVariants({ variant: active ? "brand" : "quiet", size: "md" }), "min-w-control-md tabular-nums")
 ---
 
@@ -23,7 +24,7 @@ const pill = (active: boolean) => cn(buttonVariants({ variant: active ? "brand" 
   data-pill-active={pill(true)}
   data-step={buttonVariants({ variant: "secondary", size: "md" })}
 >
-  <CardGrid items={items} listing />
+  <CardGrid items={items} listing showCategory={showCategory} />
   <div data-empty hidden>
     <LinkEmptyState className="mt-8" title={empty.title} description={empty.description} actions={empty.actions} />
   </div>
@@ -77,7 +78,7 @@ const pill = (active: boolean) => cn(buttonVariants({ variant: active ? "brand" 
 
     const n = shown.length
     for (const el of document.querySelectorAll("[data-count]")) el.textContent = `${n.toLocaleString("en-GB")} ${n === 1 ? "opportunity" : "opportunities"}`
-    for (const el of document.querySelectorAll("[data-page-note]")) el.textContent = page > 1 ? ` · page ${page}` : ""
+    for (const el of document.querySelectorAll("[data-page-note]")) el.textContent = page > 1 ? `, page ${page}` : ""
     root.querySelector<HTMLElement>("[data-empty]")!.hidden = n > 0
 
     const href = (p: number) => {

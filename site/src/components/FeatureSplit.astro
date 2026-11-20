@@ -5,14 +5,13 @@ import Illustration from "./Illustration.astro"
 
 interface Props {
   id: string
-  eyebrow?: string
   title: string
   full: ImageMetadata
   small: ImageMetadata
   tone?: "sun" | "forest" | "sunk"
   reverse?: boolean
 }
-const { id, eyebrow, title, full, small, tone = "sun", reverse = false } = Astro.props
+const { id, title, full, small, tone = "sun", reverse = false } = Astro.props
 const tint = { sun: "bg-sun-soft", forest: "bg-forest-soft", sunk: "bg-surface-sunk" }[tone]
 ---
 
@@ -25,14 +24,17 @@ const tint = { sun: "bg-sun-soft", forest: "bg-forest-soft", sunk: "bg-surface-s
       </div>
     </div>
     <div class={cn("max-w-[600px]", reverse ? "md:justify-self-end" : "md:justify-self-start")}>
-      {eyebrow && <p class="m-0 mb-3 eyebrow text-ink">{eyebrow}</p>}
       <h2 id={id} class="m-0 type-title-1 text-ink">{title}</h2>
       <div class="mt-4 text-lg leading-7 text-ink-secondary">
         <slot />
       </div>
-      <div class="mt-8 flex flex-wrap items-center gap-3">
-        <slot name="cta" />
-      </div>
+      {
+        Astro.slots.has("cta") && (
+          <div class="mt-8 flex flex-wrap items-center gap-3">
+            <slot name="cta" />
+          </div>
+        )
+      }
     </div>
   </div>
 </section>
