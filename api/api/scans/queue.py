@@ -401,7 +401,7 @@ async def _wait(event: asyncio.Event, timeout: float) -> None:
 
 
 async def hourly_jobs(session) -> None:
-    """Deadline reminders, email digests, trace pruning and the scheduled sweep."""
+    """Deadline reminders, match alerts, email digests, trace pruning and the scheduled sweep."""
     from api.notifications.deadlines import check_deadlines, send_digests
     from api.opportunities.sweep import maybe_sweep
     from api.scans.service import prune_traces
@@ -409,6 +409,10 @@ async def hourly_jobs(session) -> None:
     reminders = await check_deadlines(session)
     if reminders:
         print(f"[worker] {reminders} deadline reminder(s)", flush=True)
+    from api.matching.alerts import run as match_alerts
+
+    if alerts := await match_alerts(session):
+        print(f"[worker] {alerts} match alert(s)", flush=True)
     await send_digests(session)
     await prune_traces(session)
     from api.opportunities.archive import auto_archive

@@ -90,6 +90,8 @@ EXPECTED_TABLES = sorted(
         "assistant_conversations",
         "assistant_messages",
         "scan_finds",
+        "match_profiles",
+        "saved_searches",
         "collections",
         "collection_items",
         "opportunity_reports",

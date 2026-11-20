@@ -92,8 +92,8 @@ def _published():
     return m.Opportunity.status == m.OpportunityStatus.published.value
 
 
-async def list_public(
-    session,
+def catalogue_filters(
+    on: date,
     *,
     q: str = "",
     category: str | None = None,
@@ -101,14 +101,13 @@ async def list_public(
     country: str | None = None,
     open_only: bool = True,
     closing_within: int | None = None,
-    sort: str = "deadline",
-    limit: int = 30,
-    offset: int = 0,
     public_only: bool = False,
     new: bool = False,
     audience: str | None = None,
-) -> dict:
-    on = today()
+) -> list:
+    """WHERE clauses for published listings; shared by the list and saved-search alerts."""
+    from api.matching import service as matching
+
     filters = [_published()]
     if public_only:
         filters.append(m.Opportunity.audience == "public")
@@ -134,24 +133,74 @@ async def list_public(
         filters.append(m.Opportunity.deadline_date.is_not(None))
         filters.append(m.Opportunity.deadline_date >= on)
         filters.append(m.Opportunity.deadline_date <= _plus_days(on, closing_within))
-    for word in [w for w in (q or "").split() if w][:8]:
-        like = f"%{word}%"
-        filters.append(
-            or_(
-                m.Opportunity.title.ilike(like),
-                m.Opportunity.organization.ilike(like),
-                m.Opportunity.summary.ilike(like),
-                m.Opportunity.eligibility.ilike(like),
-                cast(m.Opportunity.tags, String).ilike(like),
-            )
-        )
+    tsquery = matching.search_query(q)
+    if tsquery is not None:
+        filters.append(matching.search_clause(tsquery))
+    return filters
+
+
+async def list_public(
+    session,
+    *,
+    q: str = "",
+    category: str | None = None,
+    kind: str | None = None,
+    country: str | None = None,
+    open_only: bool = True,
+    closing_within: int | None = None,
+    sort: str = "deadline",
+    limit: int = 30,
+    offset: int = 0,
+    public_only: bool = False,
+    new: bool = False,
+    audience: str | None = None,
+    match=None,
+) -> dict:
+    """One page of published listings.
+
+    sort is "deadline", "new", "relevance" (needs q; falls back to deadline) or
+    "for_you" (needs `match`, a matching.service.Prefs; falls back to deadline).
+    """
+    from api.matching import service as matching
+
+    on = today()
+    filters = catalogue_filters(
+        on,
+        q=q,
+        category=category,
+        kind=kind,
+        country=country,
+        open_only=open_only,
+        closing_within=closing_within,
+        public_only=public_only,
+        new=new,
+        audience=audience,
+    )
+    tsquery = matching.search_query(q)
+    for_you = sort == "for_you" and match is not None
+    if for_you:
+        filters.append(matching.country_gate(match))
     total = (
         await session.execute(
             select(func.count()).select_from(m.Opportunity).where(*filters)
         )
     ).scalar_one()
     stmt = select(m.Opportunity).where(*filters)
-    if sort == "new":
+    if for_you:
+        score, terms = matching.score_columns(match)
+        stmt = stmt.add_columns(score, terms).order_by(
+            score.desc(),
+            m.Opportunity.deadline_date.asc().nulls_last(),
+            m.Opportunity.created_at.desc(),
+            m.Opportunity.id,
+        )
+    elif sort == "relevance" and tsquery is not None:
+        stmt = stmt.order_by(
+            matching.search_rank(tsquery).desc(),
+            m.Opportunity.deadline_date.asc().nulls_last(),
+            m.Opportunity.id,
+        )
+    elif sort == "new":
         stmt = stmt.order_by(m.Opportunity.created_at.desc(), m.Opportunity.id)
     else:
         # Soonest real deadline first; rolling and undated after them.
@@ -161,12 +210,15 @@ async def list_public(
             m.Opportunity.id,
         )
     limit = max(1, min(limit, MAX_PAGE))
-    rows = (
-        (await session.execute(stmt.offset(max(offset, 0)).limit(limit)))
-        .scalars()
-        .all()
-    )
-    return {"items": [to_out(r, on) for r in rows], "total": total}
+    result = await session.execute(stmt.offset(max(offset, 0)).limit(limit))
+    if for_you:
+        items = [
+            {**to_out(r, on), "match_score": round(float(sc), 2), "match_terms": list(t or [])}
+            for r, sc, t in result.all()
+        ]
+    else:
+        items = [to_out(r, on) for r in result.scalars().all()]
+    return {"items": items, "total": total}
 
 
 def _plus_days(on: date, days: int) -> date:

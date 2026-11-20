@@ -18,7 +18,8 @@ from api.todos.models import Todo
 
 
 def snapshot(row):
-    return {col.name: getattr(row, col.name) for col in row.__table__.columns}
+    # Generated columns (opportunities.search_vector) are derived and never loaded.
+    return {col.name: getattr(row, col.name) for col in row.__table__.columns if col.computed is None}
 
 
 async def commit(session):
