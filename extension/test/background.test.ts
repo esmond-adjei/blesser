@@ -100,6 +100,8 @@ describe("Api", () => {
     await expect(api.match("https://a.example/apply", "Apply")).rejects.toThrow("Extension tokens cannot access this route.")
     expect(await store.auth()).toMatchObject({ access_token: "a2" })
     expect(String(fetcher.mock.calls[0][0])).toBe("http://localhost:8000/api/app/autofill/match?url=https%3A%2F%2Fa.example%2Fapply&title=Apply")
+    await expect(api.createApplication({ title: "A", organization: "", link: "", deadline: "", deadline_date: null, status: "saved" })).rejects.toThrow("Add it in the app.")
+    expect(await store.auth()).toBeDefined()
   })
 
   it("downloads documents with their filename and type", async () => {

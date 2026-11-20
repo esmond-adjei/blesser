@@ -140,6 +140,25 @@ export interface TrackedApplication {
   deadline_date: string | null
   /** Submitted or further along in the member's records. */
   applied: boolean
+  status: ApplicationStatus
+}
+
+/** What the page itself says about the opportunity. Guesses: the member confirms them. */
+export interface PageDetails {
+  title: string
+  organization: string
+  deadline: { text: string; date: string | null; rolling: boolean } | null
+}
+
+export type ApplicationStatus = "saved" | "preparing" | "submitted" | "interview" | "accepted" | "rejected"
+
+export interface NewApplication {
+  title: string
+  organization: string
+  link: string
+  deadline: string
+  deadline_date: string | null
+  status: ApplicationStatus
 }
 
 export interface PageMatch {
@@ -227,7 +246,6 @@ export type PanelMessage =
   | { type: "review"; tabId: number }
   | { type: "trackedApplication"; tabId: number }
   | { type: "focus"; tabId: number; key: string }
-  | { type: "markApplied"; tabId: number }
   | { type: "edit"; tabId: number; key: string; value: string | string[] | null }
   | { type: "clear"; tabId: number; key: string }
   | { type: "wrongField"; tabId: number; key: string }
@@ -238,5 +256,8 @@ export type PanelMessage =
   | { type: "settings"; settings: Settings }
   | { type: "progress"; tabId: number }
   | { type: "exportForm"; tabId: number }
+  | { type: "pageDetails"; tabId: number }
+  | { type: "saveApplication"; tabId: number; application: NewApplication }
+  | { type: "setStatus"; tabId: number; status: ApplicationStatus }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }

@@ -1,8 +1,8 @@
-import type { CollectedField, ExportField, FillInstruction, FillOutcome, PageMessage, PanelMessage, ProgressField, Reply, Status, WriteResult } from "../shared/types"
+import type { CollectedField, ExportField, PageDetails, FillInstruction, FillOutcome, PageMessage, PanelMessage, ProgressField, Reply, Status, WriteResult } from "../shared/types"
 import { Actions } from "./actions"
 import { Api, SignedOut } from "./api"
 import { acceptConnect, connectUrl, newState } from "./connect"
-import { runFill, type Scripting, NO_ACCESS } from "./fill"
+import { blockedReason, runFill, type Scripting, NO_ACCESS } from "./fill"
 import { exportForm, startProgress, type FormScripting } from "./progress"
 import { FILL_REQUEST } from "../shared/ui"
 import { Store, type Area } from "./store"
@@ -115,8 +115,6 @@ async function handle(message: PanelMessage): Promise<unknown> {
       if (!run?.result) throw new Error("That field isn't on the page any more.")
       return true
     }
-    case "markApplied":
-      return actions.markApplied(await tabInfo(message.tabId))
     case "edit":
       return actions.edit(message.tabId, message.key, message.value)
     case "clear":
@@ -133,6 +131,17 @@ async function handle(message: PanelMessage): Promise<unknown> {
       return actions.report(message.report)
     case "progress":
       return startProgress(forms, store, await tabInfo(message.tabId)).catch(explain)
+    case "pageDetails": {
+      const tab = await tabInfo(message.tabId)
+      if (blockedReason(tab.url)) return { title: "", organization: "", deadline: null } satisfies PageDetails
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }).catch(explain)
+      const [run] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => window.__blesser?.details() ?? null })
+      return (run?.result as PageDetails | null) ?? { title: "", organization: "", deadline: null }
+    }
+    case "saveApplication":
+      return actions.saveApplication(await tabInfo(message.tabId), message.application)
+    case "setStatus":
+      return actions.setStatus(await tabInfo(message.tabId), message.status)
     case "exportForm":
       return exportForm(forms, await tabInfo(message.tabId)).catch(explain)
   }

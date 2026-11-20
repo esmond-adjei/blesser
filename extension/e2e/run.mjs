@@ -14,6 +14,8 @@ const APP = process.env.E2E_APP_URL ?? "http://localhost:5180"
 const SITE_PORT = Number(process.env.E2E_SITE_PORT ?? 5190)
 const PROXY_PORT = Number(process.env.E2E_PROXY_PORT ?? 5191)
 const SITE = `http://localhost:${SITE_PORT}`
+// The same server under another host name: a funder site with nothing tracked yet.
+const OTHER_SITE = `http://127.0.0.1:${SITE_PORT}`
 const PROXY = `http://localhost:${PROXY_PORT}`
 const OUT = process.env.E2E_SCREENSHOTS ?? join(root, "dist-e2e-shots")
 const DIST = join(root, "dist-e2e")
@@ -59,7 +61,7 @@ const proxy = createServer(async (req, res) => {
 })
 await new Promise((resolve) => proxy.listen(PROXY_PORT, "127.0.0.1", resolve))
 
-const env = { ...process.env, BLESSER_API_URL: PROXY, BLESSER_APP_URL: APP, BLESSER_E2E_HOSTS: `${SITE}/*`, BLESSER_OUT_DIR: DIST }
+const env = { ...process.env, BLESSER_API_URL: PROXY, BLESSER_APP_URL: APP, BLESSER_E2E_HOSTS: `${SITE}/*,${OTHER_SITE}/*`, BLESSER_OUT_DIR: DIST }
 execFileSync("npx", ["vite", "build", "--logLevel", "warn"], { cwd: root, env, stdio: "inherit" })
 execFileSync("npx", ["vite", "build", "-c", "vite.content.config.ts", "--logLevel", "warn"], { cwd: root, env, stdio: "inherit" })
 
@@ -180,7 +182,7 @@ try {
   await panel.getByRole("combobox").first().selectOption({ label: "Siwa" })
   if (process.env.E2E_DRAFTING === "0") await panel.getByRole("switch", { name: "Draft answers I haven't saved" }).click()
   const opportunity = panel.getByRole("region", { name: "Opportunity on this page" })
-  await opportunity.getByText("Tracked", { exact: true }).waitFor({ timeout: 10_000 })
+  await opportunity.getByText("Saved", { exact: true }).waitFor({ timeout: 10_000 })
   results.steps.push("recognised a tracked application before any fill")
   await shot(panel, "02-panel-ready-light.png")
   await panel.emulateMedia({ colorScheme: "dark" })
@@ -252,10 +254,11 @@ try {
   results.steps.push("exported the form to a Word document")
 
   await opportunity.getByRole("button", { name: "Opportunity actions" }).click()
-  await panel.getByRole("menuitem", { name: "Mark as applied" }).click()
-  await opportunity.getByText("Marked as applied").waitFor()
+  await panel.getByRole("menuitem", { name: "Status" }).click()
+  await panel.getByRole("menuitemradio", { name: "Submitted" }).click()
+  await opportunity.getByText("Submitted", { exact: true }).waitFor()
   assert.equal((await call("GET", `/api/app/applications/${tracked.id}`, token)).status, "submitted")
-  results.steps.push("marked the tracked application as applied")
+  results.steps.push("moved the tracked application to Submitted from the panel")
 
   const row = (label) => panel.getByRole("region", { name: "Review" }).locator("li").filter({ has: panel.getByText(label, { exact: true }) })
 
@@ -388,6 +391,55 @@ try {
   const saved = await call("GET", "/api/app/profile", token)
   if ("place_of_birth" in saved) assert.equal(saved.place_of_birth, "Kumasi")
   results.steps.push("Apply kit has country and place of birth")
+
+  // A form with no clear title or deadline: the panel asks for what's missing.
+  const unknown = await context.newPage()
+  await unknown.goto(`${OTHER_SITE}/open-call.html?call=a`)
+  const [unknownTab] = await worker.evaluate((url) => chrome.tabs.query({ url }), `${OTHER_SITE}/open-call.html?call=a`)
+  await panel.goto(`chrome-extension://${extId}/sidepanel.html?tab=${unknownTab.id}`)
+  await panel.bringToFront()
+  const card = panel.getByRole("region", { name: "Opportunity on this page" })
+  await card.getByText("Not in your applications").waitFor({ timeout: 10_000 })
+  await shot(panel, "15-not-in-applications.png")
+  await card.getByRole("button", { name: "Save to my applications" }).click()
+  const saveDialog = panel.getByRole("dialog", { name: "Save to my applications" })
+  await saveDialog.getByText("We couldn't find a deadline on this page.").waitFor()
+  assert.equal(await saveDialog.getByLabel("Title").inputValue(), "")
+  await saveDialog.getByLabel("Title").fill("Tamale Agritech Open Call")
+  await saveDialog.getByLabel("Deadline").fill("2030-12-15")
+  await saveDialog.getByLabel("Status").selectOption({ label: "Saved" })
+  await shot(panel, "16-save-dialog.png")
+  await saveDialog.getByRole("button", { name: "Save", exact: true }).click()
+  await card.getByText("Saved", { exact: true }).waitFor()
+  await panel.getByText("Saved to your applications as Saved").waitFor()
+
+  // A page that names the prize and its deadline is saved in one click, as Preparing.
+  const prize = await context.newPage()
+  await prize.goto(`${OTHER_SITE}/prize.html?call=b`)
+  const [prizeTab] = await worker.evaluate((url) => chrome.tabs.query({ url }), `${OTHER_SITE}/prize.html?call=b`)
+  await panel.goto(`chrome-extension://${extId}/sidepanel.html?tab=${prizeTab.id}`)
+  await panel.bringToFront()
+  await card.getByText("Not in your applications").waitFor({ timeout: 10_000 })
+  await card.getByRole("button", { name: "Save to my applications" }).click()
+  await card.getByText("Preparing", { exact: true }).waitFor()
+  assert.equal(await panel.getByRole("dialog").count(), 0, "no dialog when the page says enough")
+  await shot(panel, "17-saved-from-page.png")
+  await panel.emulateMedia({ colorScheme: "dark" })
+  await shot(panel, "18-saved-from-page-dark.png")
+  await panel.emulateMedia({ colorScheme: "light" })
+
+  const myApps = await call("GET", "/api/app/applications", token)
+  const openCall = myApps.find((a) => a.title === "Tamale Agritech Open Call")
+  assert.deepEqual([openCall?.status, openCall?.deadline_date, openCall?.link], ["saved", "2030-12-15", `${OTHER_SITE}/open-call.html?call=a`])
+  const prizeApp = myApps.find((a) => a.title === "Accra Climate Prize 2026")
+  assert.deepEqual(
+    [prizeApp?.status, prizeApp?.organization, prizeApp?.deadline_date, prizeApp?.link],
+    ["preparing", "Green Ghana Fund", "2030-11-30", `${OTHER_SITE}/prize.html?call=b`],
+  )
+  await prize.reload()
+  await panel.goto(`chrome-extension://${extId}/sidepanel.html?tab=${prizeTab.id}`)
+  await card.getByText("Preparing", { exact: true }).waitFor({ timeout: 10_000 })
+  results.steps.push("saved unmatched forms to my applications, with and without the dialog")
 } catch (err) {
   for (const [i, page] of (context?.pages() ?? []).entries()) await page.screenshot({ path: join(OUT, `fail-${i}.png`) }).catch(() => {})
   throw err

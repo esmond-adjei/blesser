@@ -8,7 +8,7 @@ import {
   notePageEdit,
   sameValue,
 } from "../shared/review"
-import type { Corrected, FieldDescriptor, PageMatch, PageMessage, ProblemReport, Review, ReviewRow, TrackedApplication } from "../shared/types"
+import type { ApplicationStatus, Corrected, FieldDescriptor, PageMatch, PageMessage, NewApplication, ProblemReport, Review, ReviewRow, TrackedApplication } from "../shared/types"
 import type { Api, Application } from "./api"
 import { blockedReason, cleanDescriptor, collectPage, split, type Scripting, type TabInfo } from "./fill"
 import { cleanProgress } from "./progress"
@@ -24,6 +24,7 @@ export interface ActionResult {
 
 const MAX_NOTE = 2000
 const APPLIED = new Set(["submitted", "interview", "accepted", "rejected"])
+const STATUSES = new Set(["saved", "preparing", ...APPLIED])
 const message = (err: unknown) => (err instanceof Error ? err.message : "Blesser didn't answer.")
 
 /** Review actions from the panel and events from the page; every change goes through the stored review. */
@@ -134,8 +135,8 @@ export class Actions {
       review && review.moved !== "navigated" ? { application_id: review.matchedApplicationId ?? null, opportunity_id: review.matchedOpportunityId } : null
     if (!match?.application_id && !match?.opportunity_id) {
       if (blockedReason(tab.url)) return null
-      // An API without the match route answers 404; the panel then just shows no match.
-      match = await this.api.match(tab.url, tab.title).catch(() => null)
+      // A failed lookup (rate limit, older API) is "unknown", never "not tracked": that would offer to save a duplicate.
+      match = await this.api.match(tab.url, tab.title)
     }
     if (!match?.application_id && !match?.opportunity_id) return null
     const apps = await this.api.applications()
@@ -148,17 +149,38 @@ export class Actions {
 
   async tracked(tab: TabInfo): Promise<TrackedApplication | null> {
     const app = await this.application(tab)
-    if (!app) return null
-    const { title, deadline, deadline_date, status } = app
-    return { title, deadline, deadline_date, applied: APPLIED.has(status) }
+    return app && summary(app)
   }
 
-  async markApplied(tab: TabInfo): Promise<TrackedApplication> {
+  async setStatus(tab: TabInfo, status: ApplicationStatus): Promise<TrackedApplication> {
     const app = await this.application(tab)
     if (!app) throw new Error("This page isn't linked to an application you track.")
-    if (!APPLIED.has(app.status)) await this.api.markSubmitted(app.id)
-    await this.store.updateReview(tab.id, (r) => ({ ...r, applied: true }))
-    const { title, deadline, deadline_date } = app
-    return { title, deadline, deadline_date, applied: true }
+    const next = app.status === status ? app : await this.api.updateApplication(app.id, { status })
+    if (APPLIED.has(status)) await this.store.updateReview(tab.id, (r) => ({ ...r, applied: true }))
+    return summary(next)
   }
+
+  /** Saves the page as a new application; the page's own address becomes its link so the match finds it again. */
+  async saveApplication(tab: TabInfo, input: NewApplication): Promise<TrackedApplication> {
+    if (blockedReason(tab.url)) throw new Error("Open the application form first.")
+    const title = input.title.trim().slice(0, 300)
+    if (!title) throw new Error("Add a title for this application.")
+    if (!STATUSES.has(input.status)) throw new Error("Choose a status.")
+    if (await this.application(tab)) throw new Error("This page is already in your applications.")
+    const created = await this.api.createApplication({
+      title,
+      organization: input.organization.trim().slice(0, 200),
+      link: tab.url.slice(0, 2000),
+      deadline: input.deadline.trim().slice(0, 120),
+      deadline_date: /^\d{4}-\d{2}-\d{2}$/.test(input.deadline_date ?? "") ? input.deadline_date : null,
+      status: input.status,
+    })
+    await this.store.updateReview(tab.id, (r) => ({ ...r, matchedApplicationId: created.id, matchedOpportunityId: created.opportunity_id }))
+    return summary(created)
+  }
+}
+
+function summary(app: Application): TrackedApplication {
+  const { title, deadline, deadline_date, status } = app
+  return { title, deadline, deadline_date, status: status as ApplicationStatus, applied: APPLIED.has(status) }
 }

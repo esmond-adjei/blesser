@@ -1,4 +1,4 @@
-import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, PageMatch, ProblemReport } from "../shared/types"
+import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, NewApplication, PageMatch, ProblemReport } from "../shared/types"
 import type { Store } from "./store"
 
 const FILL_TIMEOUT_MS = 75_000
@@ -148,8 +148,17 @@ export class Api {
     return this.json<Application[]>("/api/app/applications")
   }
 
-  markSubmitted(id: string) {
-    return this.json<Application>(`/api/app/applications/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status: "submitted" }) })
+  async createApplication(body: NewApplication): Promise<Application> {
+    // Optional like match: an API from before extensions could save applications answers 401, which mustn't sign the member out.
+    const res = await this.raw("/api/app/applications", { method: "POST", body: JSON.stringify(body) }, { optional: true }).catch((err: unknown) => {
+      if (err instanceof Error && err.message.startsWith("Extension tokens")) throw new Error("This Blesser can't save applications from the extension yet. Add it in the app.")
+      throw err
+    })
+    return (await res.json()) as Application
+  }
+
+  updateApplication(id: string, body: Partial<Pick<Application, "status">>) {
+    return this.json<Application>(`/api/app/applications/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) })
   }
 
   async download(documentId: string): Promise<{ name: string; type: string; base64: string }> {
