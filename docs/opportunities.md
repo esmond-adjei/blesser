@@ -175,7 +175,7 @@ Private calendar feed tokens are stored encrypted, with a SHA-256 hash for looku
 
 ## Crawler-first scans
 
-The worker crawls enabled sources on their due schedule and when staff request a crawl. Each scan's existing category tasks process the crawler pipeline before their discovery agent. Sweeps use the same tasks. The extraction budget defaults to eight pages per category, with at most eighty candidates examined so deterministic rejections do not consume model calls. This budget is separate from the existing opportunity save limits.
+The worker crawls enabled sources on their due schedule and when staff request a crawl. Scheduled sweeps (`scans.kind = sweep`) process the crawler pipeline in each category task before their discovery agent. Member scans skip it and work on the member's request (see below), unless no sweep account is configured: then a member's task runs the pipeline after its agent, so crawled candidates still get extracted. Candidates are claimed newest first: by publish date (feed items, or sitemap `lastmod`), then by their source's yield, then by when they were found. The extraction budget defaults to eight pages per category, with at most eighty candidates examined so deterministic rejections do not consume model calls. This budget is separate from the existing opportunity save limits.
 
 Sources can be RSS or Atom feeds, sitemaps, or HTML listings. Migration `0003` seeds seven sources checked live with BlesserBot on 9 November 2026: Wellcome funding schemes, DAAD Ghana funding, NEIP, Grand Challenges grant opportunities, the Tony Elumelu Foundation, Opportunities for Africans RSS and Opportunity Desk RSS. An unreachable Youth feed, a removed Gates Cambridge page and an old redirected Anzisha page were excluded.
 
@@ -205,6 +205,20 @@ One extraction request returns strict JSON on trimmed page text. It identifies a
 The database page cache is shared across tasks, workers and scans, including failed fetches. It respects conditional GETs and robots.txt. Repeated fetches of the same window within a task return only a short reminder; a new offset can still read unseen text. Known catalogue and rejected URLs are suppressed before HTTP. Code-confirmed closed URLs become closed candidates. Agent irrelevance is recorded as a rejected outcome scoped to its category and region, so another scope can still consider the page. Domains that produce saves become disabled source proposals, unless the registry already contains that domain.
 
 An agent no longer has to spend turns trying to save something when no useful leads remain. It stops after `DISCOVERY_NO_YIELD_TURNS` without a new save, default five, or `DISCOVERY_MAX_TURNS`, default twelve, and records a Saved/Skipped summary. The global `MAX_AGENT_TURNS` remains an additional ceiling. Explicit staff re-verification can still fetch a known opportunity and refresh its verified deadline.
+
+## Member scans
+
+A member's scan is about that member's request: their focus note, category, region and up to five sites.
+
+1. The agent searches the catalogue first (`search_catalogue`) and records clear fits with `add_catalogue_match`. Fetching a known catalogue URL returns its listing id, so the agent can match it instead of re-saving it.
+2. When the member listed sites, the agent reads them next (`fetch_page`), follows links to opportunity pages and saves what fits. Sites must be public http(s) addresses: `scans.service.check_sites` runs the egress guard before the scan starts, and every fetch runs it again, redirects included. A site the crawl rejected earlier is still read when a member asks for it.
+3. Then it searches the web.
+
+Every listing a scan returns is a row in `scan_finds`, with `via` (`agent`, `crawler` or `catalog`) and `created` (new to the catalogue). A scan shows all of them, so a scan that finds six fitting listings that already exist shows six, not "added 0". The finished notification says "found N for you, M new to Blesser".
+
+New listings saved from a member's site whose host is not an enabled staff source wait in review (`in_review`, `review_reason = agent_find`) with an editor note naming the site. The member sees them in their scan marked "In review". The site's domain becomes a disabled source proposal, as for any agent save.
+
+Budgets are separate. The scan's `MAX_OPPORTUNITIES_PER_RUN` counts only the agent's new listings; crawler saves have their own per-task and per-scan limits, so crawled candidates never use up the member's room.
 
 Crawler settings live under `site_settings.crawler` and are editable in admin Settings. Config supplies defaults:
 

@@ -375,8 +375,13 @@ async def upsert_from_agent(
     scan_id: str | None,
     data: schemas.AgentOpportunityIn,
     low_confidence: bool = False,
+    review_note: str = "",
 ) -> tuple[m.Opportunity, bool, list[str]]:
-    """Return the grounded row, whether created, and the fields refreshed."""
+    """Return the grounded row, whether created, and the fields refreshed.
+
+    A `review_note` (a find from a member-supplied site) holds a new listing for
+    staff review, whatever the editorial default, with the note for the editor.
+    """
     key = await dedupe.key_for(session, data.organization, data.title)
     now = utcnow_naive()
     deadline_date = parse_deadline(data.deadline)
@@ -411,7 +416,7 @@ async def upsert_from_agent(
         from api.editorial.service import get_settings, new_slug
 
         default = (await get_settings(session))["agent_default"]
-        if low_confidence:
+        if low_confidence or review_note:
             default = {**default, "status": "in_review"}
         opp = m.Opportunity(
             title=data.title.strip(),
@@ -434,6 +439,7 @@ async def upsert_from_agent(
             audience=default["audience"],
             slug=await new_slug(session, data.title),
             review_reason="agent_find" if default["status"] == "in_review" else None,
+            editor_note=review_note,
             published_at=now if default["status"] == "published" else None,
             source=m.OpportunitySource.agent.value,
             dedupe_key=key,

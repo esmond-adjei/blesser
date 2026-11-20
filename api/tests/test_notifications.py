@@ -352,7 +352,7 @@ def test_push_payload_says_what_happened_and_links_only(pushes):
         assert payload["link"] == f"/scans/{run_id}"
         assert SECRET_FOCUS not in str(payload)
     finished = next(s["payload"] for s in sent if s["payload"]["kind"] == "scan_finished")
-    assert finished["body"] == "Your opportunity scan in Ghana added 0 new opportunities."
+    assert finished["body"] == "Your opportunity scan in Ghana didn't find anything that fits yet."
 
 
 def test_test_endpoint_without_keys_reports_push_disabled(monkeypatch):

@@ -112,14 +112,32 @@ def validate_grounding(
     return None
 
 
-async def _scan_created(session, scan_id: str) -> int:
-    return (
-        await session.execute(
-            select(func.count())
-            .select_from(m.Opportunity)
-            .where(m.Opportunity.scan_id == scan_id)
-        )
-    ).scalar_one()
+async def _scan_created(session, scan_id: str, via: str | None = "agent") -> int:
+    """Listings this scan added to the catalogue; by default only the agent's.
+
+    Crawler saves have their own per-task limit, so they never use up the room the
+    member's agent has.
+    """
+    query = (
+        select(func.count())
+        .select_from(ScanFind)
+        .where(ScanFind.scan_id == scan_id, ScanFind.created.is_(True))
+    )
+    if via is not None:
+        query = query.where(ScanFind.via == via)
+    return (await session.execute(query)).scalar_one()
+
+
+def member_site_host(ctx, url: str) -> str | None:
+    """The member-supplied site host this URL is on, if any."""
+    hosts = getattr(ctx, "member_hosts", None)
+    if not hosts:
+        return None
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    return next(
+        (h for h in hosts if host == h or host.endswith("." + h)),
+        None,
+    )
 
 
 async def handle_save_opportunity(
@@ -152,12 +170,14 @@ async def handle_save_opportunity(
     if error := validate_grounding(data, pages):
         return {"error": error}
     scan_id = getattr(getattr(ctx, "run", None), "id", None)
-    if scan_id:
+    via = getattr(ctx, "save_via", "agent")
+    if scan_id and via == "agent":
         await ctx.session.execute(
             select(func.pg_advisory_xact_lock(func.hashtext("scan-budget:" + scan_id)))
         )
     if (
         scan_id
+        and via == "agent"
         and await _scan_created(ctx.session, scan_id)
         >= settings.max_opportunities_per_run
     ):
@@ -167,6 +187,7 @@ async def handle_save_opportunity(
                 "per scan. Stop saving and write your final summary."
             )
         }
+    member_host = member_site_host(ctx, data.source_url)
     opp, created, updated = await opp_service.upsert_from_agent(
         ctx.session,
         user_id=getattr(ctx, "user_id", None),
@@ -174,6 +195,11 @@ async def handle_save_opportunity(
         data=data,
         low_confidence=getattr(ctx, "extraction_confidence", 1)
         < settings.extraction_min_confidence,
+        review_note=(
+            f"Found on {member_host}, a site a member asked a scan to check."
+            if member_host
+            else ""
+        ),
     )
     if scan_id:
         await ctx.session.execute(
@@ -182,6 +208,8 @@ async def handle_save_opportunity(
                 scan_id=scan_id,
                 opportunity_id=opp.id,
                 source_url=data.source_url if created else None,
+                via=via,
+                created=created,
             )
             .on_conflict_do_nothing()
         )
@@ -268,3 +296,84 @@ async def handle_reject_candidate(tool_input: dict, ctx: ToolContext) -> dict:
             row.category_hints = []
     await ctx.session.commit()
     return {"url": url, "verdict": status, "reason": reason}
+
+
+#: Catalogue listings one task may match to the member's request.
+MAX_CATALOGUE_MATCHES = 15
+
+
+async def handle_search_catalogue(tool_input: dict, ctx: ToolContext) -> dict:
+    """Open, published listings in this task's category matching the words."""
+    from api.opportunities.service import list_public
+
+    query = str(tool_input.get("query", ""))[:200]
+    page = await list_public(
+        ctx.session,
+        q=query,
+        category=ctx.category,
+        sort="deadline",
+        limit=10,
+    )
+    if not page["items"] and len(query.split()) > 1:
+        # Every word must match; retry on each word alone, best first.
+        seen: dict[str, dict] = {}
+        for word in query.split()[:4]:
+            more = await list_public(
+                ctx.session, q=word, category=ctx.category, limit=5
+            )
+            for item in more["items"]:
+                seen.setdefault(item["id"], item)
+        page = {"items": list(seen.values())[:10]}
+    return {
+        "results": [
+            {
+                "opportunity_id": item["id"],
+                "title": item["title"],
+                "organization": item["organization"],
+                "kind": item["kind"],
+                "deadline": item["deadline_date"]
+                or ("rolling" if item["rolling"] else ""),
+                "location": item["location"],
+                "summary": (item["summary"] or "")[:240],
+                "eligibility": (item["eligibility"] or "")[:240],
+            }
+            for item in page["items"]
+        ]
+    }
+
+
+async def handle_add_catalogue_match(tool_input: dict, ctx: ToolContext) -> dict:
+    """Record an existing listing as a result of this member's scan."""
+    scan_id = getattr(getattr(ctx, "run", None), "id", None)
+    if not scan_id:
+        return {"error": "Matches belong to a scan."}
+    matched = getattr(ctx, "catalogue_matches", set())
+    if len(matched) >= MAX_CATALOGUE_MATCHES:
+        return {
+            "error": f"Match limit reached ({MAX_CATALOGUE_MATCHES}). Keep only the best fits."
+        }
+    opp_id = str(tool_input.get("opportunity_id", ""))
+    opp = await ctx.session.get(m.Opportunity, opp_id)
+    if (
+        opp is None
+        or opp.status != m.OpportunityStatus.published.value
+        or not opp_service.is_open(opp)
+    ):
+        return {"error": "Only open, published listings can be matched."}
+    result = await ctx.session.execute(
+        insert(ScanFind)
+        .values(
+            scan_id=scan_id,
+            opportunity_id=opp.id,
+            source_url=None,
+            via="catalog",
+            created=False,
+        )
+        .on_conflict_do_nothing()
+        .returning(ScanFind.opportunity_id)
+    )
+    added = result.scalar_one_or_none() is not None
+    await ctx.session.commit()
+    matched.add(opp.id)
+    ctx.catalogue_matches = matched
+    return {"opportunity_id": opp.id, "title": opp.title, "added": added}

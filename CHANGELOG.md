@@ -23,3 +23,4 @@
 - Search uses Postgres full-text search: plurals and word stems match, a word still being typed matches as a prefix, and "Best match" ranks by match quality.
 - "What you're looking for" in Settings: audiences, kinds, stage, fields and countries, suggested from the Apply kit. The For you order ranks listings by it and leaves out listings closed to the member's countries.
 - Saved searches, and alerts for new listings that fit the member (daily or weekly), a weekly "closing soon that fit you" list, and new results for saved searches.
+- Member scans follow the member's request: the agent matches existing catalogue listings first, then reads up to five sites the member names, then searches the web. A scan shows every listing that fits, matched or new, and its notification says how many were found and how many are new. Crawler saves no longer use the member's save limit, and finds from member sites wait for staff review.

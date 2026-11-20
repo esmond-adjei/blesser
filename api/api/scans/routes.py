@@ -1,7 +1,7 @@
 """Scan routes: start agent scans for opportunities and watch them work."""
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -25,6 +25,11 @@ class ScanCreate(BaseModel):
         default="",
         max_length=2000,
         description="Optional: sectors, fields or kinds to look for first.",
+    )
+    sites: list[Annotated[str, Field(max_length=2000)]] = Field(
+        default_factory=list,
+        max_length=service.MAX_SCAN_SITES,
+        description="Optional: up to five public sites to read before searching.",
     )
 
 
@@ -65,8 +70,11 @@ class ScanOut(BaseModel):
     region: str
     categories: list[str]
     focus: str
+    sites: list[str] = Field(default_factory=list)
+    kind: str = "member"
     status: str
     created_at: datetime
+    opportunities_found: int = 0
     opportunities_added: int
     started_at: datetime | None = None
     finished_at: datetime | None = None
@@ -89,6 +97,7 @@ async def start_scan(
         categories=[c.value for c in req.categories],
         region=req.region,
         focus=req.focus,
+        sites=await service.check_sites(req.sites),
     )
     return await service.scan_detail(session, current.id, scan.id)
 

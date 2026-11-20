@@ -95,7 +95,9 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     metrics["sources"] = {**metrics.get("sources", {}), **crawl["sources"]}
     ctx = ToolContext(session, scan)
     ctx.category = category
-    ctx.opportunities_saved = metrics.get("saved", 0)
+    # Crawler saves have their own budget: they never use up the agent's room.
+    ctx.save_via = "crawler"
+    ctx.opportunities_saved = metrics.get("crawler_saved", 0)
     limit = (await get_settings(session))["crawler"]["max_candidates_per_task"]
     attempts = 0
     for _ in range(limit * 10):
@@ -104,7 +106,10 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
             or ctx.opportunities_saved >= settings.max_opportunities_per_task
         ):
             break
-        if await _scan_created(session, scan.id) >= settings.max_opportunities_per_run:
+        if (
+            await _scan_created(session, scan.id, via="crawler")
+            >= settings.max_opportunities_per_run
+        ):
             break
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
@@ -222,6 +227,9 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                             metrics["saved"] = metrics.get("saved", 0) + int(
                                 saved["created"]
                             )
+                            metrics["crawler_saved"] = metrics.get(
+                                "crawler_saved", 0
+                            ) + int(saved["created"])
                             if candidate.source_id and saved["created"]:
                                 await session.execute(
                                     update(Source)
