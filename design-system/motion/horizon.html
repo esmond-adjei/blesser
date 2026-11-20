@@ -1,0 +1,118 @@
+<!doctype html>
+<!--
+  "From the horizon": the social intro. Rendered to video by scripts/render-intro.mjs,
+  which calls window.seek(ms) for each frame. Open it in a browser to watch it play.
+  ?ratio=square gives the 1:1 cut; ?tagline=0 drops the line under the lockup.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Blesser intro</title>
+<style>
+  @font-face {
+    font-family: "Figtree Variable";
+    font-weight: 300 900;
+    src: url("../../node_modules/@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2") format("woff2");
+  }
+  html, body { margin: 0; height: 100%; background: #0f4f3b; overflow: hidden; }
+  svg { display: block; width: 100vw; height: 100vh; }
+  text { font-family: "Figtree Variable", Figtree, sans-serif; }
+</style>
+</head>
+<body>
+<svg id="scene" role="img" aria-label="Blesser. Opportunities, made visible.">
+  <rect width="100%" height="100%" fill="#0f4f3b" />
+  <defs><clipPath id="name-clip"><rect id="name-window" /></clipPath></defs>
+  <svg id="mark" viewBox="0 0 32 32" overflow="visible">
+    <path id="sun" d="M9 18a7 7 0 0 1 14 0Z" fill="#ffbe1a" />
+    <rect class="step" x="6" y="21" width="20" height="3" fill="#ffffff" />
+    <rect class="step" x="9" y="18" width="14" height="3.2" fill="#ffffff" />
+    <rect class="step" x="12" y="15" width="8" height="3.2" fill="#ffffff" />
+  </svg>
+  <g clip-path="url(#name-clip)"><text id="name" fill="#ffffff" font-weight="800">blesser</text></g>
+  <text id="tagline" text-anchor="middle" fill="#ffffff">Opportunities, made visible.</text>
+</svg>
+<script>
+  // Timings match the storyboard. Easing matches --ease-out in design-system/src/motion.css.
+  const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)"
+  const EASE_IN_OUT = "cubic-bezier(0.65, 0, 0.35, 1)"
+  const TOTAL = 2800
+  const params = new URLSearchParams(location.search)
+  const square = params.get("ratio") === "square"
+  const W = square ? 180 : 320, H = 180
+  const s = square ? 2 : 2.4            // logo units to scene units
+  const fontSize = square ? 26 : 31     // wordmark cap height close to the steps' height
+  const scene = document.getElementById("scene")
+  scene.setAttribute("viewBox", `0 0 ${W} ${H}`)
+
+  function track(el, keys) {
+    const k = keys.slice()
+    if (k[0].t > 0) k.unshift({ ...k[0], t: 0, ease: "linear" })
+    if (k[k.length - 1].t < TOTAL) k.push({ ...k[k.length - 1], t: TOTAL })
+    const frames = k.map(({ t, ease, ...props }) => ({ ...props, offset: t / TOTAL, easing: ease || "linear" }))
+    const a = el.animate(frames, { duration: TOTAL, fill: "both" })
+    a.pause()
+    return a
+  }
+
+  function build() {
+    const name = document.getElementById("name")
+    name.setAttribute("font-size", fontSize)
+    name.setAttribute("letter-spacing", -0.04 * fontSize)
+    const w = name.getComputedTextLength()
+    const gap = square ? 2.5 : 3
+    const left = W / 2 - (20 * s + gap + w) / 2
+    const markX = left - 6 * s, markY = H * 0.39 - 11 * s
+    const mark = document.getElementById("mark")
+    Object.entries({ x: markX, y: markY, width: 32 * s, height: 32 * s }).forEach(([k, v]) => mark.setAttribute(k, v))
+    name.setAttribute("x", left + 20 * s + gap)
+    name.setAttribute("y", markY + 24 * s)
+    const win = document.getElementById("name-window")
+    Object.entries({ x: left + 20 * s + gap - 1, y: markY, width: w + 20, height: 32 * s }).forEach(([k, v]) => win.setAttribute(k, v))
+    const tagline = document.getElementById("tagline")
+    tagline.setAttribute("x", W / 2)
+    tagline.setAttribute("y", markY + 24 * s + (square ? 26 : 34))
+    tagline.setAttribute("font-size", square ? 8.5 : 9.5)
+    if (params.get("tagline") === "0") tagline.remove()
+
+    // The big sun sits on the frame's bottom edge like the admin sign-in, then gathers into the mark.
+    const r = square ? 50 : 56
+    const k = r / (7 * s)
+    const at = (gx, gy) => {
+      const lx = (gx - markX) / s, ly = (gy - markY) / s
+      return `translate(${(lx - k * 16).toFixed(3)}px, ${(ly - k * 18).toFixed(3)}px) scale(${k.toFixed(4)})`
+    }
+    const sun = document.getElementById("sun")
+    sun.style.transformBox = "view-box"
+    sun.style.transformOrigin = "0 0"
+    const anims = [
+      track(sun, [
+        { t: 0, transform: at(W / 2, H + r + 2), ease: EASE_OUT },
+        { t: 600, transform: at(W / 2, H) },
+        { t: 700, transform: at(W / 2, H), ease: EASE_IN_OUT },
+        { t: 1500, transform: "translate(0px, 0px) scale(1)" },
+      ]),
+      ...[...document.querySelectorAll(".step")].map((step, i) =>
+        track(step, [
+          { t: 1250 + i * 70, transform: "translateY(3px)", opacity: 0, ease: EASE_OUT },
+          { t: 1530 + i * 70, transform: "translateY(0px)", opacity: 1 },
+        ]),
+      ),
+      track(name, [
+        { t: 1550, transform: "translateX(-22px)", opacity: 0, ease: EASE_OUT },
+        { t: 1950, transform: "translateX(0px)", opacity: 1 },
+      ]),
+    ]
+    if (tagline.isConnected) anims.push(track(tagline, [{ t: 2050, opacity: 0, ease: EASE_OUT }, { t: 2400, opacity: 0.85 }]))
+    return anims
+  }
+
+  window.ready = document.fonts.load(`800 ${fontSize}px "Figtree Variable"`).then(() => {
+    const anims = build()
+    window.TOTAL = TOTAL
+    window.seek = (ms) => anims.forEach((a) => (a.currentTime = Math.min(ms, TOTAL)))
+    if (!navigator.webdriver) anims.forEach((a) => a.play())
+  })
+</script>
+</body>
+</html>

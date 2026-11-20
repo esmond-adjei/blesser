@@ -12,7 +12,7 @@ export {
 } from "./components/ApplicationStatus"
 export { EmptyState, Sunrise, type EmptyStateProps } from "./components/EmptyState"
 export { Wordmark } from "./components/Wordmark"
-export { LOGO, Logo, logoSvg, type LogoProps, type LogoVariant } from "./components/Logo"
+export { LOGO, Logo, logoSvg, type LogoMotion, type LogoProps, type LogoVariant } from "./components/Logo"
 export {
   OpportunityArt,
   opportunityArt,

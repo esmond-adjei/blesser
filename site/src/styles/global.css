@@ -2,6 +2,7 @@
 @import "@blesser/ui/fonts.css";
 @import "@blesser/ui/tokens.css" layer(base);
 @import "@blesser/ui/theme.css";
+@import "@blesser/ui/motion.css";
 
 @layer base {
   * {
