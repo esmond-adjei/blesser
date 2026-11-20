@@ -1,6 +1,6 @@
 # API contract
 
-The shared contract between the API (`api/`), the public site (`site/`), the member app (`webapp/`) and the admin console (`admin/`). Read `architecture.md` first for the why. Field names are exact; all JSON is snake_case; dates are ISO 8601 (`YYYY-MM-DD` for dates, UTC datetimes with `Z`).
+The shared contract between the API (`api/`), the public site (`site/`), the member app (`webapp/`) and the admin console (`admin/`). Read `architecture.md` first for the why. Notes on what was removed or migrated describe the move from the first version of the API; that move has shipped. Field names are exact; all JSON is snake_case; dates are ISO 8601 (`YYYY-MM-DD` for dates, UTC datetimes with `Z`).
 
 ## Opportunity states
 

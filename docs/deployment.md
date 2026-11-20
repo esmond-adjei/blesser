@@ -26,7 +26,7 @@ Two wiring modes:
 - `LLM_API_KEY` and a search key (`TAVILY_API_KEY` or `BRAVE_API_KEY`): without them scans fail. The API logs a warning at startup when either is missing.
 - `APP_BASE_URL`: the public web app URL, used in emails and calendar events.
 - `MAIL_BACKEND=smtp` and the `SMTP_*` settings ([email.md](email.md)), so verification, resets and reminders reach people.
-- `OPS_ADMIN_EMAILS`, for publishing community submissions.
+- `OPS_ADMIN_EMAILS`: comma-separated verified member accounts promoted to admin at startup, so someone can sign in to the admin console and review submissions.
 - Optional: `OPPORTUNITY_SWEEP_EMAIL` and `OPPORTUNITY_SWEEP_HOURS` for scheduled scans, VAPID keys for push ([notifications.md](notifications.md)), Google sign-in ([sign-in-providers.md](sign-in-providers.md)).
 
 Scans cost model tokens and search calls. Each account may start 3 scans an hour and 10 a day (the `scan` limit in `api/api/core/ratelimit.py`), and each scan saves at most `MAX_OPPORTUNITIES_PER_RUN` opportunities.
