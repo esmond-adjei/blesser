@@ -101,6 +101,25 @@ The worker crawls enabled sources on their due schedule and when staff request a
 
 Sources can be RSS or Atom feeds, sitemaps, or HTML listings. Migration `0003` seeds seven sources checked live with BlesserBot on 9 November 2026: Wellcome funding schemes, DAAD Ghana funding, NEIP, Grand Challenges grant opportunities, the Tony Elumelu Foundation, Opportunities for Africans RSS and Opportunity Desk RSS. An unreachable Youth feed, a removed Gates Cambridge page and an old redirected Anzisha page were excluded.
 
+Migration `0009_ghana_sources` adds Ghana sources read on 20 November 2026. Enabled: the Ghana Scholarships Authority notices, the University of Ghana research calls, announcements and financial aid pages, KNUST announcements, Africa Research Excellence Fund calls, the Japan embassy notices (MEXT scholarships) and the British Council GREAT Scholarships page for Ghana. Each listed current calls and its robots.txt allowed the listing path, except the Japan embassy, whose robots.txt could not be read; the crawler checks robots.txt before every fetch anyway. Disabled until they post new calls: the Ghana Enterprises Agency expressions of interest and the GETFund scholarship page. Staff enable them from the Sources page. The migration skips any URL staff already added.
+
+### PDF calls
+
+Many government and university calls are only published as PDFs. Listings and feeds keep `.pdf` links as candidates, and the shared page cache reads them for both the pipeline and the agent's `fetch_page`. A response is treated as a PDF when its content type says so, when a generic type comes with a `.pdf` path, or when the body starts with the PDF header and is not labelled HTML.
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `PDF_MAX_BYTES` | 10,000,000 | Download cap. A larger declared length is refused after one chunk, and a cut file is never parsed. |
+| `PDF_MAX_PAGES` | 40 | Pages read per file. |
+| `PDF_MAX_CHARS` | 400,000 | Text kept per file, the same as HTML pages. |
+| `PDF_TIMEOUT_SECONDS` | 30 | Wall-clock limit; the parser is killed after it. |
+| `PDF_MEMORY_MB` | 768 | Address-space limit for the parser. |
+| `PDF_CONCURRENCY` | 2 | Parsers running at once per process. |
+
+Text comes from `pypdf` in a separate `python -I` process with memory, CPU-time and no-file-write limits (`opportunities/pdf_text.py`), so a hostile or broken file only costs that child. The page text is the PDF title, its text, and any web links in it, which the extractor can use as the application link. PDF pages never expand into more candidates. Saves from a PDF go through the same grounding checks: the PDF URL is the `source_url`, and the name and full deadline date must appear in its text.
+
+A PDF that is too large, password-protected, unreadable, too slow, or has almost no text (usually a scan) is cached with an error code (`pdf_too_large`, `pdf_encrypted`, `pdf_unreadable`, `pdf_timeout`, `pdf_no_text`). Triage records that code as a rejection instead of retrying it as a temporary fetch failure. Scanned PDFs need OCR, which is not implemented. Word documents are not read either.
+
 The crawler removes navigation and sharing links, normalizes tracking parameters, and records new item URLs only once. Generic funding listings can expand into more candidates without a model call. Triage checks catalogue source URLs, application links, known dedupe keys, content hashes and explicit deadline dates. Publication dates do not count as deadlines. Ambiguous dates and pages with future or rolling application dates survive date triage.
 
 One extraction request returns strict JSON on trimmed page text. It identifies a named open opportunity, its category, regional eligibility and confidence. The same grounding validator handles pipeline and agent saves. Missing required fields, invalid JSON, unsupported names and unsupported deadlines cannot be saved. Results below `EXTRACTION_MIN_CONFIDENCE` default to staff review. Regional exclusions and categories outside the requested scan remain available for later scans that match them.
