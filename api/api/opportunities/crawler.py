@@ -113,7 +113,8 @@ def parse_items(
         for node in tree.xpath("//a[@href]"):
             label = " ".join(node.text_content().split())
             href = urljoin(url, node.get("href", ""))
-            if not any(word in (label + " " + href).lower() for word in _LEAD_WORDS):
+            words = (label + " " + href).lower().replace("-", " ").replace("_", " ")
+            if not any(word in words for word in _LEAD_WORDS):
                 continue
             if is_social_host(href):
                 continue
@@ -133,7 +134,7 @@ def parse_items(
             p.scheme not in {"http", "https"}
             or p.username
             or not p.netloc
-            or p.path.lower().endswith((".jpg", ".png", ".pdf", ".zip"))
+            or p.path.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".zip"))
         ):
             continue
         item["url"] = normalized_url(item["url"])

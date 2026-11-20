@@ -76,8 +76,15 @@ async def safe_get(
     max_redirects: int = MAX_REDIRECTS,
     headers: dict | None = None,
     before_request=None,
-) -> tuple[httpx.Response, str]:
-    """Checked GET on every hop; returns the response and its text cut at `max_bytes`."""
+    byte_limit=None,
+    decode: bool = True,
+) -> tuple[httpx.Response, str | bytes]:
+    """Checked GET on every hop; returns the response and its text cut at `max_bytes`.
+
+    `byte_limit(response)`, when given, picks the cap per final response (for
+    example a larger one for PDFs). With `decode=False` the body comes back as
+    bytes, one byte past the cap when it was longer, so callers can tell a
+    complete file from a cut one."""
     current = httpx.URL(url)
     for _ in range(max_redirects + 1):
         await check_url(current)
@@ -90,13 +97,16 @@ async def safe_get(
             if resp.is_redirect and location:
                 current = current.join(location)
                 continue
+            limit = max_bytes if byte_limit is None else byte_limit(resp)
             body = bytearray()
             async for chunk in resp.aiter_bytes():
                 body.extend(chunk)
-                if len(body) >= max_bytes:
+                if len(body) > limit:
                     break
+            if not decode:
+                return resp, bytes(body[: limit + 1])
             encoding = resp.encoding or "utf-8"
-            return resp, bytes(body[:max_bytes]).decode(encoding, errors="replace")
+            return resp, bytes(body[:limit]).decode(encoding, errors="replace")
     raise EgressBlocked(f"more than {max_redirects} redirects")
 
 

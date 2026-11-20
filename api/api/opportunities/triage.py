@@ -40,6 +40,10 @@ async def duplicate_url(session, url: str) -> bool:
 async def triage_page(
     session, candidate: CrawlCandidate, page: Page, today: date
 ) -> str | None:
+    if page.error.startswith("pdf_"):
+        # A PDF that is too large, locked, scanned or broken stays that way:
+        # reject it instead of retrying it as a temporary fetch failure.
+        return page.error
     if page.error:
         return "fetch_failed:" + page.error
     if len(page.text.strip()) < 120:
