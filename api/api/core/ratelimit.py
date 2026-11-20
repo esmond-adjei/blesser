@@ -20,6 +20,8 @@ from api.core.exceptions import RateLimitError
 # bucket -> [(max_calls, window_seconds), ...]; every window must allow.
 LIMITS: dict[str, list[tuple[int, int]]] = {
     "autofill": [(20, 60), (200, 3600)],
+    # The side panel asks which application a page belongs to on every page it opens.
+    "autofill_match": [(60, 60), (1000, 3600)],
     "extension_connect": [(10, 3600)],
     "extension_refresh": [(120, 60)],
     "kit_upload": [(20, 3600), (100, 86400)],
@@ -40,6 +42,7 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
 
 _LABEL = {
     "autofill": "autofill requests",
+    "autofill_match": "page lookups",
     "extension_connect": "browser connections",
     "extension_refresh": "browser refresh requests",
     "kit_upload": "document uploads",

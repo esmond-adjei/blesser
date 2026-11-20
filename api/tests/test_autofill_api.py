@@ -640,6 +640,22 @@ def test_fill_rate_limit_runs_before_validation_and_is_per_member(
     response = kit[0].post("/api/app/autofill/fill", json={})
     assert response.status_code == 429 and int(response.headers["retry-after"]) > 0
     assert fill(kit[1], [], allow_drafting=False)["fills"] == []
+    # Page lookups have their own budget, so opening pages never uses up fills.
+    lookup = kit[0].get("/api/app/autofill/match", params={"url": "https://a.example/"})
+    assert lookup.status_code == 200
+
+
+@pytest.mark.rate_limits
+def test_page_lookups_are_limited_separately(saved_kit, monkeypatch):
+    from api.core.ratelimit import LIMITS
+
+    kit, _ = saved_kit
+    monkeypatch.setitem(LIMITS, "autofill_match", [(1, 60)])
+    params = {"url": "https://a.example/"}
+    assert kit[0].get("/api/app/autofill/match", params=params).status_code == 200
+    response = kit[0].get("/api/app/autofill/match", params=params)
+    assert response.status_code == 429 and "page lookups" in response.text
+    assert fill(kit[0], [], allow_drafting=False)["fills"] == []
 
 
 def test_fill_bounds_and_private_errors(kit):

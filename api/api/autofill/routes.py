@@ -32,7 +32,7 @@ async def fill(
 @router.get(
     "/match",
     response_model=schemas.PageMatch,
-    dependencies=[Depends(rate_limit("autofill"))],
+    dependencies=[Depends(rate_limit("autofill_match"))],
 )
 async def match(
     session: Annotated[AsyncSession, Depends(get_session)],

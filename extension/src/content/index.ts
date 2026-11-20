@@ -1,7 +1,8 @@
-import type { CollectedField, ExportField, FillInstruction, FillOutcome, PageMessage, ProgressField, WriteResult } from "../shared/types"
+import type { CollectedField, ExportField, PageDetails, FillInstruction, FillOutcome, PageMessage, ProgressField, WriteResult } from "../shared/types"
 import { collectFields, type Collected } from "./collect"
 import { applyFills, writeField } from "./fill"
 import { clearMarks, flashField, markField, unmarkField } from "./highlight"
+import { pageDetails } from "./details"
 import { exportOf, frameSection, trackProgress, type ProgressTracker } from "./progress"
 import { watchPage, type Watcher } from "./watch"
 
@@ -15,6 +16,8 @@ export interface BlesserContent {
   track(): ProgressField[]
   /** Every field with what it holds now, for the Word export. */
   snapshot(): ExportField[]
+  /** Title, funder and deadline as the page states them. */
+  details(): PageDetails
 }
 
 declare global {
@@ -73,6 +76,9 @@ if (!window.__blesser) {
     track() {
       tracker ??= trackProgress(document, (fields) => notify({ type: "blesser.progress", fields }), { fallbackSection: frameSection(window) })
       return tracker.snapshot()
+    },
+    details() {
+      return pageDetails(document)
     },
     snapshot() {
       return exportOf(collectFields(document, { layout: true }), frameSection(window))
