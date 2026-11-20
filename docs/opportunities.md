@@ -218,6 +218,14 @@ Every listing a scan returns is a row in `scan_finds`, with `via` (`agent`, `cra
 
 New listings saved from a member's site whose host is not an enabled staff source wait in review (`in_review`, `review_reason = agent_find`) with an editor note naming the site. The member sees them in their scan marked "In review". The site's domain becomes a disabled source proposal, as for any agent save.
 
+### My sources
+
+Members can save up to `MEMBER_SOURCES_MAX` sites (default 10) in "My sources" on the Scans page (`/api/app/sources`). Each has an audience and an optional note on what to look for. Rows live in `member_sources`, private to the member and apart from the staff `sources` registry; the same site can be saved by several members.
+
+The worker's hourly pass checks members whose sources are due (`next_check_at`), up to `MEMBER_SOURCE_CHECKS_PER_HOUR` members per pass (default 20; 0 pauses checks), skipping disabled accounts and members with a check still running. A check is a scan of kind `sources`, one per audience, whose sites are the member's sources and whose focus is their notes. It uses the same agent without web search: catalogue matches, then the member's sites and the pages they link to. Sources are then due again after `MEMBER_SOURCE_CHECK_DAYS` (default 7). "Check now" starts the same check at most once an hour. Source checks never use the member's scan quota, and a check that finds nothing sends no notification.
+
+Finds follow the member-site rule above: new listings wait for staff review unless the site is an enabled staff source. Each saved domain also becomes a disabled staff source proposal through the usual save path, with its save count, so staff can enable strong member sources from the Sources page. A source's `finds` counts the new listings its checks found.
+
 Budgets are separate. The scan's `MAX_OPPORTUNITIES_PER_RUN` counts only the agent's new listings; crawler saves have their own per-task and per-scan limits, so crawled candidates never use up the member's room.
 
 Crawler settings live under `site_settings.crawler` and are editable in admin Settings. Config supplies defaults:

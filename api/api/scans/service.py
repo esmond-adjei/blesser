@@ -125,7 +125,9 @@ async def note_tasks_drained(session, scan_id: str) -> None:
             # Scheduled checks report through the listings themselves, not a notification.
             return
         from api.notifications import events
+        from api.scans.sources import record_finds
 
+        await record_finds(session, scan)
         await events.scan_finished(session, scan)
 
 
@@ -404,6 +406,7 @@ async def scan_allowance(session, user_id: str) -> dict:
             .select_from(m.Scan)
             .where(
                 m.Scan.user_id == user_id,
+                m.Scan.kind == "member",
                 m.Scan.created_at > now - timedelta(seconds=seconds),
             )
         )

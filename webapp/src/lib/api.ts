@@ -13,6 +13,9 @@ import type {
   OpportunityQuery,
   OpportunitySubmit,
   Paged,
+  MemberSource,
+  MemberSourceIn,
+  MemberSources,
   SavedSearch,
   Scan,
   ScanAllowance,
@@ -245,6 +248,12 @@ export const scanAllowance = () => get<ScanAllowance>("/api/app/scans/allowance"
 export const startScan = (body: ScanRequest) => post<Scan>("/api/app/scans", body)
 export const cancelScan = (id: string) => post<Scan>(`/api/app/scans/${id}/cancel`)
 export const deleteScan = (id: string) => del<{ status: string }>(`/api/app/scans/${id}`)
+export const listSources = () => get<MemberSources>("/api/app/sources")
+export const addSource = (body: MemberSourceIn) => post<MemberSource>("/api/app/sources", body)
+export const updateSource = (id: string, body: Partial<Pick<MemberSource, "category" | "note" | "paused">>) =>
+  patch<MemberSource>(`/api/app/sources/${id}`, body)
+export const deleteSource = (id: string) => del<void>(`/api/app/sources/${id}`)
+export const checkSources = () => post<Scan[]>("/api/app/sources/check")
 
 // --- Notifications ------------------------------------------------------------------
 

@@ -112,7 +112,7 @@ export interface Scan {
   focus: string
   /** Sites the member asked the agent to read first. */
   sites?: string[]
-  kind?: "member" | "sweep"
+  kind?: "member" | "sweep" | "sources"
   status: "running" | "done" | "cancelled"
   created_at: string
   /** Listings that fit the request: matched from the catalog or found on the web. */
@@ -131,6 +131,31 @@ export interface ScanAllowance {
   left_this_hour: number
   per_day: number
   left_today: number
+}
+
+export interface MemberSource {
+  id: string
+  url: string
+  category: OpportunityCategory
+  note: string
+  paused: boolean
+  next_check_at: string | null
+  last_checked_at: string | null
+  last_scan_id: string | null
+  finds: number
+  created_at: string
+}
+
+export interface MemberSources {
+  sources: MemberSource[]
+  max_sources: number
+  check_days: number
+}
+
+export interface MemberSourceIn {
+  url: string
+  category: OpportunityCategory
+  note?: string
 }
 
 export interface ScanRequest {

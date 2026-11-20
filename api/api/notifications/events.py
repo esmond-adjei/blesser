@@ -23,6 +23,9 @@ async def scan_finished(session, scan: scan_models.Scan) -> bool:
         )
     ).scalar() or 0
     found, added = (await find_counts(session, [scan.id])).get(scan.id, (0, 0))
+    if scan.kind == "sources" and found == 0:
+        # A scheduled check of the member's sources that found nothing is not news.
+        return False
     return await notify(
         session,
         user_id=scan.user_id,

@@ -1,5 +1,5 @@
-import { utcMs } from "./format"
-import type { Scan, ScanTaskEvent } from "./types"
+import { formatAgo, utcMs } from "./format"
+import type { MemberSource, Scan, ScanTaskEvent } from "./types"
 
 export type LineKind = "search" | "read" | "save" | "update" | "note" | "other"
 
@@ -132,4 +132,14 @@ export function clock(iso: string | undefined): string {
   const ms = utcMs(iso)
   if (Number.isNaN(ms)) return ""
   return new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
+}
+
+/** "Checked 2d ago, 3 found, next in 5 days", or what happens next for a source. */
+export function sourceStatus(source: MemberSource, now = Date.now()): string {
+  if (source.paused) return "Paused"
+  if (!source.last_checked_at) return "First check within the hour"
+  const next = utcMs(source.next_check_at)
+  const days = Number.isNaN(next) ? null : Math.max(0, Math.ceil((next - now) / 86_400_000))
+  const upcoming = days == null ? "" : days === 0 ? ", next check today" : `, next in ${days} ${days === 1 ? "day" : "days"}`
+  return `Checked ${formatAgo(source.last_checked_at, now)}, ${source.finds} found${upcoming}`
 }

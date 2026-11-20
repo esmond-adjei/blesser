@@ -79,6 +79,7 @@ def user_message(
     known: list[str],
     sites: list[str] | None = None,
     member: bool = False,
+    sources_only: bool = False,
 ) -> str:
     known_block = "\n".join(f"- {k}" for k in known) if known else "(none yet)"
     focus = (focus or "").strip()
@@ -95,7 +96,13 @@ def user_message(
                 if sites
                 else ""
             )
-            + f"{3 if sites else 2}. Search the web for more that fit the request.\n\n"
+            + (
+                "Only read the member's sites and pages they link to: this "
+                "scheduled check does not search the web.\n\n"
+                if sources_only
+                else f"{3 if sites else 2}. Search the web for more that fit the "
+                "request.\n\n"
+            )
         )
     return (
         f"Target region: {region}\n"
@@ -138,7 +145,8 @@ async def run_discover_opportunities(
     """A sweep runs the crawler pipeline, then the agent. A member's scan runs the
     agent on their request first; the pipeline follows only when no sweep exists."""
     category = category_of(task)
-    member = (scan.kind or "member") == "member"
+    # Member scans and scheduled checks of a member's sources serve one member.
+    member = (scan.kind or "member") != "sweep"
     metrics = task.metrics or {}
     if not member and not metrics.get("pipeline_complete"):
         await run_pipeline(session, task, scan, category, on_event)
@@ -160,7 +168,7 @@ async def run_discover_opportunities(
         task.messages_json = None
         await session.commit()
     if (
-        member
+        scan.kind == "member"
         and not (task.metrics or {}).get("pipeline_complete")
         and await _crawler_runs_in_member_scans(session)
     ):
@@ -192,6 +200,7 @@ async def _run_agent(
 
     region = (scan.region or "").strip() or settings.opportunity_default_region
     sites = list(scan.sites or []) if member else []
+    sources_only = scan.kind == "sources"
     message = user_message(
         region=region,
         category=category,
@@ -200,6 +209,7 @@ async def _run_agent(
         known=await _known(session, category, region),
         sites=sites,
         member=member,
+        sources_only=sources_only,
     )
     ctx = ToolContext(session=session, run=scan)
     ctx.category = category
@@ -258,7 +268,9 @@ async def _run_agent(
             "final_text": "Saved: None\nSkipped: Save budget reached.",
             "turns": 0,
         }
-    tools = ["search_web", "fetch_page", "save_opportunity", "reject_candidate"]
+    tools = ["fetch_page", "save_opportunity", "reject_candidate"]
+    if not sources_only:
+        tools.insert(0, "search_web")
     if member:
         tools += ["search_catalogue", "add_catalogue_match"]
     result = await run_agent_task(

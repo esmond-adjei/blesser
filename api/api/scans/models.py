@@ -4,7 +4,17 @@ import enum
 from datetime import datetime
 from typing import ClassVar
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.core.db import Base
@@ -134,3 +144,36 @@ class ScanFind(Base):
     via: Mapped[str] = mapped_column(String, default="agent", server_default="agent")
     # This scan created the listing (it was not in the catalogue before).
     created: Mapped[bool] = mapped_column(default=False, server_default="false")
+
+
+class MemberSource(Base):
+    """A site a member wants checked for opportunities on a schedule ("My sources").
+
+    Private to the member, and kept apart from the staff `sources` registry. Checks
+    run as scans of kind `sources`; a domain that yields saves still becomes a staff
+    source proposal through the usual agent save path.
+    """
+
+    __tablename__ = "member_sources"
+    __table_args__ = (
+        UniqueConstraint("user_id", "url_key", name="uq_member_sources_user_url"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    url: Mapped[str] = mapped_column(Text)
+    url_key: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String)
+    note: Mapped[str] = mapped_column(Text, default="")
+    paused: Mapped[bool] = mapped_column(default=False)
+    next_check_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow_naive, index=True
+    )
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_scan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("scans.id", ondelete="SET NULL")
+    )
+    finds: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)

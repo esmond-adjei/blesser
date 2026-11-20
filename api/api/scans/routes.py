@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
+from api.core.config import settings
 from api.core.db import get_session
 from api.core.ratelimit import enforce_scan_limit
 from api.opportunities.models import OpportunityCategory
-from api.scans import service
+from api.scans import service, sources
 
 router = APIRouter(tags=["scans"])
 
@@ -153,3 +154,94 @@ async def delete_scan(
     current: auth_schemas.UserOut = Depends(get_current_user),
 ):
     return await service.delete_scan(session, current.id, scan_id)
+
+
+# --- My sources -----------------------------------------------------------------
+
+
+class MemberSourceIn(BaseModel):
+    url: str = Field(min_length=3, max_length=2000)
+    category: OpportunityCategory
+    note: str = Field(default="", max_length=500)
+
+
+class MemberSourcePatch(BaseModel):
+    category: OpportunityCategory | None = None
+    note: str | None = Field(default=None, max_length=500)
+    paused: bool | None = None
+
+
+class MemberSourceOut(BaseModel):
+    id: str
+    url: str
+    category: str
+    note: str
+    paused: bool
+    next_check_at: datetime | None
+    last_checked_at: datetime | None
+    last_scan_id: str | None
+    finds: int
+    created_at: datetime
+
+
+class MemberSourcesOut(BaseModel):
+    sources: list[MemberSourceOut]
+    max_sources: int
+    check_days: int
+
+
+@router.get("/sources", response_model=MemberSourcesOut)
+async def list_member_sources(
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """The member's saved sources, checked on a schedule."""
+    rows = await sources.list_sources(session, current.id)
+    return {
+        "sources": [sources.source_out(r) for r in rows],
+        "max_sources": settings.member_sources_max,
+        "check_days": settings.member_source_check_days,
+    }
+
+
+@router.post("/sources", response_model=MemberSourceOut, status_code=201)
+async def add_member_source(
+    req: MemberSourceIn,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    row = await sources.add_source(
+        session, current.id, url=req.url, category=req.category.value, note=req.note
+    )
+    return sources.source_out(row)
+
+
+@router.patch("/sources/{source_id}", response_model=MemberSourceOut)
+async def edit_member_source(
+    source_id: str,
+    req: MemberSourcePatch,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    values = req.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    row = await sources.update_source(session, current.id, source_id, values)
+    return sources.source_out(row)
+
+
+@router.delete("/sources/{source_id}", status_code=204)
+async def delete_member_source(
+    source_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    await sources.delete_source(session, current.id, source_id)
+
+
+@router.post("/sources/check", response_model=list[ScanOut], status_code=202)
+async def check_member_sources(
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Check every active source now; at most once an hour."""
+    started = await sources.check_now(session, current.id)
+    return [await service.scan_detail(session, current.id, s.id) for s in started]

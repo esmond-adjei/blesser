@@ -420,6 +420,10 @@ async def hourly_jobs(session) -> None:
     await auto_archive(session)
     if sweep := await maybe_sweep(session):
         print(f"[worker] started opportunity sweep {sweep[:8]}", flush=True)
+    from api.scans.sources import check_due_sources
+
+    if checks := await check_due_sources(session):
+        print(f"[worker] started {checks} member source check(s)", flush=True)
 
 
 async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
