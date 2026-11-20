@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Chip, Field, Textarea } from "@blesser/ui";
 import * as api from "../lib/api";
+import { ScanTrace } from "../components/ScanTrace";
 import {
   MutationError,
   PageHeader,
@@ -99,38 +100,7 @@ export default function Scans() {
       {starting && <StartScan onClose={() => setStarting(false)} />}
       {current && (
         <Panel title="Scan trace" onClose={() => setSelected(null)}>
-          <div className="section-stack">
-            <h2>
-              {current.categories.join(", ")} in {current.region}
-            </h2>
-            <p>
-              {current.owner_email || "Owner not provided"},{" "}
-              {formatDate(current.created_at)}
-            </p>
-            {current.tasks?.length ? (
-              current.tasks.map((task) => (
-                <section key={task.id} className="section-stack scan-task">
-                  <h3>
-                    {task.task_type}
-                    {task.target ? ` / ${task.target}` : ""}
-                  </h3>
-                  <Chip>{task.status}</Chip>
-                  {task.error && <p className="error">{task.error}</p>}
-                  {task.final_text && (
-                    <p className="whitespace-pre-wrap">{task.final_text}</p>
-                  )}
-                  <pre className="source-excerpt">
-                    {JSON.stringify(task.log, null, 2)}
-                  </pre>
-                </section>
-              ))
-            ) : (
-              <p className="text-ink-secondary">
-                No trace was included in this scan. Running scans refresh every
-                10 seconds.
-              </p>
-            )}
-          </div>
+          <ScanTrace scan={current} />
         </Panel>
       )}
     </>
