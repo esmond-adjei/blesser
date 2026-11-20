@@ -110,8 +110,14 @@ export interface Scan {
   region: string
   categories: OpportunityCategory[]
   focus: string
+  /** Sites the member asked the agent to read first. */
+  sites?: string[]
+  kind?: "member" | "sweep"
   status: "running" | "done" | "cancelled"
   created_at: string
+  /** Listings that fit the request: matched from the catalog or found on the web. */
+  opportunities_found?: number
+  /** Of those, listings new to Blesser. */
   opportunities_added: number
   started_at?: string | null
   finished_at?: string | null
@@ -131,6 +137,7 @@ export interface ScanRequest {
   categories?: OpportunityCategory[]
   region?: string
   focus?: string
+  sites?: string[]
 }
 
 // --- Opportunities, to-dos and calendar ------------------------------------

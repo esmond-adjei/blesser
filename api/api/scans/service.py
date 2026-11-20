@@ -15,6 +15,49 @@ from api.scans import models as m
 from api.scans.notify import notify_work
 
 TASK_TYPE = "discover_opportunities"
+#: Sites a member may ask one scan to read first.
+MAX_SCAN_SITES = 5
+
+
+async def check_sites(raw: list[str]) -> list[str]:
+    """Clean the member's sites: https assumed, public addresses only, no repeats.
+
+    The egress guard runs again on every fetch (redirects included); this check
+    turns a bad address into a clear error before the scan starts.
+    """
+    import httpx
+
+    from api.core import egress
+    from api.core.exceptions import BadRequestError
+    from api.opportunities.page_content import normalized_url
+
+    sites: list[str] = []
+    seen: set[str] = set()
+    for value in raw:
+        site = value.strip()
+        if not site:
+            continue
+        if "://" not in site:
+            site = "https://" + site
+        try:
+            await egress.check_url(site)
+        except httpx.ConnectError as exc:
+            raise BadRequestError(
+                f"We couldn't find {value.strip()}. Check the address.", field="sites"
+            ) from exc
+        except (egress.EgressBlocked, httpx.InvalidURL, ValueError) as exc:
+            raise BadRequestError(
+                f"{value.strip()} isn't a public web address.", field="sites"
+            ) from exc
+        key = normalized_url(site)
+        if key not in seen:
+            seen.add(key)
+            sites.append(site)
+    if len(sites) > MAX_SCAN_SITES:
+        raise BadRequestError(
+            f"Add at most {MAX_SCAN_SITES} sites to one scan.", field="sites"
+        )
+    return sites
 
 
 async def start_scan(
@@ -24,9 +67,14 @@ async def start_scan(
     categories: list[str],
     region: str = "",
     focus: str = "",
+    sites: list[str] | None = None,
+    kind: str = "member",
     commit: bool = True,
 ) -> m.Scan:
-    """Create the scan and queue one discovery task per category. Commits."""
+    """Create the scan and queue one discovery task per category. Commits.
+
+    `sites` must already be checked (`check_sites`): public http(s) addresses only.
+    """
     chosen = set(categories)
     ordered = [c.value for c in OpportunityCategory if c.value in chosen] or [
         c.value for c in OpportunityCategory
@@ -36,6 +84,8 @@ async def start_scan(
         region=region.strip() or settings.opportunity_default_region,
         categories=ordered,
         focus=focus.strip(),
+        kind=kind,
+        sites=list(sites or []),
         status="running",
     )
     session.add(scan)
@@ -110,26 +160,46 @@ def task_out(task: m.ScanTask) -> dict:
     }
 
 
-async def _added_counts(session, scan_ids: list[str]) -> dict[str, int]:
+def _visible_find():
+    """Finds a member may see: published listings, and ones this scan created that
+    wait for review."""
+    return (Opportunity.status == "published") | (
+        m.ScanFind.created.is_(True) & (Opportunity.status == "in_review")
+    )
+
+
+async def find_counts(session, scan_ids: list[str]) -> dict[str, tuple[int, int]]:
+    """{scan_id: (listings found for the member, of which new to the catalogue)}."""
     if not scan_ids:
         return {}
     rows = await session.execute(
-        select(Opportunity.scan_id, func.count())
-        .where(Opportunity.scan_id.in_(scan_ids))
-        .group_by(Opportunity.scan_id)
+        select(
+            m.ScanFind.scan_id,
+            func.count(),
+            func.count().filter(m.ScanFind.created.is_(True)),
+        )
+        .join(Opportunity, Opportunity.id == m.ScanFind.opportunity_id)
+        .where(m.ScanFind.scan_id.in_(scan_ids), _visible_find())
+        .group_by(m.ScanFind.scan_id)
     )
-    return dict(rows.all())
+    return {scan_id: (found, new) for scan_id, found, new in rows.all()}
 
 
-def _scan_out(scan: m.Scan, added: int, tasks: list[m.ScanTask] | None = None) -> dict:
+def _scan_out(
+    scan: m.Scan, counts: tuple[int, int], tasks: list[m.ScanTask] | None = None
+) -> dict:
+    found, added = counts
     out = {
         "metrics": aggregate_metrics(tasks or []),
         "id": scan.id,
         "region": scan.region,
         "categories": scan.categories or [],
         "focus": scan.focus,
+        "sites": scan.sites or [],
+        "kind": scan.kind,
         "status": scan.status,
         "created_at": scan.created_at,
+        "opportunities_found": found,
         "opportunities_added": added,
     }
     if tasks is not None:
@@ -181,7 +251,7 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
         .scalars()
         .all()
     )
-    added = await _added_counts(session, [s.id for s in scans])
+    counts = await find_counts(session, [s.id for s in scans])
     tasks = (
         (
             await session.execute(
@@ -193,7 +263,7 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
     )
     result = []
     for scan in scans:
-        out = _scan_out(scan, added.get(scan.id, 0))
+        out = _scan_out(scan, counts.get(scan.id, (0, 0)))
         mine = [t for t in tasks if t.scan_id == scan.id]
         out["metrics"] = aggregate_metrics(mine)
         out.update(_timing(scan, mine))
@@ -227,19 +297,16 @@ async def _scan_finds(session, scan: m.Scan) -> list[dict]:
         .exists()
     )
     rows = await session.execute(
-        select(Opportunity, m.ScanFind.source_url, seen.label("seen"))
-        .join(m.ScanFind, m.ScanFind.opportunity_id == Opportunity.id)
-        .where(
-            m.ScanFind.scan_id == scan.id,
-            (Opportunity.status == "published")
-            | ((Opportunity.scan_id == scan.id) & (Opportunity.status == "in_review")),
+        select(
+            Opportunity, m.ScanFind.source_url, m.ScanFind.created, seen.label("seen")
         )
-        .order_by(m.ScanFind.found_at, Opportunity.id)
+        .join(m.ScanFind, m.ScanFind.opportunity_id == Opportunity.id)
+        .where(m.ScanFind.scan_id == scan.id, _visible_find())
+        .order_by(m.ScanFind.created.desc(), m.ScanFind.found_at, Opportunity.id)
     )
     finds = []
-    for opportunity, found_url, already_seen in rows:
-        from_web = opportunity.scan_id == scan.id
-        source_url, domain = _web_url(found_url if from_web else opportunity.source_url)
+    for opportunity, found_url, created, already_seen in rows:
+        source_url, domain = _web_url(found_url if created else opportunity.source_url)
         official_url, _ = _web_url(opportunity.link)
         finds.append(
             {
@@ -249,8 +316,8 @@ async def _scan_finds(session, scan: m.Scan) -> list[dict]:
                 "category": opportunity.category,
                 "kind": opportunity.kind,
                 "deadline_date": opportunity.deadline_date,
-                "source": "web" if from_web else "catalog",
-                "source_domain": domain if from_web else None,
+                "source": "web" if created else "catalog",
+                "source_domain": domain if created else None,
                 "official_url": official_url or source_url,
                 "is_new": not already_seen,
                 "in_review": opportunity.status == "in_review",
@@ -266,8 +333,8 @@ async def scan_detail(session, user_id: str, scan_id: str) -> dict:
         .scalars()
         .all()
     )
-    added = await _added_counts(session, [scan.id])
-    out = _scan_out(scan, added.get(scan.id, 0), list(tasks))
+    counts = await find_counts(session, [scan.id])
+    out = _scan_out(scan, counts.get(scan.id, (0, 0)), list(tasks))
     out["finds"] = await _scan_finds(session, scan)
     return out
 
@@ -330,7 +397,10 @@ async def scan_allowance(session, user_id: str) -> dict:
         used = await session.scalar(
             select(func.count())
             .select_from(m.Scan)
-            .where(m.Scan.user_id == user_id, m.Scan.created_at > now - timedelta(seconds=seconds))
+            .where(
+                m.Scan.user_id == user_id,
+                m.Scan.created_at > now - timedelta(seconds=seconds),
+            )
         )
         left[key] = max(0, limits[key] - (used or 0))
     return {

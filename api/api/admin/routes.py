@@ -630,6 +630,7 @@ async def start_scan(
         categories=[c.value for c in req.categories],
         region=req.region,
         focus=req.focus,
+        sites=await scans.check_sites(req.sites),
         commit=False,
     )
     await service.write_audit(
