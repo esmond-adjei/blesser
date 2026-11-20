@@ -40,7 +40,6 @@ def compose(
     paragraphs: list[str],
     action: tuple[str, str] | None = None,
     items: list[Item] | None = None,
-    eyebrow: str | None = None,
     note: str | None = None,
     footer: Footer | None = None,
 ) -> Mail:
@@ -48,7 +47,7 @@ def compose(
         to=to,
         subject=subject,
         text=_text(heading, paragraphs, action, items or [], note, footer),
-        html=_html(subject, heading, paragraphs, action, items or [], eyebrow, note, footer),
+        html=_html(subject, heading, paragraphs, action, items or [], note, footer),
     )
 
 
@@ -76,15 +75,6 @@ def _text(heading, paragraphs, action, items, note, footer) -> str:
 
 def _p(text: str, style: str, margin: str = "0 0 16px") -> str:
     return f'<p style="margin:{margin};{style}">{escape(text)}</p>'
-
-
-def _eyebrow(label: str) -> str:
-    return (
-        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px">'
-        f'<tr><td bgcolor="{t.SUN_SOFT}" style="background:{t.SUN_SOFT};border-radius:{t.RADIUS_FULL};padding:4px 12px;'
-        f'font-family:{SANS};font-size:12px;font-weight:600;line-height:16px;letter-spacing:0.02em;color:{t.SUN_INK}">'
-        f"{escape(label)}</td></tr></table>"
-    )
 
 
 def _button(label: str, url: str) -> str:
@@ -124,9 +114,8 @@ def _items(items: list[Item]) -> str:
     )
 
 
-def _html(subject, heading, paragraphs, action, items, eyebrow, note, footer) -> str:
-    body = _eyebrow(eyebrow) if eyebrow else ""
-    body += (
+def _html(subject, heading, paragraphs, action, items, note, footer) -> str:
+    body = (
         f'<h1 style="margin:0 0 12px;font-family:{DISPLAY};font-size:26px;font-weight:700;line-height:32px;'
         f'letter-spacing:-0.015em;color:{t.INK}">{escape(heading)}</h1>'
     )

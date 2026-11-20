@@ -88,7 +88,6 @@ function Shell() {
     <NavLink to="/review" className="wordmark" aria-label="Blesser admin home">
       <Logo title="" />
       <Wordmark />
-      <span className="wordmark-tag">Admin</span>
     </NavLink>
   );
   return (

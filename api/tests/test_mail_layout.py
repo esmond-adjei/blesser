@@ -29,16 +29,16 @@ def test_mail_follows_the_copy_rules_and_brand_tokens():
     mail = compose(
         to="a@example.com",
         subject="Digest",
-        eyebrow="Daily digest",
         heading="You have 2 unread notifications",
         paragraphs=["Here is what happened in the last day."],
         items=[Item("One", "first"), Item("Two", "second", "https://x.test/2")],
+        action=("Open your inbox", "https://x.test/"),
         footer=Footer("Why you got this.", [("Stop", "https://x.test/s"), ("Settings", "https://x.test/p")]),
     )
     assert mail.html
     # No middle dots or em dashes anywhere, footer links included.
     assert "·" not in mail.html and "—" not in mail.html and "&middot;" not in mail.html
-    assert mail_tokens.SUN_SOFT in mail.html and mail_tokens.SURFACE_SUNK in mail.html
+    assert mail_tokens.SUN in mail.html and mail_tokens.SURFACE_SUNK in mail.html
     assert 'alt="Blesser"' in mail.html
 
 

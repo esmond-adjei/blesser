@@ -271,24 +271,21 @@
   }
   .counts-bar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     margin-bottom: 24px;
-    border: 1px solid var(--separator);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow: var(--elevation-1);
-    overflow: hidden;
+    border-block: 1px solid var(--separator);
   }
   .counts-bar > div {
     display: grid;
     gap: 4px;
     padding: 16px 20px;
     border-left: 1px solid var(--separator);
-    margin-left: -1px;
   }
   .counts-bar > :first-child {
-    background: var(--sun-soft);
+    padding-left: 0;
+    border-left: 0;
   }
+  .counts-bar > :first-child strong,
   .counts-bar > :first-child span {
     color: var(--sun-ink);
   }
@@ -307,7 +304,7 @@
   }
   .counts-bar > [role="status"],
   .counts-bar > button {
-    margin: 16px 20px;
+    margin: 16px 0;
   }
   .tabs {
     display: flex;
@@ -363,7 +360,7 @@
     border: 1px solid var(--input-border-hover);
     border-bottom-width: 2px;
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 16px;
     text-align: center;
     color: var(--ink);
@@ -873,11 +870,11 @@
   .signin-sun {
     position: absolute;
     left: 50%;
-    bottom: -150px;
-    width: 300px;
-    height: 300px;
-    margin-left: -150px;
-    border-radius: 50%;
+    bottom: 0;
+    width: 280px;
+    height: 140px;
+    margin-left: -140px;
+    border-radius: 140px 140px 0 0;
     background: var(--sun);
   }
   .signin-form {
@@ -1008,10 +1005,10 @@
   .counts-bar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .counts-bar > div {
-    padding: 12px 14px;
-    border-top: 1px solid var(--separator);
-    margin-top: -1px;
+  .counts-bar > div,
+  .counts-bar > :first-child {
+    padding: 12px 0;
+    border-left: 0;
   }
   .shortcut-legend {
     display: none;
@@ -1040,10 +1037,10 @@
     margin-bottom: 96px;
   }
   .signin-sun {
-    width: 200px;
-    height: 200px;
-    margin-left: -100px;
-    bottom: -110px;
+    width: 180px;
+    height: 90px;
+    margin-left: -90px;
+    border-radius: 90px 90px 0 0;
   }
   .signin-form {
     padding: 8px 4px 24px;
