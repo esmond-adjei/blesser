@@ -59,6 +59,13 @@ const ldJson = (o: object) => JSON.stringify(o).replace(/</g, "\\u003c")
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content={ogImage} />
     {ld.map((o) => <script type="application/ld+json" set:html={ldJson(o)} />)}
+    {/* The header logo plays its Sunrise once per visit; later pages show it still. */}
+    <script is:inline>
+      try {
+        if (sessionStorage.getItem("bl-sunrise")) document.documentElement.classList.add("bl-motion-seen")
+        else sessionStorage.setItem("bl-sunrise", "1")
+      } catch {}
+    </script>
   </head>
   <body class="flex min-h-dvh flex-col bg-canvas text-ink">
     <a
