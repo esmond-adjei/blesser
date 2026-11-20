@@ -1,5 +1,5 @@
 // Renders motion/horizon.html to MP4 at 60fps, one screenshot per frame, then encodes with ffmpeg.
-// Needs ffmpeg on PATH and a Chromium: CHROMIUM_PATH=/path/to/chrome node scripts/render-intro.mjs
+// Needs ffmpeg on PATH and a Chromium: CHROMIUM_PATH=/path/to/chrome node scripts/render-intro.mjs [texture=rings|none]
 // Writes assets/motion/blesser-intro-16x9.mp4, -1x1.mp4 and a poster PNG for each.
 import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
@@ -15,9 +15,13 @@ const page_url = new URL("../motion/horizon.html", import.meta.url).href
 const out = join(root, "assets/motion")
 mkdirSync(out, { recursive: true })
 
+// Pass texture=rings or texture=none to render the other grounds (files get a suffix).
+const texture = process.argv.find((a) => a.startsWith("texture="))?.slice(8)
+const suffix = texture && texture !== "grain" ? `-${texture}` : ""
+const extra = texture ? `texture=${texture}` : ""
 const cuts = [
-  { name: "16x9", query: "", width: 1920, height: 1080 },
-  { name: "1x1", query: "?ratio=square", width: 1080, height: 1080 },
+  { name: `16x9${suffix}`, query: `?${extra}`, width: 1920, height: 1080 },
+  { name: `1x1${suffix}`, query: `?ratio=square&${extra}`, width: 1080, height: 1080 },
 ]
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ["--no-sandbox"] })

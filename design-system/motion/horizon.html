@@ -2,7 +2,8 @@
 <!--
   "From the horizon": the social intro. Rendered to video by scripts/render-intro.mjs,
   which calls window.seek(ms) for each frame. Open it in a browser to watch it play.
-  ?ratio=square gives the 1:1 cut; ?tagline=0 drops the line under the lockup.
+  ?ratio=square gives the 1:1 cut; ?tagline=0 drops the line under the lockup;
+  ?texture=grain (default), rings or none sets the ground.
 -->
 <html lang="en">
 <head>
@@ -15,13 +16,23 @@
     src: url("../../node_modules/@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2") format("woff2");
   }
   html, body { margin: 0; height: 100%; background: #0f4f3b; overflow: hidden; }
-  svg { display: block; width: 100vw; height: 100vh; }
+  svg { position: relative; display: block; width: 100vw; height: 100vh; }
+  /* A still, fine grain on the forest ground only; the logo stays clean on top. */
+  .grain {
+    position: fixed;
+    inset: 0;
+    opacity: var(--grain-opacity, 0.22);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncG type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncB type='linear' slope='2.4' intercept='-0.7'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: calc(360px * var(--grain-scale, 1));
+  }
   text { font-family: "Figtree Variable", Figtree, sans-serif; }
 </style>
 </head>
 <body>
+<div class="grain" hidden></div>
 <svg id="scene" role="img" aria-label="Blesser. Opportunities, made visible.">
-  <rect width="100%" height="100%" fill="#0f4f3b" />
+  <g id="rings" fill="none" stroke="#ffffff" stroke-opacity="0.045" hidden></g>
   <defs><clipPath id="name-clip"><rect id="name-window" /></clipPath></defs>
   <svg id="mark" viewBox="0 0 32 32" overflow="visible">
     <path id="sun" d="M9 18a7 7 0 0 1 14 0Z" fill="#ffbe1a" />
@@ -36,7 +47,9 @@
   // Timings match the storyboard. Easing matches --ease-out in design-system/src/motion.css.
   const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)"
   const EASE_IN_OUT = "cubic-bezier(0.65, 0, 0.35, 1)"
-  const TOTAL = 2800
+  // A soft start and a long settle, so the steps, sun and name unfold as one movement.
+  const EASE_UNFOLD = "cubic-bezier(0.37, 0, 0.18, 1)"
+  const TOTAL = 3200
   const params = new URLSearchParams(location.search)
   const square = params.get("ratio") === "square"
   const W = square ? 180 : 320, H = 180
@@ -75,6 +88,23 @@
     tagline.setAttribute("font-size", square ? 8.5 : 9.5)
     if (params.get("tagline") === "0") tagline.remove()
 
+    const texture = params.get("texture") || "grain"
+    if (texture === "grain") {
+      const grain = document.querySelector(".grain")
+      grain.hidden = false
+      grain.style.setProperty("--grain-scale", Math.max(1, innerWidth / 1920).toString())
+    }
+    if (texture === "rings") {
+      // Faint horizon lines spreading out from where the big sun rises.
+      const rings = document.getElementById("rings")
+      rings.hidden = false
+      for (let r = 76; r < Math.hypot(W / 2, H) + 20; r += 20) {
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle")
+        Object.entries({ cx: W / 2, cy: H, r, "stroke-width": 0.5 }).forEach(([k, v]) => c.setAttribute(k, v))
+        rings.appendChild(c)
+      }
+    }
+
     // The big sun sits on the frame's bottom edge like the admin sign-in, then gathers into the mark.
     const r = square ? 50 : 56
     const k = r / (7 * s)
@@ -90,20 +120,20 @@
         { t: 0, transform: at(W / 2, H + r + 2), ease: EASE_OUT },
         { t: 600, transform: at(W / 2, H) },
         { t: 700, transform: at(W / 2, H), ease: EASE_IN_OUT },
-        { t: 1500, transform: "translate(0px, 0px) scale(1)" },
+        { t: 1600, transform: "translate(0px, 0px) scale(1)" },
       ]),
       ...[...document.querySelectorAll(".step")].map((step, i) =>
         track(step, [
-          { t: 1250 + i * 70, transform: "translateY(3px)", opacity: 0, ease: EASE_OUT },
-          { t: 1530 + i * 70, transform: "translateY(0px)", opacity: 1 },
+          { t: 1350 + i * 110, transform: "translateY(3px)", opacity: 0, ease: EASE_UNFOLD },
+          { t: 1790 + i * 110, transform: "translateY(0px)", opacity: 1 },
         ]),
       ),
       track(name, [
-        { t: 1550, transform: "translateX(-22px)", opacity: 0, ease: EASE_OUT },
-        { t: 1950, transform: "translateX(0px)", opacity: 1 },
+        { t: 1850, transform: "translateX(-22px)", opacity: 0, ease: EASE_UNFOLD },
+        { t: 2450, transform: "translateX(0px)", opacity: 1 },
       ]),
     ]
-    if (tagline.isConnected) anims.push(track(tagline, [{ t: 2050, opacity: 0, ease: EASE_OUT }, { t: 2400, opacity: 0.85 }]))
+    if (tagline.isConnected) anims.push(track(tagline, [{ t: 2550, opacity: 0, ease: EASE_UNFOLD }, { t: 3000, opacity: 0.85 }]))
     return anims
   }
 
