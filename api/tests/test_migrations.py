@@ -301,7 +301,7 @@ def test_editorial_migration_preserves_data_and_reverses_states():
 def test_listing_freshness_rekeys_cycles_and_parks_collisions():
     with _scratch_db() as url:
         cfg = _cfg(url)
-        command.upgrade(cfg, "0008_assistant")
+        command.upgrade(cfg, "0010_ghana_sources")
         _run(
             _fetch(
                 url,
@@ -334,5 +334,5 @@ def test_listing_freshness_rekeys_cycles_and_parks_collisions():
         }
         aliases = _run(_fetch(url, "SELECT count(*) AS n FROM organization_aliases"))
         assert aliases[0]["n"] > 0
-        command.downgrade(cfg, "0008_assistant")
+        command.downgrade(cfg, "0010_ghana_sources")
         command.upgrade(cfg, "head")

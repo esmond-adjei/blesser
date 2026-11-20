@@ -63,6 +63,14 @@ class Settings(BaseSettings):
     crawl_max_items_per_source: int = 40
     crawl_max_candidates_per_task: int = 8
     crawl_host_interval_seconds: float = 2.0
+    # PDF calls (opportunities/pdf_text.py): download cap, pages and characters
+    # read, and the parser child's wall-clock, memory and concurrency limits.
+    pdf_max_bytes: int = 10_000_000
+    pdf_max_pages: int = 40
+    pdf_max_chars: int = 400_000
+    pdf_timeout_seconds: float = 30.0
+    pdf_memory_mb: int = 768
+    pdf_concurrency: int = 2
     extraction_max_chars: int = 10000
     extraction_min_confidence: float = 0.85
     discovery_no_yield_turns: int = 5

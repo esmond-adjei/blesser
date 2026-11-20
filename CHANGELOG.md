@@ -16,5 +16,7 @@
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.
 - The web app builds on Node 26 LTS.
+- The crawler reads the newest pages first: feed items by publish date, sitemaps by last-updated date, then sources that have produced saves. Duplicate URL checks use a stored, indexed normalized URL.
+- The crawler reads PDF calls in a sandboxed parser with size, page, time and memory limits, and ten more Ghana sources are seeded: the Ghana Scholarships Authority, University of Ghana and KNUST notices, AREF, the Japan embassy and GREAT Scholarships (GEA and GETFund are seeded disabled).
 - Listings stay current: the worker re-checks listing pages on a schedule (unchanged pages without a model, changed ones with an agent), sends lost pages to review, archives undated listings nothing has confirmed for 120 days, and reopens a closed listing when its page opens a new cycle.
 - Fewer duplicates: the dedupe key ignores years, cycle words and words like "Foundation", organization aliases cover other names, and a Duplicates page in the admin console lists likely pairs to merge or dismiss. Merging moves tracking, to-dos, reports and links to the kept listing.

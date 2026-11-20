@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    event,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -108,6 +109,9 @@ class Opportunity(Base):
     # Where to apply, and the page the facts were read from (may be the same).
     link: Mapped[str] = mapped_column(String, default="")
     source_url: Mapped[str] = mapped_column(String, default="", index=True)
+    # normalized_url() of link and source_url, kept in step by the hooks below.
+    link_key: Mapped[str] = mapped_column(String, default="", index=True)
+    source_url_key: Mapped[str] = mapped_column(String, default="", index=True)
     status: Mapped[str] = mapped_column(
         String, default=OpportunityStatus.published.value, index=True
     )
@@ -176,3 +180,20 @@ class DuplicateDismissal(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+def url_keys(link: str, source_url: str) -> tuple[str, str]:
+    from api.opportunities.page_content import normalized_url
+
+    return (
+        normalized_url(link) if link else "",
+        normalized_url(source_url) if source_url else "",
+    )
+
+
+@event.listens_for(Opportunity, "before_insert")
+@event.listens_for(Opportunity, "before_update")
+def _sync_url_keys(_mapper, _connection, target: Opportunity) -> None:
+    target.link_key, target.source_url_key = url_keys(
+        target.link or "", target.source_url or ""
+    )

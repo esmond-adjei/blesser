@@ -340,13 +340,21 @@ async def upsert_from_agent(
         )
     opp = await find_by_key(session, key)
     if opp is None:
-        rows = (await session.execute(select(m.Opportunity))).scalars().all()
-        for row in rows:
-            if any(
-                value and normalized_url(value) in urls
-                for value in (row.source_url, row.link)
-            ):
-                return row, False, []
+        same_page = (
+            await session.execute(
+                select(m.Opportunity)
+                .where(
+                    or_(
+                        m.Opportunity.source_url_key.in_(urls),
+                        m.Opportunity.link_key.in_(urls),
+                    )
+                )
+                .order_by(m.Opportunity.created_at, m.Opportunity.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if same_page is not None:
+            return same_page, False, []
     if opp is None:
         from api.editorial.service import get_settings, new_slug
 

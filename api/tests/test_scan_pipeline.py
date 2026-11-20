@@ -865,3 +865,131 @@ def test_cache_lease_recovers_and_discards_stale_completion(monkeypatch, superse
         )
 
     run(check())
+
+
+def test_sitemaps_keep_the_most_recently_changed_pages():
+    raw = (
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "<url><loc>https://example.org/old</loc><lastmod>2019-01-01</lastmod></url>"
+        "<url><loc>https://example.org/undated</loc></url>"
+        "<url><loc>https://example.org/new</loc><lastmod>2026-11-01T10:00:00+00:00</lastmod></url>"
+        "<url><loc>https://example.org/mid</loc><lastmod>2024-05-05</lastmod></url>"
+        "</urlset>"
+    )
+    items, _ = crawler.parse_items(raw, "https://example.org/", "sitemap", 2)
+    assert [item["url"] for item in items] == [
+        "https://example.org/new",
+        "https://example.org/mid",
+    ]
+    assert items[0]["published_date"] == date(2026, 11, 1)
+    index = (
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "<sitemap><loc>https://example.org/a.xml</loc><lastmod>2020-01-01</lastmod></sitemap>"
+        "<sitemap><loc>https://example.org/b.xml</loc><lastmod>2026-01-01</lastmod></sitemap>"
+        "</sitemapindex>"
+    )
+    _, maps = crawler.parse_items(index, "https://example.org/", "sitemap", 5)
+    assert maps == ["https://example.org/b.xml", "https://example.org/a.xml"]
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://www.facebook.com/grants",
+        "https://m.facebook.com/grants",
+        "https://WWW.LinkedIn.com/company/x",
+        "https://youtube.com/watch?v=1",
+    ],
+)
+def test_social_hosts_are_navigation_with_or_without_www(link):
+    from api.opportunities.triage import triage_url
+
+    async def check():
+        async with SessionLocal() as session:
+            candidate = CrawlCandidate(url=link, dedupe_key="")
+            assert await triage_url(session, candidate) == "navigation"
+
+    run(check())
+
+
+def test_trimmed_text_keeps_lines_naming_the_scan_region(monkeypatch):
+    monkeypatch.setattr(extraction.settings, "extraction_max_chars", 200)
+    filler = "\n".join("Unrelated line about the weather." for _ in range(40))
+    page = Page(
+        url="https://example.org/x",
+        title="x",
+        text=filler + "\nOpen to applicants from Kenya and Uganda.",
+        content_hash="h",
+    )
+    assert "Kenya" in extraction.trimmed_text(page, "Kenya")
+    assert "Kenya" not in extraction.trimmed_text(page, "Ghana")
+
+
+def test_claims_prefer_newest_items_then_productive_sources():
+    async def check():
+        async with SessionLocal() as session:
+            good = Source(
+                url=url(), kind="rss", candidates_found=10, opportunities_saved=8
+            )
+            poor = Source(
+                url=url(), kind="rss", candidates_found=10, opportunities_saved=0
+            )
+            session.add_all([good, poor])
+            await session.flush()
+            rows = {
+                "old_dated": CrawlCandidate(
+                    url=url(), published_date=date(2025, 1, 1), source_id=poor.id
+                ),
+                "new_dated": CrawlCandidate(
+                    url=url(), published_date=date(2026, 11, 1), source_id=poor.id
+                ),
+                "undated_poor": CrawlCandidate(url=url(), source_id=poor.id),
+                "undated_good": CrawlCandidate(url=url(), source_id=good.id),
+            }
+            session.add_all(rows.values())
+            await session.flush()
+            ordered = (
+                (
+                    await session.execute(
+                        select(CrawlCandidate.id)
+                        .outerjoin(Source, Source.id == CrawlCandidate.source_id)
+                        .where(CrawlCandidate.id.in_([r.id for r in rows.values()]))
+                        .order_by(*pipeline.claim_order())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            names = {row.id: name for name, row in rows.items()}
+            assert [names[i] for i in ordered] == [
+                "new_dated",
+                "old_dated",
+                "undated_good",
+                "undated_poor",
+            ]
+            await session.rollback()
+
+    run(check())
+
+
+def test_opportunity_url_keys_follow_edits():
+    async def check():
+        async with SessionLocal() as session:
+            base = url()
+            opp = service.m.Opportunity(
+                title="Key Test",
+                category="startup",
+                dedupe_key="key-test|" + base,
+                source_url=base + "/?utm_source=x",
+                link="",
+            )
+            session.add(opp)
+            await session.flush()
+            assert opp.source_url_key == normalized_url(base)
+            assert await duplicate_url(session, "https://www." + base[8:] + "/")
+            opp.link = base + "/apply"
+            await session.flush()
+            assert await duplicate_url(session, base + "/apply?utm_medium=y")
+            await session.rollback()
+
+    run(check())

@@ -13,8 +13,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0009_listing_freshness"
-down_revision = "0008_assistant"
+revision = "0011_listing_freshness"
+down_revision = "0010_ghana_sources"
 branch_labels = None
 depends_on = None
 
