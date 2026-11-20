@@ -159,7 +159,12 @@ async def handle_save_opportunity(
         target = await opp_service.get_or_404(
             ctx.session, ctx.reverify_id, public=False
         )
-        if opp_service.dedupe_key(data.organization, data.title) != target.dedupe_key:
+        from api.opportunities.dedupe import key_for
+
+        if (
+            await key_for(ctx.session, data.organization, data.title)
+            != target.dedupe_key
+        ):
             return {"error": "Only the requested opportunity may be re-verified."}
     pages = getattr(ctx, "fetched_pages", None) or {}
     if error := validate_grounding(data, pages):

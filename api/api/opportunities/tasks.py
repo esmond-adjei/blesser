@@ -298,12 +298,22 @@ async def member_only_hosts(session, sites: list[str]) -> set[str]:
 async def run_reverify_opportunity(
     session, task, scan, on_event=None, resume_messages=None, on_checkpoint=None
 ):
+    from api.core.time import utcnow_naive
+    from api.opportunities.freshness import record_agent_check
+
     row = await opp_service.get_or_404(session, task.target, public=False)
+    started = utcnow_naive()
     ctx = ToolContext(session=session, run=scan)
     ctx.reverify_id = row.id
-    return await run_agent_task(
+    cycle = (
+        " It closed earlier: if the page now advertises a new cycle, save it with that"
+        " cycle's title and deadline; otherwise do not save."
+        if row.status == m.OpportunityStatus.archived.value
+        else ""
+    )
+    result = await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
-        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url}. Save only this opportunity if the source still confirms it. Today: {opp_service.today().isoformat()}.",
+        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url or row.link}. Save only this opportunity if the source still confirms it.{cycle} Today: {opp_service.today().isoformat()}.",
         ctx,
         on_event=on_event,
         resume_messages=resume_messages,
@@ -311,3 +321,6 @@ async def run_reverify_opportunity(
         tools=["fetch_page", "save_opportunity"],
         progress_tools={"save_opportunity"},
     )
+    await record_agent_check(session, task, started)
+    await session.commit()
+    return result

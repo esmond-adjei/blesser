@@ -8,21 +8,18 @@ from api.applications import service as application_service
 from api.applications.dates import parse_deadline
 from api.core.exceptions import ConflictError, NotFoundError
 from api.core.time import utcnow_naive
+from api.opportunities import dedupe, schemas
 from api.opportunities import models as m
-from api.opportunities import schemas
+from api.opportunities.dedupe import normalize
 
 #: Days ahead that count as "closing soon".
 CLOSING_SOON_DAYS = 14
 MAX_PAGE = 100
 
 
-def normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", (text or "").lower())).strip()
-
-
-def dedupe_key(organization: str, title: str) -> str:
-    """One row per real opportunity, whoever finds it and however they case it."""
-    return f"{normalize(organization)}|{normalize(title)}"
+def dedupe_key(organization: str, title: str, aliases: dict | None = None) -> str:
+    """One row per real opportunity, whoever finds it, however they case it, whatever the cycle."""
+    return dedupe.dedupe_key(organization, title, aliases)
 
 
 def today() -> date:
@@ -73,6 +70,8 @@ def to_out(opp: m.Opportunity, on: date | None = None) -> dict:
         "status": opp.status,
         "source": opp.source,
         "verified_at": opp.verified_at,
+        "checked_at": opp.checked_at,
+        "check_outcome": opp.check_outcome or "",
         "created_at": opp.created_at,
         "updated_at": opp.updated_at,
         "is_open": is_open(opp, on),
@@ -92,8 +91,8 @@ def _published():
     return m.Opportunity.status == m.OpportunityStatus.published.value
 
 
-async def list_public(
-    session,
+def catalogue_filters(
+    on: date,
     *,
     q: str = "",
     category: str | None = None,
@@ -101,14 +100,13 @@ async def list_public(
     country: str | None = None,
     open_only: bool = True,
     closing_within: int | None = None,
-    sort: str = "deadline",
-    limit: int = 30,
-    offset: int = 0,
     public_only: bool = False,
     new: bool = False,
     audience: str | None = None,
-) -> dict:
-    on = today()
+) -> list:
+    """WHERE clauses for published listings; shared by the list and saved-search alerts."""
+    from api.matching import service as matching
+
     filters = [_published()]
     if public_only:
         filters.append(m.Opportunity.audience == "public")
@@ -134,24 +132,74 @@ async def list_public(
         filters.append(m.Opportunity.deadline_date.is_not(None))
         filters.append(m.Opportunity.deadline_date >= on)
         filters.append(m.Opportunity.deadline_date <= _plus_days(on, closing_within))
-    for word in [w for w in (q or "").split() if w][:8]:
-        like = f"%{word}%"
-        filters.append(
-            or_(
-                m.Opportunity.title.ilike(like),
-                m.Opportunity.organization.ilike(like),
-                m.Opportunity.summary.ilike(like),
-                m.Opportunity.eligibility.ilike(like),
-                cast(m.Opportunity.tags, String).ilike(like),
-            )
-        )
+    tsquery = matching.search_query(q)
+    if tsquery is not None:
+        filters.append(matching.search_clause(tsquery))
+    return filters
+
+
+async def list_public(
+    session,
+    *,
+    q: str = "",
+    category: str | None = None,
+    kind: str | None = None,
+    country: str | None = None,
+    open_only: bool = True,
+    closing_within: int | None = None,
+    sort: str = "deadline",
+    limit: int = 30,
+    offset: int = 0,
+    public_only: bool = False,
+    new: bool = False,
+    audience: str | None = None,
+    match=None,
+) -> dict:
+    """One page of published listings.
+
+    sort is "deadline", "new", "relevance" (needs q; falls back to deadline) or
+    "for_you" (needs `match`, a matching.service.Prefs; falls back to deadline).
+    """
+    from api.matching import service as matching
+
+    on = today()
+    filters = catalogue_filters(
+        on,
+        q=q,
+        category=category,
+        kind=kind,
+        country=country,
+        open_only=open_only,
+        closing_within=closing_within,
+        public_only=public_only,
+        new=new,
+        audience=audience,
+    )
+    tsquery = matching.search_query(q)
+    for_you = sort == "for_you" and match is not None
+    if for_you:
+        filters.append(matching.country_gate(match))
     total = (
         await session.execute(
             select(func.count()).select_from(m.Opportunity).where(*filters)
         )
     ).scalar_one()
     stmt = select(m.Opportunity).where(*filters)
-    if sort == "new":
+    if for_you:
+        score, terms = matching.score_columns(match)
+        stmt = stmt.add_columns(score, terms).order_by(
+            score.desc(),
+            m.Opportunity.deadline_date.asc().nulls_last(),
+            m.Opportunity.created_at.desc(),
+            m.Opportunity.id,
+        )
+    elif sort == "relevance" and tsquery is not None:
+        stmt = stmt.order_by(
+            matching.search_rank(tsquery).desc(),
+            m.Opportunity.deadline_date.asc().nulls_last(),
+            m.Opportunity.id,
+        )
+    elif sort == "new":
         stmt = stmt.order_by(m.Opportunity.created_at.desc(), m.Opportunity.id)
     else:
         # Soonest real deadline first; rolling and undated after them.
@@ -161,12 +209,15 @@ async def list_public(
             m.Opportunity.id,
         )
     limit = max(1, min(limit, MAX_PAGE))
-    rows = (
-        (await session.execute(stmt.offset(max(offset, 0)).limit(limit)))
-        .scalars()
-        .all()
-    )
-    return {"items": [to_out(r, on) for r in rows], "total": total}
+    result = await session.execute(stmt.offset(max(offset, 0)).limit(limit))
+    if for_you:
+        items = [
+            {**to_out(r, on), "match_score": round(float(sc), 2), "match_terms": list(t or [])}
+            for r, sc, t in result.all()
+        ]
+    else:
+        items = [to_out(r, on) for r in result.scalars().all()]
+    return {"items": items, "total": total}
 
 
 def _plus_days(on: date, days: int) -> date:
@@ -255,9 +306,15 @@ async def find_by_key(session, key: str) -> m.Opportunity | None:
     ).scalar_one_or_none()
 
 
+async def blocks_save(session, key: str) -> bool:
+    """A listing with this key exists and is not a closed one a new cycle could reopen."""
+    row = await find_by_key(session, key)
+    return row is not None and row.status != m.OpportunityStatus.archived.value
+
+
 async def submit(session, user_id: str | None, data: schemas.OpportunitySubmit) -> dict:
     """Share an opportunity using the editorial publishing default."""
-    key = dedupe_key(data.organization, data.title)
+    key = await dedupe.key_for(session, data.organization, data.title)
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(key))))
     existing = await find_by_key(session, key)
     if existing is not None:
@@ -325,7 +382,7 @@ async def upsert_from_agent(
     A `review_note` (a find from a member-supplied site) holds a new listing for
     staff review, whatever the editorial default, with the note for the editor.
     """
-    key = dedupe_key(data.organization, data.title)
+    key = await dedupe.key_for(session, data.organization, data.title)
     now = utcnow_naive()
     deadline_date = parse_deadline(data.deadline)
     # Parallel scan tasks can find the same opportunity: serialize on its key until commit.
@@ -394,6 +451,13 @@ async def upsert_from_agent(
         await session.flush()
         return opp, True, []
     updated: list[str] = []
+    # Only a listing closed by its date (or by a check) may reopen; a staff archive of a
+    # listing with a future deadline is a deliberate close.
+    reopenable = (
+        opp.deadline_date < today()
+        if opp.deadline_date is not None
+        else opp.check_outcome in ("stale", "closed")
+    )
     for field in _FILLABLE:
         incoming = (getattr(data, field, "") or "").strip()
         if incoming and not (getattr(opp, field) or "").strip():
@@ -424,9 +488,41 @@ async def upsert_from_agent(
     if data.rolling and not opp.rolling:
         opp.rolling = True
         updated.append("rolling")
+    if (
+        opp.status == m.OpportunityStatus.archived.value
+        and reopenable
+        and _new_cycle(
+            opp, deadline_date, data.rolling
+        )
+    ):
+        # A closed listing whose source now shows an open cycle: reopen it under the
+        # cycle's own name. Held for review when the extraction was unsure.
+        opp.status = (
+            m.OpportunityStatus.in_review.value
+            if low_confidence
+            else m.OpportunityStatus.published.value
+        )
+        opp.review_reason = "agent_find" if low_confidence else None
+        opp.title = data.title.strip() or opp.title
+        # The cycle may have moved to a new page; point at the one just verified.
+        opp.source_url = data.source_url.strip()
+        opp.link = (data.link or data.source_url).strip()
+        opp.source_hash = ""
+        opp.check_outcome = "reopened"
+        if opp.published_at is None and not low_confidence:
+            opp.published_at = now
+        updated.append("status")
     opp.verified_at = now
     await session.flush()
     return opp, False, updated
+
+
+def _new_cycle(opp: m.Opportunity, deadline_date: date | None, rolling: bool) -> bool:
+    """The save confirms an open cycle: a future deadline, or rolling and undated."""
+    on = today()
+    if deadline_date is not None:
+        return deadline_date >= on and opp.deadline_date == deadline_date
+    return bool(rolling) and (opp.deadline_date is None or opp.deadline_date >= on)
 
 
 async def tracked_map(session, user_id: str) -> dict[str, str]:

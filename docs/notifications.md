@@ -9,6 +9,9 @@ Blesser tells people when something needs them, without the tab open: an in-app 
 | Application deadline in 14 / 7 / 1 days (`deadline`) | the hourly deadline check | inbox + push + email |
 | Scan finished, with how many opportunities it added (`scan_finished`) | the scan's last task concludes (`scans/service.py`) | inbox + push |
 | Scan needs attention (`scan_attention`) | a task fails for good | inbox |
+| New listings that fit the member (`new_match`) | the hourly match alert pass, daily or weekly | inbox + push + email |
+| Fitting listings that close within two weeks (`closing_match`) | the same pass, weekly | inbox + email |
+| New results for a saved search (`saved_search`) | the same pass, daily or weekly | inbox + push + email |
 
 Every event and channel can be turned off in Settings > Notifications. Reminder days are fixed. The test buttons in Settings create a `test` notification, which ignores preferences, quiet hours and the rate cap.
 
@@ -19,6 +22,9 @@ An event site calls `notify()` inside the transaction of the change that caused 
 * `app:{id}:{days}:{deadline date}`: moving a deadline re-arms its reminders.
 * `scan:{id}:done:{task count}`.
 * `scan:{id}:attention:{day}`: at most one a day per scan.
+* `match:new:{local day}`, `match:closing:{local day}`, `saved:{id}:{local day}`.
+
+A row may carry `items` (title, body, in-app link): the email lists them under the message. Match alerts use it for the listings they are about. See [Opportunities](opportunities.md#search-and-matching).
 
 Delivery happens after commit, in the worker's delivery loop. It wakes on a `"<user_id>:notifications"` payload on the `blesser_events` channel and polls every `NOTIFICATION_DELIVER_SECONDS` (30) as a backstop. For each undelivered row:
 

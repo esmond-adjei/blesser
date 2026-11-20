@@ -119,6 +119,11 @@ async def note_tasks_drained(session, scan_id: str) -> None:
     ).scalar() or 0
     if open_tasks == 0:
         scan.status = "done"
+        from api.opportunities.freshness import CHECK_FOCUS
+
+        if scan.focus == CHECK_FOCUS:
+            # Scheduled checks report through the listings themselves, not a notification.
+            return
         from api.notifications import events
 
         await events.scan_finished(session, scan)

@@ -60,8 +60,17 @@ const opportunityFields = {
   published_by: s.nullable(s.text),
   updated_at: s.text,
   dedupe_key: s.text,
+  checked_at: s.optional(s.nullable(s.text)),
+  check_outcome: s.optional(s.text),
 };
 const opportunitySchema = s.shape(opportunityFields);
+const duplicatePairSchema = s.shape({
+  first: opportunitySchema,
+  second: opportunitySchema,
+  score: s.number,
+  reason: s.choice("similar_title", "same_page"),
+});
+const aliasSchema = s.shape({ alias: s.text, canonical: s.text });
 const auditSchema = s.shape({
   id: s.text,
   actor_id: s.text,
@@ -125,6 +134,17 @@ const settingsSchema = s.shape({
       max_candidates_per_task: s.number,
       host_interval_seconds: s.number,
       page_cache_seconds: s.number,
+    }),
+  ),
+  freshness: s.optional(
+    s.shape({
+      recheck_days: s.number,
+      closing_days: s.number,
+      closing_recheck_days: s.number,
+      cycle_days: s.number,
+      stale_days: s.number,
+      max_checks: s.number,
+      max_agent_checks: s.number,
     }),
   ),
 });
@@ -194,6 +214,8 @@ export type StaffUser = ReturnType<typeof userSchema>;
 export type Collection = ReturnType<typeof collectionSchema>;
 export type SiteContent = ReturnType<typeof siteSchema>;
 export type Settings = ReturnType<typeof settingsSchema>;
+export type DuplicatePair = ReturnType<typeof duplicatePairSchema>;
+export type OrganizationAlias = ReturnType<typeof aliasSchema>;
 export type Scan = ReturnType<typeof scanSchema>;
 export type Report = ReturnType<typeof reportSchema>;
 export type OpportunityInput = Pick<
@@ -467,6 +489,19 @@ export const mergeOpportunity = (id: string, into_id: string) =>
   request(`/opportunities/${idPath(id)}/merge`, opportunitySchema, "POST", {
     into_id,
   });
+export const duplicates = () =>
+  request("/opportunities/duplicates", s.array(duplicatePairSchema));
+export const dismissDuplicate = (pair: {
+  first_id: string;
+  second_id: string;
+}) =>
+  request("/opportunities/duplicates/dismiss", () => undefined, "POST", pair);
+export const organizationAliases = () =>
+  request("/organization-aliases", s.array(aliasSchema));
+export const saveOrganizationAlias = (body: OrganizationAlias) =>
+  request("/organization-aliases", aliasSchema, "PUT", body);
+export const deleteOrganizationAlias = (alias: string) =>
+  request(`/organization-aliases/${idPath(alias)}`, () => undefined, "DELETE");
 export const reverifyOpportunity = (id: string) =>
   request(
     `/opportunities/${idPath(id)}/reverify`,

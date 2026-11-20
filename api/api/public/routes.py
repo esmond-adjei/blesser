@@ -61,7 +61,7 @@ async def opportunities(
     country: str | None = Query(None, max_length=80),
     closing_within: int | None = Query(None, ge=0, le=365),
     include_closed: bool = False,
-    sort: Literal["deadline", "new"] = "deadline",
+    sort: Literal["deadline", "new", "relevance"] = "deadline",
     limit: int = Query(30, ge=1, le=100),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),

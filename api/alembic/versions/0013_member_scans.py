@@ -4,8 +4,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0010_member_scans"
-down_revision = "0009_crawler_freshness"
+revision = "0013_member_scans"
+down_revision = "0012_member_matching"
 branch_labels = None
 depends_on = None
 

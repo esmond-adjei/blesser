@@ -14,7 +14,7 @@ from api.auth import models as auth_models
 from api.auth import security as auth_security
 from api.core import mailer
 from api.core.config import settings
-from api.core.mail_layout import Footer, compose
+from api.core.mail_layout import Footer, Item, compose
 from api.core.time import utcnow_naive
 from api.notifications import models as notification_models
 from api.notifications import push
@@ -46,6 +46,15 @@ def settings_link() -> str:
     return app_url("/settings/notifications")
 
 
+def _items(raw) -> list[Item]:
+    out = []
+    for entry in raw or []:
+        if isinstance(entry, dict) and entry.get("title"):
+            link = entry.get("link")
+            out.append(Item(str(entry["title"]), str(entry.get("body") or ""), app_url(link) if link else None))
+    return out
+
+
 def email_for(user: auth_models.User, notification: notification_models.Notification) -> mailer.Mail:
     kind = KINDS.get(notification.kind)
     return compose(
@@ -54,6 +63,7 @@ def email_for(user: auth_models.User, notification: notification_models.Notifica
         eyebrow=kind.label if kind else None,
         heading=notification.title,
         paragraphs=[notification.body] if notification.body else [],
+        items=_items(notification.items),
         action=("Open in Blesser", app_url(notification.link)),
         footer=Footer(
             reason=f"You're getting this because email is on for {kind.label if kind else 'this event'} in your notification settings.",

@@ -10,6 +10,7 @@ import {
 import {
   ClipboardCheck,
   Rows3,
+  CopyCheck,
   Layers,
   Radar,
   Rss,
@@ -26,6 +27,7 @@ import { Protected, useAuth } from "./lib/auth";
 import * as api from "./lib/api";
 import SignIn from "./pages/SignIn";
 import Opportunities from "./pages/Opportunities";
+import Duplicates from "./pages/Duplicates";
 import Curation from "./pages/Curation";
 import Scans from "./pages/Scans";
 import Reports from "./pages/Reports";
@@ -42,6 +44,7 @@ const navigation: {
 }[] = [
   { path: "/review", label: "Review queue", icon: ClipboardCheck },
   { path: "/opportunities", label: "Opportunities", icon: Rows3 },
+  { path: "/duplicates", label: "Duplicates", icon: CopyCheck },
   { path: "/curation", label: "Curation", icon: Layers },
   { path: "/scans", label: "Scans", icon: Radar },
   { path: "/sources", label: "Sources", icon: Rss },
@@ -151,6 +154,7 @@ export default function App() {
             <Route index element={<Navigate to="/review" replace />} />
             <Route path="review" element={<Opportunities review />} />
             <Route path="opportunities" element={<Opportunities />} />
+            <Route path="duplicates" element={<Duplicates />} />
             <Route path="curation" element={<Curation />} />
             <Route path="scans" element={<Scans />} />
             <Route path="sources" element={<Sources />} />
