@@ -14,8 +14,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0009_ghana_sources"
-down_revision = "0008_assistant"
+revision = "0010_ghana_sources"
+down_revision = "0009_crawler_freshness"
 branch_labels = None
 depends_on = None
 
