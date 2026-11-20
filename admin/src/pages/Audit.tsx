@@ -176,7 +176,7 @@ export default function Audit() {
           <div className="section-stack">
             <h2>{selected.action}</h2>
             <p>
-              {selected.actor_email} · {formatDate(selected.at)}
+              {selected.actor_email}, {formatDate(selected.at)}
             </p>
             <AuditDiff entry={selected} />
           </div>

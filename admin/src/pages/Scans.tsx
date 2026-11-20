@@ -104,7 +104,7 @@ export default function Scans() {
               {current.categories.join(", ")} in {current.region}
             </h2>
             <p>
-              {current.owner_email || "Owner not provided"} ·{" "}
+              {current.owner_email || "Owner not provided"},{" "}
               {formatDate(current.created_at)}
             </p>
             {current.tasks?.length ? (

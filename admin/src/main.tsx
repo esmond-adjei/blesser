@@ -8,6 +8,13 @@ import { ApiError } from "./lib/api";
 import App from "./App";
 import "./index.css";
 
+// Follow the system theme; the tokens switch on [data-theme="dark"].
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const applyTheme = () => {
+  document.documentElement.dataset.theme = dark.matches ? "dark" : "light";
+};
+applyTheme();
+dark.addEventListener("change", applyTheme);
 const icon = document.getElementById("favicon");
 if (icon instanceof HTMLLinkElement) icon.href = favicon;
 const client = new QueryClient({

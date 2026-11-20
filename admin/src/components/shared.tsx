@@ -42,12 +42,43 @@ export function PageHeader({
   return (
     <header className="page-header">
       <div>
-        <p className="eyebrow">Editorial workspace</p>
         <h1>{title}</h1>
         <p className="text-ink-secondary">{description}</p>
       </div>
       {action}
     </header>
+  );
+}
+/** One pressed option in a sunk well, like the member app's view switcher. */
+export function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  aside,
+}: {
+  label: string;
+  value: T;
+  options: readonly (readonly [T, string])[];
+  onChange: (value: T) => void;
+  aside?: ReactNode;
+}) {
+  return (
+    <div className="tabs">
+      <div className="segmented" role="group" aria-label={label}>
+        {options.map(([key, text]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={value === key}
+            onClick={() => onChange(key)}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+      {aside}
+    </div>
   );
 }
 export function QueryState({

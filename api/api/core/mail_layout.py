@@ -105,21 +105,15 @@ def _items(items: list[Item]) -> str:
         border = f"border-top:1px solid {t.SEPARATOR};" if i else ""
         title = escape(item.title)
         if item.link:
-            title = f'<a href="{escape(item.link)}" style="color:{t.INK};text-decoration:none">{title}</a>'
+            title = f'<a href="{escape(item.link)}" style="color:{t.LINK};text-decoration:underline;text-underline-offset:2px">{title}</a>'
         body = (
             f'<div style="margin-top:2px;font-size:14px;line-height:20px;color:{t.INK_SECONDARY}">{escape(item.body)}</div>'
             if item.body
             else ""
         )
-        arrow = (
-            f'<td width="24" align="right" valign="top" style="{border}padding:14px 0;font-family:{SANS};font-size:16px;line-height:22px">'
-            f'<a href="{escape(item.link)}" style="color:{t.LINK};text-decoration:none" aria-hidden="true">&rarr;</a></td>'
-            if item.link
-            else f'<td width="24" style="{border}"></td>'
-        )
         rows.append(
             f'<tr><td style="{border}padding:14px 0;font-family:{SANS}">'
-            f'<div style="font-size:16px;font-weight:600;line-height:22px;color:{t.INK}">{title}</div>{body}</td>{arrow}</tr>'
+            f'<div style="font-size:16px;font-weight:600;line-height:22px;color:{t.INK}">{title}</div>{body}</td></tr>'
         )
     return (
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{t.SURFACE_SUNK}" '

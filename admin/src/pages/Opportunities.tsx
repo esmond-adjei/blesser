@@ -16,6 +16,7 @@ import {
   formatDate,
   statusLabels,
   useAction,
+  Segmented,
 } from "../components/shared";
 import OpportunityEditor from "./OpportunityEditor";
 import { AuditDiff } from "./Audit";
@@ -247,27 +248,22 @@ export default function Opportunities({
       </div>
       {review && (
         <>
-          <div className="tabs" role="group" aria-label="Review queues">
-            <Button
-              variant={tab === "review" ? "brand" : "quiet"}
-              aria-pressed={tab === "review"}
-              onClick={() => setFilter("queue", "review")}
-            >
-              Needs review
-            </Button>
-            <Button
-              variant={tab === "agent" ? "brand" : "quiet"}
-              aria-pressed={tab === "agent"}
-              onClick={() => setFilter("queue", "agent")}
-            >
-              Recent agent finds
-            </Button>
-            <span className="text-footnote text-ink-secondary">
-              {tab === "agent"
-                ? "Newest discoveries first"
-                : "Waiting for an editorial decision"}
-            </span>
-          </div>
+          <Segmented
+            label="Review queues"
+            value={tab}
+            onChange={(next) => setFilter("queue", next)}
+            options={[
+              ["review", "Needs review"],
+              ["agent", "Recent agent finds"],
+            ]}
+            aside={
+              <span className="text-footnote text-ink-secondary">
+                {tab === "agent"
+                  ? "Newest discoveries first"
+                  : "Waiting for an editorial decision"}
+              </span>
+            }
+          />
           <div className="shortcut-legend" aria-label="Keyboard shortcuts">
             {[
               ["j / k", "Next / previous"],
@@ -576,7 +572,7 @@ export default function Opportunities({
                       Open application page
                     </SafeLink>
                     <p className="text-footnote text-ink-secondary">
-                      Verified {formatDate(detail.data.verified_at)} · Source:{" "}
+                      Verified {formatDate(detail.data.verified_at)}. Source:{" "}
                       {detail.data.source}
                     </p>
                     <pre className="source-excerpt">
@@ -630,7 +626,7 @@ export default function Opportunities({
                         >
                           <strong>{entry.action}</strong>
                           <span>
-                            {entry.actor_email} · {formatDate(entry.at)}
+                            {entry.actor_email}, {formatDate(entry.at)}
                           </span>
                         </button>
                       ))
