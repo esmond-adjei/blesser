@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -107,7 +108,7 @@ class Opportunity(Base):
     rolling: Mapped[bool] = mapped_column(default=False)
     # Where to apply, and the page the facts were read from (may be the same).
     link: Mapped[str] = mapped_column(String, default="")
-    source_url: Mapped[str] = mapped_column(String, default="")
+    source_url: Mapped[str] = mapped_column(String, default="", index=True)
     # normalized_url() of link and source_url, kept in step by the hooks below.
     link_key: Mapped[str] = mapped_column(String, default="", index=True)
     source_url_key: Mapped[str] = mapped_column(String, default="", index=True)
@@ -125,10 +126,60 @@ class Opportunity(Base):
     )
     # Last time an agent read the source page and confirmed the facts.
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Scheduled re-checks (freshness.py): when the source was last looked at, what
+    # that found, and the page's content hash when the facts were last confirmed.
+    checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
+    check_outcome: Mapped[str] = mapped_column(String, default="", server_default="")
+    source_hash: Mapped[str] = mapped_column(String, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+
+
+# Possible-duplicate search (dedupe.possible_duplicates) uses pg_trgm on titles.
+Index(
+    "ix_opportunities_title_trgm",
+    func.lower(Opportunity.title).label("lower_title"),
+    postgresql_using="gin",
+    postgresql_ops={"lower_title": "gin_trgm_ops"},
+)
+
+
+class OrganizationAlias(Base):
+    """Maps an organization's other name to one canonical name for the dedupe key.
+
+    Both columns hold `dedupe.organization_key` output: lowercase, no punctuation,
+    without "the" or trailing words such as "foundation" and "trust".
+    """
+
+    __tablename__ = "organization_aliases"
+
+    alias: Mapped[str] = mapped_column(String, primary_key=True)
+    canonical: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class DuplicateDismissal(Base):
+    """A pair staff confirmed are different opportunities; first_id < second_id."""
+
+    __tablename__ = "duplicate_dismissals"
+    __table_args__ = (
+        CheckConstraint("first_id < second_id", name="ck_duplicate_dismissal_order"),
+    )
+
+    first_id: Mapped[str] = mapped_column(
+        ForeignKey("opportunities.id", ondelete="CASCADE"), primary_key=True
+    )
+    second_id: Mapped[str] = mapped_column(
+        ForeignKey("opportunities.id", ondelete="CASCADE"), primary_key=True
+    )
+    dismissed_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 def url_keys(link: str, source_url: str) -> tuple[str, str]:

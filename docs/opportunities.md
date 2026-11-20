@@ -6,7 +6,8 @@ Blesser lists grants, accelerators, incubators, fellowships, scholarships, inter
 
 | Piece | Code | Notes |
 |---|---|---|
-| Catalogue | `api/api/opportunities/` | One shared `opportunities` table, deduplicated on normalized organization and title. |
+| Catalogue | `api/api/opportunities/` | One shared `opportunities` table, deduplicated on a cycle-aware key of organization and title (`dedupe.py`). |
+| Listing checks | `opportunities/freshness.py`, `archive.py` | Scheduled re-checks, undated expiry and new-cycle watch. |
 | Public API | `api/api/public/` | Public response schema, visibility filters, slug redirects and cache headers. |
 | Member API | `api/api/app/` and the feature routers | Member response schema, tracking, scans, applications, notifications and to-dos. |
 | Admin API | `api/api/admin/` | Staff authentication, editorial changes, people management and auditing. |
@@ -26,7 +27,23 @@ Blesser lists grants, accelerators, incubators, fellowships, scholarships, inter
 3. The complete calendar date of a stated deadline appears on the page. Passed deadlines are refused unless applications are rolling.
 4. The task and scan have room in their opportunity budgets.
 
-An existing listing is refreshed instead of duplicated. Agent saves fill empty fields, merge requirements, countries and tags, replace a passed deadline with a verified newer cycle, and stamp `verified_at`. They preserve editorial status and audience, including hidden rows. A Postgres advisory lock serializes saves on the dedupe key.
+An existing listing is refreshed instead of duplicated. Agent saves fill empty fields, merge requirements, countries and tags, replace a passed deadline with a verified newer cycle, and stamp `verified_at`. They preserve editorial status and audience, including hidden rows, with one exception: an archived listing whose deadline passed (or that expired as stale) is reopened when a save confirms a new cycle with a deadline ahead or rolling applications. It takes the new cycle's title, and goes to review instead when the extraction was unsure. A staff archive of a listing with a future deadline is never reopened. A Postgres advisory lock serializes saves on the dedupe key.
+
+## Duplicates
+
+The dedupe key is the normalized organization plus the normalized title, without what changes between cycles of one scheme:
+
+- Years and year ranges ("2026", "2026/27").
+- Cycle phrases: "call for applications" (or proposals, entries, nominations), "applications now open", "apply now", and cycle words with their number ("cohort 5", "6th cohort", "round 3", "intake", "edition", "cycle", "batch").
+- A leading "the" and trailing "foundation", "trust", "fund", "ltd" and similar words on the organization, so "Wellcome" and "Wellcome Trust" match.
+
+So "Mastercard Foundation Scholars Program 2027" refreshes the "Mastercard Foundation Scholars Program" row instead of adding a second one. Two genuinely different schemes whose names differ only by those words also share a key; staff can split them by editing the title.
+
+Organizations written in unrelated ways ("DAAD" and "German Academic Exchange Service") are mapped by the `organization_aliases` table, which migration `0011` seeds with a few common Ghana funders. Editors manage it on the admin Duplicates page; a change re-keys existing listings unless another listing already holds the new key.
+
+The Duplicates page lists pairs that the key did not catch: titles with trigram similarity of 0.5 or more (`pg_trgm`) from the same or a similar organization, and listings that share a source page. Editors keep one listing of a pair or mark the pair as different, which hides it from the list for good. Keeping one merges the other into it: tracking, to-dos, reports, scan results, collection places and crawl candidates move over, empty fields are filled, tags, countries and requirements are combined, the later `verified_at` is kept, and the merged listing's public link redirects to the kept one. The merged listing is hidden, not deleted.
+
+Migration `0011` re-keys the existing catalogue. Where two rows now share a key, the published (then most recently verified) row takes it and the others keep `<key>#<id>`, so they appear on the Duplicates page for an editor to merge.
 
 These checks establish where the facts came from. They do not establish whether a source is trustworthy. Members should confirm details on the official page before applying.
 
@@ -56,7 +73,32 @@ Member scan quotas default to 3 per hour and 10 per day. Admin settings can chan
 
 Set `OPPORTUNITY_SWEEP_EMAIL` to an existing enabled account and configure `sweep_hours` through admin settings to enable scheduled scans. The worker checks hourly and starts a scan across all categories when the account's last scan is old enough.
 
-The worker also runs an archive pass once per UTC date. With `auto_archive = true`, it archives published opportunities whose `deadline_date` is before today. Rolling opportunities are skipped. Existing tracked applications retain their copied listing details.
+The worker also runs an archive pass once per UTC date. With `auto_archive = true`, it archives published opportunities whose `deadline_date` is before today. Rolling opportunities are skipped. It also archives undated and rolling listings that nothing has confirmed (`verified_at`, else `created_at`) for `freshness.stale_days`, default 120, with `check_outcome = stale`, so an undated listing does not stay open forever. Existing tracked applications retain their copied listing details.
+
+### Scheduled listing checks
+
+Every 15 minutes the worker claims up to `freshness.max_checks` listings (default 10) that are due, most urgent first:
+
+1. Published, closing within `closing_days` (7), and not confirmed for `closing_recheck_days` (14).
+2. Published with no deadline, or rolling, and not confirmed for `recheck_days` (30).
+3. Archived, with a deadline in the last 400 days or none, and not checked for `cycle_days` (30).
+
+Claiming stamps `checked_at`, so workers never check the same listing twice and a failed check is retried a day later. A listing with a check task already queued is skipped, and listings with no source page or link are left to the expiry rule.
+
+A check reads the source page through the shared page cache first, without a model:
+
+| Page | Published listing | Archived listing |
+|---|---|---|
+| 404 or 410, or redirected to a homepage | To review, `review_reason = source_changed` | Recorded |
+| Same content hash as when last confirmed | `verified_at` stamped | Recorded |
+| Every stated deadline has passed | Undated or rolling: archived (to review when `auto_archive` is off). Dated: to review, since the page disagrees | Recorded |
+| Shows a deadline ahead or rolling applications | Agent check | Agent check |
+| Otherwise changed | Agent check | Recorded as closed |
+| Unreachable (timeouts, 5xx, robots) | Nothing changes; retried in a day | Same |
+
+An agent check is a `reverify_opportunity` task, at most `max_agent_checks` (20) a day, grouped into one scan per pass with the focus "Scheduled listing checks". These scans belong to `OPPORTUNITY_SWEEP_EMAIL`'s account, or the earliest active admin, and send no "scan finished" notification; without either account, changed pages are recorded and retried later. The agent re-reads the page and saves the current facts through the usual grounding checks. A confirmed save stamps `verified_at` and stores the page's content hash, so the next check of an unchanged page needs no model. For an archived listing the save reopens it (see above). When a scheduled check cannot confirm a published listing, the listing goes to review with `review_reason = source_changed`; a staff-requested check only records `check_outcome = unconfirmed`.
+
+Each listing keeps `checked_at`, `check_outcome` and `source_hash`. Members already see "Checked N days ago" from `verified_at`. Staff see both on the admin listing. The settings are editable under "Listing checks" in admin Settings.
 
 ## API
 
@@ -82,12 +124,14 @@ Public GET responses send `Cache-Control: public, max-age=60, s-maxage=300, stal
 | `POST /api/admin/auth/login`, `POST /api/admin/auth/refresh`, `POST /api/admin/auth/logout`, `GET /api/admin/auth/me` | Staff credentials or staff token | Separate staff sessions. Login requires a verified, enabled editor or admin. |
 | `GET/POST /api/admin/opportunities`, `GET/PATCH/DELETE /api/admin/opportunities/{id}` | Editor | Catalogue editing, including drafts, audience, slug, notes and featured rank. Detail includes the last 20 audit entries and a source trace excerpt. |
 | `GET /api/admin/opportunities/counts`, `POST /api/admin/opportunities/bulk` | Editor | Editorial counts and bulk publish, archive, hide or review. |
-| `POST /api/admin/opportunities/{id}/merge`, `POST /api/admin/opportunities/{id}/reverify` | Editor | Hide a duplicate and re-point tracking; queue one verification task. |
+| `POST /api/admin/opportunities/{id}/merge`, `POST /api/admin/opportunities/{id}/reverify` | Editor | Merge a duplicate into another listing and hide it; queue one verification task. |
+| `GET /api/admin/opportunities/duplicates`, `POST /api/admin/opportunities/duplicates/dismiss` | Editor | Possible duplicate pairs; mark a pair as different. |
+| `GET/PUT /api/admin/organization-aliases`, `DELETE /api/admin/organization-aliases/{alias}` | Editor | Organization names treated as one for the dedupe key. |
 | `GET /api/admin/reports`, `PATCH /api/admin/reports/{id}` | Editor | Read reports and mark them resolved. |
 | `GET/POST /api/admin/collections`, `PATCH/DELETE /api/admin/collections/{id}` | Editor | Curated items or saved catalogue filters. |
 | `GET/PUT /api/admin/site` | Editor | Read and publish versioned homepage content. |
 | `GET/POST /api/admin/scans` | Editor | All scans with owner email and traces; start a scan. |
-| `GET/PUT /api/admin/settings` | Admin | Publishing defaults, archiving, member scan quotas and sweep interval. |
+| `GET/PUT /api/admin/settings` | Admin | Publishing defaults, archiving, member scan quotas, sweep interval, crawler and listing checks. |
 | `GET /api/admin/users`, `PATCH /api/admin/users/{id}` | Admin | Search users, change roles and disable accounts. Self-demotion and removal of the last active admin are blocked. |
 | `GET /api/admin/audit` | Admin | Filter append-only audit entries. |
 
@@ -139,7 +183,7 @@ Crawler settings live under `site_settings.crawler` and are editable in admin Se
 | `host_interval_seconds` | `CRAWL_HOST_INTERVAL_SECONDS=2` | Minimum time between host requests, across workers. |
 | `page_cache_seconds` | `FETCH_CACHE_SECONDS=21600` | Shared page TTL. |
 
-`EXTRACTION_MAX_CHARS=10000` bounds extraction text and `EXTRACTION_MIN_CONFIDENCE=0.85` sets the review threshold. Temporary page failures retry after 30 minutes. Rejected and closed outcomes remain recorded; staff can explicitly re-verify catalogue entries for a later cycle. Automated annual-cycle reactivation of rejected URLs is not implemented.
+`EXTRACTION_MAX_CHARS=10000` bounds extraction text and `EXTRACTION_MIN_CONFIDENCE=0.85` sets the review threshold. Temporary page failures retry after 30 minutes. Rejected and closed outcomes remain recorded. A new cycle on a page already in the catalogue is picked up by the scheduled listing checks. A new cycle on a different page is not blocked by the closed listing's key: triage and extraction let it through, and the save reopens the closed listing.
 
 Editors can list, add, edit, enable, disable, delete and request crawls at `/api/admin/sources`. Deleting a source preserves its candidates and opportunities. Every staff write is audited. The Sources page shows candidates and saves, last-crawl yield, errors, failure counts and queued requests.
 

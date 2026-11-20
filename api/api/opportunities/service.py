@@ -8,21 +8,18 @@ from api.applications import service as application_service
 from api.applications.dates import parse_deadline
 from api.core.exceptions import ConflictError, NotFoundError
 from api.core.time import utcnow_naive
+from api.opportunities import dedupe, schemas
 from api.opportunities import models as m
-from api.opportunities import schemas
+from api.opportunities.dedupe import normalize
 
 #: Days ahead that count as "closing soon".
 CLOSING_SOON_DAYS = 14
 MAX_PAGE = 100
 
 
-def normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", (text or "").lower())).strip()
-
-
-def dedupe_key(organization: str, title: str) -> str:
-    """One row per real opportunity, whoever finds it and however they case it."""
-    return f"{normalize(organization)}|{normalize(title)}"
+def dedupe_key(organization: str, title: str, aliases: dict | None = None) -> str:
+    """One row per real opportunity, whoever finds it, however they case it, whatever the cycle."""
+    return dedupe.dedupe_key(organization, title, aliases)
 
 
 def today() -> date:
@@ -73,6 +70,8 @@ def to_out(opp: m.Opportunity, on: date | None = None) -> dict:
         "status": opp.status,
         "source": opp.source,
         "verified_at": opp.verified_at,
+        "checked_at": opp.checked_at,
+        "check_outcome": opp.check_outcome or "",
         "created_at": opp.created_at,
         "updated_at": opp.updated_at,
         "is_open": is_open(opp, on),
@@ -255,9 +254,15 @@ async def find_by_key(session, key: str) -> m.Opportunity | None:
     ).scalar_one_or_none()
 
 
+async def blocks_save(session, key: str) -> bool:
+    """A listing with this key exists and is not a closed one a new cycle could reopen."""
+    row = await find_by_key(session, key)
+    return row is not None and row.status != m.OpportunityStatus.archived.value
+
+
 async def submit(session, user_id: str | None, data: schemas.OpportunitySubmit) -> dict:
     """Share an opportunity using the editorial publishing default."""
-    key = dedupe_key(data.organization, data.title)
+    key = await dedupe.key_for(session, data.organization, data.title)
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(key))))
     existing = await find_by_key(session, key)
     if existing is not None:
@@ -320,7 +325,7 @@ async def upsert_from_agent(
     low_confidence: bool = False,
 ) -> tuple[m.Opportunity, bool, list[str]]:
     """Return the grounded row, whether created, and the fields refreshed."""
-    key = dedupe_key(data.organization, data.title)
+    key = await dedupe.key_for(session, data.organization, data.title)
     now = utcnow_naive()
     deadline_date = parse_deadline(data.deadline)
     # Parallel scan tasks can find the same opportunity: serialize on its key until commit.
@@ -388,6 +393,13 @@ async def upsert_from_agent(
         await session.flush()
         return opp, True, []
     updated: list[str] = []
+    # Only a listing closed by its date (or by a check) may reopen; a staff archive of a
+    # listing with a future deadline is a deliberate close.
+    reopenable = (
+        opp.deadline_date < today()
+        if opp.deadline_date is not None
+        else opp.check_outcome in ("stale", "closed")
+    )
     for field in _FILLABLE:
         incoming = (getattr(data, field, "") or "").strip()
         if incoming and not (getattr(opp, field) or "").strip():
@@ -418,9 +430,41 @@ async def upsert_from_agent(
     if data.rolling and not opp.rolling:
         opp.rolling = True
         updated.append("rolling")
+    if (
+        opp.status == m.OpportunityStatus.archived.value
+        and reopenable
+        and _new_cycle(
+            opp, deadline_date, data.rolling
+        )
+    ):
+        # A closed listing whose source now shows an open cycle: reopen it under the
+        # cycle's own name. Held for review when the extraction was unsure.
+        opp.status = (
+            m.OpportunityStatus.in_review.value
+            if low_confidence
+            else m.OpportunityStatus.published.value
+        )
+        opp.review_reason = "agent_find" if low_confidence else None
+        opp.title = data.title.strip() or opp.title
+        # The cycle may have moved to a new page; point at the one just verified.
+        opp.source_url = data.source_url.strip()
+        opp.link = (data.link or data.source_url).strip()
+        opp.source_hash = ""
+        opp.check_outcome = "reopened"
+        if opp.published_at is None and not low_confidence:
+            opp.published_at = now
+        updated.append("status")
     opp.verified_at = now
     await session.flush()
     return opp, False, updated
+
+
+def _new_cycle(opp: m.Opportunity, deadline_date: date | None, rolling: bool) -> bool:
+    """The save confirms an open cycle: a future deadline, or rolling and undated."""
+    on = today()
+    if deadline_date is not None:
+        return deadline_date >= on and opp.deadline_date == deadline_date
+    return bool(rolling) and (opp.deadline_date is None or opp.deadline_date >= on)
 
 
 async def tracked_map(session, user_id: str) -> dict[str, str]:

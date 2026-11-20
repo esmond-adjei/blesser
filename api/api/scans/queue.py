@@ -464,6 +464,18 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
                 print(f"[worker] crawler error: {exc!r}", flush=True)
             await asyncio.sleep(30)
 
+    async def checking():
+        from api.opportunities.freshness import INTERVAL_SECONDS, run_checks
+
+        while True:
+            try:
+                async with SessionLocal() as session:
+                    if counts := await run_checks(session):
+                        print(f"[worker] listing checks: {counts}", flush=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[worker] listing check error: {exc!r}", flush=True)
+            await asyncio.sleep(INTERVAL_SECONDS)
+
     async def delivery() -> None:
         from api.notifications.delivery import deliver_pending
 
@@ -483,6 +495,7 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
             _listen(work, notifications_due),
             housekeeping(),
             crawling(),
+            checking(),
             delivery(),
         )
     finally:
