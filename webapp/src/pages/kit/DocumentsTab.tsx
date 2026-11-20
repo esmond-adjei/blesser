@@ -2,11 +2,13 @@ import { Select as NativeSelect } from "@blesser/ui"
 import * as React from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { CloudUpload, Download, FileImage, FileSpreadsheet, FileText, Pencil, RotateCcw, Star, Trash2, X } from "lucide-react"
+import { DocumentPreview } from "../../components/kit/DocumentPreview"
+import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../../components/ui/menu"
 import { Button, Chip, Field, cn } from "@blesser/ui"
 import { SettingsSection } from "../../components/settings/controls"
 import { ErrorState } from "../../components/feedback/EmptyState"
-import { CheckField, ConfirmDialog, KitSkeleton, SelectField } from "../../components/kit/parts"
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog"
+import { CheckField, ConfirmDialog, SelectField } from "../../components/kit/parts"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog"
 import { useAutosave } from "../../lib/autosave"
 import { formatAgo } from "../../lib/format"
 import { DOCUMENT_KINDS, KIT_PITCH, UPLOAD_ACCEPT, formatBytes, guessKind, kindLabel, titleFromFilename, uploadProblem } from "../../lib/kit"
@@ -33,6 +35,7 @@ function DocumentsBody() {
   const [kind, setKind] = React.useState("")
   const [editing, setEditing] = React.useState<KitDocument | null>(null)
   const [removing, setRemoving] = React.useState<KitDocument | null>(null)
+  const [viewing, setViewing] = React.useState<KitDocument | null>(null)
 
   const docs = documents.data ?? []
   const shown = kind ? docs.filter((d) => d.kind === kind) : docs
@@ -140,7 +143,7 @@ function DocumentsBody() {
       ) : null}
 
       {documents.isLoading ? (
-        <KitSkeleton rows={2} />
+        <GridSkeleton />
       ) : documents.isError ? (
         <ErrorState title="Your documents didn't load" description="Check your connection and try again." onRetry={() => void documents.refetch()} />
       ) : docs.length === 0 ? (
@@ -167,14 +170,15 @@ function DocumentsBody() {
               </NativeSelect>
             ) : null}
           </div>
-          <ul className="divide-y divide-separator overflow-hidden rounded-lg border border-separator bg-surface">
+          <ul className={GRID}>
             {shown.map((d) => (
-              <DocumentRow key={d.id} doc={d} projectNames={projectNames} onEdit={() => setEditing(d)} onDelete={() => setRemoving(d)} />
+              <DocumentCard key={d.id} doc={d} projectNames={projectNames} onView={() => setViewing(d)} onEdit={() => setEditing(d)} onDelete={() => setRemoving(d)} />
             ))}
           </ul>
         </div>
       )}
 
+      <PreviewDialog doc={viewing} onClose={() => setViewing(null)} />
       <EditDialog doc={editing} projects={projects.data ?? []} onClose={() => setEditing(null)} />
       <ConfirmDialog
         open={!!removing}
@@ -187,6 +191,7 @@ function DocumentsBody() {
           try {
             await deleteDocument(removing.id)
             client.setQueryData<KitDocument[]>(kitKeys.documents, (list) => list?.filter((d) => d.id !== removing.id))
+            client.removeQueries({ queryKey: kitKeys.preview(removing.id) })
             refresh()
             toastSuccess("File deleted")
           } catch (err) {
@@ -287,54 +292,111 @@ function FileIcon({ name, type = "" }: { name: string; type?: string }) {
   )
 }
 
-function DocumentRow({ doc, projectNames, onEdit, onDelete }: { doc: KitDocument; projectNames: Map<string, string>; onEdit: () => void; onDelete: () => void }) {
-  const [downloading, setDownloading] = React.useState(false)
-  const linked = doc.project_ids.map((id) => projectNames.get(id)).filter(Boolean)
+const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] sm:gap-4"
+
+function GridSkeleton() {
   return (
-    <li className="flex items-center gap-3 px-4 py-3 sm:px-5">
-      <FileIcon name={doc.filename} type={doc.content_type} />
-      <div className="min-w-0 flex-1">
-        <p className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-callout font-medium text-ink">{doc.title}</span>
-          {doc.is_default ? (
-            <Chip tone="sun" icon={<Star className="fill-current" />} className="h-5 px-2 max-sm:px-1">
-              <span className="max-sm:sr-only">Default</span> <span className="sr-only">{kindLabel(doc.kind)}</span>
-            </Chip>
-          ) : null}
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-footnote text-ink-tertiary">
-          <span className="font-medium text-ink-secondary">{kindLabel(doc.kind)}</span>
-          <span className="tabular-nums">{formatBytes(doc.size_bytes)}</span>
-          <span className="max-sm:hidden">Added {formatAgo(doc.created_at)}</span>
-          {linked.length ? (
-            <span className="truncate">{linked.join(", ")}</span>
-          ) : null}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center">
-        <Button
-          size="sm"
-          variant="quiet"
-          icon={<Download />}
-          aria-label={`Download ${doc.title}`}
-          data-tooltip="Download"
-          disabled={downloading}
-          className="size-8 text-ink-secondary [&_svg]:size-4"
-          onClick={async () => {
-            setDownloading(true)
-            try {
-              await downloadDocument(doc)
-            } catch (err) {
-              toastError(err, "Couldn't download")
-            } finally {
-              setDownloading(false)
-            }
-          }}
-        />
-        <Button size="sm" variant="quiet" icon={<Pencil />} aria-label={`Edit ${doc.title}`} data-tooltip="Rename, retag or link" className="size-8 text-ink-secondary [&_svg]:size-4" onClick={onEdit} />
-        <Button size="sm" variant="quiet" icon={<Trash2 />} aria-label={`Delete ${doc.title}`} data-tooltip="Delete" className="size-8 text-ink-secondary hover:text-critical [&_svg]:size-4" onClick={onDelete} />
-      </div>
+    <div className={GRID} aria-busy="true" aria-label="Loading">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="overflow-hidden rounded-lg border border-separator bg-surface">
+          <div className="aspect-[4/3] animate-pulse bg-surface-sunk motion-reduce:animate-none" />
+          <div className="h-[60px]" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function useDownload(doc: KitDocument) {
+  const [busy, setBusy] = React.useState(false)
+  const run = async () => {
+    setBusy(true)
+    try {
+      await downloadDocument(doc)
+    } catch (err) {
+      toastError(err, "Couldn't download")
+    } finally {
+      setBusy(false)
+    }
+  }
+  return [busy, run] as const
+}
+
+function DocumentCard({ doc, projectNames, onView, onEdit, onDelete }: { doc: KitDocument; projectNames: Map<string, string>; onView: () => void; onEdit: () => void; onDelete: () => void }) {
+  const [downloading, download] = useDownload(doc)
+  const linked = doc.project_ids.map((id) => projectNames.get(id)).filter(Boolean)
+  const actions: MenuAction[] = [
+    { label: "Download", icon: <Download />, onSelect: () => void download(), disabled: downloading },
+    { label: "Rename, retag or link", icon: <Pencil />, onSelect: onEdit },
+    { kind: "separator" },
+    { label: "Delete", icon: <Trash2 />, onSelect: onDelete, danger: true },
+  ]
+  return (
+    <li className="min-w-0">
+      <ActionContextMenu actions={actions}>
+        <article className="relative flex h-full flex-col overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1 transition-[transform,box-shadow] duration-180 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+          <div className="relative border-b border-separator">
+            <button
+              type="button"
+              onClick={onView}
+              aria-label={`Preview ${doc.title}`}
+              className="block w-full cursor-pointer text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+            >
+              <DocumentPreview doc={doc} />
+            </button>
+            {doc.is_default ? (
+              <Chip tone="sun" icon={<Star className="fill-current" />} className="pointer-events-none absolute bottom-2 left-2 h-6 px-2 shadow-elevation-1">
+                Default <span className="sr-only">{kindLabel(doc.kind)}</span>
+              </Chip>
+            ) : null}
+          </div>
+          <div className="flex min-w-0 flex-1 items-start gap-1 py-2.5 pr-1.5 pl-3 sm:pl-4">
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="truncate text-callout font-semibold text-ink" title={doc.title}>{doc.title}</p>
+              <p className="flex min-w-0 flex-wrap gap-x-2 text-footnote text-ink-tertiary">
+                <span className="truncate font-medium text-ink-secondary">{kindLabel(doc.kind)}</span>
+                <span className="tabular-nums">{formatBytes(doc.size_bytes)}</span>
+              </p>
+              {linked.length ? <p className="truncate text-footnote text-ink-tertiary">{linked.join(", ")}</p> : null}
+            </div>
+            <ActionMenuButton actions={actions} label={`More for ${doc.title}`} className="size-8 [&_svg]:size-4" />
+          </div>
+        </article>
+      </ActionContextMenu>
     </li>
+  )
+}
+
+function PreviewDialog({ doc, onClose }: { doc: KitDocument | null; onClose: () => void }) {
+  const [last, setLast] = React.useState(doc)
+  if (doc && doc !== last) setLast(doc)
+  const shown = doc ?? last
+  return (
+    <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent onClose={onClose} className="max-w-xl">
+        {shown ? <PreviewBody key={shown.id} doc={shown} /> : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PreviewBody({ doc }: { doc: KitDocument }) {
+  const [downloading, download] = useDownload(doc)
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="truncate">{doc.title}</DialogTitle>
+        <DialogDescription>
+          {kindLabel(doc.kind)}, {formatBytes(doc.size_bytes)}, added {formatAgo(doc.created_at)}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody>
+        <DocumentPreview doc={doc} size="full" />
+      </DialogBody>
+      <DialogFooter>
+        <Button size="sm" variant="secondary" icon={<Download />} disabled={downloading} onClick={() => void download()}>Download</Button>
+      </DialogFooter>
+    </>
   )
 }
 

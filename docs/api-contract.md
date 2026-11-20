@@ -105,6 +105,7 @@ These routes exist only under `/api/app` and never expose another member's kit. 
 | `PATCH /documents/{id}` | `{title?, kind?, project_ids?, is_default?}`; no null values | `Document` |
 | `DELETE /documents/{id}` | | `204`; removes the file and project links |
 | `GET /documents/{id}/download` | | Owner-only attachment with `nosniff` and private, no-store caching |
+| `GET /documents/{id}/preview` | | Owner-only. `200 image/webp` thumbnail, `200 application/json` excerpt (`{type: "text", paragraphs}` or `{type: "table", rows}`), `204` when the file has no preview, `503` when building it timed out. `private, max-age=86400` |
 | `GET /documents/usage` | | `{used_bytes: number, limit_bytes: number}` |
 | `GET /answers` | `q`, `project_id` optional | `Answer[]`; literal substring search of question and answer, newest first |
 | `POST /answers` | `{question, answer, tags?, project_id?}` | `201 Answer` |

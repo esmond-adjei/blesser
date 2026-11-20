@@ -140,6 +140,16 @@ async def download_document(document_id: str, session: Session, current: Member)
     return get_storage().download(row.storage_key, row.filename, row.content_type)
 
 
+@router.get("/documents/{document_id}/preview")
+async def preview_document(document_id: str, session: Session, current: Member):
+    """Thumbnail (image/webp), excerpt (application/json) or 204 when none exists."""
+    row = await service.owned(session, models.Document, current.id, document_id)
+    key, content_type = row.storage_key, row.content_type
+    # Building a preview can take seconds; don't hold a pooled connection meanwhile.
+    await session.close()
+    return await get_storage().preview(key, content_type)
+
+
 @router.delete("/documents/{document_id}", status_code=204)
 async def delete_document(document_id: str, session: Session, current: Member):
     await service.delete_document(session, current.id, document_id)
