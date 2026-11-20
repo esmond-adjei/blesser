@@ -110,8 +110,14 @@ export interface Scan {
   region: string
   categories: OpportunityCategory[]
   focus: string
+  /** Sites the member asked the agent to read first. */
+  sites?: string[]
+  kind?: "member" | "sweep"
   status: "running" | "done" | "cancelled"
   created_at: string
+  /** Listings that fit the request: matched from the catalog or found on the web. */
+  opportunities_found?: number
+  /** Of those, listings new to Blesser. */
   opportunities_added: number
   started_at?: string | null
   finished_at?: string | null
@@ -131,6 +137,7 @@ export interface ScanRequest {
   categories?: OpportunityCategory[]
   region?: string
   focus?: string
+  sites?: string[]
 }
 
 // --- Opportunities, to-dos and calendar ------------------------------------
@@ -179,9 +186,49 @@ export interface MemberOpportunity {
   found_by: "agent" | "community" | "staff"
   created_at: string
   is_new: boolean
+  /** Only with sort=for_you. */
+  match_score?: number | null
+  match_terms?: string[]
 }
 
 export type Opportunity = MemberOpportunity
+
+export type AlertFrequency = "off" | "daily" | "weekly"
+export type MatchLevel = "undergraduate" | "masters" | "phd" | "postdoc" | "founder"
+
+export interface MatchProfileInput {
+  categories: OpportunityCategory[]
+  kinds: OpportunityKind[]
+  fields: string[]
+  levels: MatchLevel[]
+  countries: string[]
+  alerts: AlertFrequency
+  closing_soon: boolean
+}
+
+export interface MatchProfile extends MatchProfileInput {
+  /** False while the values are only a suggestion from the Applicant Kit. */
+  saved: boolean
+  updated_at: string | null
+}
+
+export interface SearchFilters {
+  q?: string
+  category?: OpportunityCategory | null
+  kind?: OpportunityKind | null
+  country?: string | null
+  closing_within?: number | null
+}
+
+export interface SavedSearch {
+  id: string
+  name: string
+  filters: SearchFilters
+  alerts: AlertFrequency
+  created_at: string
+}
+
+export type OpportunitySort = "deadline" | "new" | "relevance" | "for_you"
 
 export interface OpportunityQuery {
   q?: string
@@ -192,7 +239,7 @@ export interface OpportunityQuery {
   new?: boolean
   audience?: "public" | "members"
   closing_within?: number
-  sort?: "deadline" | "new"
+  sort?: OpportunitySort
   limit?: number
   offset?: number
 }

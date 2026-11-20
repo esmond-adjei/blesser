@@ -24,7 +24,13 @@ people in a target region discover funding, programmes and positions they \
 would otherwise miss.
 
 You will be given: a target region, one audience category, today's date, \
-optional focus notes, and the titles already in the catalogue.
+optional focus notes, optional sites to read first, and the titles already in \
+the catalogue.
+
+When the scan is for one member, their focus notes decide what counts: save \
+and match only opportunities that fit them. Start from the catalogue \
+(search_catalogue, then add_catalogue_match for clear fits), then the \
+member's sites, then the web.
 
 Your job, using the tools available:
 1. Search the web for current, open opportunities for the category that \
@@ -50,8 +56,9 @@ Rules:
 - Keep summary to 1-3 plain sentences on what it is and what it gives. Put \
   who can apply in eligibility, and concrete application items (pitch deck, \
   CV, proposal, references) in requirements.
-- Skip anything already in the catalogue unless you are confirming a new \
-  deadline for it.
+- Skip saving anything already in the catalogue unless you are confirming a \
+  new deadline for it. When a known listing fits the member, match it with \
+  add_catalogue_match instead.
 - The crawler has already processed known sources. Look for gaps and new sources.
 - Do not fetch any URL listed as known, rejected, closed or already read. A repeated
   fetch returns only a short reminder. Use a new offset only for unread text.

@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 
 from api.admin.audit import audited
@@ -11,14 +11,17 @@ from api.core.exceptions import BadRequestError, ConflictError, NotFoundError
 from api.core.time import utcnow_naive
 from api.editorial import models as m
 from api.editorial import service as editorial
+from api.opportunities import dedupe
 from api.opportunities import service as opportunities
+from api.opportunities.crawl_models import CrawlCandidate
 from api.opportunities.models import Opportunity
 from api.scans.models import Scan, ScanTask
 from api.todos.models import Todo
 
 
 def snapshot(row):
-    return {col.name: getattr(row, col.name) for col in row.__table__.columns}
+    # Generated columns (opportunities.search_vector) are derived and never loaded.
+    return {col.name: getattr(row, col.name) for col in row.__table__.columns if col.computed is None}
 
 
 async def commit(session):
@@ -139,7 +142,7 @@ async def edit_opportunity(session, row, values, actor):
         and "review_reason" not in values
     ):
         row.review_reason = None
-    row.dedupe_key = opportunities.dedupe_key(row.organization, row.title)
+    row.dedupe_key = await dedupe.key_for(session, row.organization, row.title)
     row.updated_at = utcnow_naive()
     with session.no_autoflush:
         existing = (
@@ -155,21 +158,82 @@ async def edit_opportunity(session, row, values, actor):
     await session.flush()
 
 
+#: Text fields a merge copies from the duplicate when the kept listing has none.
+_MERGE_FILL = (
+    "organization",
+    "summary",
+    "eligibility",
+    "benefits",
+    "location",
+    "link",
+    "source_url",
+)
+
+
 async def merge(session, source, target):
+    """Fold a duplicate into the listing to keep, then hide the duplicate.
+
+    Tracking, to-dos, reports, scan results, collection places and crawl candidates move
+    to the kept listing; empty fields are filled from the duplicate; its public link
+    redirects to the kept listing.
+    """
     if source.id == target.id:
         raise BadRequestError("Choose another opportunity to merge into.")
+    if target.status == "hidden":
+        raise BadRequestError("Choose a listing that is not hidden to keep.")
+    for model in (Application, Todo, m.OpportunityReport, CrawlCandidate):
+        await session.execute(
+            update(model)
+            .where(model.opportunity_id == source.id)
+            .values(opportunity_id=target.id)
+            .execution_options(synchronize_session=False)
+        )
+    ids = {"source": source.id, "target": target.id}
+    for table, columns in (
+        ("scan_finds", "scan_id, found_at, source_url"),
+        ("collection_items", "collection_id, position"),
+    ):
+        await session.execute(
+            text(
+                f"INSERT INTO {table} (opportunity_id, {columns}) "
+                f"SELECT :target, {columns} FROM {table} WHERE opportunity_id = :source "
+                "ON CONFLICT DO NOTHING"
+            ),
+            ids,
+        )
+        await session.execute(
+            text(f"DELETE FROM {table} WHERE opportunity_id = :source"), ids
+        )
+    for field in _MERGE_FILL:
+        if not (getattr(target, field) or "").strip() and getattr(source, field):
+            setattr(target, field, getattr(source, field))
+    if target.deadline_date is None and source.deadline_date is not None:
+        target.deadline, target.deadline_date = source.deadline, source.deadline_date
+    for field, limit in (("countries", 20), ("requirements", 30), ("tags", 20)):
+        target_values = getattr(target, field) or []
+        merged = opportunities._clean_list(
+            [*target_values, *(getattr(source, field) or [])], limit
+        )
+        if merged != target_values:
+            setattr(target, field, merged)
+    if source.verified_at and (
+        target.verified_at is None or source.verified_at > target.verified_at
+    ):
+        target.verified_at = source.verified_at
     await session.execute(
-        update(Application)
-        .where(Application.opportunity_id == source.id)
+        update(m.SlugHistory)
+        .where(m.SlugHistory.opportunity_id == source.id)
         .values(opportunity_id=target.id)
+        .execution_options(synchronize_session=False)
     )
-    await session.execute(
-        update(Todo)
-        .where(Todo.opportunity_id == source.id)
-        .values(opportunity_id=target.id)
-    )
+    if source.slug and await session.get(m.SlugHistory, source.slug) is None:
+        old_slug = source.slug
+        source.slug = f"{old_slug}-merged-{source.id[:8]}"[:200]
+        await session.flush()
+        session.add(m.SlugHistory(slug=old_slug, opportunity_id=target.id))
     source.status = "hidden"
-    source.updated_at = utcnow_naive()
+    source.updated_at = target.updated_at = utcnow_naive()
+    await session.flush()
 
 
 async def queue_reverify(session, row, actor):

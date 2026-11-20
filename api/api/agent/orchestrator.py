@@ -303,7 +303,9 @@ async def run_agent_task(
                 and "error" not in result
             ):
                 progress_made = True
-            if tool_use.name == "save_opportunity" and result.get("created"):
+            if (
+                tool_use.name == "save_opportunity" and result.get("created")
+            ) or (tool_use.name == "add_catalogue_match" and result.get("added")):
                 last_save_turn = turn + 1
             if on_event is not None:
                 await on_event(

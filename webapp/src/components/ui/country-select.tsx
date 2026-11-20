@@ -35,12 +35,14 @@ export function Flag({ code, className }: { code: string; className?: string }) 
 }
 
 /** Picks one country by name, or Anywhere (an empty value). */
-export function CountrySelect({ value, onChange, label = "Where", className, side = "bottom" }: {
+export function CountrySelect({ value, onChange, label = "Where", className, side = "bottom", placeholder }: {
   value: string
   onChange: (name: string) => void
   label?: string
   className?: string
   side?: "top" | "bottom"
+  /** Shown while empty instead of "Anywhere"; also leaves the Anywhere option out. */
+  placeholder?: string
 }) {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
@@ -50,7 +52,7 @@ export function CountrySelect({ value, onChange, label = "Where", className, sid
   const selected = byName.get(value.trim().toLowerCase())
   const q = query.trim().toLowerCase()
   const options = [
-    ...(!q || "anywhere".includes(q) ? [{ code: "", name: "Anywhere", flag: "" }] : []),
+    ...(!placeholder && (!q || "anywhere".includes(q)) ? [{ code: "", name: "Anywhere", flag: "" }] : []),
     ...COUNTRIES.filter((c) => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase() === q),
   ]
   const current = Math.min(active, Math.max(options.length - 1, 0))
@@ -75,14 +77,14 @@ export function CountrySelect({ value, onChange, label = "Where", className, sid
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`${label}: ${selected?.name ?? (value || "Anywhere")}`}
+          aria-label={placeholder && !value ? label : `${label}: ${selected?.name ?? (value || "Anywhere")}`}
           className={cn(
             "flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-full border border-separator px-3 text-footnote text-ink transition-colors hover:border-input-border-hover focus-visible:outline-2 focus-visible:outline-focus",
             className,
           )}
         >
           {selected ? <Flag code={selected.code} /> : <Globe className="size-3.5 shrink-0 text-ink-tertiary" aria-hidden="true" />}
-          <span className="max-w-32 truncate">{selected?.name ?? (value || "Anywhere")}</span>
+          <span className="max-w-32 truncate">{selected?.name ?? (value || placeholder || "Anywhere")}</span>
           <ChevronDown className="size-3.5 shrink-0 text-ink-tertiary" aria-hidden="true" />
         </button>
       </PopoverTrigger>
