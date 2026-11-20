@@ -6,8 +6,6 @@ import {
   ArrowUp,
   ArrowUpRight,
   Check,
-  CircleAlert,
-  CircleDashed,
   Database,
   GripVertical,
   Globe,
@@ -26,7 +24,6 @@ import { CATEGORIES, CATEGORY_LABELS, useTrackedOpportunities, useTrackOpportuni
 import {
   clock,
   describeEvent,
-  elapsedMs,
   formatDuration,
   scanElapsedMs,
   type LogLine,
@@ -39,7 +36,6 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -822,47 +818,6 @@ function FindRow({ find, tracking, index }: { find: ScanFind; tracking: boolean;
 function taskName(task: ScanTask): string {
   const category = CATEGORIES.find((value) => task.target === `category:${value}`)
   return category ? `Searching for ${CATEGORY_LABELS[category].toLowerCase()}` : "Searching"
-}
-
-const TASK_STATE = {
-  pending: { cls: "bg-surface-sunk text-ink-secondary", icon: CircleDashed },
-  running: { cls: "bg-sun-soft text-sun-ink", icon: Loader2 },
-  done: { cls: "bg-forest-soft text-link", icon: Check },
-  error: { cls: "bg-caution-soft text-caution", icon: CircleAlert },
-  cancelled: { cls: "bg-surface-sunk text-ink-tertiary", icon: Square },
-} as const
-
-function lastAction(task: ScanTask): string | null {
-  for (let i = task.log.length - 1; i >= 0; i--) {
-    if (task.log[i].kind !== "turn") return describeEvent(task.log[i]).text
-  }
-  return null
-}
-
-function Tasks({ tasks }: { tasks: ScanTask[] }) {
-  if (!tasks.length) return null
-  return (
-    <ol aria-label="Scan tasks">
-      {tasks.map((task) => {
-        const { cls, icon: Icon } = TASK_STATE[task.status]
-        const activity = task.status === "running" ? lastAction(task) : task.status === "pending" ? "Waiting to start" : task.status === "error" ? task.error : null
-        const duration = task.started_at ? formatDuration(elapsedMs(task.started_at, task.finished_at)) : ""
-        const right = task.status === "pending" ? "Queued" : task.status === "error" ? "Stopped early" : task.status === "cancelled" ? "Stopped" : duration
-        return (
-          <li key={task.id} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-start gap-3 border-t border-separator py-3 first:border-t-0">
-            <span className={cn("grid size-7 place-items-center rounded-full", cls)}>
-              <Icon aria-hidden="true" className={cn("size-3.5", task.status === "running" && "motion-safe:animate-spin")} />
-            </span>
-            <div className="min-w-0 pt-0.5">
-              <p className="text-callout font-semibold text-ink">{taskName(task)}</p>
-              {activity ? <p className="line-clamp-2 text-footnote text-ink-secondary wrap-anywhere">{activity}</p> : null}
-            </div>
-            {right ? <span className="pt-1 text-footnote text-ink-tertiary tabular-nums">{right}</span> : null}
-          </li>
-        )
-      })}
-    </ol>
-  )
 }
 
 const PREFIX: Record<string, { label: string; tone: string }> = {

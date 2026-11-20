@@ -187,7 +187,7 @@ Same shape as today, one more container and one more nginx server block per host
 
 ## Rollout
 
-Each phase ships on its own and leaves the product working.
+Each phase ships on its own and leaves the product working. Phases 1 to 6 have shipped, and so has report handling from phase 7. Staff TOTP and a CDN in front of the public site are still to do. The old `/api/*` member paths from phase 4 are still mounted as aliases of `/api/app/*` (`api/api/main.py`), because about 160 backend test calls still use them. Moving those tests to `/api/app` and dropping the alias is a separate change.
 
 1. **Design system package.** Create `design-system/` from the artifact's tokens and components, and switch the member app to it. Visible change: the new look.
 2. **Roles and admin API.** Add `users.role`, `audit_log`, the `admin` token audience and `/api/admin/*` for review and opportunity editing. Retire `OPS_ADMIN_EMAILS` checks and the `/opportunities/pending` and `/status` routes.
@@ -202,7 +202,7 @@ Each phase ships on its own and leaves the product working.
 - **Product name and domains.** Blesser is the working name; hosts above are placeholders.
 - **Members-only finds.** The default above keeps agent finds members-only until an editor promotes them. The alternative is to publish everything verified straight to the public site and use membership only for tracking. The first makes membership more valuable and the public site more trustworthy; the second gets more pages indexed sooner.
 - **Who can run scans.** Today any member can (3 an hour, 10 a day) on the operator's API keys. Options: keep it, limit it to staff, or make it a perk of a future paid tier.
-- **Astro or a second React app for the site.** Astro gives fast, indexable pages for little JavaScript. If the team prefers one framework, a React app with server-side prerendering (React Router framework mode) also works, at the cost of a heavier public page.
+- **Astro or a second React app for the site.** Settled: the site is Astro (`site/`).
 
 ## Crawler and scan execution
 

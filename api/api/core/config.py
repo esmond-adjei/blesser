@@ -21,9 +21,6 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     # Anthropic prompt caching on tools, system prompt and history.
     llm_prompt_cache: bool = True
-    # Hosts (host or host:port, comma-separated) LLM_BASE_URL may target over plain
-    # http or a private address (e.g. a self-hosted Ollama).
-    allowed_provider_hosts: str = ""
     # Per-request model timeout (seconds); keep well under the stale-task window.
     llm_timeout_seconds: float = 120.0
     # Whole-call deadline for one agent turn, retries included (0 = none).

@@ -108,66 +108,6 @@ class GuardedTransport(httpx.AsyncHTTPTransport):
         return await super().handle_async_request(request)
 
 
-def allowed_provider_hosts() -> set[str]:
-    """Operator allowlist (ALLOWED_PROVIDER_HOSTS) of host or host:port entries."""
-    from api.core.config import settings
-
-    raw = settings.allowed_provider_hosts or ""
-    return {h.strip().lower() for h in raw.split(",") if h.strip()}
-
-
-def provider_host_allowlisted(url: str) -> bool:
-    parsed = httpx.URL(url)
-    host = (parsed.host or "").lower()
-    allowed = allowed_provider_hosts()
-    if host in allowed:
-        return True
-    return parsed.port is not None and f"{host}:{parsed.port}" in allowed
-
-
-def validate_provider_base_url(url: str, default: str = "") -> str:
-    """Syntax checks for a user's provider base URL; raises ValueError.
-
-    Blank and the provider default always pass. Otherwise https or an allowlisted
-    host; no userinfo, query or fragment; IP literals public unless allowlisted.
-    Hostnames are checked again at request time.
-    """
-    value = url.strip()
-    if not value or value.rstrip("/") == default.rstrip("/"):
-        return value
-    if "?" in value or "#" in value:
-        raise ValueError("Base URL must not contain '?' or '#'.")
-    try:
-        parsed = httpx.URL(value)
-    except httpx.InvalidURL as exc:
-        raise ValueError("Base URL is not a valid URL.") from exc
-    if parsed.userinfo:
-        raise ValueError("Base URL must not contain credentials.")
-    if not parsed.host:
-        raise ValueError("Base URL needs a host.")
-    if provider_host_allowlisted(value):
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError("Base URL must use http or https.")
-        return value
-    if parsed.scheme != "https":
-        raise ValueError(
-            "Base URL must use https (ask the operator to add the host to "
-            "ALLOWED_PROVIDER_HOSTS for a local model server)."
-        )
-    literal = _literal_ip(parsed.host)
-    if literal is not None and not ip_is_public(literal):
-        raise ValueError("Base URL must point at a public address.")
-    return value
-
-
-def needs_guard(base_url: str, default: str = "") -> bool:
-    """True for a user-chosen URL that is neither the provider default nor allowlisted."""
-    value = (base_url or "").strip()
-    if not value or value.rstrip("/") == default.rstrip("/"):
-        return False
-    return not provider_host_allowlisted(value)
-
-
 # Fixed advice for common provider failures; the body is only matched, never shown.
 _OUT_OF_CREDIT_PHRASES = (
     "credit balance is too low",

@@ -4,8 +4,6 @@ import { X } from "lucide-react"
 import { cn } from "@blesser/ui"
 
 export const Dialog = DialogPrimitive.Root
-export const DialogTrigger = DialogPrimitive.Trigger
-export const DialogClose = DialogPrimitive.Close
 
 export function DialogContent({ className, children, onClose }: {
   className?: string

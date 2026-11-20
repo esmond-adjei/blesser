@@ -130,6 +130,14 @@ const theme = [
     outline-offset: 2px;
   }
 
+  /* Text fields show the caret, not a focus ring. */
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]):focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
       transition-duration: 0ms !important;

@@ -42,7 +42,7 @@ APP_BASE_URL=https://app.yourdomain   # links in emails point here
 
 ## Flows
 
-* **Reset:** `POST /api/auth/password/forgot` always returns the same
+* **Reset:** `POST /api/app/auth/password/forgot` always returns the same
   message (no account enumeration; mail is sent in the background so
   timing matches). Throttled per email (3 per 15 min) and per IP. Links
   are single-use, expire in 30 minutes, and using one revokes every
