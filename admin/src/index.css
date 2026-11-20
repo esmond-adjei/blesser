@@ -561,6 +561,13 @@
     background: var(--surface-raised);
     color: var(--ink);
     box-shadow: var(--elevation-3);
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--separator) transparent;
+  }
+  /* A modal panel scrolls on its own, so the page behind must not add a second bar. */
+  html:has(dialog[open]) {
+    overflow: hidden;
   }
   .side-panel[open] {
     animation: bl-sheet-in-right var(--dur-slow) var(--ease-out);
