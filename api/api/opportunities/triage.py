@@ -1,23 +1,40 @@
 from datetime import date
 from urllib.parse import urlsplit
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from api.opportunities.crawl_models import CrawlCandidate
 from api.opportunities.models import Opportunity
 from api.opportunities.page_content import Page, expired, normalized_url
 from api.opportunities.service import dedupe_key
 
+#: Social and video hosts: their pages are never an opportunity's source.
+SOCIAL_HOSTS = frozenset(
+    {
+        "facebook.com",
+        "twitter.com",
+        "x.com",
+        "linkedin.com",
+        "instagram.com",
+        "youtube.com",
+    }
+)
 
-async def known_urls(session) -> set[str]:
-    rows = (
-        await session.execute(select(Opportunity.source_url, Opportunity.link))
-    ).all()
-    return {normalized_url(url) for row in rows for url in row if url}
+
+def is_social_host(url: str) -> bool:
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    return any(host == social or host.endswith("." + social) for social in SOCIAL_HOSTS)
 
 
 async def duplicate_url(session, url: str) -> bool:
-    return normalized_url(url) in await known_urls(session)
+    key = normalized_url(url)
+    return (
+        await session.execute(
+            select(Opportunity.id)
+            .where(or_(Opportunity.source_url_key == key, Opportunity.link_key == key))
+            .limit(1)
+        )
+    ).first() is not None
 
 
 async def triage_page(
@@ -85,14 +102,7 @@ async def triage_url(session, candidate: CrawlCandidate) -> str | None:
     if candidate.dedupe_key and await find_by_key(session, candidate.dedupe_key):
         return "dedupe_key"
     parsed = urlsplit(candidate.url)
-    if parsed.netloc in {
-        "facebook.com",
-        "twitter.com",
-        "x.com",
-        "linkedin.com",
-        "instagram.com",
-        "youtube.com",
-    }:
+    if is_social_host(candidate.url):
         return "navigation"
     path = parsed.path.lower().rstrip("/")
     if (

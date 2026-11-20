@@ -51,28 +51,30 @@ def extraction_schema() -> dict:
     return schema
 
 
-def trimmed_text(page: Page) -> str:
+_SIGNAL_WORDS = (
+    "deadline",
+    "eligib",
+    "apply",
+    "africa",
+    "rolling",
+    "funding",
+    "scholarship",
+)
+
+
+def signal_words(region: str) -> tuple[str, ...]:
+    """Lines with these words survive trimming; the scan's region counts as one."""
+    words = [w for w in region.casefold().replace(",", " ").split() if len(w) >= 3]
+    return (*_SIGNAL_WORDS, *words)
+
+
+def trimmed_text(page: Page, region: str = "") -> str:
     limit = settings.extraction_max_chars
     if len(page.text) <= limit:
         return page.text
     lines = page.text.splitlines()
-    signals = [
-        line
-        for line in lines
-        if any(
-            key in line.lower()
-            for key in (
-                "deadline",
-                "eligib",
-                "apply",
-                "ghana",
-                "africa",
-                "rolling",
-                "funding",
-                "scholarship",
-            )
-        )
-    ]
+    keys = signal_words(region)
+    signals = [line for line in lines if any(key in line.lower() for key in keys)]
     tail = "\n".join(signals)[: limit // 2]
     return page.text[: limit - len(tail)] + "\n" + tail
 
@@ -112,7 +114,7 @@ async def extract_page(
                             d.isoformat()
                             for d in deadline_dates(page.text, page.metadata)
                         ],
-                        "page_text": trimmed_text(page),
+                        "page_text": trimmed_text(page, region),
                     },
                     ensure_ascii=False,
                 ),

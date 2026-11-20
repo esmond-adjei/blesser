@@ -16,6 +16,7 @@ from api.editorial.service import get_settings
 from api.opportunities.crawl_http import fetch_error, get_document
 from api.opportunities.crawl_models import CrawlCandidate, Source
 from api.opportunities.page_content import normalized_url
+from api.opportunities.triage import is_social_host
 
 _LEAD_WORDS = (
     "grant",
@@ -45,6 +46,20 @@ def published_date(raw: str) -> date | None:
             return None
 
 
+def newest_first(nodes) -> list[tuple[str, date | None]]:
+    """(loc, lastmod) of sitemap entries, most recently changed first, undated last."""
+    entries = []
+    for index, node in enumerate(nodes):
+        loc = node.xpath('./*[local-name()="loc"]/text()')
+        if not loc or not loc[0].strip():
+            continue
+        lastmod = node.xpath('./*[local-name()="lastmod"]/text()')
+        modified = published_date(lastmod[0].strip()) if lastmod else None
+        entries.append((loc[0].strip(), modified, index))
+    entries.sort(key=lambda e: (e[1] is None, -(e[1].toordinal() if e[1] else 0), e[2]))
+    return [(loc, modified) for loc, modified, _ in entries]
+
+
 def parse_items(
     raw: str, url: str, kind: str, limit: int
 ) -> tuple[list[dict], list[str]]:
@@ -64,13 +79,14 @@ def parse_items(
         ):
             raise ValueError("not a feed or sitemap")
         if kind == "sitemap":
-            maps = tree.xpath(
-                '//*[local-name()="sitemap"]/*[local-name()="loc"]/text()'
-            )[:5]
-            for node in tree.xpath('//*[local-name()="url"]')[:limit]:
-                loc = node.xpath('./*[local-name()="loc"]/text()')
-                if loc:
-                    items.append({"url": loc[0], "title": "", "published_date": None})
+            maps = [
+                loc
+                for loc, _ in newest_first(tree.xpath('//*[local-name()="sitemap"]'))
+            ][:5]
+            for loc, modified in newest_first(tree.xpath('//*[local-name()="url"]'))[
+                :limit
+            ]:
+                items.append({"url": loc, "title": "", "published_date": modified})
         else:
             for node in tree.xpath('//*[local-name()="item" or local-name()="entry"]')[
                 :limit
@@ -99,15 +115,7 @@ def parse_items(
             href = urljoin(url, node.get("href", ""))
             if not any(word in (label + " " + href).lower() for word in _LEAD_WORDS):
                 continue
-            host = (urlsplit(href).hostname or "").removeprefix("www.")
-            if host in {
-                "facebook.com",
-                "twitter.com",
-                "x.com",
-                "linkedin.com",
-                "instagram.com",
-                "youtube.com",
-            }:
+            if is_social_host(href):
                 continue
             if label.lower().startswith(
                 ("about ", "faq", "our past", "grants awarded")
