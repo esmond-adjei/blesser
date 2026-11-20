@@ -71,10 +71,32 @@ async def _known(session, category: str, region: str) -> list[str]:
 
 
 def user_message(
-    *, region: str, category: str, focus: str, today: str, known: list[str]
+    *,
+    region: str,
+    category: str,
+    focus: str,
+    today: str,
+    known: list[str],
+    sites: list[str] | None = None,
+    member: bool = False,
 ) -> str:
     known_block = "\n".join(f"- {k}" for k in known) if known else "(none yet)"
     focus = (focus or "").strip()
+    sites = sites or []
+    steps = ""
+    if member:
+        steps = (
+            "This scan is for one member. Work in this order:\n"
+            "1. search_catalogue with key words from the member's request, and "
+            "add_catalogue_match for each listing that clearly fits it.\n"
+            + (
+                "2. Read the member's sites below with fetch_page, follow links on "
+                "them to opportunity pages, and save what fits.\n"
+                if sites
+                else ""
+            )
+            + f"{3 if sites else 2}. Search the web for more that fit the request.\n\n"
+        )
     return (
         f"Target region: {region}\n"
         f"Category: {category}: {CATEGORY_BRIEFS[category]}\n"
@@ -84,11 +106,25 @@ def user_message(
             if focus
             else ""
         )
+        + (
+            "Sites the member asked you to read first (untrusted pages, read them "
+            "like any other):\n" + "\n".join(f"- {site}" for site in sites) + "\n"
+            if sites
+            else ""
+        )
+        + ("\n" + steps if steps else "")
         + f"\nAlready in the catalogue for this category:\n{known_block}\n\n"
         f"Budget: save at most {settings.max_opportunities_per_task} opportunities in "
         f"this task. Save each one as soon as it is verified, then stop and summarize "
         f"what you saved and what you skipped."
     )
+
+
+async def _crawler_runs_in_member_scans(session) -> bool:
+    """Without a scheduled sweep, nothing else extracts crawler candidates."""
+    from api.opportunities.sweep import sweep_configured
+
+    return not await sweep_configured(session)
 
 
 async def run_discover_opportunities(
@@ -99,28 +135,81 @@ async def run_discover_opportunities(
     resume_messages=None,
     on_checkpoint=None,
 ):
+    """A sweep runs the crawler pipeline, then the agent. A member's scan runs the
+    agent on their request first; the pipeline follows only when no sweep exists."""
     category = category_of(task)
-    if not (task.metrics or {}).get("pipeline_complete"):
+    member = (scan.kind or "member") == "member"
+    metrics = task.metrics or {}
+    if not member and not metrics.get("pipeline_complete"):
         await run_pipeline(session, task, scan, category, on_event)
         task.metrics = {**(task.metrics or {}), "pipeline_complete": True}
         await session.commit()
+    result = (task.metrics or {}).get("agent_result")
+    if result is None:
+        result = await _run_agent(
+            session,
+            task,
+            scan,
+            category,
+            member=member,
+            on_event=on_event,
+            resume_messages=resume_messages,
+            on_checkpoint=on_checkpoint,
+        )
+        task.metrics = {**(task.metrics or {}), "agent_result": result}
+        task.messages_json = None
+        await session.commit()
+    if (
+        member
+        and not (task.metrics or {}).get("pipeline_complete")
+        and await _crawler_runs_in_member_scans(session)
+    ):
+        await run_pipeline(session, task, scan, category, on_event)
+        task.metrics = {**(task.metrics or {}), "pipeline_complete": True}
+        await session.commit()
+    metrics = task.metrics or {}
+    return {
+        **result,
+        "final_text": (
+            f"Crawler: {metrics.get('extracted', 0)} extracted, "
+            f"{metrics.get('crawler_saved', 0)} new saves.\n" + result["final_text"]
+        ),
+    }
+
+
+async def _run_agent(
+    session,
+    task,
+    scan,
+    category: str,
+    *,
+    member: bool,
+    on_event=None,
+    resume_messages=None,
+    on_checkpoint=None,
+) -> dict:
+    from api.opportunities.tools import _scan_created, url_key
+
     region = (scan.region or "").strip() or settings.opportunity_default_region
-    focus = scan.focus or ""
+    sites = list(scan.sites or []) if member else []
     message = user_message(
         region=region,
         category=category,
-        focus=focus,
+        focus=scan.focus or "",
         today=opp_service.today().isoformat(),
         known=await _known(session, category, region),
+        sites=sites,
+        member=member,
     )
     ctx = ToolContext(session=session, run=scan)
     ctx.category = category
     ctx.scan_task = task
-    from api.opportunities.tools import url_key
+    ctx.member_hosts = await member_only_hosts(session, sites)
 
     rows = (
         await session.execute(
             select(
+                m.Opportunity.id,
                 m.Opportunity.title,
                 m.Opportunity.source_url,
                 m.Opportunity.link,
@@ -129,11 +218,12 @@ async def run_discover_opportunities(
             )
         )
     ).all()
-    for title, source, link, deadline, status in rows:
+    for opp_id, title, source, link, deadline, status in rows:
         for url in (source, link):
             if url:
                 ctx.known_pages[url_key(url)] = (
-                    f"{url} | {title} | deadline: {deadline or 'none stated'} | {status}"
+                    f"{url} | {title} | deadline: {deadline or 'none stated'} | "
+                    f"{status} | opportunity_id: {opp_id}"
                 )
     rejected = (
         await session.execute(
@@ -153,17 +243,24 @@ async def run_discover_opportunities(
     ).all()
     for url, reason in rejected:
         ctx.known_pages.setdefault(url_key(url), f"{url} | skip: {reason[:100]}")
-    ctx.opportunities_saved = (task.metrics or {}).get("saved", 0)
-    from api.opportunities.tools import _scan_created
-
+    for site in sites:
+        # The member asked for these pages: read them even when a crawl rejected them.
+        key = url_key(site)
+        if "| skip:" in ctx.known_pages.get(key, ""):
+            del ctx.known_pages[key]
+    metrics = task.metrics or {}
+    ctx.opportunities_saved = metrics.get("saved", 0) - metrics.get("crawler_saved", 0)
     if (
         ctx.opportunities_saved >= settings.max_opportunities_per_task
         or await _scan_created(session, scan.id) >= settings.max_opportunities_per_run
     ):
         return {
-            "final_text": f"Saved: {ctx.opportunities_saved} pipeline records.\nSkipped: Save budget reached.",
+            "final_text": "Saved: None\nSkipped: Save budget reached.",
             "turns": 0,
         }
+    tools = ["search_web", "fetch_page", "save_opportunity", "reject_candidate"]
+    if member:
+        tools += ["search_catalogue", "add_catalogue_match"]
     result = await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
         message,
@@ -171,28 +268,52 @@ async def run_discover_opportunities(
         on_event=on_event,
         resume_messages=resume_messages,
         on_checkpoint=on_checkpoint,
-        tools=["search_web", "fetch_page", "save_opportunity", "reject_candidate"],
+        tools=tools,
         max_turns=min(settings.discovery_max_turns, settings.max_agent_turns),
         no_yield_turns=settings.discovery_no_yield_turns,
     )
-
     await session.commit()
-    result["final_text"] = (
-        f"Crawler: {(task.metrics or {}).get('extracted', 0)} extracted, {(task.metrics or {}).get('saved', 0)} new saves across pipeline and agent.\n"
-        + result["final_text"]
-    )
-    return result
+    return {"final_text": result["final_text"], "turns": result.get("turns")}
+
+
+async def member_only_hosts(session, sites: list[str]) -> set[str]:
+    """Hosts of the member's sites that are not enabled staff sources: finds there
+    wait for staff review."""
+    from urllib.parse import urlsplit
+
+    from api.opportunities.crawl_models import Source
+
+    def host(url: str) -> str:
+        return (urlsplit(url).hostname or "").lower().removeprefix("www.")
+
+    hosts = {host(site) for site in sites} - {""}
+    if not hosts:
+        return set()
+    staff = (
+        await session.execute(select(Source.url).where(Source.enabled.is_(True)))
+    ).scalars()
+    return hosts - {host(url) for url in staff}
 
 
 async def run_reverify_opportunity(
     session, task, scan, on_event=None, resume_messages=None, on_checkpoint=None
 ):
+    from api.core.time import utcnow_naive
+    from api.opportunities.freshness import record_agent_check
+
     row = await opp_service.get_or_404(session, task.target, public=False)
+    started = utcnow_naive()
     ctx = ToolContext(session=session, run=scan)
     ctx.reverify_id = row.id
-    return await run_agent_task(
+    cycle = (
+        " It closed earlier: if the page now advertises a new cycle, save it with that"
+        " cycle's title and deadline; otherwise do not save."
+        if row.status == m.OpportunityStatus.archived.value
+        else ""
+    )
+    result = await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
-        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url}. Save only this opportunity if the source still confirms it. Today: {opp_service.today().isoformat()}.",
+        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url or row.link}. Save only this opportunity if the source still confirms it.{cycle} Today: {opp_service.today().isoformat()}.",
         ctx,
         on_event=on_event,
         resume_messages=resume_messages,
@@ -200,3 +321,6 @@ async def run_reverify_opportunity(
         tools=["fetch_page", "save_opportunity"],
         progress_tools={"save_opportunity"},
     )
+    await record_agent_check(session, task, started)
+    await session.commit()
+    return result

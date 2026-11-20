@@ -38,6 +38,8 @@ class AdminOpportunity(MemberOpportunity):
     published_by: str | None
     updated_at: datetime
     dedupe_key: str
+    checked_at: datetime | None = None
+    check_outcome: str = ""
 
 
 class AdminDetail(AdminOpportunity):
@@ -119,6 +121,29 @@ class MergeIn(BaseModel):
     into_id: str
 
 
+class DuplicatePair(APIModel):
+    first: AdminOpportunity
+    second: AdminOpportunity
+    score: float
+    reason: Literal["similar_title", "same_page"]
+
+
+class DismissIn(BaseModel):
+    first_id: str
+    second_id: str
+
+
+class AliasIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    alias: str = Field(min_length=1, max_length=200)
+    canonical: str = Field(min_length=1, max_length=200)
+
+
+class AliasOut(APIModel):
+    alias: str
+    canonical: str
+
+
 class CollectionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     slug: str = Field(
@@ -176,6 +201,17 @@ class CrawlerSettings(BaseModel):
     page_cache_seconds: int = Field(default=21600, ge=60, le=604800)
 
 
+class FreshnessSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recheck_days: int = Field(default=30, ge=1, le=365)
+    closing_days: int = Field(default=7, ge=0, le=60)
+    closing_recheck_days: int = Field(default=14, ge=1, le=365)
+    cycle_days: int = Field(default=30, ge=1, le=365)
+    stale_days: int = Field(default=120, ge=7, le=1095)
+    max_checks: int = Field(default=10, ge=0, le=200)
+    max_agent_checks: int = Field(default=20, ge=0, le=1000)
+
+
 class SettingsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     agent_default: PublishingDefault = PublishingDefault(
@@ -186,6 +222,7 @@ class SettingsIn(BaseModel):
     member_scan_limits: ScanLimits = ScanLimits()
     sweep_hours: int = Field(default=0, ge=0, le=8760)
     crawler: CrawlerSettings | None = None
+    freshness: FreshnessSettings | None = None
 
 
 class StaffUser(APIModel):

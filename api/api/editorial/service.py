@@ -26,6 +26,16 @@ def defaults():
             "host_interval_seconds": settings.crawl_host_interval_seconds,
             "page_cache_seconds": settings.fetch_cache_seconds,
         },
+        # Scheduled listing checks (opportunities/freshness.py).
+        "freshness": {
+            "recheck_days": 30,
+            "closing_days": 7,
+            "closing_recheck_days": 14,
+            "cycle_days": 30,
+            "stale_days": 120,
+            "max_checks": 10,
+            "max_agent_checks": 20,
+        },
     }
 
 

@@ -40,6 +40,10 @@ class Scan(Base):
     region: Mapped[str] = mapped_column(String)
     categories: Mapped[list] = mapped_column(JSON, default=list)
     focus: Mapped[str] = mapped_column(Text, default="")
+    # member: a person's request; sweep: the scheduled catalogue refresh.
+    kind: Mapped[str] = mapped_column(String, default="member", server_default="member")
+    # Up to five public sites the member asked the agent to read first.
+    sites: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     # running | done | cancelled
     status: Mapped[str] = mapped_column(String, default="running", index=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -125,3 +129,8 @@ class ScanFind(Base):
     )
     found_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     source_url: Mapped[str | None] = mapped_column(Text)
+    # agent: saved or confirmed from the web; crawler: the pipeline; catalog: an
+    # existing listing the agent matched to the member's request.
+    via: Mapped[str] = mapped_column(String, default="agent", server_default="agent")
+    # This scan created the listing (it was not in the catalogue before).
+    created: Mapped[bool] = mapped_column(default=False, server_default="false")

@@ -140,3 +140,33 @@ TOOL_DEFINITIONS.append(
         },
     }
 )
+
+TOOL_DEFINITIONS.append(
+    {
+        "name": "search_catalogue",
+        "description": (
+            "Search open, published listings already in the catalogue for this "
+            "category. Use short key words from the member's request."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    }
+)
+
+TOOL_DEFINITIONS.append(
+    {
+        "name": "add_catalogue_match",
+        "description": (
+            "Add an existing catalogue listing to this member's scan results. Only "
+            "for listings that clearly fit the member's request and region."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"opportunity_id": {"type": "string"}},
+            "required": ["opportunity_id"],
+        },
+    }
+)

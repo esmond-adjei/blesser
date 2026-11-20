@@ -255,6 +255,7 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
             country=args.country,
             open_only=not args.include_closed,
             closing_within=args.closing_within,
+            sort="relevance",
             limit=12,
         )
         page["items"] = [_opportunity(registry, row) for row in page["items"]]
