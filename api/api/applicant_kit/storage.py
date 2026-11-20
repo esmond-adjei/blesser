@@ -10,9 +10,10 @@ from xml.etree import ElementTree
 import magic
 import olefile
 from fastapi import UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from starlette.concurrency import run_in_threadpool
 
+from api.applicant_kit import previews
 from api.core.config import settings
 from api.core.exceptions import BadRequestError, DomainError, NotFoundError
 from api.core.ids import new_id
@@ -21,6 +22,8 @@ MAX_FILE_BYTES = 15 * 1024 * 1024
 MEMBER_LIMIT_BYTES = 250 * 1024 * 1024
 UPLOAD_REQUEST_BYTES = MAX_FILE_BYTES + 1024 * 1024
 CHUNK_BYTES = 64 * 1024
+# Stored files never change, so a member's browser may keep previews for a day.
+PREVIEW_CACHE = "private, max-age=86400"
 
 
 class UploadTooLarge(DomainError):
@@ -45,6 +48,7 @@ class DocumentStorage(Protocol):
     async def delete(self, key: str) -> None: ...
     async def delete_member(self, user_id: str) -> None: ...
     def download(self, key: str, filename: str, content_type: str) -> FileResponse: ...
+    async def preview(self, key: str, content_type: str) -> Response: ...
 
 
 def detect_type(path: Path) -> str:
@@ -191,7 +195,10 @@ class LocalDocumentStorage:
             raise
 
     async def delete(self, key: str) -> None:
-        await run_in_threadpool(self._path(key).unlink, missing_ok=True)
+        path = self._path(key)
+        await run_in_threadpool(path.unlink, missing_ok=True)
+        for cached in previews.cached_files(path):
+            await run_in_threadpool(cached.unlink, missing_ok=True)
 
     async def delete_member(self, user_id: str) -> None:
         directory = self._member_dir(user_id)
@@ -214,6 +221,24 @@ class LocalDocumentStorage:
                 "Cache-Control": "private, no-store",
             },
         )
+
+    async def preview(self, key: str, content_type: str) -> Response:
+        """A small thumbnail or excerpt of the file, for the member's own document grid."""
+        path = self._path(key)
+        if not path.is_file():
+            raise NotFoundError("Document not found")
+        headers = {
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": PREVIEW_CACHE,
+            "Content-Security-Policy": "default-src 'none'",
+        }
+        try:
+            file, media = await previews.preview(path, content_type)
+        except TimeoutError:
+            return Response(status_code=503, headers={"Retry-After": "30"})
+        if media is None:
+            return Response(status_code=204, headers=headers)
+        return FileResponse(file, media_type=media, headers=headers)
 
 
 def get_storage() -> DocumentStorage:

@@ -63,3 +63,25 @@ export function isHttpUrl(url: string): boolean {
 export function plural(n: number, one: string, many = `${one}s`) {
   return `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`
 }
+
+const REGIONS = new Intl.DisplayNames(["en-GB"], { type: "region", fallback: "code" })
+
+/** "GH" reads "Ghana"; anything that isn't a two-letter region code is shown as given. */
+export function countryName(code: string): string {
+  const trimmed = code.trim()
+  if (!/^[A-Za-z]{2}$/.test(trimmed)) return trimmed
+  try {
+    return REGIONS.of(trimmed.toUpperCase()) ?? trimmed
+  } catch {
+    return trimmed
+  }
+}
+
+/** True when the source's own deadline wording names the same day as `iso`, so it needn't be shown again. */
+export function sameDay(text: string, iso: string): boolean {
+  if (text.trim() === iso) return true
+  const parsed = new Date(text)
+  if (Number.isNaN(parsed.getTime())) return false
+  const local = [parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate()].map((n) => String(n).padStart(2, "0")).join("-")
+  return local === iso
+}

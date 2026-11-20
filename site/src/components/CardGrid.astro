@@ -11,8 +11,10 @@ interface Props {
   rows?: boolean
   /** Render every item with the data ClientListing filters and pages on. */
   listing?: boolean
+  /** Off where the page is already filtered to one audience. */
+  showCategory?: boolean
 }
-const { items, rows = false, listing = false } = Astro.props
+const { items, rows = false, listing = false, showCategory = true } = Astro.props
 const three = rows ? wholeRows(items.length, 3) : items.length
 const four = rows ? wholeRows(items.length, 4) : items.length
 ---
@@ -32,7 +34,7 @@ const four = rows ? wholeRows(items.length, 4) : items.length
           "data-text": [opp.title, opp.organization, opp.summary, opp.benefits, ...opp.tags].join(" ").toLowerCase(),
         })}
       >
-        <SiteCard opp={opp} trackUrl={registerUrl(opp.slug)} />
+        <SiteCard opp={opp} trackUrl={registerUrl(opp.slug)} showCategory={showCategory} />
       </li>
     ))
   }

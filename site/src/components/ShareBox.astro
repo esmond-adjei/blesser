@@ -101,7 +101,7 @@ const chip = "rounded-full px-3 py-1.5 text-footnote font-semibold"
                 <div>
                   <div class="flex items-center justify-between gap-2">
                     <label for={`cap-${c.key}`} class="text-callout font-semibold text-ink">
-                      {c.label} <span class="font-normal text-ink-tertiary">· {c.hint}</span>
+                      {c.label} <span class="font-normal text-ink-tertiary">({c.hint})</span>
                     </label>
                     <button type="button" data-share-copy={`cap-${c.key}`} class={buttonVariants({ variant: "quiet", size: "sm" })}>
                       <CopyIcon />

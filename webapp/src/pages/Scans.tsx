@@ -186,7 +186,7 @@ export function Scans() {
       <div className="flex items-center gap-3">
         <AllowanceNote />
         <Button size="sm" variant="quiet" icon={<Link2 />} aria-label="My sources" onClick={() => setSourcesOpen(true)}><span className="max-sm:sr-only">My sources</span></Button>
-        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto Arrange</Button>
+        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto arrange</Button>
       </div>
     ),
   }), [arrange])

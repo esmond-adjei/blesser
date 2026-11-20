@@ -78,9 +78,11 @@ def test_every_mounted_app_route_has_the_expected_ext_audience_boundary(kit):
         ("GET", "/api/app/documents/usage"),
         ("GET", "/api/app/documents/{document_id}/download"),
         ("GET", "/api/app/applications"),
+        ("POST", "/api/app/applications"),
         ("GET", "/api/app/applications/{application_id}"),
         ("PATCH", "/api/app/applications/{application_id}"),
         ("POST", "/api/app/autofill/fill"),
+        ("GET", "/api/app/autofill/match"),
         ("POST", "/api/app/autofill/feedback"),
         ("POST", "/api/app/autofill/reports"),
         ("GET", "/api/app/extension/me"),
@@ -123,6 +125,10 @@ def test_every_mounted_app_route_has_the_expected_ext_audience_boundary(kit):
                     },
                     "corrected": {"wrong_field": True},
                 }
+            if method == "POST" and path == "/api/app/applications":
+                body = {"title": "Saved from the extension"}
+            if path.endswith("/autofill/match"):
+                url += "?url=https%3A%2F%2Fexample.com%2Fapply"
             if path.endswith("/autofill/reports"):
                 body = {
                     "page": {"url": "https://example.com"},

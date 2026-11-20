@@ -157,6 +157,7 @@ export async function runFill(api: Api, scripting: Scripting, tab: TabInfo, pref
     at: new Date().toISOString(),
     rows,
     matchedOpportunityId: response.matched_opportunity_id,
+    matchedApplicationId: response.matched_application_id ?? null,
     applied: false,
     remainingToday: response.usage.remaining_today,
     moved: null,

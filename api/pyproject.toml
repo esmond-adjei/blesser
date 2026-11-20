@@ -30,6 +30,8 @@ dependencies = [
     "olefile>=0.47",
     "phonenumbers>=8.13",
     "pycountry>=24.6",
+    "pillow>=11",
+    "pypdfium2>=4.30",
     "pypdf>=6",
 ]
 

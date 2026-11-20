@@ -34,7 +34,7 @@ const items = collection?.items.filter((o) => !o.closed) ?? []
   {
     collection && (
       <>
-      <PageHeader eyebrow="Collection" title={collection.title} description={collection.intro || undefined} tone="sun">
+      <PageHeader title={collection.title} description={collection.intro || undefined} tone="sun">
         <p slot="meta" class="m-0 mt-4 text-callout font-semibold text-sun-ink">{plural(items.length, "opportunity", "opportunities")} open</p>
       </PageHeader>
       <div class="site-container py-10">

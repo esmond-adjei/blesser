@@ -1,7 +1,9 @@
-import type { CollectedField, FillInstruction, FillOutcome, PageMessage, WriteResult } from "../shared/types"
+import type { CollectedField, ExportField, PageDetails, FillInstruction, FillOutcome, PageMessage, ProgressField, WriteResult } from "../shared/types"
 import { collectFields, type Collected } from "./collect"
 import { applyFills, writeField } from "./fill"
 import { clearMarks, flashField, markField, unmarkField } from "./highlight"
+import { pageDetails } from "./details"
+import { exportOf, frameSection, trackProgress, type ProgressTracker } from "./progress"
 import { watchPage, type Watcher } from "./watch"
 
 export interface BlesserContent {
@@ -10,6 +12,12 @@ export interface BlesserContent {
   write(key: string, value: string | string[] | null): WriteResult
   focus(key: string): boolean
   clear(): void
+  /** Starts reporting progress (once per page) and returns the count now. */
+  track(): ProgressField[]
+  /** Every field with what it holds now, for the Word export. */
+  snapshot(): ExportField[]
+  /** Title, funder and deadline as the page states them. */
+  details(): PageDetails
 }
 
 declare global {
@@ -21,11 +29,14 @@ declare global {
 if (!window.__blesser) {
   let state: Collected | null = null
   let watcher: Watcher | null = null
+  let tracker: ProgressTracker | null = null
   const notify = (message: PageMessage) => {
     try {
       void chrome.runtime.sendMessage(message).catch(() => {})
     } catch {
+      // The extension was reloaded or removed; this copy of the script is orphaned.
       watcher?.stop()
+      tracker?.stop()
     }
   }
   const ensureState = () => (state ??= collectFields(document, { layout: true }))
@@ -61,6 +72,16 @@ if (!window.__blesser) {
     },
     clear() {
       clearMarks(document)
+    },
+    track() {
+      tracker ??= trackProgress(document, (fields) => notify({ type: "blesser.progress", fields }), { fallbackSection: frameSection(window) })
+      return tracker.snapshot()
+    },
+    details() {
+      return pageDetails(document)
+    },
+    snapshot() {
+      return exportOf(collectFields(document, { layout: true }), frameSection(window))
     },
   }
 }

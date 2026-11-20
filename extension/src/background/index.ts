@@ -1,8 +1,9 @@
-import type { CollectedField, FillInstruction, FillOutcome, PageMessage, PanelMessage, Reply, Status, TrackedApplication, WriteResult } from "../shared/types"
+import type { CollectedField, ExportField, PageDetails, FillInstruction, FillOutcome, PageMessage, PanelMessage, ProgressField, Reply, Status, WriteResult } from "../shared/types"
 import { Actions } from "./actions"
 import { Api, SignedOut } from "./api"
 import { acceptConnect, connectUrl, newState } from "./connect"
-import { runFill, type Scripting, NO_ACCESS } from "./fill"
+import { blockedReason, runFill, type Scripting, NO_ACCESS } from "./fill"
+import { exportForm, startProgress, type FormScripting } from "./progress"
 import { FILL_REQUEST } from "../shared/ui"
 import { Store, type Area } from "./store"
 
@@ -37,6 +38,17 @@ const scripting: Scripting = {
   },
 }
 const actions = new Actions(api, store, scripting)
+
+async function inEveryFrame<T>(tabId: number, func: () => T): Promise<{ frameId: number; result: T }[]> {
+  await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["content.js"] })
+  const runs = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func })
+  return runs.map((r) => ({ frameId: r.frameId, result: r.result as T }))
+}
+
+const forms: FormScripting = {
+  track: (tabId) => inEveryFrame(tabId, () => window.__blesser?.track() ?? ([] as ProgressField[])),
+  snapshot: (tabId) => inEveryFrame(tabId, () => window.__blesser?.snapshot() ?? ([] as ExportField[])),
+}
 
 const NO_ACCESS_ERROR = /cannot access|cannot be scripted|must request permission|no tab with id|frame with id/i
 
@@ -86,14 +98,8 @@ async function handle(message: PanelMessage): Promise<unknown> {
       return store.saveSettings(message.settings)
     case "review":
       return (await store.review(message.tabId)) ?? null
-    case "trackedApplication": {
-      const review = await store.review(message.tabId)
-      if (!review?.matchedOpportunityId || review.moved === "navigated") return null
-      const match = (await api.applications()).find((app) => app.opportunity_id === review.matchedOpportunityId)
-      if (!match) return null
-      const { title, deadline, deadline_date } = match
-      return { title, deadline, deadline_date } satisfies TrackedApplication
-    }
+    case "trackedApplication":
+      return actions.tracked(await tabInfo(message.tabId))
     case "fill": {
       const review = await runFill(api, scripting, await tabInfo(message.tabId), await store.prefs()).catch(explain)
       await store.saveReview(review)
@@ -109,8 +115,6 @@ async function handle(message: PanelMessage): Promise<unknown> {
       if (!run?.result) throw new Error("That field isn't on the page any more.")
       return true
     }
-    case "markApplied":
-      return actions.markApplied(message.tabId)
     case "edit":
       return actions.edit(message.tabId, message.key, message.value)
     case "clear":
@@ -125,11 +129,26 @@ async function handle(message: PanelMessage): Promise<unknown> {
       return actions.reportPreview(await tabInfo(message.tabId)).catch(explain)
     case "report":
       return actions.report(message.report)
+    case "progress":
+      return startProgress(forms, store, await tabInfo(message.tabId)).catch(explain)
+    case "pageDetails": {
+      const tab = await tabInfo(message.tabId)
+      if (blockedReason(tab.url)) return { title: "", organization: "", deadline: null } satisfies PageDetails
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }).catch(explain)
+      const [run] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => window.__blesser?.details() ?? null })
+      return (run?.result as PageDetails | null) ?? { title: "", organization: "", deadline: null }
+    }
+    case "saveApplication":
+      return actions.saveApplication(await tabInfo(message.tabId), message.application)
+    case "setStatus":
+      return actions.setStatus(await tabInfo(message.tabId), message.status)
+    case "exportForm":
+      return exportForm(forms, await tabInfo(message.tabId)).catch(explain)
   }
 }
 
 const isPageMessage = (message: unknown): message is PageMessage =>
-  !!message && typeof message === "object" && ["blesser.edited", "blesser.step"].includes((message as { type?: string }).type ?? "")
+  !!message && typeof message === "object" && ["blesser.edited", "blesser.step", "blesser.progress"].includes((message as { type?: string }).type ?? "")
 
 chrome.runtime.onMessage.addListener((message: PanelMessage, sender, respond: (reply: Reply<unknown>) => void) => {
   if (sender.id !== chrome.runtime.id) return false
@@ -151,10 +170,15 @@ chrome.runtime.onMessageExternal.addListener((message: unknown, sender, respond:
 })
 
 chrome.tabs.onUpdated.addListener((tabId, info) => {
-  if (info.status === "loading") void actions.navigated(tabId).catch(() => {})
+  if (info.status !== "loading") return
+  void actions.navigated(tabId).catch(() => {})
+  void store.dropProgress(tabId)
 })
 
-chrome.tabs.onRemoved.addListener((tabId) => void store.dropReview(tabId))
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void store.dropReview(tabId)
+  void store.dropProgress(tabId)
+})
 
 // Shortcut and context menu grant activeTab on the page, which the side panel's own button can't.
 function fillFromGesture(tabId: number | undefined) {
