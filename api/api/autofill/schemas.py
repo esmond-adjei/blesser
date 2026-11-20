@@ -92,7 +92,13 @@ class FillResponse(BaseModel):
     fills: list[Fill]
     unfilled: list[Unfilled]
     matched_opportunity_id: str | None
+    matched_application_id: str | None = None
     usage: Usage
+
+
+class PageMatch(BaseModel):
+    application_id: str | None
+    opportunity_id: str | None
 
 
 FeedbackText = Annotated[str, Field(max_length=20000)]

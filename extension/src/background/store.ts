@@ -1,4 +1,4 @@
-import type { Prefs, Review, Settings } from "../shared/types"
+import type { FormProgress, Prefs, ProgressField, Review, Settings } from "../shared/types"
 
 export interface Auth {
   access_token: string
@@ -22,6 +22,7 @@ export const DEFAULT_PREFS: Prefs = { fillAs: "me", allowDrafting: true }
 const CONNECT_TTL_MS = 10 * 60_000
 
 export const reviewKey = (tabId: number) => `review:${tabId}`
+export const progressKey = (tabId: number) => `progress:${tabId}`
 
 const trim = (url: string) => url.trim().replace(/\/+$/, "")
 
@@ -87,7 +88,14 @@ export class Store {
     return !!pending && pending.state === state && now - pending.created < CONNECT_TTL_MS
   }
 
-  private queue = new Map<number, Promise<unknown>>()
+  private queue = new Map<string, Promise<unknown>>()
+
+  /** Runs read-modify-write steps on one key one after another, so concurrent events don't overwrite each other. */
+  private serial<T>(key: string, step: () => Promise<T>): Promise<T> {
+    const run = (this.queue.get(key) ?? Promise.resolve()).catch(() => {}).then(step)
+    this.queue.set(key, run)
+    return run
+  }
 
   review(tabId: number) {
     return this.read<Review>(this.session, reviewKey(tabId))
@@ -103,14 +111,34 @@ export class Store {
 
   /** Read-modify-write of one tab's review, serialized so page events and panel actions don't overwrite each other. */
   updateReview(tabId: number, change: (review: Review) => Review | Promise<Review>): Promise<Review | undefined> {
-    const run = (this.queue.get(tabId) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    return this.serial(reviewKey(tabId), async () => {
       const current = await this.review(tabId)
       if (!current) return undefined
       const next = await change(current)
       await this.saveReview(next)
       return next
     })
-    this.queue.set(tabId, run)
-    return run
+  }
+
+  progress(tabId: number) {
+    return this.read<FormProgress>(this.session, progressKey(tabId))
+  }
+
+  saveProgress(progress: FormProgress) {
+    return this.serial(progressKey(progress.tabId), () => this.session.set({ [progressKey(progress.tabId)]: progress }))
+  }
+
+  /** One frame's latest count; other frames keep theirs. */
+  updateProgress(tabId: number, frameId: number, fields: ProgressField[]): Promise<FormProgress> {
+    return this.serial(progressKey(tabId), async () => {
+      const current = (await this.progress(tabId)) ?? { tabId, url: "", frames: {} }
+      const next = { ...current, frames: { ...current.frames, [String(frameId)]: fields } }
+      await this.session.set({ [progressKey(tabId)]: next })
+      return next
+    })
+  }
+
+  dropProgress(tabId: number) {
+    return this.serial(progressKey(tabId), () => this.session.remove(progressKey(tabId)))
   }
 }
