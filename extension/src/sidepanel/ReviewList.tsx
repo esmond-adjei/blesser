@@ -81,7 +81,7 @@ export function ReviewList({ review, tabId, stale }: { review: Review; tabId: nu
 function Confidence({ level }: { level: ReviewRow["confidence"] }) {
   if (!level || level === "high") return null
   return (
-    <span className="shrink-0 text-[11px] leading-4 text-ink-tertiary" title={`${level === "medium" ? "Medium" : "Low"} confidence: check it`}>
+    <span className="shrink-0 text-caption text-ink-tertiary" title={`${level === "medium" ? "Medium" : "Low"} confidence: check it`}>
       {level === "medium" ? "Medium" : "Low"} confidence
     </span>
   )

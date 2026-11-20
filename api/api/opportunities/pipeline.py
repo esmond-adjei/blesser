@@ -2,7 +2,7 @@ import time
 from datetime import timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import cast, or_, select, update
+from sqlalchemy import cast, func, or_, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.agent.orchestrator import TaskHalted, _halt_reason
@@ -14,6 +14,7 @@ from api.editorial.service import get_settings
 from api.opportunities import service
 from api.opportunities.crawl_models import CrawlCandidate, Source
 from api.opportunities.crawler import crawl_due, record_candidate
+from api.opportunities.dedupe import key_for
 from api.opportunities.extraction import extract_page
 from api.opportunities.page_cache import get_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
@@ -31,6 +32,21 @@ async def lock_claim(session, candidate, token) -> bool:
         return True
     await session.commit()
     return False
+
+
+def claim_order():
+    """Newest items first, then sources that have yielded saves, then newest found.
+
+    Yield is smoothed ((saved + 1) / (found + 2)) so a new source starts at one half.
+    """
+    source_yield = (func.coalesce(Source.opportunities_saved, 0) + 1.0) / (
+        func.coalesce(Source.candidates_found, 0) + 2.0
+    )
+    return (
+        CrawlCandidate.published_date.desc().nulls_last(),
+        source_yield.desc(),
+        CrawlCandidate.created_at.desc(),
+    )
 
 
 async def claim_candidate(session, category: str, region: str):
@@ -56,8 +72,9 @@ async def claim_candidate(session, category: str, region: str):
                 cast(CrawlCandidate.category_hints, JSONB).contains([category]),
             ),
         )
-        .order_by(CrawlCandidate.created_at)
-        .with_for_update(skip_locked=True)
+        .outerjoin(Source, Source.id == CrawlCandidate.source_id)
+        .order_by(*claim_order())
+        .with_for_update(skip_locked=True, of=CrawlCandidate)
         .limit(1)
     )
     row = (await session.execute(query)).scalar_one_or_none()
@@ -78,7 +95,9 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     metrics["sources"] = {**metrics.get("sources", {}), **crawl["sources"]}
     ctx = ToolContext(session, scan)
     ctx.category = category
-    ctx.opportunities_saved = metrics.get("saved", 0)
+    # Crawler saves have their own budget: they never use up the agent's room.
+    ctx.save_via = "crawler"
+    ctx.opportunities_saved = metrics.get("crawler_saved", 0)
     limit = (await get_settings(session))["crawler"]["max_candidates_per_task"]
     attempts = 0
     for _ in range(limit * 10):
@@ -87,7 +106,10 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
             or ctx.opportunities_saved >= settings.max_opportunities_per_task
         ):
             break
-        if await _scan_created(session, scan.id) >= settings.max_opportunities_per_run:
+        if (
+            await _scan_created(session, scan.id, via="crawler")
+            >= settings.max_opportunities_per_run
+        ):
             break
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
@@ -168,14 +190,14 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                     add_reason(metrics, "region_excluded")
                 else:
                     data = result.opportunity
-                    candidate.dedupe_key = service.dedupe_key(
-                        data.organization, data.title
+                    candidate.dedupe_key = await key_for(
+                        session, data.organization, data.title
                     )
                     if data.category.value not in scan.categories:
                         candidate.status, candidate.reason = "new", "category_deferred"
                         candidate.category_hints = [data.category.value]
                         add_reason(metrics, "category_deferred")
-                    elif await service.find_by_key(session, candidate.dedupe_key):
+                    elif await service.blocks_save(session, candidate.dedupe_key):
                         candidate.status, candidate.reason = "duplicate", "dedupe_key"
                         add_reason(metrics, "dedupe_key")
                     elif data.source_url != page.url:
@@ -205,6 +227,9 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                             metrics["saved"] = metrics.get("saved", 0) + int(
                                 saved["created"]
                             )
+                            metrics["crawler_saved"] = metrics.get(
+                                "crawler_saved", 0
+                            ) + int(saved["created"])
                             if candidate.source_id and saved["created"]:
                                 await session.execute(
                                     update(Source)

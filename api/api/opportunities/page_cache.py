@@ -13,6 +13,7 @@ from api.editorial.service import get_settings
 from api.opportunities.crawl_http import fetch_error, get_document
 from api.opportunities.crawl_models import PageCache
 from api.opportunities.page_content import Page, normalized_url, parse_page
+from api.opportunities.pdf_text import PdfBody, read_pdf
 
 _FETCHING = "fetch_in_progress"
 
@@ -71,15 +72,23 @@ async def get_page(url: str) -> Page:
         try:
             response, raw = await asyncio.wait_for(
                 get_document(
-                    url, interval=config["host_interval_seconds"], headers=headers
+                    url,
+                    interval=config["host_interval_seconds"],
+                    headers=headers,
+                    allow_pdf=True,
                 ),
                 timeout=300,
             )
-            page = (
-                None
-                if response.status_code == 304
-                else await asyncio.to_thread(parse_page, raw, key)
-            )
+            if response.status_code == 304:
+                page = None
+            elif isinstance(raw, PdfBody):
+                page = await read_pdf(raw, key)
+            else:
+                page = await asyncio.to_thread(parse_page, raw, key)
+            final = str(getattr(response, "url", "") or "")
+            if page is not None and final and normalized_url(final) != key:
+                # Redirected: scheduled checks treat a move to a homepage as a lost page.
+                page.metadata["final_url"] = final
         except (
             httpx.HTTPError,
             egress.EgressBlocked,

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Navigate, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
-import { Bell, CalendarDays, Copy, Palette, RefreshCw, ShieldCheck, UserRound } from "lucide-react"
+import { Bell, CalendarDays, Copy, Palette, RefreshCw, ShieldCheck, Target, UserRound } from "lucide-react"
 import { ConnectedBrowsers } from "../components/settings/ConnectedBrowsers"
 import { Button, Field, Input, Select, buttonVariants, cn } from "@blesser/ui"
 import * as api from "../lib/api"
@@ -13,6 +13,7 @@ import { toastError, toastSuccess } from "../lib/toast"
 import { PageHeader } from "../components/layout/PageHeader"
 import { Avatar } from "../components/layout/AccountMenu"
 import { NotificationsPanel } from "../components/settings/NotificationsPanel"
+import { MatchingPanel } from "../components/settings/MatchingPanel"
 import { SettingRow, SettingsGroup, SettingsSection } from "../components/settings/controls"
 import { useAutosave } from "../lib/autosave"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog"
@@ -20,6 +21,7 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, Dia
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: UserRound, description: "How you appear in Blesser and in the emails it sends." },
   { id: "account", label: "Account and security", icon: ShieldCheck, description: "Your sign-in email, password, connected browsers and account." },
+  { id: "matching", label: "What you're looking for", icon: Target, description: "Your For you list, match alerts and saved searches." },
   { id: "notifications", label: "Notifications", icon: Bell, description: "What you hear about, where it reaches you and when it waits." },
   { id: "calendar", label: "Calendar", icon: CalendarDays, description: "Your application deadlines and dated to-dos in your own calendar app." },
   { id: "appearance", label: "Appearance", icon: Palette, description: "How Blesser looks on this device." },
@@ -74,6 +76,7 @@ export function Settings() {
           <SettingsSection id={active.id} title={active.label} description={active.description}>
             {active.id === "profile" ? <ProfileSection /> : null}
             {active.id === "account" ? <AccountSection /> : null}
+            {active.id === "matching" ? <MatchingPanel /> : null}
             {active.id === "notifications" ? <NotificationsPanel /> : null}
             {active.id === "calendar" ? <CalendarSection /> : null}
             {active.id === "appearance" ? <AppearanceSection /> : null}

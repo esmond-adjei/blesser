@@ -1,4 +1,4 @@
-import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, ProblemReport, TrackedApplication } from "../shared/types"
+import type { ExtensionMe, FillFeedback, FillRequest, FillResponse, NewApplication, PageMatch, ProblemReport } from "../shared/types"
 import type { Store } from "./store"
 
 const FILL_TIMEOUT_MS = 75_000
@@ -37,8 +37,11 @@ interface DocumentMeta {
   content_type: string
 }
 
-export interface Application extends TrackedApplication {
+export interface Application {
   id: string
+  title: string
+  deadline: string
+  deadline_date: string | null
   status: string
   opportunity_id: string | null
 }
@@ -81,7 +84,8 @@ export class Api {
     return this.refreshing
   }
 
-  async raw(path: string, init: RequestInit = {}): Promise<Response> {
+  /** `optional`: a lookup the panel can do without; an API that refuses it doesn't end the session. */
+  async raw(path: string, init: RequestInit = {}, { optional = false } = {}): Promise<Response> {
     const auth = await this.store.auth()
     if (!auth) throw new SignedOut()
     const send = (token: string) =>
@@ -96,6 +100,7 @@ export class Api {
       const token = await this.refresh()
       if (!token) throw new SignedOut()
       res = await send(token)
+      if (res.status === 401 && optional) throw await errorFrom(res)
       if (res.status === 401) {
         await this.store.clearAuth()
         throw new SignedOut()
@@ -132,12 +137,28 @@ export class Api {
     return this.json<void>("/api/app/autofill/reports", { method: "POST", body: JSON.stringify(body) })
   }
 
+  async match(url: string, title: string): Promise<PageMatch> {
+    const query = new URLSearchParams({ url: url.slice(0, 2048), title: title.slice(0, 500) })
+    // Optional: an API from before this route answers 401 to extension tokens.
+    const res = await this.raw(`/api/app/autofill/match?${query}`, {}, { optional: true })
+    return (await res.json()) as PageMatch
+  }
+
   applications() {
     return this.json<Application[]>("/api/app/applications")
   }
 
-  markSubmitted(id: string) {
-    return this.json<Application>(`/api/app/applications/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status: "submitted" }) })
+  async createApplication(body: NewApplication): Promise<Application> {
+    // Optional like match: an API from before extensions could save applications answers 401, which mustn't sign the member out.
+    const res = await this.raw("/api/app/applications", { method: "POST", body: JSON.stringify(body) }, { optional: true }).catch((err: unknown) => {
+      if (err instanceof Error && err.message.startsWith("Extension tokens")) throw new Error("This Blesser can't save applications from the extension yet. Add it in the app.")
+      throw err
+    })
+    return (await res.json()) as Application
+  }
+
+  updateApplication(id: string, body: Partial<Pick<Application, "status">>) {
+    return this.json<Application>(`/api/app/applications/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) })
   }
 
   async download(documentId: string): Promise<{ name: string; type: string; base64: string }> {

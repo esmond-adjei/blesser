@@ -11,6 +11,7 @@ from api.auth import models as _auth_models  # noqa: F401
 from api.autofill import models as _autofill_models  # noqa: F401
 from api.editorial import models as _editorial_models  # noqa: F401
 from api.extension_auth import models as _extension_models  # noqa: F401
+from api.matching import models as _matching_models  # noqa: F401
 from api.notifications import models as _notification_models  # noqa: F401
 from api.opportunities import crawl_models as _crawl_models  # noqa: F401
 from api.opportunities import models as _opportunity_models  # noqa: F401

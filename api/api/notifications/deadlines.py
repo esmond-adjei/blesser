@@ -138,7 +138,6 @@ async def send_digests(session, now: datetime | None = None) -> int:
             compose(
                 to=user.email,
                 subject=f"Blesser: {count}",
-                eyebrow="Daily digest",
                 heading=f"You have {count}",
                 paragraphs=["Here is what happened in the last day."],
                 items=[Item(row.title, row.body or "", app_url(row.link)) for row in unread],

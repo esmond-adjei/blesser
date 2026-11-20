@@ -14,6 +14,8 @@ const APP = process.env.E2E_APP_URL ?? "http://localhost:5180"
 const SITE_PORT = Number(process.env.E2E_SITE_PORT ?? 5190)
 const PROXY_PORT = Number(process.env.E2E_PROXY_PORT ?? 5191)
 const SITE = `http://localhost:${SITE_PORT}`
+// The same server under another host name: a funder site with nothing tracked yet.
+const OTHER_SITE = `http://127.0.0.1:${SITE_PORT}`
 const PROXY = `http://localhost:${PROXY_PORT}`
 const OUT = process.env.E2E_SCREENSHOTS ?? join(root, "dist-e2e-shots")
 const DIST = join(root, "dist-e2e")
@@ -59,7 +61,7 @@ const proxy = createServer(async (req, res) => {
 })
 await new Promise((resolve) => proxy.listen(PROXY_PORT, "127.0.0.1", resolve))
 
-const env = { ...process.env, BLESSER_API_URL: PROXY, BLESSER_APP_URL: APP, BLESSER_E2E_HOSTS: `${SITE}/*`, BLESSER_OUT_DIR: DIST }
+const env = { ...process.env, BLESSER_API_URL: PROXY, BLESSER_APP_URL: APP, BLESSER_E2E_HOSTS: `${SITE}/*,${OTHER_SITE}/*`, BLESSER_OUT_DIR: DIST }
 execFileSync("npx", ["vite", "build", "--logLevel", "warn"], { cwd: root, env, stdio: "inherit" })
 execFileSync("npx", ["vite", "build", "-c", "vite.content.config.ts", "--logLevel", "warn"], { cwd: root, env, stdio: "inherit" })
 
@@ -88,6 +90,10 @@ const session = await call("POST", "/api/app/auth/register", null, { email, pass
 const token = session.tokens.access_token
 const results = { email, backend: V2 ? "real v2 routes" : "feedback and reports mocked by the e2e proxy", steps: [] }
 async function shot(page, name, full = false) {
+  // Let entrance animations and colour-scheme transitions finish, or the shot catches a half-drawn frame.
+  // The theme follows a media-query listener, so give it a frame to start its transition before waiting it out.
+  await page.waitForTimeout(100)
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"), null, { timeout: 3000 }).catch(() => {})
   if (!full) return page.screenshot({ path: join(OUT, name) })
   // Sized to the content rather than fullPage, which crops a page laid out with a scrollbar.
   const size = page.viewportSize()
@@ -114,6 +120,8 @@ try {
   form.append("title", "Ama Mensah CV")
   form.append("is_default", "true")
   await call("POST", "/api/app/documents", token, form)
+  // Added by hand, with the funder's site as its link: the form page lives elsewhere on that site.
+  const tracked = await call("POST", "/api/app/applications", token, { title: "Kumasi Founders Fund 2026", link: `${SITE}/apply`, deadline: "30 Nov 2030" })
   results.steps.push("kit seeded")
 
   const profileDir = mkdtempSync(join(tmpdir(), "blesser-e2e-"))
@@ -156,7 +164,7 @@ try {
   const app = await connectTab
   await app.waitForURL(/\/login\?next=/)
   await app.getByLabel("Email").fill(email)
-  await app.getByLabel("Password").fill(password)
+  await app.getByLabel("Password", { exact: true }).fill(password)
   await app.getByRole("button", { name: /sign in/i }).click()
   await app.waitForURL(/\/connect\/extension\?ext=/)
   await app.getByRole("button", { name: "Allow" }).click()
@@ -173,6 +181,9 @@ try {
   await panel.getByRole("button", { name: "Fill this page" }).waitFor()
   await panel.getByRole("combobox").first().selectOption({ label: "Siwa" })
   if (process.env.E2E_DRAFTING === "0") await panel.getByRole("switch", { name: "Draft answers I haven't saved" }).click()
+  const opportunity = panel.getByRole("region", { name: "Opportunity on this page" })
+  await opportunity.getByText("Saved", { exact: true }).waitFor({ timeout: 10_000 })
+  results.steps.push("recognised a tracked application before any fill")
   await shot(panel, "02-panel-ready-light.png")
   await panel.emulateMedia({ colorScheme: "dark" })
   await shot(panel, "03-panel-ready-dark.png")
@@ -203,6 +214,51 @@ try {
   assert.equal(values.cv, "Ama-Mensah-CV.pdf")
   assert.notEqual(values.title, "SUBMITTED", "the form must never be submitted")
   results.steps.push("filled")
+
+  // Progress follows the page live, across the main page and the referee frame.
+  const progressBar = panel.getByRole("progressbar", { name: "Form progress" })
+  await progressBar.waitFor()
+  const filledNow = async () => Number(await progressBar.getAttribute("aria-valuenow"))
+  await panel.waitForFunction(() => Number(document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")) > 0, null, { timeout: 10_000 })
+  const filledAfterFill = await filledNow()
+  const total = Number(await progressBar.getAttribute("aria-valuemax"))
+  assert(filledAfterFill > 0 && filledAfterFill < total, `progress after the fill: ${filledAfterFill} of ${total}`)
+  const empty = await tabPage.evaluate(() => ["pronouns", "amount", "site", "traction", "mentor"].find((id) => !document.getElementById(id).value))
+  assert(empty, "the fixture has an empty field to type into")
+  await tabPage.locator(`#${empty}`).fill("42")
+  await panel.waitForFunction((n) => Number(document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")) === n, filledAfterFill + 1, { timeout: 10_000 })
+  await tabPage.locator(`#${empty}`).fill("")
+  await panel.waitForFunction((n) => Number(document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")) === n, filledAfterFill, { timeout: 10_000 })
+  assert(await panel.getByRole("list", { name: "Sections" }).getByText("Referee", { exact: true }).count(), "the frame's fields count under the frame's name")
+  results.progress = { filled: filledAfterFill, total }
+  await shot(panel, "04a-progress-light.png")
+  await panel.emulateMedia({ colorScheme: "dark" })
+  await shot(panel, "04b-progress-dark.png")
+  await panel.emulateMedia({ colorScheme: "light" })
+  results.steps.push("progress counted filled fields and followed typing on the page")
+
+  const download = panel.waitForEvent("download")
+  await panel.getByRole("button", { name: "Download as Word" }).click()
+  const docx = await download
+  assert.equal(docx.suggestedFilename(), "kumasi-founders-fund-application.docx")
+  const docxPath = join(OUT, "form-export.docx")
+  await docx.saveAs(docxPath)
+  const bytes = readFileSync(docxPath)
+  assert.equal(bytes.readUInt32LE(0), 0x04034b50, "the export is a ZIP package")
+  const text = bytes.toString("utf8")
+  for (const part of ["word/document.xml", "word/styles.xml", "[Content_Types].xml"]) assert(text.includes(part), `the package has ${part}`)
+  for (const expected of ["Kumasi Founders Fund: application", "First name", "Ama", "Founder CV", "City of residence"])
+    assert(text.includes(expected), `the document has ${expected}`)
+  assert(!text.includes("Card number"), "fields Blesser never fills stay out of the export")
+  await panel.getByText("Saved kumasi-founders-fund-application.docx").waitFor()
+  results.steps.push("exported the form to a Word document")
+
+  await opportunity.getByRole("button", { name: "Opportunity actions" }).click()
+  await panel.getByRole("menuitem", { name: "Status" }).click()
+  await panel.getByRole("menuitemradio", { name: "Submitted" }).click()
+  await opportunity.getByText("Submitted", { exact: true }).waitFor()
+  assert.equal((await call("GET", `/api/app/applications/${tracked.id}`, token)).status, "submitted")
+  results.steps.push("moved the tracked application to Submitted from the panel")
 
   const row = (label) => panel.getByRole("region", { name: "Review" }).locator("li").filter({ has: panel.getByText(label, { exact: true }) })
 
@@ -335,6 +391,55 @@ try {
   const saved = await call("GET", "/api/app/profile", token)
   if ("place_of_birth" in saved) assert.equal(saved.place_of_birth, "Kumasi")
   results.steps.push("Apply kit has country and place of birth")
+
+  // A form with no clear title or deadline: the panel asks for what's missing.
+  const unknown = await context.newPage()
+  await unknown.goto(`${OTHER_SITE}/open-call.html?call=a`)
+  const [unknownTab] = await worker.evaluate((url) => chrome.tabs.query({ url }), `${OTHER_SITE}/open-call.html?call=a`)
+  await panel.goto(`chrome-extension://${extId}/sidepanel.html?tab=${unknownTab.id}`)
+  await panel.bringToFront()
+  const card = panel.getByRole("region", { name: "Opportunity on this page" })
+  await card.getByText("Not in your applications").waitFor({ timeout: 10_000 })
+  await shot(panel, "15-not-in-applications.png")
+  await card.getByRole("button", { name: "Save to my applications" }).click()
+  const saveDialog = panel.getByRole("dialog", { name: "Save to my applications" })
+  await saveDialog.getByText("We couldn't find a deadline on this page.").waitFor()
+  assert.equal(await saveDialog.getByLabel("Title").inputValue(), "")
+  await saveDialog.getByLabel("Title").fill("Tamale Agritech Open Call")
+  await saveDialog.getByLabel("Deadline").fill("2030-12-15")
+  await saveDialog.getByLabel("Status").selectOption({ label: "Saved" })
+  await shot(panel, "16-save-dialog.png")
+  await saveDialog.getByRole("button", { name: "Save", exact: true }).click()
+  await card.getByText("Saved", { exact: true }).waitFor()
+  await panel.getByText("Saved to your applications as Saved").waitFor()
+
+  // A page that names the prize and its deadline is saved in one click, as Preparing.
+  const prize = await context.newPage()
+  await prize.goto(`${OTHER_SITE}/prize.html?call=b`)
+  const [prizeTab] = await worker.evaluate((url) => chrome.tabs.query({ url }), `${OTHER_SITE}/prize.html?call=b`)
+  await panel.goto(`chrome-extension://${extId}/sidepanel.html?tab=${prizeTab.id}`)
+  await panel.bringToFront()
+  await card.getByText("Not in your applications").waitFor({ timeout: 10_000 })
+  await card.getByRole("button", { name: "Save to my applications" }).click()
+  await card.getByText("Preparing", { exact: true }).waitFor()
+  assert.equal(await panel.getByRole("dialog").count(), 0, "no dialog when the page says enough")
+  await shot(panel, "17-saved-from-page.png")
+  await panel.emulateMedia({ colorScheme: "dark" })
+  await shot(panel, "18-saved-from-page-dark.png")
+  await panel.emulateMedia({ colorScheme: "light" })
+
+  const myApps = await call("GET", "/api/app/applications", token)
+  const openCall = myApps.find((a) => a.title === "Tamale Agritech Open Call")
+  assert.deepEqual([openCall?.status, openCall?.deadline_date, openCall?.link], ["saved", "2030-12-15", `${OTHER_SITE}/open-call.html?call=a`])
+  const prizeApp = myApps.find((a) => a.title === "Accra Climate Prize 2026")
+  assert.deepEqual(
+    [prizeApp?.status, prizeApp?.organization, prizeApp?.deadline_date, prizeApp?.link],
+    ["preparing", "Green Ghana Fund", "2030-11-30", `${OTHER_SITE}/prize.html?call=b`],
+  )
+  await prize.reload()
+  await panel.goto(`chrome-extension://${extId}/sidepanel.html?tab=${prizeTab.id}`)
+  await card.getByText("Preparing", { exact: true }).waitFor({ timeout: 10_000 })
+  results.steps.push("saved unmatched forms to my applications, with and without the dialog")
 } catch (err) {
   for (const [i, page] of (context?.pages() ?? []).entries()) await page.screenshot({ path: join(OUT, `fail-${i}.png`) }).catch(() => {})
   throw err

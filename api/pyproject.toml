@@ -32,6 +32,7 @@ dependencies = [
     "pycountry>=24.6",
     "pillow>=11",
     "pypdfium2>=4.30",
+    "pypdf>=6",
 ]
 
 [project.scripts]

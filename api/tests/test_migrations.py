@@ -90,6 +90,10 @@ EXPECTED_TABLES = sorted(
         "assistant_conversations",
         "assistant_messages",
         "scan_finds",
+        "organization_aliases",
+        "duplicate_dismissals",
+        "match_profiles",
+        "saved_searches",
         "collections",
         "collection_items",
         "opportunity_reports",
@@ -294,3 +298,43 @@ def test_editorial_migration_preserves_data_and_reverses_states():
         }
         command.upgrade(cfg, "head")
         assert len(_run(_fetch(url, "SELECT slug FROM opportunities"))) == 4
+
+
+def test_listing_freshness_rekeys_cycles_and_parks_collisions():
+    with _scratch_db() as url:
+        cfg = _cfg(url)
+        command.upgrade(cfg, "0010_ghana_sources")
+        _run(
+            _fetch(
+                url,
+                """
+                INSERT INTO opportunities (id, slug, audience, editor_note, title, organization,
+                    category, kind, summary, eligibility, benefits, location, countries,
+                    requirements, tags, deadline, rolling, link, source_url, status, source,
+                    dedupe_key, verified_at, created_at, updated_at)
+                SELECT v.id, v.id, 'public', '', v.title, v.org, 'student', 'scholarship', '',
+                    '', '', '', '[]', '[]', '[]', '', false, '', '', v.status, 'agent', v.key,
+                    v.verified, now(), now()
+                FROM (VALUES
+                    ('a', 'Scholars Program 2026', 'Mastercard Foundation', 'archived',
+                     'mastercard foundation|scholars program 2026', NULL::timestamp),
+                    ('b', 'Scholars Program 2027', 'Mastercard Foundation', 'published',
+                     'mastercard foundation|scholars program 2027', now()),
+                    ('c', 'In-Country Scholarships', 'German Academic Exchange Service',
+                     'published', 'german academic exchange service|in country scholarships',
+                     NULL::timestamp)
+                ) AS v(id, title, org, status, key, verified)
+                """,
+            )
+        )
+        command.upgrade(cfg, "head")
+        rows = _run(_fetch(url, "SELECT id, dedupe_key FROM opportunities ORDER BY id"))
+        assert {r["id"]: r["dedupe_key"] for r in rows} == {
+            "a": "mastercard|scholars program#a",
+            "b": "mastercard|scholars program",
+            "c": "daad|in country scholarships",
+        }
+        aliases = _run(_fetch(url, "SELECT count(*) AS n FROM organization_aliases"))
+        assert aliases[0]["n"] > 0
+        command.downgrade(cfg, "0010_ghana_sources")
+        command.upgrade(cfg, "head")

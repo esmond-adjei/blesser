@@ -89,6 +89,21 @@ describe("Api", () => {
     expect(await store.auth()).toBeUndefined()
   })
 
+  it("keeps the session when an older API refuses the optional page match", async () => {
+    const store = await signedIn()
+    const fetcher = vi.fn(async (url: string | URL | Request) => {
+      const path = String(url).replace("http://localhost:8000", "")
+      if (path === "/api/app/extension/refresh") return json(200, { access_token: "a2", refresh_token: "r2" })
+      return json(401, { detail: "Extension tokens cannot access this route." })
+    })
+    const api = new Api(store, fetcher as typeof fetch)
+    await expect(api.match("https://a.example/apply", "Apply")).rejects.toThrow("Extension tokens cannot access this route.")
+    expect(await store.auth()).toMatchObject({ access_token: "a2" })
+    expect(String(fetcher.mock.calls[0][0])).toBe("http://localhost:8000/api/app/autofill/match?url=https%3A%2F%2Fa.example%2Fapply&title=Apply")
+    await expect(api.createApplication({ title: "A", organization: "", link: "", deadline: "", deadline_date: null, status: "saved" })).rejects.toThrow("Add it in the app.")
+    expect(await store.auth()).toBeDefined()
+  })
+
   it("downloads documents with their filename and type", async () => {
     const store = await signedIn()
     const fetcher = vi.fn(async () =>

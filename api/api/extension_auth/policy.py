@@ -8,6 +8,7 @@ from api.core.exceptions import AuthError
 EXTENSION_ROUTES = frozenset(
     {
         ("POST", "/api/app/autofill/fill"),
+        ("GET", "/api/app/autofill/match"),
         ("POST", "/api/app/autofill/feedback"),
         ("POST", "/api/app/autofill/reports"),
         ("GET", "/api/app/profile"),
@@ -17,6 +18,7 @@ EXTENSION_ROUTES = frozenset(
         ("GET", "/api/app/documents/usage"),
         ("GET", "/api/app/documents/{document_id}/download"),
         ("GET", "/api/app/applications"),
+        ("POST", "/api/app/applications"),
         ("GET", "/api/app/applications/{application_id}"),
         ("PATCH", "/api/app/applications/{application_id}"),
         ("GET", "/api/app/extension/me"),

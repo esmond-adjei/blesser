@@ -147,7 +147,7 @@ function AppSidebar() {
         <nav aria-label="App">
           {NAV_GROUPS.map((group) => (
             <SidebarGroup key={group.label} className="px-0 pt-4 pb-0">
-              <SidebarGroupLabel className="h-6 px-2 text-[10px] text-ink-tertiary uppercase">{group.label}</SidebarGroupLabel>
+              <SidebarGroupLabel className="h-6 px-2 text-caption text-ink-tertiary">{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.items.map((item) => {

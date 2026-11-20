@@ -1,31 +1,33 @@
 ---
 import { cn } from "@blesser/ui"
-import ArrowLink from "./ArrowLink.astro"
 
 interface Props {
   id: string
-  eyebrow?: string
   title: string
   description?: string
   link?: { href: string; label: string }
   tone?: "sunk" | "sun" | "forest"
   class?: string
 }
-const { id, eyebrow, title, description, link, tone = "sunk", class: className } = Astro.props
+const { id, title, description, link, tone = "sunk", class: className } = Astro.props
 const tint = { sunk: "bg-surface-sunk", sun: "bg-sun-soft", forest: "bg-forest-soft" }[tone]
 ---
 
 <section aria-labelledby={id} class={cn("site-container py-6 sm:py-8", className)}>
-  <div class={cn("relative rounded-xl px-4 py-12 sm:px-8 md:py-16 lg:px-12", tint)}>
-    <slot name="decor" />
-    <header class="relative mx-auto mb-10 max-w-[640px] text-center">
-      {eyebrow && <p class="m-0 mb-3 eyebrow text-ink">{eyebrow}</p>}
-      <h2 id={id} class="m-0 type-title-1 text-ink">{title}</h2>
-      {description && <p class="m-0 mt-3 text-lg leading-7 text-ink-secondary">{description}</p>}
-      {link && <ArrowLink href={link.href} class="mt-6">{link.label}</ArrowLink>}
+  <div class={cn("rounded-xl px-4 py-10 sm:px-8 md:py-14 lg:px-12", tint)}>
+    <header class="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-10">
+      <div class="max-w-[640px]">
+        <h2 id={id} class="m-0 type-title-1 text-ink">{title}</h2>
+        {description && <p class="m-0 mt-3 text-lg leading-7 text-ink-secondary">{description}</p>}
+      </div>
+      {
+        link && (
+          <a href={link.href} class="shrink-0 font-semibold text-link underline decoration-1 underline-offset-4 hover:decoration-2">
+            {link.label}
+          </a>
+        )
+      }
     </header>
-    <div class="relative">
-      <slot />
-    </div>
+    <slot />
   </div>
 </section>

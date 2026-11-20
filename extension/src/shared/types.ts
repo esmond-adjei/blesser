@@ -51,6 +51,8 @@ export interface FillResponse {
   fills: Fill[]
   unfilled: { key: string; reason: string }[]
   matched_opportunity_id: string | null
+  /** Newer APIs also match applications added by hand, which have no opportunity. */
+  matched_application_id?: string | null
   usage: { drafted_fields: number; remaining_today: number }
 }
 
@@ -124,6 +126,8 @@ export interface Review {
   at: string
   rows: ReviewRow[]
   matchedOpportunityId: string | null
+  /** Absent on reviews stored before the API matched applications directly. */
+  matchedApplicationId?: string | null
   applied: boolean
   remainingToday: number | null
   /** "navigated": the tab loaded another page; "step": new fields appeared on the same page. */
@@ -134,6 +138,32 @@ export interface TrackedApplication {
   title: string
   deadline: string
   deadline_date: string | null
+  /** Submitted or further along in the member's records. */
+  applied: boolean
+  status: ApplicationStatus
+}
+
+/** What the page itself says about the opportunity. Guesses: the member confirms them. */
+export interface PageDetails {
+  title: string
+  organization: string
+  deadline: { text: string; date: string | null; rolling: boolean } | null
+}
+
+export type ApplicationStatus = "saved" | "preparing" | "submitted" | "interview" | "accepted" | "rejected"
+
+export interface NewApplication {
+  title: string
+  organization: string
+  link: string
+  deadline: string
+  deadline_date: string | null
+  status: ApplicationStatus
+}
+
+export interface PageMatch {
+  application_id: string | null
+  opportunity_id: string | null
 }
 
 export type Corrected = { value: string | string[] | null } | { wrong_field: true }
@@ -157,9 +187,37 @@ export interface WriteResult {
   value: string | string[] | null
 }
 
+/** One field's place in the progress count; labels only, never the value. */
+export interface ProgressField {
+  key: string
+  label: string
+  section: string
+  required: boolean
+  filled: boolean
+}
+
+/** Live progress on one tab, kept per frame because each frame reports on its own. */
+export interface FormProgress {
+  tabId: number
+  url: string
+  frames: Record<string, ProgressField[]>
+}
+
+/** A field with what it holds now, for the Word export. Read on the device and never sent to Blesser. */
+export interface ExportField extends FieldDescriptor {
+  value: string | string[] | null
+}
+
+export interface FormExport {
+  title: string
+  url: string
+  fields: ExportField[]
+}
+
 export type PageMessage =
   | { type: "blesser.edited"; key: string; value: string | string[] | null }
   | { type: "blesser.step"; added: number }
+  | { type: "blesser.progress"; fields: ProgressField[] }
 
 export interface Settings {
   apiUrl: string
@@ -188,7 +246,6 @@ export type PanelMessage =
   | { type: "review"; tabId: number }
   | { type: "trackedApplication"; tabId: number }
   | { type: "focus"; tabId: number; key: string }
-  | { type: "markApplied"; tabId: number }
   | { type: "edit"; tabId: number; key: string; value: string | string[] | null }
   | { type: "clear"; tabId: number; key: string }
   | { type: "wrongField"; tabId: number; key: string }
@@ -197,5 +254,10 @@ export type PanelMessage =
   | { type: "reportPreview"; tabId: number }
   | { type: "report"; tabId: number; report: ProblemReport }
   | { type: "settings"; settings: Settings }
+  | { type: "progress"; tabId: number }
+  | { type: "exportForm"; tabId: number }
+  | { type: "pageDetails"; tabId: number }
+  | { type: "saveApplication"; tabId: number; application: NewApplication }
+  | { type: "setStatus"; tabId: number; status: ApplicationStatus }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }

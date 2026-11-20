@@ -4,15 +4,20 @@ import type {
   ApplicationInput,
   AuthSession,
   AuthUser,
+  AlertFrequency,
   CalendarFeed,
+  MatchProfile,
+  MatchProfileInput,
   Opportunity,
   OpportunityFacets,
   OpportunityQuery,
   OpportunitySubmit,
   Paged,
+  SavedSearch,
   Scan,
   ScanAllowance,
   ScanRequest,
+  SearchFilters,
   ShareKit,
   Todo,
   TodoCreate,
@@ -180,6 +185,17 @@ function query(params: object): string {
   const text = q.toString()
   return text ? `?${text}` : ""
 }
+
+export const getMatchProfile = () => get<MatchProfile>("/api/app/match-profile")
+export const putMatchProfile = (body: MatchProfileInput) =>
+  req<MatchProfile>("/api/app/match-profile", { method: "PUT", body: JSON.stringify(body) })
+export const deleteMatchProfile = () => del<void>("/api/app/match-profile")
+export const listSavedSearches = () => get<SavedSearch[]>("/api/app/saved-searches")
+export const createSavedSearch = (body: { name: string; filters: SearchFilters; alerts: AlertFrequency }) =>
+  post<SavedSearch>("/api/app/saved-searches", body)
+export const updateSavedSearch = (id: string, body: { name?: string; alerts?: AlertFrequency }) =>
+  patch<SavedSearch>(`/api/app/saved-searches/${encodeURIComponent(id)}`, body)
+export const deleteSavedSearch = (id: string) => del<void>(`/api/app/saved-searches/${encodeURIComponent(id)}`)
 
 export const listOpportunities = (params: OpportunityQuery = {}) =>
   get<Paged<Opportunity>>(`/api/app/opportunities${query(params)}`)

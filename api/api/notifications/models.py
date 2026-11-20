@@ -58,6 +58,8 @@ class Notification(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # How it went out: "push", "email", "push,email", "none" or "capped".
     delivery: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Optional list for the email body: [{title, body, link}], e.g. matched listings.
+    items: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
 
 class PushSubscription(Base):
