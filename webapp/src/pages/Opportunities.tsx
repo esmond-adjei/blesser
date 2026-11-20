@@ -3,6 +3,7 @@ import * as React from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   ArrowUpRight,
+  BookmarkPlus,
   Check,
   CalendarPlus,
   Download,
@@ -16,6 +17,7 @@ import {
   Search,
   Share2,
   Sparkles,
+  Target,
 } from "lucide-react"
 import * as api from "../lib/api"
 import {
@@ -35,11 +37,22 @@ import {
   useTrackedOpportunities,
 } from "../lib/opportunities"
 import { formatAgo } from "../lib/format"
+import {
+  ALERTS,
+  ALERT_LABELS,
+  filtersToParams,
+  sameFilters,
+  suggestName,
+  useMatchProfile,
+  useSavedSearchMutations,
+  useSavedSearches,
+} from "../lib/matching"
 import { useDrawerParam, useUrlParam } from "../lib/urlParams"
 import { toastError, toastSuccess } from "../lib/toast"
-import type { Opportunity, OpportunityCategory, OpportunityKind } from "../lib/types"
+import type { AlertFrequency, Opportunity, OpportunityCategory, OpportunityKind, OpportunitySort, SearchFilters } from "../lib/types"
 import {
   Button,
+  Chip,
   Countdown,
   Field,
   Input,
@@ -68,10 +81,14 @@ import { ScanDialog } from "./Scans"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
 import { useIsMobile } from "../hooks/use-mobile"
 
-const SORTS = [
+const SORTS: { value: OpportunitySort; label: string }[] = [
+  { value: "for_you", label: "For you" },
+  { value: "relevance", label: "Best match" },
   { value: "deadline", label: "Closing soonest" },
   { value: "new", label: "Newest" },
 ]
+
+const isSort = (value: string): value is OpportunitySort => SORTS.some((s) => s.value === value)
 
 type View = "cards" | "list"
 const VIEW_KEY = "blesser.opportunities.view"
@@ -103,14 +120,16 @@ export function Opportunities() {
   const [draft, setDraft] = React.useState(query)
   const [categoryParam, setCategory] = useUrlParam("category")
   const [kindParam, setKind] = useUrlParam("kind")
-  const [sortParam, setSort] = useUrlParam("sort", "deadline")
+  const [sortParam, setSort] = useUrlParam("sort")
+  const [country] = useUrlParam("country")
   const [soonParam, setSoon] = useUrlParam("soon")
   const [closedParam, setClosed] = useUrlParam("closed")
   const [newParam, setNew] = useUrlParam("new")
   const drawer = useDrawerParam()
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
-  const sort = sortParam === "new" ? "new" : "deadline"
+  // Searching ranks by best match until a sort is picked; best match needs words.
+  const sort: OpportunitySort = isSort(sortParam) && (sortParam !== "relevance" || query) ? sortParam : query ? "relevance" : "deadline"
   const [view, setView] = useView()
 
   // Typing waits a beat before it touches the URL and the query; a URL change
@@ -130,6 +149,7 @@ export function Opportunities() {
     q: query || undefined,
     category,
     kind,
+    country: country || undefined,
     sort,
     closing_within: soonParam ? 14 : undefined,
     new: newParam ? true : undefined,
@@ -150,6 +170,19 @@ export function Opportunities() {
     onShare: setShareFor,
   }
   const filtered = !!(query || category || kind || soonParam || newParam || closedParam)
+  const filters: SearchFilters = {
+    q: query || undefined,
+    category: category ?? null,
+    kind: kind ?? null,
+    country: country || null,
+    closing_within: soonParam ? 14 : null,
+  }
+  const searchable = !!(query || category || kind || country || soonParam)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const profile = useMatchProfile()
+  const saved = useSavedSearches()
+  const current = saved.data?.find((s) => sameFilters(s.filters, filters))
+  useSavedSearchLink(saved.data)
 
   return (
     <div className="space-y-5">
@@ -211,7 +244,7 @@ export function Opportunities() {
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
-            {SORTS.map((s) => (
+            {SORTS.filter((s) => s.value !== "relevance" || query).map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
@@ -226,6 +259,11 @@ export function Opportunities() {
           <FilterToggle pressed={!!closedParam} onChange={(on) => setClosed(on ? "1" : "")}>
             Include closed
           </FilterToggle>
+          {searchable && !current ? (
+            <Button size="sm" variant="quiet" icon={<BookmarkPlus />} onClick={() => setSaveOpen(true)}>
+              Save search
+            </Button>
+          ) : null}
           <Segmented
             label="View"
             value={view}
@@ -238,6 +276,39 @@ export function Opportunities() {
           />
         </div>
       </div>
+
+      {saved.data?.length ? (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Saved searches" role="group">
+          <span className="text-footnote text-ink-secondary">Saved:</span>
+          {saved.data.slice(0, 8).map((s) => (
+            <Link
+              key={s.id}
+              to={`/opportunities?${filtersToParams(s.filters).toString()}`}
+              aria-current={s.id === current?.id ? "true" : undefined}
+              className="rounded-full focus-visible:outline-2 focus-visible:outline-focus"
+            >
+              <Chip tone={s.id === current?.id ? "forest" : "neutral"} className="h-7 hover:bg-separator">
+                {s.name}
+              </Chip>
+            </Link>
+          ))}
+          <Link to="/settings/matching" className="text-footnote text-link hover:underline">
+            Manage
+          </Link>
+        </div>
+      ) : null}
+
+      {sort === "for_you" && profile.data && !profile.data.saved ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-forest/40 bg-forest-soft px-4 py-3.5 sm:flex-row sm:items-center">
+          <Target aria-hidden="true" className="hidden size-5 shrink-0 text-link sm:block" />
+          <p className="min-w-0 flex-1 text-footnote text-ink">
+            Tell us what you're looking for and this list puts the best fits first. You can also get alerts when new ones are added.
+          </p>
+          <Link to="/settings/matching" className={cn(buttonVariants({ size: "sm", variant: "primary" }))}>
+            Set it up
+          </Link>
+        </div>
+      ) : null}
 
       {list.isLoading && view === "cards" ? (
         <div className="@container">
@@ -314,7 +385,93 @@ export function Opportunities() {
       <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
       <SubmitDialog open={submitOpen} onOpenChange={setSubmitOpen} />
       <ShareDialog opp={shareFor} onClose={() => setShareFor(null)} />
+      <SaveSearchDialog open={saveOpen} filters={filters} onOpenChange={setSaveOpen} />
     </div>
+  )
+}
+
+/** `?saved=<id>` (from an alert) opens that saved search's filters. */
+function useSavedSearchLink(searches: { id: string; filters: SearchFilters }[] | undefined) {
+  const [savedParam] = useUrlParam("saved")
+  const navigate = useNavigate()
+  React.useEffect(() => {
+    if (!savedParam || !searches) return
+    const found = searches.find((s) => s.id === savedParam)
+    const params = found ? filtersToParams(found.filters) : new URLSearchParams()
+    params.set("sort", "new")
+    navigate({ pathname: "/opportunities", search: params.toString() }, { replace: true })
+  }, [savedParam, searches, navigate])
+}
+
+function SaveSearchDialog({ open, filters, onOpenChange }: { open: boolean; filters: SearchFilters; onOpenChange: (open: boolean) => void }) {
+  const { create } = useSavedSearchMutations()
+  const [name, setName] = React.useState("")
+  const [alerts, setAlerts] = React.useState<AlertFrequency>("daily")
+  const [seenOpen, setSeenOpen] = React.useState(open)
+  if (seenOpen !== open) {
+    setSeenOpen(open)
+    if (open) {
+      setName(suggestName(filters))
+      setAlerts("daily")
+    }
+  }
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    create.mutate(
+      { name: name.trim(), filters, alerts },
+      {
+        onSuccess: () => {
+          toastSuccess(alerts === "off" ? "Search saved." : "Search saved. We'll tell you when new listings match it.")
+          onOpenChange(false)
+        },
+        onError: (err) => toastError(err, "That didn't save. Try again."),
+      },
+    )
+  }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md" onClose={() => onOpenChange(false)}>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>Save this search</DialogTitle>
+            <DialogDescription>Come back to these filters in one tap, and hear about new listings that match.</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <Field label="Name">
+              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required autoFocus />
+            </Field>
+            <Field label="Alerts for new listings">
+              <Select value={alerts} onChange={(e) => setAlerts(e.target.value as AlertFrequency)}>
+                {ALERTS.map((a) => (
+                  <option key={a} value={a}>
+                    {ALERT_LABELS[a]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="quiet" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={create.isPending || !name.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** On the For you list: which of the member's fields the listing mentions. */
+function MatchLine({ opp }: { opp: Opportunity }) {
+  if (!opp.match_terms?.length) return null
+  return (
+    <span className="inline-flex items-center gap-1 text-caption text-link">
+      <Target aria-hidden="true" className="size-3" />
+      Fits {opp.match_terms.slice(0, 2).join(", ")}
+    </span>
   )
 }
 
@@ -327,6 +484,7 @@ function Markers({ opp, members = true }: { opp: Opportunity; members?: boolean 
           New
         </span>
       ) : null}
+      <MatchLine opp={opp} />
       {members && opp.audience === "members" ? (
         <span className="inline-flex items-center gap-1 text-caption text-ink-tertiary">
           <Lock aria-hidden="true" className="size-3" />
@@ -451,7 +609,9 @@ function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) 
           trackDisabled={pending}
           onTrack={onTrack}
           cornerAction={<ActionMenuButton actions={actions} label={`More for ${opp.title}`} className={FLOATING_MENU_BUTTON} />}
-        />
+        >
+          <MatchLine opp={opp} />
+        </OpportunityCard>
       </li>
     </ActionContextMenu>
   )

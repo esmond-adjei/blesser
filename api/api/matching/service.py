@@ -90,7 +90,8 @@ def prefs_of(row: mm.MatchProfile | None) -> Prefs:
 # --- SQL pieces -------------------------------------------------------------
 
 _NORM_SQL = (
-    "btrim(regexp_replace(regexp_replace(lower(replace(c.value, 'ô', 'o')), "
+    "btrim(regexp_replace(regexp_replace(replace(translate(lower(c.value), "
+    f"'{geo.ACCENTED}', '{geo.PLAIN}'), '&', ' and '), "
     "'[^a-z0-9 ]', ' ', 'g'), '\\s+', ' ', 'g'))"
 )
 
@@ -270,8 +271,8 @@ async def suggest(session, user_id: str) -> dict:
     """A starting profile from the Applicant Kit: countries, stage, fields and skills."""
     from api.applicant_kit.models import Profile
 
-    kit = await session.get(Profile, user_id)
-    data = (kit.data if kit else None) or {}
+    # Only the plain profile column: the encrypted identity fields are never read.
+    data = await session.scalar(select(Profile.data).where(Profile.user_id == user_id)) or {}
     countries = clean_countries([data.get("nationality"), data.get("country_of_residence")])
     education = [e for e in data.get("education") or [] if isinstance(e, dict)]
     # Most recent first: an open-ended entry is the one in progress.

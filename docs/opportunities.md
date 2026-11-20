@@ -58,13 +58,45 @@ Set `OPPORTUNITY_SWEEP_EMAIL` to an existing enabled account and configure `swee
 
 The worker also runs an archive pass once per UTC date. With `auto_archive = true`, it archives published opportunities whose `deadline_date` is before today. Rolling opportunities are skipped. Existing tracked applications retain their copied listing details.
 
+## Search and matching
+
+Code: `api/api/matching/` (profile, scoring, saved searches, alerts) and the list in `opportunities/service.py`.
+
+**Search.** `opportunities.search_vector` is a stored generated `tsvector` (English stemming) with a GIN index. It weighs the title highest, then the funder, kind and tags, then the summary and location, then eligibility. Each word in `q` must match as a stemmed prefix, so "scholarships" finds "scholarship" and "schol" finds both while still typing. A query of only stop words ("the", "for") filters nothing. `sort=relevance` ranks by `ts_rank_cd`, then deadline. The web app uses it by default while there are search words; the public API and the Assistant's catalogue search accept it too.
+
+**What you're looking for.** A member's `match_profiles` row holds categories, kinds, fields of study or sectors (free text), stages (`undergraduate`, `masters`, `phd`, `postdoc`, `founder`) and countries they can apply from. Before it is saved, `GET /api/app/match-profile` suggests one from the Applicant Kit: nationality and country of residence, the latest education entry's stage (a finished degree points at the next stage), its field, and the first skills. Only the plain profile column is read, never the encrypted identity fields.
+
+**For you.** `sort=for_you` scores each listing in SQL (`matching/service.py`):
+
+| Signal | Points |
+|---|---|
+| Category is one of the member's | 3 |
+| Kind is one of the member's | 2 |
+| Each field the listing text mentions (first 8 fields, at most 2 count) | 1.5 |
+| A stage word (for example "masters", "PhD", "startup") | 1 |
+| Closes in 7 to 30 days (0 to 6 days: 0.5) | 1 |
+| Verified in the last 30 days | 0.5 |
+| Added in the last 7 days | 0.5 |
+
+Ties fall back to the soonest deadline. A listing whose `countries` names only specific countries, none of them the member's, is left out. Regions ("West Africa"), "Global" and an empty list keep it in, so an unclear listing is never hidden. Country names are matched after folding case, accents and punctuation, with aliases such as "Ivory Coast" and "UK" (`matching/geo.py`). Rows carry `match_score` and `match_terms` (the member's fields the listing mentions); the web app shows "Fits ..." on each card.
+
+**Saved searches.** Up to 20 per member: a name, the list filters (`q`, `category`, `kind`, `country`, `closing_within`) and an alert frequency.
+
+**Alerts.** The worker's hourly pass (`matching/alerts.py`) runs from 08:00 in the member's timezone:
+
+- `new_match`: listings published since the last alert that fit the profile, daily or weekly. A fit passes the country check and matches each kind of preference the member set among categories, kinds and fields. A profile with only countries gets no alerts.
+- `closing_match`: once a week, fitting listings that close within 14 days.
+- `saved_search`: listings published since the last alert that match a saved search.
+
+Each run makes at most one notification per member and kind (one per saved search), listing up to 10 listings, with the full list in the email. Tracked listings are left out. Alerts never look back more than 8 days, and turning alerts on starts from that moment. Notification settings decide push and email; with email off for a kind, the daily digest carries it.
+
 ## API
 
 Public GET responses send `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=3600`. Public schemas omit internal status, source, scan IDs, account IDs, editor notes, review reasons and traces. Public submissions are limited to 5 per IP per hour; reports to 10 per IP per hour.
 
 | Method and path | Auth | What it does |
 |---|---|---|
-| `GET /api/public/opportunities` | None | Published public listings, open by default. Filters: `q`, `category`, `kind`, `country`, `closing_within`, `include_closed`, `sort=deadline\|new`, `limit` up to 100, `offset`. |
+| `GET /api/public/opportunities` | None | Published public listings, open by default. Filters: `q`, `category`, `kind`, `country`, `closing_within`, `include_closed`, `sort=deadline\|new\|relevance`, `limit` up to 100, `offset`. |
 | `GET /api/public/opportunities/{slug}` | None | Public listing or archived closed marker; old slugs redirect. |
 | `GET /api/public/opportunities/{slug}/calendar.ics` | None | Deadline event. |
 | `GET /api/public/facets` | None | Open public category and kind counts, total and closing-soon count. |
@@ -72,7 +104,9 @@ Public GET responses send `Cache-Control: public, max-age=60, s-maxage=300, stal
 | `GET /api/public/site`, `GET /api/public/sitemap` | None | Current homepage content, active announcement, featured and closing-soon listings; sitemap data. |
 | `POST /api/public/submissions` | None | Share a listing, with optional email. Returns `201 {id}`. |
 | `POST /api/public/opportunities/{slug}/report` | None | Report a problem, with optional email. Returns 202. |
-| `GET /api/app/opportunities`, `GET /api/app/opportunities/{id_or_slug}` | Member | Published listings of either audience. List supports public filters plus `new=true` and `audience=members\|public`. |
+| `GET /api/app/opportunities`, `GET /api/app/opportunities/{id_or_slug}` | Member | Published listings of either audience. List supports public filters plus `new=true`, `audience=members\|public` and `sort=for_you`. |
+| `GET`/`PUT`/`DELETE /api/app/match-profile` | Member | What the member is looking for. `GET` returns `saved: false` and a suggestion from the Applicant Kit until one is saved. |
+| `GET`/`POST /api/app/saved-searches`, `PATCH`/`DELETE /api/app/saved-searches/{id}` | Member | Saved searches with `alerts=off\|daily\|weekly`; up to 20 (`409` past that). |
 | `GET /api/app/opportunities/facets` | Member | Counts of listings members can see. |
 | `POST /api/app/opportunities` | Member | Share a listing using the community publishing default. |
 | `POST /api/app/opportunities/{id}/track`, `GET /api/app/opportunities/tracked` | Member | Track idempotently; read the member's opportunity-to-application map. |

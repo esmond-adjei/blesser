@@ -16,3 +16,6 @@
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.
 - The web app builds on Node 26 LTS.
+- Search uses Postgres full-text search: plurals and word stems match, a word still being typed matches as a prefix, and "Best match" ranks by match quality.
+- "What you're looking for" in Settings: audiences, kinds, stage, fields and countries, suggested from the Apply kit. The For you order ranks listings by it and leaves out listings closed to the member's countries.
+- Saved searches, and alerts for new listings that fit the member (daily or weekly), a weekly "closing soon that fit you" list, and new results for saved searches.

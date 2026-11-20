@@ -466,3 +466,12 @@ def test_for_you_and_alerts_agree_on_the_country_gate():
     assert prefs.can_alert and not matching.Prefs(countries=("Ghana",)).can_alert
     # Members typed "Ghanaian" in the kit; it maps to the same gate.
     assert matching.clean_countries(["Ghanaian"]) == ["Ghana"]
+
+
+def test_country_gate_reads_browser_country_names_and_accents():
+    _profile(categories=["student"], countries=["Côte d’Ivoire"])
+    accented = _add("Ivorian Scholarship", countries=["Côte d'Ivoire", "Senegal"])
+    _add("Senegal Scholarship", countries=["Senegal"])
+    region = _add("Francophone Scholarship", countries=["Francophone Africa"])
+    page = _client().get("/api/opportunities", params={"sort": "for_you"}).json()
+    assert set(_ids(page)) == {accented, region}

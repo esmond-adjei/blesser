@@ -6,6 +6,7 @@ member; anything else (a region, "Global", a typo) keeps the listing in.
 """
 
 import re
+import unicodedata
 
 COUNTRIES = (
     "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
@@ -78,6 +79,12 @@ ALIASES = {
     "viet nam": "Vietnam",
     "lao pdr": "Laos",
     "macedonia": "North Macedonia",
+    "myanmar burma": "Myanmar",
+    "st kitts and nevis": "Saint Kitts and Nevis",
+    "st lucia": "Saint Lucia",
+    "st vincent and grenadines": "Saint Vincent and the Grenadines",
+    "palestinian territories": "Palestine",
+    "cabo verde": "Cabo Verde",
 }
 
 #: Nationality words members type in the Applicant Kit ("Ghanaian").
@@ -115,8 +122,18 @@ DEMONYMS = {
 }
 
 
+#: Accented letters folded the same way in SQL (service.country_gate).
+ACCENTED = "áàâäãåçéèêëíìîïñóòôöõúùûüý"
+PLAIN = "aaaaaaceeeeiiiinooooouuuuy"
+_FOLD = str.maketrans(ACCENTED, PLAIN)
+
+
 def normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", (text or "").lower().replace("ô", "o"))).strip()
+    folded = (text or "").lower().translate(_FOLD).replace("&", " and ")
+    # Punctuation becomes a space first ("d’Ivoire"), then other accents drop.
+    folded = re.sub(r"[^\w ]|_", " ", folded)
+    folded = unicodedata.normalize("NFKD", folded).encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", folded)).strip()
 
 
 _BY_KEY = {normalize(name): name for name in COUNTRIES} | ALIASES
