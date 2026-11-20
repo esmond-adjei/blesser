@@ -401,7 +401,7 @@ async def _wait(event: asyncio.Event, timeout: float) -> None:
 
 
 async def hourly_jobs(session) -> None:
-    """Deadline reminders, email digests, trace pruning and the scheduled sweep."""
+    """Deadline reminders, match alerts, email digests, trace pruning and the scheduled sweep."""
     from api.notifications.deadlines import check_deadlines, send_digests
     from api.opportunities.sweep import maybe_sweep
     from api.scans.service import prune_traces
@@ -409,6 +409,10 @@ async def hourly_jobs(session) -> None:
     reminders = await check_deadlines(session)
     if reminders:
         print(f"[worker] {reminders} deadline reminder(s)", flush=True)
+    from api.matching.alerts import run as match_alerts
+
+    if alerts := await match_alerts(session):
+        print(f"[worker] {alerts} match alert(s)", flush=True)
     await send_digests(session)
     await prune_traces(session)
     from api.opportunities.archive import auto_archive
@@ -464,6 +468,18 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
                 print(f"[worker] crawler error: {exc!r}", flush=True)
             await asyncio.sleep(30)
 
+    async def checking():
+        from api.opportunities.freshness import INTERVAL_SECONDS, run_checks
+
+        while True:
+            try:
+                async with SessionLocal() as session:
+                    if counts := await run_checks(session):
+                        print(f"[worker] listing checks: {counts}", flush=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[worker] listing check error: {exc!r}", flush=True)
+            await asyncio.sleep(INTERVAL_SECONDS)
+
     async def delivery() -> None:
         from api.notifications.delivery import deliver_pending
 
@@ -483,6 +499,7 @@ async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:
             _listen(work, notifications_due),
             housekeeping(),
             crawling(),
+            checking(),
             delivery(),
         )
     finally:

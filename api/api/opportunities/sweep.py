@@ -26,6 +26,15 @@ async def sweep_user_id(session) -> str | None:
     ).scalar_one_or_none()
 
 
+async def sweep_configured(session) -> bool:
+    """Whether a scheduled sweep account exists to extract crawler candidates."""
+    from api.editorial.service import get_settings
+
+    if (await get_settings(session))["sweep_hours"] <= 0:
+        return False
+    return await sweep_user_id(session) is not None
+
+
 async def maybe_sweep(session) -> str | None:
     """Start a scheduled scan when the last one is old enough; returns its id, or None."""
     from api.editorial.service import get_settings
@@ -52,6 +61,9 @@ async def maybe_sweep(session) -> str | None:
         if utcnow_naive() - last < timedelta(hours=hours):
             return None
     scan = await start_scan(
-        session, user_id, categories=[c.value for c in OpportunityCategory]
+        session,
+        user_id,
+        categories=[c.value for c in OpportunityCategory],
+        kind="sweep",
     )
     return scan.id

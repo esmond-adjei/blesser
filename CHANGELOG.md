@@ -16,3 +16,11 @@
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.
 - The web app builds on Node 26 LTS.
+- The crawler reads the newest pages first: feed items by publish date, sitemaps by last-updated date, then sources that have produced saves. Duplicate URL checks use a stored, indexed normalized URL.
+- The crawler reads PDF calls in a sandboxed parser with size, page, time and memory limits, and ten more Ghana sources are seeded: the Ghana Scholarships Authority, University of Ghana and KNUST notices, AREF, the Japan embassy and GREAT Scholarships (GEA and GETFund are seeded disabled).
+- Listings stay current: the worker re-checks listing pages on a schedule (unchanged pages without a model, changed ones with an agent), sends lost pages to review, archives undated listings nothing has confirmed for 120 days, and reopens a closed listing when its page opens a new cycle.
+- Fewer duplicates: the dedupe key ignores years, cycle words and words like "Foundation", organization aliases cover other names, and a Duplicates page in the admin console lists likely pairs to merge or dismiss. Merging moves tracking, to-dos, reports and links to the kept listing.
+- Search uses Postgres full-text search: plurals and word stems match, a word still being typed matches as a prefix, and "Best match" ranks by match quality.
+- "What you're looking for" in Settings: audiences, kinds, stage, fields and countries, suggested from the Apply kit. The For you order ranks listings by it and leaves out listings closed to the member's countries.
+- Saved searches, and alerts for new listings that fit the member (daily or weekly), a weekly "closing soon that fit you" list, and new results for saved searches.
+- Member scans follow the member's request: the agent matches existing catalogue listings first, then reads up to five sites the member names, then searches the web. A scan shows every listing that fits, matched or new, and its notification says how many were found and how many are new. Crawler saves no longer use the member's save limit, and finds from member sites wait for staff review.

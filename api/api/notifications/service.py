@@ -43,6 +43,23 @@ KINDS: dict[str, Kind] = {
         push=True,
         email=True,
     ),
+    "new_match": Kind(
+        "New matches for you",
+        "New listings that fit what you're looking for, daily or weekly.",
+        push=True,
+        email=True,
+    ),
+    "closing_match": Kind(
+        "Closing soon that fit you",
+        "Once a week, listings that fit you and close within two weeks.",
+        email=True,
+    ),
+    "saved_search": Kind(
+        "Saved search alerts",
+        "New listings for a search you saved.",
+        push=True,
+        email=True,
+    ),
     "test": Kind("Test notification", "", push=True, configurable=False),
 }
 
@@ -143,6 +160,7 @@ async def notify(
     body: str = "",
     link: str = "",
     entity_id: str | None = None,
+    items: list[dict] | None = None,
 ) -> bool:
     """Create one notification unless the dedupe_key exists; True when created.
     Never commits."""
@@ -161,6 +179,7 @@ async def notify(
             link=link[:500],
             entity_id=entity_id,
             dedupe_key=dedupe_key[:200],
+            items=items or None,
             in_inbox=channels["inbox"],
             created_at=now,
             # Nothing to send: mark handled so the delivery loop skips it.

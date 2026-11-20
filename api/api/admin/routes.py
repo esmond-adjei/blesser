@@ -2,6 +2,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.admin import schemas as s
@@ -14,11 +15,16 @@ from api.auth.security import hash_token
 from api.autofill import feedback as autofill_feedback
 from api.autofill.schemas import FormReportOut
 from api.core.db import get_session, like_pattern
-from api.core.exceptions import NotFoundError
+from api.core.exceptions import BadRequestError, NotFoundError
 from api.editorial import models as m
 from api.editorial import service as editorial
+from api.opportunities import dedupe
 from api.opportunities import service as opportunities
-from api.opportunities.models import Opportunity
+from api.opportunities.models import (
+    DuplicateDismissal,
+    Opportunity,
+    OrganizationAlias,
+)
 from api.opportunities.source_routes import router as sources_router
 from api.public.schemas import CollectionOut, SiteContent
 from api.scans import service as scans
@@ -219,6 +225,152 @@ async def counts(
     return out
 
 
+@router.get("/opportunities/duplicates", response_model=list[s.DuplicatePair])
+async def duplicates(
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_staff),
+):
+    """Pairs that look like one opportunity: similar titles or a shared source page."""
+    pairs = await dedupe.possible_duplicates(session, limit)
+    ids = {p[k] for p in pairs for k in ("first_id", "second_id")}
+    rows = {
+        r.id: opportunities.to_out(r)
+        for r in (
+            await session.execute(select(Opportunity).where(Opportunity.id.in_(ids)))
+        ).scalars()
+    }
+    return [
+        {
+            "first": rows[p["first_id"]],
+            "second": rows[p["second_id"]],
+            "score": p["score"],
+            "reason": p["reason"],
+        }
+        for p in pairs
+        if p["first_id"] in rows and p["second_id"] in rows
+    ]
+
+
+@router.post("/opportunities/duplicates/dismiss", status_code=204)
+async def dismiss_duplicate(
+    req: s.DismissIn,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_staff),
+):
+    """Record that two listings are different opportunities, so the pair stops showing."""
+    first_id, second_id = dedupe.ordered_pair(req.first_id, req.second_id)
+    if first_id == second_id:
+        raise BadRequestError("Choose two different opportunities.")
+    for id in (first_id, second_id):
+        if await session.get(Opportunity, id) is None:
+            raise NotFoundError("Opportunity not found")
+    await session.execute(
+        pg_insert(DuplicateDismissal)
+        .values(first_id=first_id, second_id=second_id, dismissed_by=staff.id)
+        .on_conflict_do_nothing()
+    )
+    await service.write_audit(
+        session,
+        staff,
+        "opportunity.dismiss_duplicate",
+        "opportunity",
+        first_id,
+        None,
+        {"second_id": second_id},
+        request,
+    )
+
+
+@router.get("/organization-aliases", response_model=list[s.AliasOut])
+async def organization_aliases(
+    session: AsyncSession = Depends(get_session), staff: User = Depends(get_staff)
+):
+    rows = await session.execute(
+        select(OrganizationAlias).order_by(
+            OrganizationAlias.canonical, OrganizationAlias.alias
+        )
+    )
+    return [{"alias": r.alias, "canonical": r.canonical} for r in rows.scalars()]
+
+
+@router.put("/organization-aliases", response_model=s.AliasOut)
+async def put_organization_alias(
+    req: s.AliasIn,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_staff),
+):
+    """Treat one organization name as another; existing listings are re-keyed."""
+    alias = dedupe.organization_key(req.alias)
+    canonical = dedupe.organization_key(req.canonical)
+    if not alias or not canonical or alias == canonical:
+        raise BadRequestError("Give two different organization names.")
+    if await session.get(OrganizationAlias, canonical) is not None:
+        raise BadRequestError("That name is itself an alias: map to its canonical name.")
+    row = await session.get(OrganizationAlias, alias)
+    before = {"alias": row.alias, "canonical": row.canonical} if row else None
+    if row is None:
+        session.add(OrganizationAlias(alias=alias, canonical=canonical))
+    else:
+        row.canonical = canonical
+    # Names that pointed at the alias now point at its canonical name (one level only).
+    chained = (
+        (
+            await session.execute(
+                select(OrganizationAlias).where(OrganizationAlias.canonical == alias)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for other in chained:
+        other.canonical = canonical
+    await session.flush()
+    rekeyed = await dedupe.rekey_organization(
+        session, alias, *(other.alias for other in chained)
+    )
+    after = {"alias": alias, "canonical": canonical, "rekeyed": rekeyed}
+    await service.write_audit(
+        session,
+        staff,
+        "organization_alias.update",
+        "organization_alias",
+        alias,
+        before,
+        after,
+        request,
+    )
+    return {"alias": alias, "canonical": canonical}
+
+
+@router.delete("/organization-aliases/{alias}", status_code=204)
+async def delete_organization_alias(
+    alias: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_staff),
+):
+    row = await session.get(OrganizationAlias, alias)
+    if row is None:
+        raise NotFoundError("Alias not found")
+    before = {"alias": row.alias, "canonical": row.canonical}
+    await session.delete(row)
+    await session.flush()
+    await dedupe.rekey_organization(session, alias)
+    await service.write_audit(
+        session,
+        staff,
+        "organization_alias.delete",
+        "organization_alias",
+        alias,
+        before,
+        None,
+        request,
+    )
+
+
 @router.post("/opportunities", response_model=s.AdminOpportunity)
 async def create_opportunity(
     req: s.OpportunityEdit,
@@ -232,7 +384,7 @@ async def create_opportunity(
         source="staff",
         created_by=staff.id,
         **values,
-        dedupe_key=opportunities.dedupe_key(req.organization, req.title),
+        dedupe_key=await dedupe.key_for(session, req.organization, req.title),
     )
     await editorial.slug_available(session, row.slug)
     if await opportunities.find_by_key(session, row.dedupe_key):
@@ -574,8 +726,9 @@ async def update_settings(
     )
     before = await editorial.get_settings(session)
     values = req.model_dump(mode="json")
-    if values.get("crawler") is None:
-        values["crawler"] = before["crawler"]
+    for nested in ("crawler", "freshness"):
+        if values.get(nested) is None:
+            values[nested] = before[nested]
     for key, value in values.items():
         row = await session.get(m.SiteSetting, key)
         if row:
@@ -630,6 +783,7 @@ async def start_scan(
         categories=[c.value for c in req.categories],
         region=req.region,
         focus=req.focus,
+        sites=await scans.check_sites(req.sites),
         commit=False,
     )
     await service.write_audit(

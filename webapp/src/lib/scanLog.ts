@@ -36,6 +36,16 @@ export function shortUrl(url: string): string {
   }
 }
 
+/** "grants.example/calls" from a site the member typed, with or without https. */
+export function siteLabel(site: string): string {
+  return shortUrl(site.includes("://") ? site : `https://${site}`)
+}
+
+/** Split typed text into sites: spaces, commas and new lines separate them. */
+export function parseSites(text: string): string[] {
+  return text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
+}
+
 /** First sentence of a tool error, without the tool-name prefix. */
 export function errorReason(preview: string | undefined): string {
   const raw = parse(preview).error
@@ -71,6 +81,19 @@ export function describeEvent(event: ScanTaskEvent): LogLine {
     const id = typeof result.opportunity_id === "string" && result.status !== "in_review" ? result.opportunity_id : undefined
     const created = result.created !== false
     return { kind: created ? "save" : "update", text: `${created ? "Saved" : "Updated"} ${title}`, opportunityId: id, failed, at }
+  }
+  if (event.tool === "search_catalogue") {
+    const query = String(input.query ?? "")
+    return failed
+      ? { kind: "search", text: `Catalog search for “${query}” didn't run`, failed, reason: errorReason(event.result_preview), at }
+      : { kind: "search", text: `Searched the catalog for “${query}”`, failed, at }
+  }
+  if (event.tool === "add_catalogue_match") {
+    if (failed) return { kind: "save", text: "Not matched", failed, reason: errorReason(event.result_preview), at }
+    const result = parse(event.result_preview)
+    const title = typeof result.title === "string" ? result.title : "a catalog listing"
+    const id = typeof result.opportunity_id === "string" ? result.opportunity_id : String(input.opportunity_id ?? "") || undefined
+    return { kind: "save", text: `Matched ${title}`, opportunityId: id, failed, at }
   }
   return { kind: "other", text: event.tool ? `Used ${event.tool.replaceAll("_", " ")}` : "Step", failed, at }
 }

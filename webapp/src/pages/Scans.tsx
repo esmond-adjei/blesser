@@ -9,6 +9,7 @@ import {
   Database,
   GripVertical,
   Globe,
+  Link2,
   LayoutGrid,
   Loader2,
   PanelRightOpen,
@@ -25,7 +26,9 @@ import {
   clock,
   describeEvent,
   formatDuration,
+  parseSites,
   scanElapsedMs,
+  siteLabel,
   type LogLine,
 } from "../lib/scanLog"
 import { toastError, toastSuccess } from "../lib/toast"
@@ -71,6 +74,12 @@ function scanFocus(scan: Scan): string {
   const focus = scan.focus.trim()
   return focus.startsWith("Find open opportunities eligible") ? "" : focus
 }
+
+function foundCount(scan: Scan): number {
+  return scan.opportunities_found ?? scan.opportunities_added
+}
+
+const MAX_SITES = 5
 
 function useTick(active: boolean, ms = 15_000) {
   const [, setTick] = React.useState(0)
@@ -383,7 +392,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
             {duration ? `${status.label} ${running ? "for" : "in"} ${duration}` : status.label}
           </Chip>
           <span className="text-caption text-ink-tertiary tabular-nums">
-            {running ? `${scan.opportunities_added} saved so far` : `${scan.opportunities_added} saved, ${formatAgo(scan.created_at)}`}
+            {running ? `${foundCount(scan)} found so far` : `${foundCount(scan)} found, ${formatAgo(scan.created_at)}`}
           </span>
         </div>
       </div>
@@ -411,11 +420,33 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
   const [category, setCategory] = React.useState<OpportunityCategory>("startup")
   const [region, setRegion] = React.useState("Ghana")
   const [focus, setFocus] = React.useState("")
+  const [sites, setSites] = React.useState<string[]>([])
+  const [siteDraft, setSiteDraft] = React.useState("")
+  const [showSites, setShowSites] = React.useState(false)
+  const siteInput = React.useRef<HTMLInputElement>(null)
+  const addSites = (text: string) => {
+    const typed = parseSites(text)
+    if (!typed.length) return
+    setSites((prev) => {
+      const next = [...prev]
+      for (const site of typed) if (next.length < MAX_SITES && !next.includes(site)) next.push(site)
+      return next
+    })
+    setSiteDraft("")
+  }
   const start = useMutation({
-    mutationFn: () => api.startScan({ categories: [category], region: region.trim(), focus: focus.trim() }),
+    mutationFn: () => api.startScan({
+      categories: [category],
+      region: region.trim(),
+      focus: focus.trim(),
+      sites: [...sites, ...parseSites(siteDraft)].slice(0, MAX_SITES),
+    }),
     onSuccess: (scan) => {
       void client.invalidateQueries({ queryKey: ["scans"] })
       setFocus("")
+      setSites([])
+      setSiteDraft("")
+      setShowSites(false)
       toastSuccess(`Agent sent to find ${CATEGORY_LABELS[category].toLowerCase()} opportunities`)
       onStarted?.(scan)
     },
@@ -440,6 +471,56 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
         placeholder="What should this agent look for? e.g. climate and agritech grants"
         className="max-h-32 min-h-9 w-full resize-none bg-transparent py-1.5 text-body text-ink outline-none [field-sizing:content] placeholder:text-ink-tertiary"
       />
+      {showSites ? (
+        <div className="mt-1 rounded-md bg-surface-sunk px-2.5 py-2">
+          <label htmlFor="scan-sites" className="text-caption font-medium text-ink-secondary">
+            Sites to check first <span className="text-ink-tertiary">({sites.length} of {MAX_SITES})</span>
+          </label>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {sites.map((site) => (
+              <span key={site} className="inline-flex max-w-full items-center gap-1 rounded-full bg-surface py-0.5 pl-2.5 pr-1 text-footnote text-ink shadow-elevation-1">
+                <span className="truncate">{siteLabel(site)}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${siteLabel(site)}`}
+                  onClick={() => setSites((prev) => prev.filter((s) => s !== site))}
+                  className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-full text-ink-tertiary hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+            {sites.length < MAX_SITES ? (
+              <input
+                id="scan-sites"
+                ref={siteInput}
+                type="text"
+                inputMode="url"
+                autoComplete="off"
+                value={siteDraft}
+                maxLength={2000}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (/[\s,]$/.test(value)) addSites(value)
+                  else setSiteDraft(value)
+                }}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData("text")
+                  if (/[\s,]/.test(text.trim())) { e.preventDefault(); addSites(siteDraft + text) }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); addSites(siteDraft) }
+                  else if (e.key === "Backspace" && !siteDraft && sites.length) setSites((prev) => prev.slice(0, -1))
+                }}
+                onBlur={() => addSites(siteDraft)}
+                placeholder={sites.length ? "Add another" : "e.g. ug.edu.gh/scholarships"}
+                className="h-7 min-w-40 flex-1 bg-transparent text-footnote text-ink outline-none placeholder:text-ink-tertiary"
+              />
+            ) : null}
+          </div>
+          <p className="mt-1 text-caption text-ink-tertiary">The agent reads these before it searches the web. New finds from them are checked by our team before they go public.</p>
+        </div>
+      ) : null}
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <div role="radiogroup" aria-label="Audience" className="flex rounded-full bg-surface-sunk p-0.5">
           {CATEGORIES.map((c) => (
@@ -459,6 +540,20 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
           ))}
         </div>
         <CountrySelect value={region} onChange={setRegion} side="top" />
+        <Button
+          type="button"
+          size="sm"
+          variant="quiet"
+          icon={<Link2 />}
+          aria-expanded={showSites}
+          aria-controls={showSites ? "scan-sites" : undefined}
+          onClick={() => {
+            setShowSites((v) => !v)
+            if (!showSites) requestAnimationFrame(() => siteInput.current?.focus())
+          }}
+        >
+          {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}
+        </Button>
         {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
         <Button
           type="submit"
@@ -519,6 +614,17 @@ function ScanPanel({ scan, actions }: { scan: Scan; actions?: React.ReactNode })
         {actions}
       </div>
       {/* <Tasks tasks={scan.tasks ?? []} /> */}
+      {scan.sites?.length ? (
+        <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-ink-secondary">
+          <Link2 aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
+          <span>Checked first:</span>
+          {scan.sites.map((site) => (
+            <a key={site} href={site} target="_blank" rel="noopener noreferrer nofollow" className="truncate text-link hover:underline">
+              {siteLabel(site)}
+            </a>
+          ))}
+        </p>
+      ) : null}
       <Finds finds={scan.finds ?? []} running={running} />
     </section>
   )
@@ -731,6 +837,7 @@ function Finds({ finds, running }: { finds: ScanFind[]; running: boolean }) {
         <h3 className="text-callout font-semibold text-ink">{running ? "Found so far" : "Found"}</h3>
         <span className="ml-auto text-footnote text-ink-tertiary tabular-nums">
           {finds.length} {finds.length === 1 ? "opportunity" : "opportunities"}
+          {finds.length ? `, ${finds.filter((f) => f.source === "web").length} new to Blesser` : ""}
         </span>
       </div>
       {shown.length ? (
@@ -740,7 +847,7 @@ function Finds({ finds, running }: { finds: ScanFind[]; running: boolean }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-1 text-footnote text-ink-secondary">{running ? "Finds appear here as the scan runs." : "This scan didn't find anything new."}</p>
+        <p className="mt-1 text-footnote text-ink-secondary">{running ? "Finds appear here as the scan runs." : "This scan didn't find anything that fits yet."}</p>
       )}
       {finds.length > FINDS_PREVIEW ? (
         <Button size="sm" variant="quiet" className="mt-1" aria-expanded={all} onClick={() => setAll((v) => !v)}>

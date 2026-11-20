@@ -30,12 +30,17 @@ async def list_opportunities(
     new: bool = False,
     audience: Literal["public", "members"] | None = None,
     closing_within: int | None = Query(default=None, ge=0, le=365),
-    sort: Literal["deadline", "new"] = "deadline",
+    sort: Literal["deadline", "new", "relevance", "for_you"] = "deadline",
     limit: int = Query(default=30, ge=1, le=opp_service.MAX_PAGE),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
 ):
-    """Member catalogue, ordered by deadline or discovery time."""
+    """Member catalogue. sort: deadline, new, relevance (best match for q) or
+    for_you (your match profile; listings closed to your countries are left out)."""
+    from api.matching import service as matching
+
+    match = await matching.get_prefs(session, current.id) if sort == "for_you" else None
     return await opp_service.list_public(
         session,
         q=q,
@@ -49,6 +54,7 @@ async def list_opportunities(
         sort=sort,
         limit=limit,
         offset=offset,
+        match=match,
     )
 
 

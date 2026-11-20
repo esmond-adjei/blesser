@@ -225,6 +225,64 @@ function SettingsForm({ initial }: { initial: api.Settings }) {
           </div>
         </section>
       )}
+      {draft.freshness && (
+        <section className="section-stack">
+          <h2>Listing checks</h2>
+          <p className="text-ink-secondary">
+            The worker re-reads listing pages on a schedule. Unchanged pages are
+            confirmed without a model; changed pages get an agent check. Closed
+            listings are watched for a new cycle.
+          </p>
+          <div className="form-grid">
+            {(
+              [
+                [
+                  "recheck_days",
+                  "Days before rechecking undated listings",
+                  1,
+                  365,
+                ],
+                ["closing_days", "Days before a deadline to recheck", 0, 60],
+                [
+                  "closing_recheck_days",
+                  "Recheck closing listings not confirmed for this many days",
+                  1,
+                  365,
+                ],
+                ["cycle_days", "Days between new-cycle checks", 1, 365],
+                [
+                  "stale_days",
+                  "Archive undated listings not confirmed for this many days",
+                  7,
+                  1095,
+                ],
+                ["max_checks", "Pages to check every 15 minutes", 0, 200],
+                ["max_agent_checks", "Agent checks per day", 0, 1000],
+              ] as const
+            ).map(([key, label, min, max]) => (
+              <Field
+                key={key}
+                label={label}
+                type="number"
+                min={min}
+                max={max}
+                step={1}
+                required
+                value={draft.freshness?.[key]}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    freshness: draft.freshness && {
+                      ...draft.freshness,
+                      [key]: Number(event.target.value),
+                    },
+                  })
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
       <MutationError error={update.error} />
       <Button type="submit" variant="primary" disabled={update.isPending}>
         {update.isPending ? "Saving…" : "Save settings"}
