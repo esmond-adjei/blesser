@@ -677,7 +677,7 @@ function AssistantReply({ message, text, status, entries = [], live, onRetry, on
           <Button size="sm" variant="secondary" icon={<Play />} onClick={onContinue} className="self-start">Continue</Button>
         ) : null}
         {content && !live ? (
-          <div className="-ml-1.5 -mt-1 flex">
+          <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}>
             <CopyButton text={content} label="Copy reply" />
             {onRetry ? <TurnAction label="Retry" onClick={onRetry}><RotateCcw className="size-3.5" aria-hidden="true" /></TurnAction> : null}
           </div>
