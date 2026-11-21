@@ -1,0 +1,12 @@
+date_utc	action	what	evidence	result	rollback_or_limit
+2026-11-21	A01	Inspect local repository state and instructions	Read-only Git and source inspection	Complete	Preserved existing changes; no infrastructure rollback needed
+2026-11-21	A02	Inspect deployment services and persistent storage	Compose Dockerfiles settings workflows queue and backup code	Complete	Findings in deployment-audit.md
+2026-11-21	A03	Check current provider and Coolify documentation	Official Oracle OVH and Coolify sources linked in plan	Complete	No provider account accessed or changed
+2026-11-21	A04	Attempt local Docker builder inspection	docker buildx ls denied access to Docker socket	Blocked verification	No image or running service created
+2026-11-21	A05	Execute existing deployment configuration checks	runpy executed test functions without database fixtures	Passed	Graduator two tests; Blesser three tests
+2026-11-21	A06	Check existing backup script syntax	bash -n on both application backup and restore scripts	Passed	No backup restore or deletion executed
+2026-11-21	A07	Create deploy branch at existing HEAD	git switch -c deploy authorized by user	Complete	No reset stash or cleanup; previous branches retained
+2026-11-21	A08	Write audit implementation plan and action log	Only new docs/deployment-* files	Complete	Revert the audit documentation commit if unwanted
+2026-11-21	A09	Infrastructure changes	User requires approval after audit and plan	Not started	No provisioning firewall DNS Coolify or production changes
+2026-11-21	A10	Validate audit documents and repeat scoped checks	Relative links TSV columns no em dashes five configuration tests and shell syntax	Passed	No database fixtures or runtime infrastructure used
+2026-11-21	A11	Commit only three deployment documentation files	Explicit path staging on local deploy branch	Recorded in Git history	Use git revert on this documentation commit; do not reset or clean unrelated work
