@@ -80,3 +80,25 @@ def test_steer_needs_a_prompt():
         ).status_code
         == 422
     )
+
+
+def test_timing_follows_the_latest_run_after_a_steer():
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace
+
+    from api.scans.service import _timing
+
+    t0 = datetime(2026, 11, 20, 10, 0, 0)
+    first = SimpleNamespace(
+        created_at=t0, started_at=t0, finished_at=t0 + timedelta(minutes=5)
+    )
+    later = t0 + timedelta(days=1)
+    second = SimpleNamespace(created_at=later, started_at=later, finished_at=None)
+    scan = SimpleNamespace(status="running")
+    assert _timing(scan, [first, second]) == {"started_at": later, "finished_at": None}
+    second.finished_at = later + timedelta(minutes=2)
+    scan.status = "done"
+    assert _timing(scan, [first, second]) == {
+        "started_at": later,
+        "finished_at": later + timedelta(minutes=2),
+    }

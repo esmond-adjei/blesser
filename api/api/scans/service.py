@@ -250,9 +250,21 @@ def _scan_out(
     return out
 
 
+RUN_WINDOW = timedelta(seconds=5)
+
+
+def latest_run(tasks: list[m.ScanTask]) -> list[m.ScanTask]:
+    """The tasks queued together last: a retry or a steer starts a new run on the same scan."""
+    if not tasks:
+        return []
+    newest = max(t.created_at for t in tasks)
+    return [t for t in tasks if t.created_at >= newest - RUN_WINDOW]
+
+
 def _timing(scan: m.Scan, tasks: list[m.ScanTask]) -> dict:
-    starts = [t.started_at for t in tasks if t.started_at]
-    ends = [t.finished_at for t in tasks if t.finished_at]
+    run = latest_run(tasks)
+    starts = [t.started_at or t.created_at for t in run]
+    ends = [t.finished_at for t in run if t.finished_at]
     finished = max(ends) if ends and m.status_str(scan.status) != "running" else None
     return {"started_at": min(starts) if starts else None, "finished_at": finished}
 
