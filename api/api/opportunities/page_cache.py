@@ -36,7 +36,11 @@ async def lock_url(session, key):
     )
 
 
-async def get_page(url: str) -> Page:
+async def get_page(url: str, need: str | None = None) -> Page:
+    """The page from the shared cache, fetched when missing or expired.
+
+    `need` names a metadata key that newer parsing adds (such as "outbound"): a cached
+    page parsed before that key existed is fetched again."""
     key = normalized_url(url)
     delay = 0.05
     while True:
@@ -45,7 +49,13 @@ async def get_page(url: str) -> Page:
             await lock_url(session, key)
             row = await session.get(PageCache, key)
             now = utcnow_naive()
-            if row is not None and row.expires_at > now:
+            outdated = (
+                need is not None
+                and row is not None
+                and not row.error
+                and need not in (row.metadata_json or {})
+            )
+            if row is not None and row.expires_at > now and not outdated:
                 if row.error != _FETCHING:
                     return from_row(row, True)
             else:
@@ -54,7 +64,8 @@ async def get_page(url: str) -> Page:
                 if row is None:
                     row = PageCache(url=key, metadata_json={})
                     session.add(row)
-                else:
+                elif not outdated:
+                    # An outdated parse needs the full body, not a 304.
                     if row.etag:
                         headers["If-None-Match"] = row.etag
                     if row.last_modified:
@@ -86,6 +97,8 @@ async def get_page(url: str) -> Page:
             else:
                 page = await asyncio.to_thread(parse_page, raw, key)
             final = str(getattr(response, "url", "") or "")
+            if page is not None:
+                page.metadata.setdefault("outbound", [])
             if page is not None and final and normalized_url(final) != key:
                 # Redirected: scheduled checks treat a move to a homepage as a lost page.
                 page.metadata["final_url"] = final

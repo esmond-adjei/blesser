@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Field, Select } from "@blesser/ui";
+import { Button, Field, Select, Textarea } from "@blesser/ui";
 import * as api from "../lib/api";
 import {
   MutationError,
@@ -223,6 +223,39 @@ function SettingsForm({ initial }: { initial: api.Settings }) {
               />
             ))}
           </div>
+        </section>
+      )}
+      {draft.aggregators && (
+        <section className="section-stack">
+          <h2>Aggregator sites</h2>
+          <p className="text-ink-secondary">
+            Sites that repost other funders' calls. Finds on them are followed
+            to the official page, and that page is stored instead. Finds with no
+            official page are held for review.
+          </p>
+          <Field label="Sites, one per line">
+            <Textarea
+              rows={8}
+              value={draft.aggregators.join("\n")}
+              onChange={(e) =>
+                setDraft({ ...draft, aggregators: e.target.value.split("\n") })
+              }
+            />
+          </Field>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={Boolean(draft.official_backfill)}
+              onChange={(e) =>
+                setDraft({ ...draft, official_backfill: e.target.checked })
+              }
+            />{" "}
+            Move existing listings off aggregator pages every hour
+          </label>
+          <p className="text-ink-secondary">
+            Ten listings a pass. Published listings with no official page go to
+            review.
+          </p>
         </section>
       )}
       {draft.freshness && (

@@ -72,7 +72,7 @@ This replaces today's `pending | published | hidden` and the `OPPORTUNITY_AUTO_P
 | `published_at`, `published_by` | When and by whom it went live. |
 | `featured_rank` | Non-null puts it in the homepage "Featured" row, in this order. |
 | `editor_note` | Internal note for staff. Never in public or member schemas. |
-| `review_reason` | Why it is in review: `new_submission`, `agent_low_confidence`, `reported`, `source_changed`. |
+| `review_reason` | Why it is in review: `new_submission`, `agent_low_confidence`, `reported`, `source_changed`, `no_official_link`. |
 
 New tables:
 
