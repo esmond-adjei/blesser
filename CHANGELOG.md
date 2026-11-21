@@ -13,6 +13,7 @@
 - Community submissions, reviewed and published in the admin console by editors and admins.
 - A public site (Astro) for the catalogue, and an admin console for review, editing, collections, sources, users and settings.
 - The Assistant: ask about opportunities, applications and to-dos; it proposes tracking or a to-do and acts once the member confirms.
+- The Assistant can do what a member can do: scans, My sources, applications, to-dos, the Apply kit, saved searches, what you're looking for, notifications and your name. Reads run freely. Every change shows an approval card first (deletes with a red button), and after you decide the reply carries on with the rest of the task. When a request is unclear it can open a short questionnaire with choices, text or a date, which you can answer or skip. Password, sign-in email, account deletion, connected browsers, push setup, the calendar feed link, appearance and file uploads stay in the app.
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
 - Fill the Apply kit profile from a CV: pick one from Documents or upload a PDF or Word file, check what Blesser found, and add only the details you tick. Fields the CV lacks stay empty, existing values are never replaced unless you choose, and national ID and passport details are never read.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from api.app.schemas import MemberOpportunity
 from api.public.schemas import APIModel
@@ -31,6 +31,22 @@ class ConfirmRequest(BaseModel):
     approved: bool
 
 
+Answer = (
+    Annotated[str, StringConstraints(max_length=300)]
+    | Annotated[
+        list[Annotated[str, StringConstraints(max_length=300)]], Field(max_length=6)
+    ]
+)
+
+
+class AnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    call_id: str
+    # Leave out to skip the questions.
+    answers: dict[str, Answer] | None = Field(default=None, max_length=4)
+
+
 class ToolStep(BaseModel):
     kind: Literal["tool"] = "tool"
     tool: str
@@ -55,7 +71,19 @@ TraceEntry = ToolStep | Commentary | Thought
 class Source(BaseModel):
     key: str
     kind: Literal[
-        "opportunity", "application", "todo", "project", "document", "answer", "web"
+        "opportunity",
+        "application",
+        "todo",
+        "project",
+        "document",
+        "answer",
+        "web",
+        "scan",
+        "find",
+        "site",
+        "saved_search",
+        "profile",
+        "settings",
     ]
     id: str
     title: str
@@ -66,11 +94,29 @@ class Source(BaseModel):
     preview: bool = False
 
 
-class PendingCall(BaseModel):
+class Question(BaseModel):
     id: str
+    prompt: str
+    type: Literal["single", "multiple", "text", "date"]
+    options: list[str] = []
+    allow_other: bool = False
+    max_choices: int | None = None
+    required: bool = True
+
+
+class PendingCall(BaseModel):
+    """A change waiting for approval, or questions waiting for answers."""
+
+    id: str
+    type: Literal["change", "questions"] = "change"
+    tool: str = ""
     summary: str
     trace: list[TraceEntry]
     note: str = ""
+    # The approve button's label; danger shows it in red (deletes and stops).
+    action: str = "Approve"
+    tone: Literal["default", "danger"] = "default"
+    questions: list[Question] = []
 
 
 class MessageOut(APIModel):
