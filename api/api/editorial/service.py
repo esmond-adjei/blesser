@@ -17,7 +17,8 @@ def defaults():
         "community_default": {"status": "in_review"},
         "auto_archive": True,
         "member_scan_limits": {"per_hour": 3, "per_day": 10},
-        "sweep_hours": settings.opportunity_sweep_hours,
+        # Scan schedules (scans/schedules.py); the daily token budget is off at 0.
+        "scheduled_scans": {"member_max": 3, "runs_per_hour": 10, "daily_token_budget": 0},
         "crawler": {
             "hours": settings.crawl_hours,
             "max_sources": settings.crawl_max_sources,

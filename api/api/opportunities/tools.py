@@ -202,16 +202,21 @@ async def handle_save_opportunity(
         ),
     )
     if scan_id:
+        find = insert(ScanFind).values(
+            scan_id=scan_id,
+            opportunity_id=opp.id,
+            source_url=data.source_url if created else None,
+            via=via,
+            created=created,
+            updated=bool(updated),
+        )
         await ctx.session.execute(
-            insert(ScanFind)
-            .values(
-                scan_id=scan_id,
-                opportunity_id=opp.id,
-                source_url=data.source_url if created else None,
-                via=via,
-                created=created,
+            find.on_conflict_do_update(
+                index_elements=[ScanFind.scan_id, ScanFind.opportunity_id],
+                set_={"updated": ScanFind.updated | find.excluded.updated},
             )
-            .on_conflict_do_nothing()
+            if updated
+            else find.on_conflict_do_nothing()
         )
     from api.opportunities.crawler import propose_source, record_candidate
 

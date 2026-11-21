@@ -80,6 +80,7 @@ def user_message(
     sites: list[str] | None = None,
     member: bool = False,
     sources_only: bool = False,
+    repeat: bool = False,
 ) -> str:
     known_block = "\n".join(f"- {k}" for k in known) if known else "(none yet)"
     focus = (focus or "").strip()
@@ -120,6 +121,14 @@ def user_message(
             else ""
         )
         + ("\n" + steps if steps else "")
+        + (
+            "\nThis scan repeats on a schedule. Spend the turns on what is new "
+            "since earlier runs. When a page you read shows a new deadline or "
+            "changed facts for a listing already in the catalogue, save it so the "
+            "listing is refreshed.\n"
+            if repeat
+            else ""
+        )
         + f"\nAlready in the catalogue for this category:\n{known_block}\n\n"
         f"Budget: save at most {settings.max_opportunities_per_task} opportunities in "
         f"this task. Save each one as soon as it is verified, then stop and summarize "
@@ -128,10 +137,10 @@ def user_message(
 
 
 async def _crawler_runs_in_member_scans(session) -> bool:
-    """Without a scheduled sweep, nothing else extracts crawler candidates."""
-    from api.opportunities.sweep import sweep_configured
+    """Without a staff schedule, nothing else extracts crawler candidates."""
+    from api.scans.schedules import staff_schedules_active
 
-    return not await sweep_configured(session)
+    return not await staff_schedules_active(session)
 
 
 async def run_discover_opportunities(
@@ -210,6 +219,7 @@ async def _run_agent(
         sites=sites,
         member=member,
         sources_only=sources_only,
+        repeat=bool(scan.schedule_id) and scan.kind != "member",
     )
     ctx = ToolContext(session=session, run=scan)
     ctx.category = category

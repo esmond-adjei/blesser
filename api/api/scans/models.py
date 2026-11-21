@@ -54,6 +54,10 @@ class Scan(Base):
     kind: Mapped[str] = mapped_column(String, default="member", server_default="member")
     # Up to five public sites the member asked the agent to read first.
     sites: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
+    # Set on each run of a scan schedule.
+    schedule_id: Mapped[str | None] = mapped_column(
+        ForeignKey("scan_schedules.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # running | done | cancelled
     status: Mapped[str] = mapped_column(String, default="running", index=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -144,6 +148,8 @@ class ScanFind(Base):
     via: Mapped[str] = mapped_column(String, default="agent", server_default="agent")
     # This scan created the listing (it was not in the catalogue before).
     created: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # An existing listing this scan read again and refreshed with new facts.
+    updated: Mapped[bool] = mapped_column(default=False, server_default="false")
 
 
 class MemberSource(Base):
@@ -176,4 +182,49 @@ class MemberSource(Base):
         ForeignKey("scans.id", ondelete="SET NULL")
     )
     finds: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+
+
+class ScanSchedule(Base):
+    """A scan request that repeats: each run is an ordinary scan with `schedule_id` set.
+
+    Member schedules belong to the member and run weekly as scans of kind `scheduled`.
+    Staff schedules have no owner: they run as the scheduled scans account (see
+    `schedules.run_as_staff`), as scans of kind `sweep`, so the crawler pipeline runs
+    first. The catalogue sweep is the first staff schedule.
+    """
+
+    __tablename__ = "scan_schedules"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    # member | staff
+    audience: Mapped[str] = mapped_column(String(8), default="member")
+    # The member who owns it; None for staff schedules.
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    created_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(80), default="")
+    categories: Mapped[list] = mapped_column(JSON, default=list)
+    region: Mapped[str] = mapped_column(String(120), default="")
+    focus: Mapped[str] = mapped_column(Text, default="")
+    sites: Mapped[list] = mapped_column(JSON, default=list)
+    interval_hours: Mapped[int] = mapped_column(Integer, default=168)
+    paused: Mapped[bool] = mapped_column(default=False)
+    # Why it paused itself: empty (runs found nothing) or inactive (owner away).
+    pause_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    next_run_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow_naive, index=True
+    )
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_scan_id: Mapped[str | None] = mapped_column(
+        ForeignKey("scans.id", ondelete="SET NULL", use_alter=True), nullable=True
+    )
+    runs: Mapped[int] = mapped_column(Integer, default=0)
+    # Finished runs in a row that found nothing.
+    empty_runs: Mapped[int] = mapped_column(Integer, default=0)
+    # The owner last created, edited or resumed it; counts as activity.
+    touched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)

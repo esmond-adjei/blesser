@@ -10,6 +10,7 @@ from api.opportunities.models import (
     OpportunityStatus,
 )
 from api.public.schemas import APIModel
+from api.scans.routes import ScheduleOut
 
 Audience = Literal["public", "members"]
 ReviewReason = Literal["new_submission", "agent_find", "reported", "source_changed"]
@@ -212,6 +213,14 @@ class FreshnessSettings(BaseModel):
     max_agent_checks: int = Field(default=20, ge=0, le=1000)
 
 
+class ScheduledScanSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    member_max: int = Field(default=3, ge=0, le=20)
+    runs_per_hour: int = Field(default=10, ge=0, le=200)
+    # Model tokens scheduled runs may use per day (UTC); 0 means no budget.
+    daily_token_budget: int = Field(default=0, ge=0, le=1_000_000_000)
+
+
 class SettingsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     agent_default: PublishingDefault = PublishingDefault(
@@ -220,7 +229,7 @@ class SettingsIn(BaseModel):
     community_default: CommunityDefault = CommunityDefault()
     auto_archive: bool = True
     member_scan_limits: ScanLimits = ScanLimits()
-    sweep_hours: int = Field(default=0, ge=0, le=8760)
+    scheduled_scans: ScheduledScanSettings = ScheduledScanSettings()
     crawler: CrawlerSettings | None = None
     freshness: FreshnessSettings | None = None
 
@@ -269,3 +278,35 @@ class StaffSession(BaseModel):
     access_token: str
     refresh_token: str
     user: StaffUser
+
+
+class StaffScheduleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(default="", max_length=80)
+    categories: list[OpportunityCategory] = Field(min_length=1, max_length=3)
+    region: str = Field(default="", max_length=120)
+    focus: str = Field(default="", max_length=2000)
+    interval_hours: Literal[24, 72, 168] = 168
+    paused: bool = False
+
+
+class StaffSchedulePatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = Field(default=None, max_length=80)
+    categories: list[OpportunityCategory] | None = Field(
+        default=None, min_length=1, max_length=3
+    )
+    region: str | None = Field(default=None, max_length=120)
+    focus: str | None = Field(default=None, max_length=2000)
+    interval_hours: Literal[24, 72, 168] | None = None
+    paused: bool | None = None
+
+
+class StaffSchedulesOut(BaseModel):
+    schedules: list[ScheduleOut]
+    member_schedules: int
+    member_schedules_active: int
+    runs_last_7_days: int
+    tokens_today: int
+    run_as: str | None
+    intervals: list[int]

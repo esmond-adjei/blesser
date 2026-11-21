@@ -110,6 +110,7 @@ EXPECTED_TABLES = sorted(
         "notifications",
         "opportunities",
         "push_subscriptions",
+        "scan_schedules",
         "scan_tasks",
         "scans",
         "todos",
@@ -339,3 +340,37 @@ def test_listing_freshness_rekeys_cycles_and_parks_collisions():
         assert aliases[0]["n"] > 0
         command.downgrade(cfg, "0010_ghana_sources")
         command.upgrade(cfg, "head")
+
+
+def test_scan_schedules_fold_the_sweep_into_a_staff_schedule():
+    with _scratch_db() as url:
+        cfg = _cfg(url)
+        command.upgrade(cfg, "0014_member_sources")
+        _run(_fetch(url, "UPDATE site_settings SET value = '12' WHERE key = 'sweep_hours'"))
+        command.upgrade(cfg, "head")
+        rows = _run(
+            _fetch(
+                url,
+                "SELECT audience, user_id, name, categories::text AS categories, "
+                "interval_hours, paused FROM scan_schedules",
+            )
+        )
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["audience"] == "staff"
+        assert row["user_id"] is None
+        assert row["interval_hours"] == 12
+        assert row["paused"] is False
+        assert json.loads(row["categories"]) == ["startup", "research", "student"]
+        left = _run(_fetch(url, "SELECT key FROM site_settings WHERE key = 'sweep_hours'"))
+        assert left == []
+        command.downgrade(cfg, "0014_member_sources")
+        back = _run(_fetch(url, "SELECT value::text AS v FROM site_settings WHERE key = 'sweep_hours'"))
+        assert back[0]["v"] == "12"
+
+
+def test_scan_schedules_skip_a_disabled_sweep():
+    with _scratch_db() as url:
+        cfg = _cfg(url)
+        command.upgrade(cfg, "head")
+        assert _run(_fetch(url, "SELECT id FROM scan_schedules")) == []

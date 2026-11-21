@@ -69,6 +69,7 @@ async def start_scan(
     focus: str = "",
     sites: list[str] | None = None,
     kind: str = "member",
+    schedule_id: str | None = None,
     commit: bool = True,
 ) -> m.Scan:
     """Create the scan and queue one discovery task per category. Commits.
@@ -86,6 +87,7 @@ async def start_scan(
         focus=focus.strip(),
         kind=kind,
         sites=list(sites or []),
+        schedule_id=schedule_id,
         status="running",
     )
     session.add(scan)
@@ -125,9 +127,11 @@ async def note_tasks_drained(session, scan_id: str) -> None:
             # Scheduled checks report through the listings themselves, not a notification.
             return
         from api.notifications import events
+        from api.scans.schedules import run_finished
         from api.scans.sources import record_finds
 
         await record_finds(session, scan)
+        await run_finished(session, scan)
         await events.scan_finished(session, scan)
 
 
@@ -193,7 +197,10 @@ async def find_counts(session, scan_ids: list[str]) -> dict[str, tuple[int, int]
 
 
 def _scan_out(
-    scan: m.Scan, counts: tuple[int, int], tasks: list[m.ScanTask] | None = None
+    scan: m.Scan,
+    counts: tuple[int, int],
+    tasks: list[m.ScanTask] | None = None,
+    updated: int = 0,
 ) -> dict:
     found, added = counts
     out = {
@@ -208,6 +215,8 @@ def _scan_out(
         "created_at": scan.created_at,
         "opportunities_found": found,
         "opportunities_added": added,
+        "opportunities_updated": updated,
+        "schedule_id": scan.schedule_id,
     }
     if tasks is not None:
         out["tasks"] = [task_out(t) for t in sorted(tasks, key=lambda t: t.created_at)]
@@ -259,6 +268,9 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
         .all()
     )
     counts = await find_counts(session, [s.id for s in scans])
+    from api.scans.schedules import run_counts
+
+    refreshed = await run_counts(session, [s.id for s in scans])
     tasks = (
         (
             await session.execute(
@@ -270,7 +282,11 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
     )
     result = []
     for scan in scans:
-        out = _scan_out(scan, counts.get(scan.id, (0, 0)))
+        out = _scan_out(
+            scan,
+            counts.get(scan.id, (0, 0)),
+            updated=refreshed.get(scan.id, {}).get("updated", 0),
+        )
         mine = [t for t in tasks if t.scan_id == scan.id]
         out["metrics"] = aggregate_metrics(mine)
         out.update(_timing(scan, mine))
@@ -341,7 +357,15 @@ async def scan_detail(session, user_id: str, scan_id: str) -> dict:
         .all()
     )
     counts = await find_counts(session, [scan.id])
-    out = _scan_out(scan, counts.get(scan.id, (0, 0)), list(tasks))
+    from api.scans.schedules import run_counts
+
+    refreshed = (await run_counts(session, [scan.id])).get(scan.id, {})
+    out = _scan_out(
+        scan,
+        counts.get(scan.id, (0, 0)),
+        list(tasks),
+        updated=refreshed.get("updated", 0),
+    )
     out["finds"] = await _scan_finds(session, scan)
     return out
 

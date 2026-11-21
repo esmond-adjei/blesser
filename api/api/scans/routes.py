@@ -13,7 +13,7 @@ from api.core.config import settings
 from api.core.db import get_session
 from api.core.ratelimit import enforce_scan_limit
 from api.opportunities.models import OpportunityCategory
-from api.scans import service, sources
+from api.scans import schedules, service, sources
 
 router = APIRouter(tags=["scans"])
 
@@ -31,6 +31,9 @@ class ScanCreate(BaseModel):
         default_factory=list,
         max_length=service.MAX_SCAN_SITES,
         description="Optional: up to five public sites to read before searching.",
+    )
+    repeat: bool = Field(
+        default=False, description="Repeat this scan every week from now on."
     )
 
 
@@ -77,6 +80,8 @@ class ScanOut(BaseModel):
     created_at: datetime
     opportunities_found: int = 0
     opportunities_added: int
+    opportunities_updated: int = 0
+    schedule_id: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     tasks: list[TaskOut] | None = None
@@ -92,14 +97,28 @@ async def start_scan(
     current: auth_schemas.UserOut = Depends(get_current_user),
 ):
     """Send agents to find new opportunities, one per category."""
+    sites = await service.check_sites(req.sites)
+    categories = [c.value for c in req.categories]
+    if req.repeat:
+        # Refuse before the scan starts, so a full or duplicate schedule costs nothing.
+        await schedules.ensure_can_repeat(
+            session,
+            current.id,
+            categories=categories,
+            region=req.region,
+            focus=req.focus,
+            sites=sites,
+        )
     scan = await service.start_scan(
         session,
         current.id,
-        categories=[c.value for c in req.categories],
+        categories=categories,
         region=req.region,
         focus=req.focus,
-        sites=await service.check_sites(req.sites),
+        sites=sites,
     )
+    if req.repeat:
+        await schedules.repeat_scan(session, current.id, scan.id)
     return await service.scan_detail(session, current.id, scan.id)
 
 
@@ -118,6 +137,97 @@ async def scan_allowance(
 ):
     """How many more scans the member can start, by the same windows the limit enforces."""
     return await service.scan_allowance(session, current.id)
+
+
+# --- Repeating scans -----------------------------------------------------------------
+
+
+class ScheduleRunOut(BaseModel):
+    scan_id: str
+    status: str
+    created_at: datetime
+    new: int
+    updated: int
+
+
+class ScheduleOut(BaseModel):
+    id: str
+    audience: Literal["member", "staff"]
+    name: str
+    categories: list[str]
+    region: str
+    focus: str
+    sites: list[str]
+    interval_hours: int
+    paused: bool
+    pause_reason: Literal["empty", "inactive"] | None
+    next_run_at: datetime | None
+    last_run_at: datetime | None
+    runs: int
+    last_run: ScheduleRunOut | None
+    created_at: datetime
+
+
+class SchedulesOut(BaseModel):
+    schedules: list[ScheduleOut]
+    max_schedules: int
+    interval_hours: int
+
+
+class SchedulePatch(BaseModel):
+    paused: bool | None = None
+    focus: str | None = Field(default=None, max_length=2000)
+    sites: list[Annotated[str, Field(max_length=2000)]] | None = Field(
+        default=None, max_length=service.MAX_SCAN_SITES
+    )
+
+
+@router.get("/scans/schedules", response_model=SchedulesOut)
+async def list_schedules(
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """The member's repeating scans."""
+    rows = await schedules.list_member(session, current.id)
+    return {
+        "schedules": [await schedules.schedule_out(session, r) for r in rows],
+        "max_schedules": await schedules.member_limit(session),
+        "interval_hours": schedules.MEMBER_INTERVAL_HOURS,
+    }
+
+
+@router.patch("/scans/schedules/{schedule_id}", response_model=ScheduleOut)
+async def edit_schedule(
+    schedule_id: str,
+    req: SchedulePatch,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Pause, resume, or change the focus or sites of a repeating scan."""
+    values = req.model_dump(exclude_unset=True, exclude_none=True)
+    row = await schedules.update_member(session, current.id, schedule_id, values)
+    return await schedules.schedule_out(session, row)
+
+
+@router.delete("/scans/schedules/{schedule_id}", status_code=204)
+async def delete_schedule(
+    schedule_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Stop repeating; the scans it ran and what they found stay."""
+    await schedules.delete_member(session, current.id, schedule_id)
+
+
+@router.post("/scans/{scan_id}/repeat", response_model=ScheduleOut, status_code=201)
+async def repeat_scan(
+    scan_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Repeat one of the member's scans every week, starting a week after it ran."""
+    row = await schedules.repeat_scan(session, current.id, scan_id)
+    return await schedules.schedule_out(session, row)
 
 
 @router.get("/scans", response_model=list[ScanOut])
