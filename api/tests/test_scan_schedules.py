@@ -551,15 +551,18 @@ def test_quiet_runs_pause_the_schedule_after_four_weeks(monkeypatch):
             fresh = await _listing(session, "Volta Growth Grant " + _token())
             await run_once(session, row, find=fresh)
             assert row.empty_runs == 0
-            latest = (await notes(session))[-1]
-            assert latest.title == "Weekly scan finished"
-            assert "1 new opportunity" in latest.body
+            weekly = [
+                n for n in await notes(session) if n.title == "Weekly scan finished"
+            ]
+            assert len(weekly) == 1
+            assert "1 new opportunity" in weekly[0].body
 
             for _ in range(4):
                 await run_once(session, row)
             assert row.paused and row.pause_reason == "empty"
-            paused = (await notes(session))[-1]
-            assert paused.title == "Weekly scan paused"
+            titles = [n.title for n in await notes(session)]
+            assert titles.count("Weekly scan paused") == 1
+            assert titles.count("Weekly scan finished") == 1  # quiet runs said nothing
             assert await schedules.run_due(session) == 0
 
             out = await schedules.schedule_out(session, row)

@@ -81,7 +81,7 @@ Only `status = published AND audience = public`, plus `archived` rows by slug (w
 
 ## `/api/app` (member token, `aud = app`)
 
-Every member route that exists today under `/api/*` moves here unchanged (`/api/app/auth/...`, `/api/app/applications`, `/api/app/todos`, `/api/app/scans`, `/api/app/notifications`, `/api/app/calendar/...`). The old `/api/*` paths stay mounted as aliases for one release.
+Every member route that exists today under `/api/*` moves here unchanged (`/api/app/auth/...`, `/api/app/applications`, `/api/app/todos`, `/api/app/scans` (with weekly repeats under `/api/app/scans/schedules` and `POST /api/app/scans/{id}/repeat`, see [opportunities.md](opportunities.md#scheduled-scans)), `/api/app/notifications`, `/api/app/calendar/...`). The old `/api/*` paths stay mounted as aliases for one release.
 
 Changes:
 
@@ -274,9 +274,13 @@ The extension audience is accepted only for `POST /autofill/fill`, `POST /autofi
 | `GET /reports` / `PATCH /reports/{id}` | editor | `{resolved: true}` | reports list / one |
 | `GET/POST /collections`, `PATCH/DELETE /collections/{id}` | editor | `Collection` fields | `Collection` |
 | `GET /site`, `PUT /site` | editor | `SiteContent` | `SiteContent` |
-| `GET /settings`, `PUT /settings` | admin | `{agent_default, community_default, auto_archive, member_scan_limits: {per_hour, per_day}, sweep_hours}` | same |
+| `GET /settings`, `PUT /settings` | admin | `{agent_default, community_default, auto_archive, member_scan_limits: {per_hour, per_day}, scheduled_scans: {member_max, runs_per_hour, daily_token_budget}, crawler, freshness}` | same |
 | `GET /scans` | editor | `limit, offset` | all scans, newest first, with owner email |
 | `POST /scans` | editor | as member scan | scan |
+| `GET /scan-schedules` | admin | | `{schedules: ScanSchedule[], member_schedules, member_schedules_active, runs_last_7_days, tokens_today, run_as, intervals}` |
+| `POST /scan-schedules` | admin | `{name?, categories, region?, focus?, interval_hours: 24 \| 72 \| 168, paused?}` | `201 ScanSchedule` |
+| `PATCH /scan-schedules/{id}` | admin | any of the create fields | `ScanSchedule` |
+| `DELETE /scan-schedules/{id}` | admin | | `204`; its scans stay |
 | `GET /users` | admin | `q, role, limit, offset` | `Page<StaffUser>` |
 | `PATCH /users/{id}` | admin | `{role?, disabled?}` | `StaffUser`; cannot demote the last admin or yourself |
 | `GET /audit` | admin | `actor_id, entity_type, entity_id, action, limit, offset` | `Page<AuditEntry>` |

@@ -71,7 +71,7 @@ Public listings have unique slugs. Changing a slug records the old one for a 301
 
 Member scan quotas default to 3 per hour and 10 per day. Admin settings can change those limits and the discovery publishing defaults. Staff scans bypass member quotas.
 
-Set `OPPORTUNITY_SWEEP_EMAIL` to an existing enabled account and configure `sweep_hours` through admin settings to enable scheduled scans. The worker checks hourly and starts a scan across all categories when the account's last scan is old enough.
+Scans can repeat on a schedule; see [Scheduled scans](#scheduled-scans). The old catalogue sweep (`sweep_hours`) is now the first staff schedule.
 
 The worker also runs an archive pass once per UTC date. With `auto_archive = true`, it archives published opportunities whose `deadline_date` is before today. Rolling opportunities are skipped. It also archives undated and rolling listings that nothing has confirmed (`verified_at`, else `created_at`) for `freshness.stale_days`, default 120, with `check_outcome = stale`, so an undated listing does not stay open forever. Existing tracked applications retain their copied listing details.
 
@@ -225,6 +225,27 @@ Members can save up to `MEMBER_SOURCES_MAX` sites (default 10) in "My sources" o
 The worker's hourly pass checks members whose sources are due (`next_check_at`), up to `MEMBER_SOURCE_CHECKS_PER_HOUR` members per pass (default 20; 0 pauses checks), skipping disabled accounts and members with a check still running. A check is a scan of kind `sources`, one per audience, whose sites are the member's sources and whose focus is their notes. It uses the same agent without web search: catalogue matches, then the member's sites and the pages they link to. Sources are then due again after `MEMBER_SOURCE_CHECK_DAYS` (default 7). "Check now" starts the same check at most once an hour. Source checks never use the member's scan quota, and a check that finds nothing sends no notification.
 
 Finds follow the member-site rule above: new listings wait for staff review unless the site is an enabled staff source. Each saved domain also becomes a disabled staff source proposal through the usual save path, with its save count, so staff can enable strong member sources from the Sources page. A source's `finds` counts the new listings its checks found.
+
+### Scheduled scans
+
+A scan schedule (`scan_schedules`, `api/scans/schedules.py`) is a saved scan request plus an interval. Each run is an ordinary scan with `scans.schedule_id` set, so the queue, agent, grounding checks, staff review and alerts apply unchanged.
+
+- **Member schedules** repeat a member's own scan every week (`interval_hours = 168`). A member turns on Weekly when starting a scan (`POST /api/app/scans` with `repeat: true`) or chooses Repeat weekly on a finished one (`POST /api/app/scans/{id}/repeat`); that scan counts as the first run and the next starts a week after it. Runs are scans of kind `scheduled`: the member's focus, category, region and sites, with web search. Members list, pause, resume, edit and stop them under `/api/app/scans/schedules`. The same request cannot repeat twice.
+- **Staff schedules** belong to no member and are managed by admins in Settings (`/api/admin/scan-schedules`): daily, every 3 days or weekly, any mix of categories, a region and a focus. Runs are scans of kind `sweep`, so the crawler pipeline runs first, then the agent with the schedule's focus. They run as `OPPORTUNITY_SWEEP_EMAIL`'s account, else the first active admin; without either they wait. Migration `0015_scan_schedules` turned a `sweep_hours` above zero into a staff schedule named "Catalogue sweep" and removed the setting. While an unpaused staff schedule can run, member scans skip the crawler pipeline, as they did with the sweep.
+
+The worker's hourly pass starts due schedules (`next_run_at`), oldest first, skipping paused ones, disabled accounts and schedules whose previous run is still going. A run sets the next slot one interval after it starts; there is no catch-up after downtime. Repeat runs tell the agent to spend its turns on what is new and to save a known listing again when its page shows a new deadline or changed facts. A save that refreshes an existing listing is recorded in `scan_finds.updated`, so a run reports "N new, M updated" (`opportunities_updated` on a scan). Listing checks remain the main way existing listings stay current.
+
+A member's weekly run notifies only when it found listings none of the member's earlier scans showed them. After four runs in a row with nothing new, the schedule pauses itself (`pause_reason = empty`) and sends one "Weekly scan paused" notice. A member schedule whose owner has not signed in (refresh token issued) or touched the schedule for 60 days pauses with `pause_reason = inactive`. Resuming clears both.
+
+Scheduled runs never use a member's scan quota. Cost is capped by `site_settings.scheduled_scans`, editable in admin Settings:
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `member_max` | 3 | Weekly scans per member. |
+| `runs_per_hour` | 10 | Runs started per hourly pass, members and staff together; 0 pauses all. |
+| `daily_token_budget` | 0 | Model tokens scheduled runs may use per UTC day; when reached, due runs wait until the next day. 0 means no budget. |
+
+The admin Settings page shows today's scheduled tokens, runs in the last 7 days and how many member weekly scans are active.
 
 Budgets are separate. The scan's `MAX_OPPORTUNITIES_PER_RUN` counts only the agent's new listings; crawler saves have their own per-task and per-scan limits, so crawled candidates never use up the member's room.
 

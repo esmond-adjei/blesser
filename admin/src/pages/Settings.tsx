@@ -374,9 +374,9 @@ function ScanSchedules() {
       {data && (
         <p className="text-ink-secondary">
           {data.member_schedules_active} of {data.member_schedules} member
-          weekly scans active. {data.runs_last_7_days} scheduled runs in the
-          last 7 days. {data.tokens_today.toLocaleString()} model tokens used
-          today.
+          weekly scans active. {data.runs_last_7_days} scheduled{" "}
+          {data.runs_last_7_days === 1 ? "run" : "runs"} in the last 7 days.{" "}
+          {data.tokens_today.toLocaleString()} model tokens used today.
         </p>
       )}
       {editing && (

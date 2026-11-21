@@ -6,7 +6,7 @@
 
 - A public opportunity catalogue for startups, researchers and students in Ghana: grants, accelerators, incubators, fellowships, scholarships, internships, competitions and calls for proposals. Browse without an account; filter by audience, kind, country, closing date and keyword.
 - Discovery agents add opportunities with `save_opportunity`. A save must cite a page fetched in the same task, the page must name the opportunity, and a stated deadline must appear on it. Duplicates merge into one listing.
-- Scans: start one, follow its activity log as it runs, stop or delete it. Optionally the worker runs a scan every N hours (`OPPORTUNITY_SWEEP_EMAIL`, `OPPORTUNITY_SWEEP_HOURS`).
+- Scans: start one, follow its activity log as it runs, stop or delete it. Members can repeat a scan weekly and hear only about new finds; admins schedule catalogue scans daily, every 3 days or weekly, within per-hour and daily token caps. Runs report new and updated listings.
 - Applications: track an opportunity from saved to accepted, with a requirements checklist, notes and deadline reminders.
 - To-dos linked to opportunities or applications, grouped by due date.
 - Calendar sync: a Google Calendar link and an `.ics` file per opportunity, and a private, rotatable subscription feed of deadlines and dated to-dos.

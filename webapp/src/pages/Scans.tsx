@@ -207,10 +207,10 @@ export function Scans() {
     title: "Scans",
     actions: (
       <div className="flex items-center gap-3">
-        <AllowanceNote />
+        <span className="max-sm:hidden"><AllowanceNote /></span>
         <Button size="sm" variant="quiet" icon={<Repeat />} aria-label="Weekly scans" onClick={() => setSchedulesOpen(true)}><span className="max-sm:sr-only">Weekly scans</span></Button>
         <Button size="sm" variant="quiet" icon={<Link2 />} aria-label="My sources" onClick={() => setSourcesOpen(true)}><span className="max-sm:sr-only">My sources</span></Button>
-        <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto arrange</Button>
+        <Button size="sm" variant="quiet" icon={<LayoutGrid />} aria-label="Auto arrange" onClick={arrange}><span className="max-sm:sr-only">Auto arrange</span></Button>
       </div>
     ),
   }), [arrange])
