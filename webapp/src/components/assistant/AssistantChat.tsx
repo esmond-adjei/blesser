@@ -498,8 +498,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
           style={{ width: listOpen ? listWidth : 0 }}
           className={cn("relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none", resizing ? "transition-none" : "transition-[width] duration-200", listOpen && "border-l")}
         >
-          <div style={{ width: listWidth }} className="flex min-h-0 shrink-0 flex-col gap-3 p-3">
-            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
+          <div style={{ width: listWidth }} className="flex min-h-0 shrink-0 flex-col p-3">
             {list}
           </div>
           <div
