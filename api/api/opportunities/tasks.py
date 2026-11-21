@@ -209,9 +209,20 @@ def _focus(scan, task) -> str:
     steer = (task.metrics or {}).get("steer")
     if not steer:
         return focus
+    tried = (task.metrics or {}).get("tried") or {}
+    lines = [f"- searched: {q}" for q in tried.get("searches", [])] + [
+        f"- read: {u}" for u in tried.get("pages", [])
+    ]
     return (
         f"{focus}\n\nThe member has steered this run. Their note comes first and "
         f"overrides the notes above where they differ:\n{steer}"
+        + (
+            "\n\nEarlier runs of this scan already tried these. Don't repeat them: "
+            "use new search terms, other organisations and other sites.\n"
+            + "\n".join(lines)
+            if lines
+            else ""
+        )
     ).strip()
 
 

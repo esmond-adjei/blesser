@@ -150,6 +150,19 @@ async def start_scan(
     return scan
 
 
+def _tried(tasks, limit: int = 15) -> dict[str, list[str]]:
+    """What earlier runs searched for and read, newest last, so a follow-up can avoid it."""
+    searches, pages = {}, {}
+    for task in sorted(tasks, key=lambda t: t.created_at):
+        for event in _parse_log(task.log):
+            args = event.get("input") or {}
+            if event.get("tool") == "search_web" and args.get("query"):
+                searches[args["query"]] = None
+            elif event.get("tool") == "fetch_page" and args.get("url"):
+                pages[args["url"]] = None
+    return {"searches": list(searches)[-limit:], "pages": list(pages)[-limit:]}
+
+
 async def steer_scan(session, user_id: str, scan_id: str, prompt: str) -> m.Scan:
     """Queue a follow-up run on a finished scan, steered by what the member said."""
     scan = await get_or_404(session, user_id, scan_id)
@@ -159,6 +172,12 @@ async def steer_scan(session, user_id: str, scan_id: str, prompt: str) -> m.Scan
         raise ConflictError(
             "Wait for this scan to finish, or stop it, before steering it."
         )
+    earlier = (
+        (await session.execute(select(m.ScanTask).where(m.ScanTask.scan_id == scan.id)))
+        .scalars()
+        .all()
+    )
+    tried = _tried(earlier)
     for category in scan.categories:
         session.add(
             m.ScanTask(
@@ -166,7 +185,11 @@ async def steer_scan(session, user_id: str, scan_id: str, prompt: str) -> m.Scan
                 user_id=user_id,
                 task_type=TASK_TYPE,
                 target=f"category:{category}",
-                metrics={"steer": prompt.strip(), "pipeline_complete": True},
+                metrics={
+                    "steer": prompt.strip(),
+                    "pipeline_complete": True,
+                    **({"tried": tried} if tried["searches"] or tried["pages"] else {}),
+                },
             )
         )
     scan.status = "running"

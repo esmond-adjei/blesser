@@ -145,3 +145,38 @@ def test_agent_brief_names_the_listing_types():
         kinds=["internship"],
     )
     assert "Listing types the member wants: internship." in text
+
+
+def test_crawler_skips_links_that_name_only_other_countries():
+    from api.opportunities.triage import names_other_country
+
+    nigerian = "https://example.org/trainee-programme-for-young-nigerian-graduates"
+    assert names_other_country(nigerian, "Ghana")
+    assert not names_other_country(nigerian, "Nigeria")
+    assert not names_other_country(
+        "https://example.org/ghana-and-nigeria-fund", "Ghana"
+    )
+    assert not names_other_country(nigerian, "Ghana / West Africa / pan-Africa")
+    assert not names_other_country("https://example.org/bursary-2027", "Ghana")
+
+
+def test_a_steered_run_hears_what_earlier_runs_tried():
+    import json
+    from types import SimpleNamespace
+
+    from api.opportunities.tasks import _focus
+    from api.scans.service import _tried
+
+    log = json.dumps(
+        [
+            {"tool": "search_web", "input": {"query": "AI jobs Accra"}},
+            {"tool": "fetch_page", "input": {"url": "https://zof.ai/careers"}},
+            {"tool": "search_web", "input": {"query": "AI jobs Accra"}},
+        ]
+    )
+    tried = _tried([SimpleNamespace(created_at=1, log=log)])
+    assert tried == {"searches": ["AI jobs Accra"], "pages": ["https://zof.ai/careers"]}
+    task = SimpleNamespace(metrics={"steer": "go deeper", "tried": tried})
+    text = _focus(SimpleNamespace(focus="AI jobs"), task)
+    assert "go deeper" in text and "- searched: AI jobs Accra" in text
+    assert "- read: https://zof.ai/careers" in text

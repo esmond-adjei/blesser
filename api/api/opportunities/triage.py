@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from urllib.parse import urlsplit
 
@@ -109,6 +110,57 @@ async def triage_page(
         )
     ).first()
     return "content_duplicate" if previous else None
+
+
+_COUNTRIES = {
+    "nigeria": ("nigeria", "nigerian", "nigerians"),
+    "south africa": ("south africa", "south african", "south africans"),
+    "kenya": ("kenya", "kenyan", "kenyans"),
+    "ghana": ("ghana", "ghanaian", "ghanaians"),
+    "uganda": ("uganda", "ugandan", "ugandans"),
+    "tanzania": ("tanzania", "tanzanian", "tanzanians"),
+    "rwanda": ("rwanda", "rwandan", "rwandans"),
+    "ethiopia": ("ethiopia", "ethiopian", "ethiopians"),
+    "egypt": ("egypt", "egyptian", "egyptians"),
+    "morocco": ("morocco", "moroccan", "moroccans"),
+    "zambia": ("zambia", "zambian", "zambians"),
+    "zimbabwe": ("zimbabwe", "zimbabwean", "zimbabweans"),
+    "cameroon": ("cameroon", "cameroonian", "cameroonians"),
+    "senegal": ("senegal", "senegalese"),
+    "malawi": ("malawi", "malawian", "malawians"),
+    "botswana": ("botswana",),
+    "namibia": ("namibia", "namibian", "namibians"),
+    "mozambique": ("mozambique",),
+    "sierra leone": ("sierra leone", "sierra leonean"),
+    "liberia": ("liberia", "liberian", "liberians"),
+    "india": ("india", "indian students"),
+    "pakistan": ("pakistan", "pakistani", "pakistanis"),
+    "bangladesh": ("bangladesh", "bangladeshi"),
+    "philippines": ("philippines", "filipino", "filipinos"),
+}
+
+
+def _countries_in(text: str) -> set[str]:
+    text = re.sub(r"[-_/]+", " ", text.casefold())
+    return {
+        country
+        for country, words in _COUNTRIES.items()
+        if any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
+    }
+
+
+def names_other_country(text: str, region: str) -> bool:
+    """True when a link plainly names only countries outside the scan's region.
+
+    Wide regions (Africa, global) and unknown countries are never ruled out."""
+    targets = _countries_in(region or "")
+    if not targets or re.search(
+        r"africa\b|global|anywhere|world",
+        (region or "").casefold().replace("south africa", ""),
+    ):
+        return False
+    named = _countries_in(text)
+    return bool(named) and not (named & targets)
 
 
 async def triage_url(session, candidate: CrawlCandidate) -> str | None:

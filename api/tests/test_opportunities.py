@@ -230,7 +230,7 @@ def test_save_creates_then_refreshes_without_duplicating():
     assert asyncio.run(count()) == 1
 
 
-def test_scan_finds_keep_web_and_catalog_provenance_without_logs():
+def test_scan_finds_keep_web_provenance_and_leave_out_catalogue_listings():
     first_scan, next_scan = _run_id(), _run_id()
     data = {
         **BASE,
@@ -264,19 +264,10 @@ def test_scan_finds_keep_web_and_catalog_provenance_without_logs():
     ]
     assert later["opportunities_added"] == 0
     assert later["tasks"] == []
-    assert later["finds"] == [
-        {
-            **first["finds"][0],
-            "source": "catalog",
-            "source_domain": None,
-            "is_new": False,
-        }
-    ]
+    # Already in the catalogue, so it's on the member's feed, not a new find.
+    assert later["finds"] == []
     client.delete(f"/api/app/scans/{first_scan}").raise_for_status()
-    assert (
-        client.get(f"/api/app/scans/{next_scan}").json()["finds"][0]["source"]
-        == "catalog"
-    )
+    assert client.get(f"/api/app/scans/{next_scan}").json()["finds"] == []
 
 
 def test_save_respects_task_budget(monkeypatch):

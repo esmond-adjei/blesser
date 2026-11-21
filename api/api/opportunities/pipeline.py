@@ -24,7 +24,12 @@ from api.opportunities.official import (
 )
 from api.opportunities.page_cache import get_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
-from api.opportunities.triage import is_listing, triage_page, triage_url
+from api.opportunities.triage import (
+    is_listing,
+    names_other_country,
+    triage_page,
+    triage_url,
+)
 
 
 def add_reason(metrics: dict, reason: str) -> None:
@@ -165,6 +170,10 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
         token = candidate.claim_token
         metrics["candidates_considered"] = metrics.get("candidates_considered", 0) + 1
         reason = await triage_url(session, candidate)
+        if reason is None and names_other_country(
+            f"{candidate.url} {candidate.title}", scan.region
+        ):
+            reason = "region_excluded:" + scan.region.strip().casefold()
         page = None
         if reason is None:
             await session.commit()
@@ -200,7 +209,7 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                 continue
             candidate.status = (
                 "new"
-                if reason.startswith("fetch_failed:")
+                if reason.startswith(("fetch_failed:", "region_excluded:"))
                 else "closed"
                 if reason == "deadline_passed"
                 else "duplicate"
@@ -208,7 +217,12 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                 else "rejected"
             )
             candidate.reason = reason
-            add_reason(metrics, reason)
+            add_reason(
+                metrics,
+                reason.partition(":")[0]
+                if reason.startswith("region_excluded:")
+                else reason,
+            )
         else:
             attempts += 1
             metrics["extraction_attempts"] = metrics.get("extraction_attempts", 0) + 1
