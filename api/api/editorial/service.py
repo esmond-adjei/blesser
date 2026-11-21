@@ -12,6 +12,8 @@ from api.public.schemas import SiteContent
 
 
 def defaults():
+    from api.opportunities.official import DEFAULT_AGGREGATORS
+
     return {
         "agent_default": {"status": "published", "audience": "members"},
         "community_default": {"status": "in_review"},
@@ -27,6 +29,10 @@ def defaults():
             "host_interval_seconds": settings.crawl_host_interval_seconds,
             "page_cache_seconds": settings.fetch_cache_seconds,
         },
+        # Sites that repost other funders' calls (opportunities/official.py).
+        "aggregators": list(DEFAULT_AGGREGATORS),
+        # Hourly pass moving existing listings off aggregator pages.
+        "official_backfill": False,
         # Scheduled listing checks (opportunities/freshness.py).
         "freshness": {
             "recheck_days": 30,

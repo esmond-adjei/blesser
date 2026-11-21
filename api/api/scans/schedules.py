@@ -10,7 +10,7 @@ queue, the agent, grounding checks, staff review and alerts all apply unchanged.
   says so once. A schedule whose owner has not signed in for `INACTIVE_DAYS` pauses.
 - Staff schedules run as the scheduled scans account (`run_as_staff`), as scans of kind
   `sweep`: the crawler pipeline first, then the agent with the schedule's focus. The
-  catalogue sweep is the first of them (migration 0015).
+  catalogue sweep is the first of them (migration 0016).
 
 Cost is capped by the `scheduled_scans` site settings: schedules per member, runs
 started per hourly pass, and an optional daily token budget for scheduled runs.

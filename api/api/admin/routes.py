@@ -729,7 +729,7 @@ async def update_settings(
     )
     before = await editorial.get_settings(session)
     values = req.model_dump(mode="json")
-    for nested in ("crawler", "freshness"):
+    for nested in ("crawler", "freshness", "aggregators"):
         if values.get(nested) is None:
             values[nested] = before[nested]
     for key, value in values.items():

@@ -173,6 +173,31 @@ Existing member paths under `/api/*` remain aliases for one release. The old pen
 
 Private calendar feed tokens are stored encrypted, with a SHA-256 hash for lookup. Rotation invalidates the previous URL; disabled accounts' feeds stop working. Links use `PUBLIC_API_URL`, or `APP_BASE_URL` when the web app proxies `/api`.
 
+## Official links for aggregator finds
+
+Aggregator sites (opportunity blogs and listing sites such as Opportunity Desk and Opportunities for Africans) repost calls that funders publish on their own sites. Blesser stores the funder's page, not the repost. The list of aggregator sites is in admin Settings under "Aggregator sites", seeded with about 20 common ones (`DEFAULT_AGGREGATORS` in `api/opportunities/official.py`). A site's subdomains count too.
+
+**Crawler finds.** When the crawler extracts a find from a page on an aggregator, it follows the post before saving (`pipeline.follow_aggregator`):
+
+1. The post's outbound links are ranked. The application link the extractor read comes first, then links whose host carries the organization's name, then links labelled "apply", "application" or "portal", then "official website", "details" and similar. Links to the aggregator itself, other aggregators, social and sharing sites are skipped.
+2. Up to three are read through the shared page cache. The first that is not on an aggregator after redirects, and whose text names the opportunity by its title, is the official page. The organization's name alone is not enough, since every page on its site has it.
+3. The official page decides the deadline. The aggregator's date is kept when the official page shows it; a single deadline on the official page replaces it; otherwise the deadline is cleared and the find is held for review.
+4. The find is saved with the official page as `source_url` and `link` (or the extracted application link when it is on the same site). The post is kept in `found_via_url`, which only staff see, and the crawler never processes that post again.
+
+When no official page checks out, the find is saved for staff review with `review_reason = no_official_link` and an editor note, whatever the publishing default. An editor adds the official link and publishes it, or rejects it. Such a find never refreshes an existing listing.
+
+**Agent saves.** The discovery agent may use aggregators to discover calls, but `save_opportunity` refuses a `source_url` or `link` on an aggregator, telling the agent to fetch the official page or skip the call.
+
+**Existing listings.** `api/opportunities/official_backfill.py` moves listings saved before this (or before a site was added to the list) off aggregator pages, in the same way. A dry run reads pages and reports counts without changing anything:
+
+```bash
+cd api
+uv run python -m api.opportunities.official_backfill            # dry run, prints JSON
+uv run python -m api.opportunities.official_backfill --apply
+```
+
+With "Move existing listings off aggregator pages every hour" switched on in Settings (off by default), the worker applies ten listings an hour. A published listing with no official page goes to review with `no_official_link`; one whose official page shows an unclear deadline goes to review with `source_changed`. Each listing is tried at most once every 30 days (`official_checked_at`), and held listings wait for staff.
+
 ## Crawler-first scans
 
 The worker crawls enabled sources on their due schedule and when staff request a crawl. Scheduled sweeps (`scans.kind = sweep`) process the crawler pipeline in each category task before their discovery agent. Member scans skip it and work on the member's request (see below), unless no sweep account is configured: then a member's task runs the pipeline after its agent, so crawled candidates still get extracted. Candidates are claimed newest first: by publish date (feed items, or sitemap `lastmod`), then by their source's yield, then by when they were found. The extraction budget defaults to eight pages per category, with at most eighty candidates examined so deterministic rejections do not consume model calls. This budget is separate from the existing opportunity save limits.
@@ -231,7 +256,7 @@ Finds follow the member-site rule above: new listings wait for staff review unle
 A scan schedule (`scan_schedules`, `api/scans/schedules.py`) is a saved scan request plus an interval. Each run is an ordinary scan with `scans.schedule_id` set, so the queue, agent, grounding checks, staff review and alerts apply unchanged.
 
 - **Member schedules** repeat a member's own scan every week (`interval_hours = 168`). A member turns on Weekly when starting a scan (`POST /api/app/scans` with `repeat: true`) or chooses Repeat weekly on a finished one (`POST /api/app/scans/{id}/repeat`); that scan counts as the first run and the next starts a week after it. Runs are scans of kind `scheduled`: the member's focus, category, region and sites, with web search. Members list, pause, resume, edit and stop them under `/api/app/scans/schedules`. The same request cannot repeat twice.
-- **Staff schedules** belong to no member and are managed by admins in Settings (`/api/admin/scan-schedules`): daily, every 3 days or weekly, any mix of categories, a region and a focus. Runs are scans of kind `sweep`, so the crawler pipeline runs first, then the agent with the schedule's focus. They run as `OPPORTUNITY_SWEEP_EMAIL`'s account, else the first active admin; without either they wait. Migration `0015_scan_schedules` turned a `sweep_hours` above zero into a staff schedule named "Catalogue sweep" and removed the setting. While an unpaused staff schedule can run, member scans skip the crawler pipeline, as they did with the sweep.
+- **Staff schedules** belong to no member and are managed by admins in Settings (`/api/admin/scan-schedules`): daily, every 3 days or weekly, any mix of categories, a region and a focus. Runs are scans of kind `sweep`, so the crawler pipeline runs first, then the agent with the schedule's focus. They run as `OPPORTUNITY_SWEEP_EMAIL`'s account, else the first active admin; without either they wait. Migration `0016_scan_schedules` turned a `sweep_hours` above zero into a staff schedule named "Catalogue sweep" and removed the setting. While an unpaused staff schedule can run, member scans skip the crawler pipeline, as they did with the sweep.
 
 The worker's hourly pass starts due schedules (`next_run_at`), oldest first, skipping paused ones, disabled accounts and schedules whose previous run is still going. A run sets the next slot one interval after it starts; there is no catch-up after downtime. Repeat runs tell the agent to spend its turns on what is new and to save a known listing again when its page shows a new deadline or changed facts. A save that refreshes an existing listing is recorded in `scan_finds.updated`, so a run reports "N new, M updated" (`opportunities_updated` on a scan). Listing checks remain the main way existing listings stay current.
 

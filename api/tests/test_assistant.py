@@ -168,12 +168,12 @@ def test_application_update_is_owned_and_requires_approval(monkeypatch, approved
     application_id, _ = _saved_application()
     _model(
         monkeypatch,
-        _tool("enable_changes"),
         _tool(
             "update_application",
             application_id=application_id,
             changes={"benefits": "Verified benefit"},
         ),
+        LLMResponse(text="Done."),
     )
     with TestClient(app) as client:
         path = _chat(client)
@@ -268,7 +268,7 @@ def test_catalog_turn_streams_and_persists_grounded_citations(monkeypatch):
 @pytest.mark.parametrize("approved", [True, False])
 def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
     title = f"Review {new_id()}"
-    _model(monkeypatch, _tool("enable_changes"), _tool("add_todo", title=title))
+    _model(monkeypatch, _tool("add_todo", title=title), LLMResponse(text=""))
     with TestClient(app) as client:
         path = _chat(client)
         events = _events(
@@ -304,7 +304,7 @@ def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
         assert receipt["sources"] == (
             [
                 {
-                    "key": "s1",
+                    "key": "p1",
                     "kind": "todo",
                     "id": todos[0]["id"],
                     "title": title,
@@ -445,8 +445,8 @@ def test_track_confirmation_uses_catalog_record_and_updates_only_current_member(
     _model(
         monkeypatch,
         _tool("search_catalog", query=title),
-        _tool("enable_changes"),
         _tool("track_opportunity", opportunity_id=opp_id),
+        LLMResponse(text=""),
     )
     with TestClient(app) as client:
         path = _chat(client)
@@ -503,7 +503,6 @@ def test_application_update_cannot_propose_changes_to_another_members_record(
     application_id, _ = _saved_application(owner)
     calls = _model(
         monkeypatch,
-        _tool("enable_changes"),
         _tool(
             "update_application",
             application_id=application_id,
@@ -526,14 +525,14 @@ def test_application_update_cannot_propose_changes_to_another_members_record(
 def test_application_ownership_is_rechecked_when_approving(monkeypatch):
     application_id, _ = _saved_application()
     other, _ = _seed(user=True)
-    _model(
+    calls = _model(
         monkeypatch,
-        _tool("enable_changes"),
         _tool(
             "update_application",
             application_id=application_id,
             changes={"benefits": "Changed"},
         ),
+        LLMResponse(text="That application is no longer available."),
     )
     with TestClient(app) as client:
         path = _chat(client)
@@ -554,10 +553,269 @@ def test_application_ownership_is_rechecked_when_approving(monkeypatch):
                 f"{path}/confirm", json={"call_id": pending["id"], "approved": True}
             )
         )
-        assert events[-2]["message"]["content"] == "That action is no longer available."
+        assert (
+            events[-2]["message"]["content"]
+            == "That application is no longer available."
+        )
+        failed = json.loads(calls[-1]["messages"][-1]["content"])
+        assert failed["code"] == "change_failed"
+        assert failed["ok"] is False
 
         async def saved_benefits():
             async with SessionLocal() as session:
                 return (await session.get(Application, application_id)).benefits
 
         assert asyncio.run(saved_benefits()) == "Saved benefit"
+
+
+def _calls(*calls):
+    return LLMResponse(
+        tool_calls=[ToolCall(new_id(), name, arguments) for name, arguments in calls]
+    )
+
+
+def _last_tool_results(call):
+    return [
+        json.loads(item["content"])
+        for item in call["messages"]
+        if item["role"] == "tool"
+    ]
+
+
+def test_approval_hands_the_result_back_and_the_reply_carries_on(monkeypatch):
+    title = f"Reference {new_id()}"
+    calls = _model(
+        monkeypatch,
+        _calls(("add_todo", {"title": title}), ("list_todos", {})),
+        LLMResponse(text="Added it. You have one open to-do now."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Add it."}))
+        pending = next(e["call"] for e in events if e["event"] == "confirm_required")
+        assert pending["type"] == "change"
+        assert pending["action"] == "Approve"
+        assert pending["tone"] == "default"
+        assert "resume" not in pending
+        assert "resume" not in client.get(path).json()["pending_call"]
+        events = _events(
+            client.post(
+                f"{path}/confirm", json={"call_id": pending["id"], "approved": True}
+            )
+        )
+        results = _last_tool_results(calls[-1])
+        assert results[-2]["approved"] is True
+        assert results[-2]["title"] == title
+        assert results[-1]["code"] == "not_run"
+        message = events[-2]["message"]
+        assert message["content"] == "Added it. You have one open to-do now."
+        assert [(s["key"], s["kind"], s["preview"]) for s in message["sources"]] == [
+            ("p1", "todo", True)
+        ]
+        assert message["trace"][-1]["label"] == "Add a to-do"
+        thread = client.get(path).json()
+        assert thread["pending_call"] is None
+        assert [m["role"] for m in thread["messages"]] == ["user", "assistant"]
+
+
+def test_a_declined_change_tells_the_model_not_to_ask_again(monkeypatch):
+    application_id, _ = _saved_application()
+    calls = _model(
+        monkeypatch,
+        _tool("delete_application", application_id=application_id),
+        LLMResponse(text="I left it as it is."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Delete it."}))
+        pending = next(e["call"] for e in events if e["event"] == "confirm_required")
+        assert pending["tone"] == "danger"
+        assert pending["action"] == "Delete"
+        events = _events(
+            client.post(
+                f"{path}/confirm", json={"call_id": pending["id"], "approved": False}
+            )
+        )
+        declined = _last_tool_results(calls[-1])[-1]
+        assert declined["code"] == "declined"
+        assert (
+            events[-2]["message"]["trace"][-1]["label"]
+            == "Delete an application skipped"
+        )
+        assert client.get(f"/api/app/applications/{application_id}").status_code == 200
+
+
+def test_each_message_has_a_limit_of_approval_cards(monkeypatch):
+    monkeypatch.setattr(service, "MAX_CARDS", 1)
+    calls = _model(
+        monkeypatch,
+        _tool("add_todo", title=f"First {new_id()}"),
+        _tool("add_todo", title=f"Second {new_id()}"),
+        LLMResponse(text="I added the first one. Ask again for the rest."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Add two."}))
+        pending = next(e["call"] for e in events if e["event"] == "confirm_required")
+        events = _events(
+            client.post(
+                f"{path}/confirm", json={"call_id": pending["id"], "approved": True}
+            )
+        )
+        assert not any(e["event"] == "confirm_required" for e in events)
+        assert "add_todo" not in {tool["name"] for tool in calls[1]["tools"]}
+        assert "limit of approval cards" in calls[1]["system"]
+        assert _last_tool_results(calls[2])[-1]["code"] == "tool_unavailable"
+
+
+QUESTIONS = {
+    "title": "A few details before I start the scan",
+    "questions": [
+        {
+            "id": "region",
+            "prompt": "Which region?",
+            "type": "single",
+            "options": ["Ghana", "West Africa"],
+            "allow_other": True,
+        },
+        {
+            "id": "kinds",
+            "prompt": "What kinds?",
+            "type": "multiple",
+            "options": ["Grants", "Fellowships", "Prizes"],
+            "max_choices": 2,
+        },
+        {"id": "start", "prompt": "From when?", "type": "date", "required": False},
+    ],
+}
+
+
+def test_questions_open_a_questionnaire_and_answers_carry_the_reply_on(monkeypatch):
+    calls = _model(
+        monkeypatch,
+        _tool("ask_member", **QUESTIONS),
+        LLMResponse(text="Thanks. I'll look in Kumasi for grants."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Scan for me."}))
+        pending = next(e["call"] for e in events if e["event"] == "questions_required")
+        assert pending["type"] == "questions"
+        assert pending["summary"] == QUESTIONS["title"]
+        assert [q["id"] for q in pending["questions"]] == ["region", "kinds", "start"]
+        assert client.get(path).json()["pending_call"]["type"] == "questions"
+        assert client.post(f"{path}/chat", json={"content": "Hi"}).status_code == 409
+        decision = {"call_id": pending["id"], "approved": True}
+        assert client.post(f"{path}/confirm", json=decision).status_code == 404
+
+        answer = f"{path}/answer"
+        for bad in (
+            {"kinds": ["Grants"]},
+            {"region": "Ghana", "kinds": ["Grants", "Fellowships", "Prizes"]},
+            {"region": "Ghana", "kinds": ["Jobs"]},
+            {"region": "Ghana", "kinds": ["Grants"], "start": "soon"},
+            {"region": "Ghana", "kinds": ["Grants"], "other": "x"},
+        ):
+            response = client.post(
+                answer, json={"call_id": pending["id"], "answers": bad}
+            )
+            assert response.status_code == 400, bad
+        assert (
+            client.post(answer, json={"call_id": "old", "answers": {}}).status_code
+            == 404
+        )
+
+        events = _events(
+            client.post(
+                answer,
+                json={
+                    "call_id": pending["id"],
+                    "answers": {"region": "Kumasi", "kinds": ["Grants"]},
+                },
+            )
+        )
+        answered = next(e for e in events if e["event"] == "questions_answered")
+        assert answered["asked"]["content"] == QUESTIONS["title"]
+        assert (
+            answered["message"]["content"]
+            == "Which region?\nKumasi\n\nWhat kinds?\nGrants"
+        )
+        result = _last_tool_results(calls[-1])[-1]
+        assert result["answers"] == {"region": "Kumasi", "kinds": ["Grants"]}
+        thread = client.get(path).json()
+        assert thread["pending_call"] is None
+        assert [(m["role"], m["content"]) for m in thread["messages"]] == [
+            ("user", "Scan for me."),
+            ("assistant", QUESTIONS["title"]),
+            ("user", "Which region?\nKumasi\n\nWhat kinds?\nGrants"),
+            ("assistant", "Thanks. I'll look in Kumasi for grants."),
+        ]
+        assert thread["messages"][-1]["trace"][0]["label"] == "Asked a few questions"
+
+
+def test_skipping_questions_lets_the_assistant_choose(monkeypatch):
+    calls = _model(
+        monkeypatch,
+        _tool("ask_member", **QUESTIONS),
+        LLMResponse(text="I'll scan Ghana for grants."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Scan."}))
+        pending = next(e["call"] for e in events if e["event"] == "questions_required")
+        events = _events(client.post(f"{path}/answer", json={"call_id": pending["id"]}))
+        assert _last_tool_results(calls[-1])[-1]["skipped"] is True
+        messages = client.get(path).json()["messages"]
+        assert messages[2]["content"] == "I skipped the questions."
+
+
+def test_bad_questions_are_sent_back_to_the_model(monkeypatch):
+    calls = _model(
+        monkeypatch,
+        _tool(
+            "ask_member",
+            title="Which one?",
+            questions=[
+                {"id": "pick", "prompt": "Pick", "type": "single", "options": ["Only"]}
+            ],
+        ),
+        LLMResponse(text="Which one do you mean?"),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Help."}))
+        assert not any(e["event"] == "questions_required" for e in events)
+        assert _last_tool_results(calls[-1])[-1]["code"] == "invalid_input"
+
+
+def test_a_card_saved_before_replies_could_carry_on_still_completes(monkeypatch):
+    title = f"Legacy {new_id()}"
+    _model(monkeypatch)
+    with TestClient(app) as client:
+        path = _chat(client)
+        chat_id = path.rsplit("/", 1)[1]
+
+        async def legacy():
+            from api.assistant.models import AssistantConversation
+
+            async with SessionLocal() as session:
+                chat = await session.get(AssistantConversation, chat_id)
+                chat.pending = {
+                    "id": "legacy-call",
+                    "tool": "add_todo",
+                    "summary": f"Add “{title}” to your to-dos?",
+                    "arguments": {"title": title, "due_date": None},
+                    "trace": [],
+                    "note": "",
+                }
+                await session.commit()
+
+        asyncio.run(legacy())
+        assert client.get(path).json()["pending_call"]["type"] == "change"
+        events = _events(
+            client.post(
+                f"{path}/confirm", json={"call_id": "legacy-call", "approved": True}
+            )
+        )
+        assert events[-2]["message"]["content"] == "Added to your to-dos."
+        assert any(t["title"] == title for t in client.get("/api/app/todos").json())

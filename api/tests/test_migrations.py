@@ -345,7 +345,7 @@ def test_listing_freshness_rekeys_cycles_and_parks_collisions():
 def test_scan_schedules_fold_the_sweep_into_a_staff_schedule():
     with _scratch_db() as url:
         cfg = _cfg(url)
-        command.upgrade(cfg, "0014_member_sources")
+        command.upgrade(cfg, "0015_official_links")
         _run(_fetch(url, "UPDATE site_settings SET value = '12' WHERE key = 'sweep_hours'"))
         command.upgrade(cfg, "head")
         rows = _run(
@@ -364,7 +364,7 @@ def test_scan_schedules_fold_the_sweep_into_a_staff_schedule():
         assert json.loads(row["categories"]) == ["startup", "research", "student"]
         left = _run(_fetch(url, "SELECT key FROM site_settings WHERE key = 'sweep_hours'"))
         assert left == []
-        command.downgrade(cfg, "0014_member_sources")
+        command.downgrade(cfg, "0015_official_links")
         back = _run(_fetch(url, "SELECT value::text AS v FROM site_settings WHERE key = 'sweep_hours'"))
         assert back[0]["v"] == "12"
 

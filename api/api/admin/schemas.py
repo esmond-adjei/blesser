@@ -13,7 +13,9 @@ from api.public.schemas import APIModel
 from api.scans.routes import ScheduleOut
 
 Audience = Literal["public", "members"]
-ReviewReason = Literal["new_submission", "agent_find", "reported", "source_changed"]
+ReviewReason = Literal[
+    "new_submission", "agent_find", "reported", "source_changed", "no_official_link"
+]
 
 
 class AuditEntry(APIModel):
@@ -41,6 +43,7 @@ class AdminOpportunity(MemberOpportunity):
     dedupe_key: str
     checked_at: datetime | None = None
     check_outcome: str = ""
+    found_via_url: str = ""
 
 
 class AdminDetail(AdminOpportunity):
@@ -232,6 +235,17 @@ class SettingsIn(BaseModel):
     scheduled_scans: ScheduledScanSettings = ScheduledScanSettings()
     crawler: CrawlerSettings | None = None
     freshness: FreshnessSettings | None = None
+    aggregators: list[str] | None = Field(default=None, max_length=500)
+    official_backfill: bool = False
+
+    @field_validator("aggregators")
+    @classmethod
+    def aggregator_hosts(cls, value):
+        if value is None:
+            return None
+        from api.opportunities.official import clean_hosts
+
+        return clean_hosts(value)
 
 
 class StaffUser(APIModel):

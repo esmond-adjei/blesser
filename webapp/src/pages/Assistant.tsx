@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
-  ArrowDown, ArrowUp, ArrowUpRight, Award, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
+  ArrowDown, ArrowUp, ArrowUpRight, Link2, MessageCircleQuestion, Radar, Settings2, UserRound, Bookmark, Award, Brain, Briefcase, Check, ChevronDown, CircleCheck, Copy, Loader2, MessageSquareText, CircleAlert, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus,
   MessageCircle, MessagesSquare, Pencil, Plus, RotateCcw, Square, Trash2, Wrench,
 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn, formatDay } from "@blesser/ui"
@@ -23,6 +23,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import guideArt from "../assets/illustrations/guide.webp"
 import { ChatSkeleton } from "../components/assistant/ChatSkeleton"
+import { PendingCard, QuestionnaireDialog } from "../components/assistant/Questionnaire"
 
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
@@ -36,9 +37,13 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
   list_todos: ListChecks,
   read_apply_kit: FolderOpen,
   search_web: Globe,
-  enable_changes: Pencil,
   track_opportunity: Plus,
   add_todo: ListPlus,
+  list_scans: Radar,
+  get_scan: Radar,
+  start_scan: Radar,
+  list_sources: Link2,
+  ask_member: MessageCircleQuestion,
 }
 
 const TOOL_RUNNING: Record<string, string> = {
@@ -48,9 +53,10 @@ const TOOL_RUNNING: Record<string, string> = {
   list_todos: "Checking your to-dos",
   read_apply_kit: "Reading your apply kit",
   search_web: "Searching the web",
-  enable_changes: "Preparing a change",
-  track_opportunity: "Preparing to track the opportunity",
-  add_todo: "Preparing your to-do",
+  list_scans: "Checking your scans",
+  get_scan: "Checking a scan",
+  list_sources: "Checking your sources",
+  ask_member: "Preparing a few questions",
 }
 
 type ChatEdit = { type: "rename" | "delete"; chat: AssistantChat }
@@ -64,6 +70,7 @@ interface LiveReply {
   user: AssistantMessage | null
   answer: AssistantMessage | null
   pending: PendingCall | null
+  asked: AssistantMessage | null
 }
 
 function updateReply(reply: LiveReply, event: AssistantEvent): LiveReply {
@@ -87,7 +94,9 @@ function updateReply(reply: LiveReply, event: AssistantEvent): LiveReply {
     case "tool_result": return { ...reply, status: "", trace: [...reply.trace, event.step] }
     case "user_message": return { ...reply, user: event.message }
     case "message": return { ...reply, status: "", answer: event.message }
-    case "confirm_required": return { ...reply, status: "", pending: event.call }
+    case "confirm_required":
+    case "questions_required": return { ...reply, status: "", pending: event.call }
+    case "questions_answered": return { ...reply, asked: event.asked, user: event.message, trace: [] }
     default: return reply
   }
 }
@@ -99,12 +108,12 @@ function useLiveReply(userId: string) {
   const connection = useRef<AbortController | null>(null)
   useEffect(() => () => connection.current?.abort(), [])
 
-  const start = useCallback(async (id: string, turn: TurnRequest) => {
+  const start = useCallback(async (id: string, turn: TurnRequest, trace: TraceEntry[] = []) => {
     connection.current?.abort()
     const controller = new AbortController()
     connection.current = controller
     setError(null)
-    setReply({ id, type: turn.type, status: "Opening your reply…", text: "", trace: [], user: null, answer: null, pending: null })
+    setReply({ id, type: turn.type, status: "Opening your reply…", text: "", trace, user: null, answer: null, pending: null, asked: null })
     try {
       await streamTurn(id, turn, (event) => {
         if (controller.signal.aborted) return
@@ -120,10 +129,9 @@ function useLiveReply(userId: string) {
         await Promise.all([
           cache.invalidateQueries({ queryKey: chatKey(userId, id) }),
           cache.invalidateQueries({ queryKey: chatsKey(userId) }),
+          // An approved change can touch any part of the app.
           ...(turn.type === "confirm" && turn.approved ? [
-            cache.invalidateQueries({ queryKey: ["opportunities", "tracked"] }),
-            cache.invalidateQueries({ queryKey: ["applications"] }),
-            cache.invalidateQueries({ queryKey: ["todos"] }),
+            cache.invalidateQueries({ predicate: (query) => query.queryKey[0] !== "assistant" }),
           ] : []),
         ])
       }
@@ -174,7 +182,9 @@ function AssistantWorkspace({ userId }: { userId: string }) {
   const [farFromEnd, setFarFromEnd] = useState(false)
   const active = reply?.id === chatId ? reply : null
   const rows = thread.data?.messages ?? []
-  const pending = active?.type === "confirm" ? null : active?.pending ?? thread.data?.pending_call
+  const pending = active?.type === "confirm" || active?.type === "answer" ? null : active?.pending ?? thread.data?.pending_call
+  const [closedQuestions, setClosedQuestions] = useState<string | null>(null)
+  const questionsOpen = pending?.type === "questions" && closedQuestions !== pending.id
 
   useEffect(() => {
     if (!chatId || !thread.data?.running) {
@@ -294,9 +304,8 @@ function AssistantWorkspace({ userId }: { userId: string }) {
       onRetry={() => void chats.refetch()}
     />
   )
-  const visibleRows = active?.user && !rows.some((row) => row.id === active.user?.id)
-    ? [...rows, active.user]
-    : rows
+  const liveRows = [active?.asked, active?.user].filter((row): row is AssistantMessage => !!row && !rows.some((r) => r.id === row.id))
+  const visibleRows = liveRows.length ? [...rows, ...liveRows] : rows
   const visibleAnswer = active?.answer && !visibleRows.some((row) => row.id === active.answer?.id) ? active.answer : null
   const working = !!active || !!thread.data?.running || creating
   const replyError = error?.id === chatId ? error?.message : null
@@ -383,14 +392,9 @@ function AssistantWorkspace({ userId }: { userId: string }) {
           ) : null}
           {pending ? (
             <AssistantReply entries={pending.trace}>
-              <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
-                <p className="text-callout text-ink wrap-anywhere">{pending.summary}</p>
-                {pending.note ? <p className="text-body-sm whitespace-pre-wrap text-ink-secondary wrap-anywhere">{pending.note}</p> : null}
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="primary" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: true })}>Approve</Button>
-                  <Button size="sm" variant="quiet" disabled={working} onClick={() => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved: false })}>Not now</Button>
-                </div>
-              </div>
+              <PendingCard call={pending} working={working}
+                onDecide={(approved) => chatId && void start(chatId, { type: "confirm", call_id: pending.id, approved }, pending.trace)}
+                onOpenQuestions={() => setClosedQuestions(null)} />
             </AssistantReply>
           ) : null}
           <div ref={end} />
@@ -425,6 +429,14 @@ function AssistantWorkspace({ userId }: { userId: string }) {
           </div>
         </SheetContent>
       </Sheet>
+      <Dialog open={questionsOpen} onOpenChange={(open) => { if (!open && pending) setClosedQuestions(pending.id) }}>
+        {pending?.type === "questions" ? (
+          <QuestionnaireDialog key={pending.id} call={pending} sending={working}
+            onClose={() => setClosedQuestions(pending.id)}
+            onSkip={() => { setClosedQuestions(pending.id); if (chatId) void start(chatId, { type: "answer", call_id: pending.id }) }}
+            onSend={(answers) => { setClosedQuestions(pending.id); if (chatId) void start(chatId, { type: "answer", call_id: pending.id, answers }) }} />
+        ) : null}
+      </Dialog>
       <Dialog open={!!edit} onOpenChange={(open) => { if (!open && !editing) setEdit(null) }}>
         {edit ? <EditChat key={edit.chat.id + edit.type} edit={edit} problem={problem} saving={editing} onClose={() => { if (!editing) setEdit(null) }}
           onSave={(title) => void saveEdit(title)} /> : null}
@@ -481,6 +493,12 @@ const RECORD_LINKS: Record<AssistantSource["kind"], (source: AssistantSource) =>
   document: () => "/kit/documents",
   answer: () => "/kit/answers",
   web: (s) => s.url,
+  scan: (s) => `/scans/${encodeURIComponent(s.id)}`,
+  find: (s) => s.url,
+  site: () => "/scans",
+  saved_search: () => "/settings/matching",
+  profile: () => "/kit/profile",
+  settings: (s) => `/settings/${encodeURIComponent(s.id)}`,
 }
 
 const RECORD_ICONS: Record<AssistantSource["kind"], typeof Briefcase> = {
@@ -491,6 +509,12 @@ const RECORD_ICONS: Record<AssistantSource["kind"], typeof Briefcase> = {
   document: FileText,
   answer: MessageSquareText,
   web: Globe,
+  scan: Radar,
+  find: Award,
+  site: Link2,
+  saved_search: Bookmark,
+  profile: UserRound,
+  settings: Settings2,
 }
 
 function recordDetail(source: AssistantSource) {

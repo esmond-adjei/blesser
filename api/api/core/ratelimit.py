@@ -132,10 +132,11 @@ def rate_limit(bucket: str):
     return dependency
 
 
-async def enforce_scan_limit(
-    session=Depends(get_session),
-    current: auth_schemas.UserOut = Depends(get_current_user),
-):
+async def check_scan_limit(session, user_id: str) -> None:
+    """Count one member scan against the hourly and daily limits, or raise 429.
+
+    Shared by the scans route and the Assistant, so both spend the same allowance.
+    """
     if not settings.rate_limits_enabled:
         return
     from datetime import timedelta
@@ -148,7 +149,7 @@ async def enforce_scan_limit(
 
     limits = (await get_settings(session))["member_scan_limits"]
     await session.execute(
-        select(func.pg_advisory_xact_lock(func.hashtext(f"member-scans:{current.id}")))
+        select(func.pg_advisory_xact_lock(func.hashtext(f"member-scans:{user_id}")))
     )
     now = utcnow_naive()
     for key, seconds in (("per_hour", 3600), ("per_day", 86400)):
@@ -156,7 +157,7 @@ async def enforce_scan_limit(
             select(func.count())
             .select_from(Scan)
             .where(
-                Scan.user_id == current.id,
+                Scan.user_id == user_id,
                 # Scheduled source checks and sweeps never use a member's quota.
                 Scan.kind == "member",
                 Scan.created_at > now - timedelta(seconds=seconds),
@@ -169,10 +170,17 @@ async def enforce_scan_limit(
 
     wait = limiter.hit(
         "member_scan",
-        current.id,
+        user_id,
         windows=[(limits["per_hour"], 3600), (limits["per_day"], 86400)],
     )
     if wait is not None:
         raise RateLimitError(
             "Scan limit reached. Try again later.", retry_after=math.ceil(wait)
         )
+
+
+async def enforce_scan_limit(
+    session=Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    await check_scan_limit(session, current.id)

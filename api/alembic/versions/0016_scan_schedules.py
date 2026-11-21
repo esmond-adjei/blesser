@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0015_scan_schedules"
-down_revision = "0014_member_sources"
+revision = "0016_scan_schedules"
+down_revision = "0015_official_links"
 branch_labels = None
 depends_on = None
 

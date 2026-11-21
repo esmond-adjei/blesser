@@ -140,9 +140,34 @@ def member_site_host(ctx, url: str) -> str | None:
     )
 
 
+def aggregator_error(data: schemas.AgentOpportunityIn, hosts) -> str | None:
+    """Agent saves must point at the funder's own pages, never an aggregator's."""
+    from api.opportunities.official import is_aggregator
+
+    for name, url in (("source_url", data.source_url), ("link", data.link)):
+        if url and is_aggregator(url, hosts):
+            return (
+                f"{name} is on an aggregator site. Open the official page or "
+                "application page it links to with fetch_page, then save with that "
+                "page as source_url. Skip the opportunity if there is none."
+            )
+    return None
+
+
 async def handle_save_opportunity(
-    tool_input: dict, ctx: ToolContext, *, commit: bool = True
+    tool_input: dict,
+    ctx: ToolContext,
+    *,
+    commit: bool = True,
+    found_via: str = "",
+    review_reason: str | None = None,
+    review_note: str = "",
 ) -> dict:
+    """Save a grounded find.
+
+    The crawler passes `found_via` (the aggregator post a find was followed from) and,
+    when no official page was found, `review_reason="no_official_link"`. The agent's
+    saves may not use aggregator pages at all."""
     saved = getattr(ctx, "opportunities_saved", 0)
     if saved >= settings.max_opportunities_per_task:
         return {
@@ -171,6 +196,11 @@ async def handle_save_opportunity(
         return {"error": error}
     scan_id = getattr(getattr(ctx, "run", None), "id", None)
     via = getattr(ctx, "save_via", "agent")
+    if via != "crawler":
+        from api.opportunities.official import aggregator_hosts
+
+        if error := aggregator_error(data, await aggregator_hosts(ctx.session)):
+            return {"error": error}
     if scan_id and via == "agent":
         await ctx.session.execute(
             select(func.pg_advisory_xact_lock(func.hashtext("scan-budget:" + scan_id)))
@@ -195,11 +225,14 @@ async def handle_save_opportunity(
         data=data,
         low_confidence=getattr(ctx, "extraction_confidence", 1)
         < settings.extraction_min_confidence,
-        review_note=(
+        review_note=review_note
+        or (
             f"Found on {member_host}, a site a member asked a scan to check."
             if member_host
             else ""
         ),
+        found_via=found_via,
+        review_reason=review_reason,
     )
     if scan_id:
         find = insert(ScanFind).values(
