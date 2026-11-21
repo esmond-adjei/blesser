@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select
 
 from api.agent.tools import ToolContext
 from api.applications.models import Application
@@ -13,14 +13,13 @@ from api.core.config import settings
 from api.core.db import SessionLocal
 from api.main import app
 from api.opportunities import service as opp_service
-from api.opportunities import sweep as sweep_module
 from api.opportunities import tasks as opp_tasks
 from api.opportunities import tools as opp_tools
 from api.opportunities.models import Opportunity
 from api.scans.models import Scan, ScanTask
 from api.todos import ics
 from api.todos.models import CalendarFeed, Todo
-from tests.conftest import TEST_USER_EMAIL, TEST_USER_ID
+from tests.conftest import TEST_USER_ID
 
 
 def _wipe():
@@ -475,48 +474,6 @@ def test_task_brief_lists_known_titles_and_today():
     assert "Today's date: 2026-11-07" in message
     assert "- Known Grant (Accra Ventures)" in message
     assert "climate" in message
-
-
-def test_scheduled_sweep_runs_once_per_interval(monkeypatch):
-    async def sweep():
-        async with SessionLocal() as session:
-            return await sweep_module.maybe_sweep(session)
-
-    async def age_earlier_scans():
-        async with SessionLocal() as session:
-            await session.execute(
-                update(Scan).values(
-                    created_at=opp_service.utcnow_naive() - timedelta(days=30)
-                )
-            )
-            await session.commit()
-
-    asyncio.run(age_earlier_scans())
-    assert asyncio.run(sweep()) is None  # off by default
-    monkeypatch.setattr(settings, "opportunity_sweep_email", TEST_USER_EMAIL)
-
-    async def enable():
-        from api.editorial.models import SiteSetting
-
-        async with SessionLocal() as session:
-            row = await session.get(SiteSetting, "sweep_hours")
-            row.value = 24
-            await session.commit()
-
-    asyncio.run(enable())
-    first = asyncio.run(sweep())
-    assert first is not None
-    assert asyncio.run(sweep()) is None
-
-    async def disable():
-        from api.editorial.models import SiteSetting
-
-        async with SessionLocal() as session:
-            row = await session.get(SiteSetting, "sweep_hours")
-            row.value = 0
-            await session.commit()
-
-    asyncio.run(disable())
 
 
 # --- the agent loop, end to end with a scripted model --------------------------------

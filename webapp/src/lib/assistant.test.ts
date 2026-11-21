@@ -49,6 +49,17 @@ it("summarises grouped activity and ignores commentary", () => {
   expect(activitySummary([entries[3]])).toBe("")
 })
 
+it("summarises tools without their own phrase from their step", () => {
+  const entries: TraceEntry[] = [
+    { tool: "list_saved_searches", label: "Checked your saved searches, 2 matches", ok: true, note: "" },
+    { tool: "start_scan", label: "Start a scan", ok: true, note: "" },
+    { tool: "delete_todo", label: "Delete a to-do skipped", ok: false, note: "" },
+  ]
+  expect(activitySummary(entries)).toBe(
+    "Checked your saved searches, made a change you approved, and held off on a change",
+  )
+})
+
 it("refreshes a rejected token before opening the authenticated chat stream", async () => {
   setAccessToken("expired")
   setRefreshHandler(async () => "fresh")

@@ -27,10 +27,22 @@ const TOOL_SUMMARY: Record<string, { done: string; tried: string }> = {
   get_opportunity: { done: "checked an opportunity", tried: "tried to check an opportunity" },
   list_applications: { done: "checked your applications", tried: "tried to check your applications" },
   list_todos: { done: "checked your to-dos", tried: "tried to check your to-dos" },
-  read_apply_kit: { done: "read your apply kit", tried: "tried to read your apply kit" },
-  enable_changes: { done: "prepared a change", tried: "tried to prepare a change" },
-  track_opportunity: { done: "prepared to track an opportunity", tried: "tried to prepare tracking an opportunity" },
-  add_todo: { done: "prepared a to-do", tried: "tried to prepare a to-do" },
+  read_apply_kit: { done: "read your Apply kit", tried: "tried to read your Apply kit" },
+  list_scans: { done: "checked your scans", tried: "tried to check your scans" },
+  get_scan: { done: "checked a scan", tried: "tried to check a scan" },
+  list_sources: { done: "checked your sources", tried: "tried to check your sources" },
+  ask_member: { done: "asked you a few questions", tried: "tried to ask you a few questions" },
+}
+
+/** A phrase for tools without their own: reads keep their label, changes say what happened. */
+function fromStep(step: ToolStep) {
+  if (step.label.endsWith(" skipped")) return "held off on a change"
+  if (!step.ok) return "tried a step that didn't go through"
+  if (/^(Checked|Searched|Asked) /.test(step.label)) {
+    const phrase = step.label.replace(/, \d+ match(es)?$/, "")
+    return phrase.charAt(0).toLowerCase() + phrase.slice(1)
+  }
+  return "made a change you approved"
 }
 
 export function isToolStep(entry: TraceEntry): entry is ToolStep {
@@ -41,8 +53,8 @@ export function activitySummary(entries: TraceEntry[]): string {
   const phrases: string[] = entries.some((e) => e.kind === "thought") ? ["thought it through"] : []
   for (const entry of entries) {
     if (!isToolStep(entry)) continue
-    const summary = TOOL_SUMMARY[entry.tool] ?? { done: "used a tool", tried: "tried a tool" }
-    const phrase = entry.ok ? summary.done : summary.tried
+    const summary = TOOL_SUMMARY[entry.tool]
+    const phrase = summary ? (entry.ok ? summary.done : summary.tried) : fromStep(entry)
     if (!phrases.includes(phrase)) phrases.push(phrase)
   }
   if (!phrases.length) return ""
@@ -55,7 +67,9 @@ export function activitySummary(entries: TraceEntry[]): string {
   return list[0].toUpperCase() + list.slice(1)
 }
 
-type RecordKind = "application" | "todo" | "project" | "document" | "answer" | "web" | "opportunity"
+type RecordKind =
+  | "application" | "todo" | "project" | "document" | "answer" | "web" | "opportunity"
+  | "scan" | "find" | "site" | "saved_search" | "profile" | "settings"
 
 export interface AssistantSource {
   key: string
@@ -97,12 +111,29 @@ export interface AssistantMessage {
   created_at: string
 }
 
+export interface Question {
+  id: string
+  prompt: string
+  type: "single" | "multiple" | "text" | "date"
+  options: string[]
+  allow_other: boolean
+  max_choices: number | null
+  required: boolean
+}
+
+export type Answers = Record<string, string | string[]>
+
+/** A change waiting for approval, or questions waiting for answers. */
 export interface PendingCall {
   id: string
-  tool?: string
+  type: "change" | "questions"
+  tool: string
   summary: string
   trace: TraceEntry[]
   note: string
+  action: string
+  tone: "default" | "danger"
+  questions: Question[]
 }
 
 export interface AssistantChat {
@@ -127,7 +158,8 @@ export type AssistantEvent =
   | { type: "tool_start"; tool: string; label: string; turn: number }
   | { type: "tool_result"; step: ToolStep; turn?: number }
   | { type: "user_message" | "message"; message: AssistantMessage }
-  | { type: "confirm_required"; call: PendingCall }
+  | { type: "confirm_required" | "questions_required"; call: PendingCall }
+  | { type: "questions_answered"; asked: AssistantMessage; message: AssistantMessage }
   | { type: "error"; message: string }
   | { type: "done" | "stopped" }
 
@@ -146,6 +178,7 @@ export const stopTurn = (id: string) => request<{ stopped: boolean }>(`${pathFor
 export type TurnRequest =
   | { type: "chat"; content: string; context?: UiContext }
   | { type: "confirm"; call_id: string; approved: boolean }
+  | { type: "answer"; call_id: string; answers?: Answers }
   | { type: "live" }
   | { type: "retry" }
 

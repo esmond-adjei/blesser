@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from "react"
-import { Brain, CircleAlert, CircleCheck, ChevronDown, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus, Loader2, MessageSquareText, Pencil, Plus, Trash2, Briefcase, Wrench } from "lucide-react"
+import { Brain, CircleAlert, CircleCheck, ChevronDown, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus, Loader2, MessageSquareText, Pencil, Plus, Trash2, Briefcase, Wrench, Link2, MessageCircleQuestion, Radar } from "lucide-react"
 import { cn } from "@blesser/ui"
 import { activitySummary, type TraceEntry } from "../../lib/assistant"
 
@@ -11,7 +11,11 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
   list_todos: ListChecks,
   read_apply_kit: FolderOpen,
   search_web: Globe,
-  enable_changes: Pencil,
+  list_scans: Radar,
+  get_scan: Radar,
+  start_scan: Radar,
+  list_sources: Link2,
+  ask_member: MessageCircleQuestion,
   track_opportunity: Plus,
   add_todo: ListPlus,
   ...Object.fromEntries(["update_profile", "update_project", "update_answer", "update_document", "update_todo"].map((name) => [name, Pencil])),

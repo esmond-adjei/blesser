@@ -51,10 +51,8 @@ class Settings(BaseSettings):
     max_opportunities_per_run: int = 40
     # Region a scan targets when none is given.
     opportunity_default_region: str = "Ghana"
-    # Scheduled scans run as this existing account.
+    # Staff scan schedules and listing checks run as this existing account.
     opportunity_sweep_email: str = ""
-    # Fallback if the database has no sweep_hours setting.
-    opportunity_sweep_hours: int = 0
     # Verified member accounts to seed as admins on boot.
     ops_admin_emails: str = ""
 

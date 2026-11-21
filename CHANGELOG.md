@@ -6,13 +6,14 @@
 
 - A public opportunity catalogue for startups, researchers and students in Ghana: grants, accelerators, incubators, fellowships, scholarships, internships, competitions and calls for proposals. Browse without an account; filter by audience, kind, country, closing date and keyword.
 - Discovery agents add opportunities with `save_opportunity`. A save must cite a page fetched in the same task, the page must name the opportunity, and a stated deadline must appear on it. Duplicates merge into one listing.
-- Scans: start one, follow its activity log as it runs, stop or delete it. Optionally the worker runs a scan every N hours (`OPPORTUNITY_SWEEP_EMAIL`, `OPPORTUNITY_SWEEP_HOURS`).
+- Scans: start one, follow its activity log as it runs, stop or delete it. Members can repeat a scan weekly and hear only about new finds; admins schedule catalogue scans daily, every 3 days or weekly, within per-hour and daily token caps. Runs report new and updated listings.
 - Applications: track an opportunity from saved to accepted, with a requirements checklist, notes and deadline reminders.
 - To-dos linked to opportunities or applications, grouped by due date.
 - Calendar sync: a Google Calendar link and an `.ics` file per opportunity, and a private, rotatable subscription feed of deadlines and dated to-dos.
 - Community submissions, reviewed and published in the admin console by editors and admins.
 - A public site (Astro) for the catalogue, and an admin console for review, editing, collections, sources, users and settings.
 - The Assistant: ask about opportunities, applications and to-dos; it proposes tracking or a to-do and acts once the member confirms.
+- The Assistant can do what a member can do: scans, My sources, applications, to-dos, the Apply kit, saved searches, what you're looking for, notifications and your name. Reads run freely. Every change shows an approval card first (deletes with a red button), and after you decide the reply carries on with the rest of the task. When a request is unclear it can open a short questionnaire with choices, text or a date, which you can answer or skip. Password, sign-in email, account deletion, connected browsers, push setup, the calendar feed link, appearance and file uploads stay in the app.
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
 - Fill the Apply kit profile from a CV: pick one from Documents or upload a PDF or Word file, check what Blesser found, and add only the details you tick. Fields the CV lacks stay empty, existing values are never replaced unless you choose, and national ID and passport details are never read.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.
@@ -26,3 +27,4 @@
 - Saved searches, and alerts for new listings that fit the member (daily or weekly), a weekly "closing soon that fit you" list, and new results for saved searches.
 - Member scans follow the member's request: the agent matches existing catalogue listings first, then reads up to five sites the member names, then searches the web. A scan shows every listing that fits, matched or new, and its notification says how many were found and how many are new. Crawler saves no longer use the member's save limit, and finds from member sites wait for staff review.
 - My sources: members save up to 10 sites they trust, and Blesser checks them every 7 days (or on demand, once an hour) with the scan agent, without web search. Checks don't use the scan quota, and finds wait for staff review.
+- Listings point at the funder's own page, not an aggregator's repost. Crawler finds on aggregator sites are followed to the official page, which is checked and stored with its deadline; finds with no official page wait for staff review. The agent may not save aggregator pages. Staff edit the aggregator list in Settings, and a backfill (dry run first) moves existing listings.

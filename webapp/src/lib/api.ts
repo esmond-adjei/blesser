@@ -20,6 +20,8 @@ import type {
   Scan,
   ScanAllowance,
   ScanRequest,
+  ScanSchedule,
+  ScanSchedules,
   SearchFilters,
   ShareKit,
   Todo,
@@ -262,6 +264,11 @@ export const scanAllowance = () => get<ScanAllowance>("/api/app/scans/allowance"
 export const startScan = (body: ScanRequest) => post<Scan>("/api/app/scans", body)
 export const cancelScan = (id: string) => post<Scan>(`/api/app/scans/${id}/cancel`)
 export const deleteScan = (id: string) => del<{ status: string }>(`/api/app/scans/${id}`)
+export const listSchedules = () => get<ScanSchedules>("/api/app/scans/schedules")
+export const repeatScan = (scanId: string) => post<ScanSchedule>(`/api/app/scans/${scanId}/repeat`)
+export const updateSchedule = (id: string, body: { paused?: boolean; focus?: string; sites?: string[] }) =>
+  patch<ScanSchedule>(`/api/app/scans/schedules/${id}`, body)
+export const deleteSchedule = (id: string) => del<void>(`/api/app/scans/schedules/${id}`)
 export const listSources = () => get<MemberSources>("/api/app/sources")
 export const addSource = (body: MemberSourceIn) => post<MemberSource>("/api/app/sources", body)
 export const updateSource = (id: string, body: Partial<Pick<MemberSource, "category" | "note" | "paused">>) =>

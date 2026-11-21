@@ -6,7 +6,7 @@ The shared contract between the API (`api/`), the public site (`site/`), the mem
 
 - `status`: `draft` | `in_review` | `published` | `archived` | `hidden`
 - `audience`: `public` | `members`
-- `review_reason` (nullable): `new_submission` | `agent_find` | `reported` | `source_changed`
+- `review_reason` (nullable): `new_submission` | `agent_find` | `reported` | `source_changed` | `no_official_link`
 
 Migration from today's values: `pending` → `in_review` (`review_reason = new_submission` for `source = community`, else `agent_find`); `published` → `published` + `audience = public`; `hidden` → `hidden`. Existing rows get a `slug`.
 
@@ -81,7 +81,7 @@ Only `status = published AND audience = public`, plus `archived` rows by slug (w
 
 ## `/api/app` (member token, `aud = app`)
 
-Every member route that exists today under `/api/*` moves here unchanged (`/api/app/auth/...`, `/api/app/applications`, `/api/app/todos`, `/api/app/scans`, `/api/app/notifications`, `/api/app/calendar/...`). The old `/api/*` paths stay mounted as aliases for one release.
+Every member route that exists today under `/api/*` moves here unchanged (`/api/app/auth/...`, `/api/app/applications`, `/api/app/todos`, `/api/app/scans` (with weekly repeats under `/api/app/scans/schedules` and `POST /api/app/scans/{id}/repeat`, see [opportunities.md](opportunities.md#scheduled-scans)), `/api/app/notifications`, `/api/app/calendar/...`). The old `/api/*` paths stay mounted as aliases for one release.
 
 Changes:
 
@@ -274,9 +274,13 @@ The extension audience is accepted only for `POST /autofill/fill`, `POST /autofi
 | `GET /reports` / `PATCH /reports/{id}` | editor | `{resolved: true}` | reports list / one |
 | `GET/POST /collections`, `PATCH/DELETE /collections/{id}` | editor | `Collection` fields | `Collection` |
 | `GET /site`, `PUT /site` | editor | `SiteContent` | `SiteContent` |
-| `GET /settings`, `PUT /settings` | admin | `{agent_default, community_default, auto_archive, member_scan_limits: {per_hour, per_day}, sweep_hours}` | same |
+| `GET /settings`, `PUT /settings` | admin | `{agent_default, community_default, auto_archive, member_scan_limits: {per_hour, per_day}, scheduled_scans: {member_max, runs_per_hour, daily_token_budget}, crawler, freshness}` | same |
 | `GET /scans` | editor | `limit, offset` | all scans, newest first, with owner email |
 | `POST /scans` | editor | as member scan | scan |
+| `GET /scan-schedules` | admin | | `{schedules: ScanSchedule[], member_schedules, member_schedules_active, runs_last_7_days, tokens_today, run_as, intervals}` |
+| `POST /scan-schedules` | admin | `{name?, categories, region?, focus?, interval_hours: 24 \| 72 \| 168, paused?}` | `201 ScanSchedule` |
+| `PATCH /scan-schedules/{id}` | admin | any of the create fields | `ScanSchedule` |
+| `DELETE /scan-schedules/{id}` | admin | | `204`; its scans stay |
 | `GET /users` | admin | `q, role, limit, offset` | `Page<StaffUser>` |
 | `PATCH /users/{id}` | admin | `{role?, disabled?}` | `StaffUser`; cannot demote the last admin or yourself |
 | `GET /audit` | admin | `actor_id, entity_type, entity_id, action, limit, offset` | `Page<AuditEntry>` |
@@ -347,3 +351,5 @@ URLs must be public HTTP(S) addresses; normalized duplicates return 409. Source 
 Admin settings add `crawler: {hours, max_sources, max_items_per_source, max_candidates_per_task, host_interval_seconds, page_cache_seconds}`. Omitting `crawler` on an existing settings client preserves its stored values. Bounds are 0 to 8760 hours, 1 to 100 sources, 1 to 200 items per source, 0 to 100 extractions per task, 0.5 to 60 seconds between host requests and 60 to 604800 seconds of page-cache lifetime.
 
 Admin settings also add `freshness: {recheck_days, closing_days, closing_recheck_days, cycle_days, stale_days, max_checks, max_agent_checks}` for scheduled listing checks (defaults 30, 7, 14, 30, 120, 10 and 20). Omitting `freshness` preserves its stored values. Bounds are 1 to 365 days for the recheck and cycle intervals, 0 to 60 days for `closing_days`, 7 to 1095 days for `stale_days`, 0 to 200 pages per pass and 0 to 1000 agent checks a day.
+
+Admin settings also add `aggregators` (a list of up to 500 hosts; URLs and `www.` are trimmed, and omitting it preserves the stored list) and `official_backfill` (boolean, default false), which switches on the hourly pass that moves existing listings off aggregator pages. Admin opportunity responses include `found_via_url`, the aggregator post a listing was found on, or an empty string. It is never in public or member responses.

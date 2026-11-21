@@ -571,6 +571,11 @@ export default function Opportunities({
                     <SafeLink href={detail.data.link}>
                       Open application page
                     </SafeLink>
+                    {detail.data.found_via_url && (
+                      <SafeLink href={detail.data.found_via_url}>
+                        Open the aggregator post it was found on
+                      </SafeLink>
+                    )}
                     <p className="text-footnote text-ink-secondary">
                       Verified {formatDate(detail.data.verified_at)}. Source:{" "}
                       {detail.data.source}

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.assistant import conversations, live, service
 from api.assistant.models import AssistantConversation
 from api.assistant.schemas import (
+    AnswerRequest,
     ChatDetail,
     ChatOut,
     ChatRequest,
@@ -157,12 +158,41 @@ async def confirm(
     session: AsyncSession = Depends(get_session),
     current: UserOut = Depends(get_current_user),
 ):
+    chat = await conversations.owned(session, chat_id, current.id)
+    if chat.pending and chat.pending.get("type") == "questions":
+        raise NotFoundError("This action is no longer waiting for confirmation.")
+    await session.rollback()
     lease = await conversations.claim(session, chat_id, current.id, call_id=req.call_id)
     return _response(
         live.start(
             chat_id,
             current.id,
             service.confirm_turn(chat_id, current.id, lease, req.approved),
+        )
+    )
+
+
+@router.post("/{chat_id}/answer", dependencies=[Depends(rate_limit("assistant"))])
+async def answer(
+    chat_id: str,
+    req: AnswerRequest,
+    session: AsyncSession = Depends(get_session),
+    current: UserOut = Depends(get_current_user),
+):
+    """Answers to the Assistant's questions, or none to skip them; the reply carries on."""
+    chat = await conversations.owned(session, chat_id, current.id)
+    if not service.configured():
+        raise HTTPException(503, "Assistant isn't set up yet")
+    if not chat.pending or chat.pending.get("id") != req.call_id:
+        raise NotFoundError("These questions are no longer waiting for answers.")
+    answers = service.check_answers(chat.pending, req.answers)
+    await session.rollback()
+    lease = await conversations.claim(session, chat_id, current.id, call_id=req.call_id)
+    return _response(
+        live.start(
+            chat_id,
+            current.id,
+            service.answer_turn(chat_id, current.id, lease, answers),
         )
     )
 

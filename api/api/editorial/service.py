@@ -12,12 +12,15 @@ from api.public.schemas import SiteContent
 
 
 def defaults():
+    from api.opportunities.official import DEFAULT_AGGREGATORS
+
     return {
         "agent_default": {"status": "published", "audience": "members"},
         "community_default": {"status": "in_review"},
         "auto_archive": True,
         "member_scan_limits": {"per_hour": 3, "per_day": 10},
-        "sweep_hours": settings.opportunity_sweep_hours,
+        # Scan schedules (scans/schedules.py); the daily token budget is off at 0.
+        "scheduled_scans": {"member_max": 3, "runs_per_hour": 10, "daily_token_budget": 0},
         "crawler": {
             "hours": settings.crawl_hours,
             "max_sources": settings.crawl_max_sources,
@@ -26,6 +29,10 @@ def defaults():
             "host_interval_seconds": settings.crawl_host_interval_seconds,
             "page_cache_seconds": settings.fetch_cache_seconds,
         },
+        # Sites that repost other funders' calls (opportunities/official.py).
+        "aggregators": list(DEFAULT_AGGREGATORS),
+        # Hourly pass moving existing listings off aggregator pages.
+        "official_backfill": False,
         # Scheduled listing checks (opportunities/freshness.py).
         "freshness": {
             "recheck_days": 30,

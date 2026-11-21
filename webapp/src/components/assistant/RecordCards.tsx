@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Award, Briefcase, FileText, FolderOpen, Globe, ListChecks, MessageSquareText } from "lucide-react"
+import { Award, Bookmark, Briefcase, FileText, FolderOpen, Globe, Link2, ListChecks, MessageSquareText, Radar, Settings2, UserRound } from "lucide-react"
 import { cn, formatDay } from "@blesser/ui"
 import type { AssistantSource } from "../../lib/assistant"
 
@@ -11,6 +11,12 @@ const RECORD_ICONS: Record<AssistantSource["kind"], typeof Briefcase> = {
   document: FileText,
   answer: MessageSquareText,
   web: Globe,
+  scan: Radar,
+  find: Award,
+  site: Link2,
+  saved_search: Bookmark,
+  profile: UserRound,
+  settings: Settings2,
 }
 
 function recordDetail(source: AssistantSource) {
