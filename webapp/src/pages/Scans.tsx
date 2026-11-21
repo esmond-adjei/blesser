@@ -15,6 +15,7 @@ import {
   PanelRightOpen,
   Radar,
   Plus,
+  Repeat,
   Square,
   Trash2,
   X,
@@ -49,6 +50,8 @@ import { useShellHeader } from "../components/layout/shellHeader"
 import { CountrySelect } from "../components/ui/country-select"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { SourcesDialog } from "../components/scans/SourcesDialog"
+import { SchedulesDialog } from "../components/scans/SchedulesDialog"
+import { SCHEDULES_KEY } from "../lib/schedules"
 
 type Status = ScanTask["status"] | Scan["status"]
 
@@ -77,6 +80,25 @@ function scanFocus(scan: Scan): string {
   if (scan.kind === "sources") return ""
   const focus = scan.focus.trim()
   return focus.startsWith("Find open opportunities eligible") ? "" : focus
+}
+
+/** A scan the member started that does not repeat yet. */
+function canRepeat(scan: Scan): boolean {
+  return (scan.kind ?? "member") === "member" && !scan.schedule_id
+}
+
+function useRepeat(scan: Scan) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.repeatScan(scan.id),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["scans"] })
+      void client.invalidateQueries({ queryKey: ["scan", scan.id] })
+      void client.invalidateQueries({ queryKey: SCHEDULES_KEY })
+      toastSuccess("This scan will run again every week")
+    },
+    onError: (e) => toastError(e, "Couldn't repeat this scan"),
+  })
 }
 
 function foundCount(scan: Scan): number {
@@ -150,6 +172,7 @@ export function Scans() {
   const [fresh, setFresh] = React.useState<string | null>(null)
   const [expanded, setExpanded] = React.useState<{ id: string; from: DOMRect } | null>(null)
   const [sourcesOpen, setSourcesOpen] = React.useState(false)
+  const [schedulesOpen, setSchedulesOpen] = React.useState(false)
   const closeMorph = React.useRef<(() => Promise<void>) | null>(null)
   const collapse = () => closeMorph.current?.() ?? Promise.resolve()
   useTick(!!scans.data?.some((s) => s.status === "running"))
@@ -185,6 +208,7 @@ export function Scans() {
     actions: (
       <div className="flex items-center gap-3">
         <AllowanceNote />
+        <Button size="sm" variant="quiet" icon={<Repeat />} aria-label="Weekly scans" onClick={() => setSchedulesOpen(true)}><span className="max-sm:sr-only">Weekly scans</span></Button>
         <Button size="sm" variant="quiet" icon={<Link2 />} aria-label="My sources" onClick={() => setSourcesOpen(true)}><span className="max-sm:sr-only">My sources</span></Button>
         <Button size="sm" variant="quiet" icon={<LayoutGrid />} onClick={arrange}>Auto arrange</Button>
       </div>
@@ -267,6 +291,7 @@ export function Scans() {
         <ScanComposer onStarted={onStarted} className="pointer-events-auto mx-auto max-w-[760px] shadow-elevation-3" />
       </div>
       <SourcesDialog open={sourcesOpen} onOpenChange={setSourcesOpen} />
+      <SchedulesDialog open={schedulesOpen} onOpenChange={setSchedulesOpen} />
     </div>
   )
 }
@@ -335,8 +360,10 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
     },
     onError: (e) => toastError(e),
   })
+  const repeat = useRepeat(scan)
   const actions: MenuAction[] = [
     { label: "Open scan", icon: <PanelRightOpen />, onSelect: open },
+    ...(canRepeat(scan) ? [{ label: "Repeat weekly", icon: <Repeat />, onSelect: () => repeat.mutate() }] : []),
     running
       ? { label: "Stop", icon: <Square />, onSelect: () => cancel.mutate() }
       : { label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) },
@@ -375,7 +402,12 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-callout font-semibold text-ink">{audiences(scan)}</h2>
-          <p className="truncate text-caption text-ink-tertiary">{scan.region || "Anywhere"}</p>
+          <p className="flex min-w-0 items-center gap-1 text-caption text-ink-tertiary">
+            <span className="truncate">{scan.region || "Anywhere"}</span>
+            {scan.schedule_id ? (
+              <span className="inline-flex shrink-0 items-center gap-1"><Repeat className="size-3" aria-hidden="true" />Weekly</span>
+            ) : null}
+          </p>
         </div>
         <button
           type="button"
@@ -430,6 +462,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
   const [sites, setSites] = React.useState<string[]>([])
   const [siteDraft, setSiteDraft] = React.useState("")
   const [showSites, setShowSites] = React.useState(false)
+  const [weekly, setWeekly] = React.useState(false)
   const siteInput = React.useRef<HTMLInputElement>(null)
   const addSites = (text: string) => {
     const typed = parseSites(text)
@@ -447,6 +480,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
       region: region.trim(),
       focus: focus.trim(),
       sites: [...sites, ...parseSites(siteDraft)].slice(0, MAX_SITES),
+      repeat: weekly,
     }),
     onSuccess: (scan) => {
       void client.invalidateQueries({ queryKey: ["scans"] })
@@ -454,7 +488,13 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
       setSites([])
       setSiteDraft("")
       setShowSites(false)
-      toastSuccess(`Agent sent to find ${CATEGORY_LABELS[category].toLowerCase()} opportunities`)
+      if (weekly) void client.invalidateQueries({ queryKey: SCHEDULES_KEY })
+      setWeekly(false)
+      toastSuccess(
+        weekly
+          ? `Agent sent to find ${CATEGORY_LABELS[category].toLowerCase()} opportunities. It runs again every week.`
+          : `Agent sent to find ${CATEGORY_LABELS[category].toLowerCase()} opportunities`,
+      )
       onStarted?.(scan)
     },
     onError: (err) => toastError(err, "Couldn't start the scan"),
@@ -561,6 +601,18 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
         >
           {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="quiet"
+          icon={<Repeat />}
+          aria-pressed={weekly}
+          title={weekly ? "This scan will run again every week" : "Run this scan again every week"}
+          onClick={() => setWeekly((v) => !v)}
+          className={cn(weekly && "bg-forest-soft text-link hover:bg-forest-soft")}
+        >
+          Weekly
+        </Button>
         {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
         <Button
           type="submit"
@@ -620,7 +672,21 @@ function ScanPanel({ scan, actions }: { scan: Scan; actions?: React.ReactNode })
         </Chip>
         {actions}
       </div>
-      {/* <Tasks tasks={scan.tasks ?? []} /> */}
+      {scan.schedule_id || scan.opportunities_updated ? (
+        <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-ink-secondary">
+          {scan.schedule_id ? (
+            <>
+              <Repeat aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
+              <span>{scan.kind === "scheduled" ? "Weekly run of your scan." : "Repeats every week."}</span>
+            </>
+          ) : null}
+          {scan.opportunities_updated ? (
+            <span>
+              Refreshed {scan.opportunities_updated} {scan.opportunities_updated === 1 ? "listing" : "listings"} already on Blesser with newer details
+            </span>
+          ) : null}
+        </p>
+      ) : null}
       {scan.sites?.length ? (
         <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-footnote text-ink-secondary">
           <Link2 aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
@@ -674,15 +740,20 @@ function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () =
     onError: (e) => toastError(e),
   })
   const running = scan.status === "running"
+  const repeat = useRepeat(scan)
   useTick(running)
+  const repeatAction: MenuAction[] = canRepeat(scan) ? [{ label: "Repeat weekly", icon: <Repeat />, onSelect: () => repeat.mutate() }] : []
   return (
     <div className="space-y-5">
       <ScanPanel
         scan={scan}
         actions={running ? (
-          <Button size="sm" variant="quiet" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Square />}>Stop</Button>
+          <>
+            <Button size="sm" variant="quiet" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Square />}>Stop</Button>
+            {repeatAction.length ? <ActionMenuButton label="Scan actions" actions={repeatAction} /> : null}
+          </>
         ) : (
-          <ActionMenuButton label="Scan actions" actions={[{ label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
+          <ActionMenuButton label="Scan actions" actions={[...repeatAction, { label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
         )}
       />
       {log ? <ActivityLog tasks={scan.tasks ?? []} /> : null}

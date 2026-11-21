@@ -1,5 +1,5 @@
 import { formatAgo, utcMs } from "./format"
-import type { MemberSource, Scan, ScanTaskEvent } from "./types"
+import type { MemberSource, Scan, ScanSchedule, ScanTaskEvent } from "./types"
 
 export type LineKind = "search" | "read" | "save" | "update" | "note" | "other"
 
@@ -142,4 +142,25 @@ export function sourceStatus(source: MemberSource, now = Date.now()): string {
   const days = Number.isNaN(next) ? null : Math.max(0, Math.ceil((next - now) / 86_400_000))
   const upcoming = days == null ? "" : days === 0 ? ", next check today" : `, next in ${days} ${days === 1 ? "day" : "days"}`
   return `Checked ${formatAgo(source.last_checked_at, now)}, ${source.finds} found${upcoming}`
+}
+
+/** "Paused after 4 quiet weeks", "Next run in 3 days", or "Next run today" for a repeating scan. */
+export function scheduleStatus(schedule: ScanSchedule, now = Date.now()): string {
+  if (schedule.paused) {
+    if (schedule.pause_reason === "empty") return "Paused after weeks with nothing new"
+    if (schedule.pause_reason === "inactive") return "Paused while you were away"
+    return "Paused"
+  }
+  const next = utcMs(schedule.next_run_at)
+  if (Number.isNaN(next)) return "Repeats weekly"
+  const days = Math.max(0, Math.ceil((next - now) / 86_400_000))
+  return days === 0 ? "Next run today" : `Next run in ${days} ${days === 1 ? "day" : "days"}`
+}
+
+/** "3 new, 2 updated" from a run, or "Nothing new" when it found neither. */
+export function runSummary(run: { new: number; updated: number }): string {
+  const parts = []
+  if (run.new) parts.push(`${run.new} new`)
+  if (run.updated) parts.push(`${run.updated} updated`)
+  return parts.length ? parts.join(", ") : "Nothing new"
 }

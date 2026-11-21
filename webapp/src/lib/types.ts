@@ -112,13 +112,17 @@ export interface Scan {
   focus: string
   /** Sites the member asked the agent to read first. */
   sites?: string[]
-  kind?: "member" | "sweep" | "sources"
+  kind?: "member" | "sweep" | "sources" | "scheduled"
   status: "running" | "done" | "cancelled"
   created_at: string
   /** Listings that fit the request: matched from the catalog or found on the web. */
   opportunities_found?: number
   /** Of those, listings new to Blesser. */
   opportunities_added: number
+  /** Listings already in the catalog that this scan refreshed with new facts. */
+  opportunities_updated?: number
+  /** Set when the scan repeats weekly, or is a run of a repeating scan. */
+  schedule_id?: string | null
   started_at?: string | null
   finished_at?: string | null
   tasks?: ScanTask[] | null
@@ -163,6 +167,41 @@ export interface ScanRequest {
   region?: string
   focus?: string
   sites?: string[]
+  /** Repeat this scan every week from now on. */
+  repeat?: boolean
+}
+
+export interface ScanScheduleRun {
+  scan_id: string
+  status: Scan["status"]
+  created_at: string
+  new: number
+  updated: number
+}
+
+export interface ScanSchedule {
+  id: string
+  audience: "member" | "staff"
+  name: string
+  categories: OpportunityCategory[]
+  region: string
+  focus: string
+  sites: string[]
+  interval_hours: number
+  paused: boolean
+  /** Why it paused itself: runs found nothing new, or the owner was away. */
+  pause_reason: "empty" | "inactive" | null
+  next_run_at: string | null
+  last_run_at: string | null
+  runs: number
+  last_run: ScanScheduleRun | null
+  created_at: string
+}
+
+export interface ScanSchedules {
+  schedules: ScanSchedule[]
+  max_schedules: number
+  interval_hours: number
 }
 
 // --- Opportunities, to-dos and calendar ------------------------------------

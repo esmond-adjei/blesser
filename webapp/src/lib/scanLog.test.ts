@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { describeEvent, errorReason, formatDuration, parseSites, scanElapsedMs, shortUrl, siteLabel, sourceStatus } from "./scanLog"
-import type { MemberSource, Scan, ScanTask } from "./types"
+import { describeEvent, errorReason, formatDuration, parseSites, runSummary, scanElapsedMs, scheduleStatus, shortUrl, siteLabel, sourceStatus } from "./scanLog"
+import type { MemberSource, Scan, ScanSchedule, ScanTask } from "./types"
 
 const task = (log: ScanTask["log"]): ScanTask => ({
   id: "t1", task_type: "discover", target: "category:student", status: "done", error: null, final_text: null,
@@ -91,5 +91,31 @@ describe("source status", () => {
   it("covers new and paused sources", () => {
     expect(sourceStatus({ ...base, last_checked_at: null }, now)).toBe("First check within the hour")
     expect(sourceStatus({ ...base, paused: true }, now)).toBe("Paused")
+  })
+})
+
+describe("repeating scans", () => {
+  const base: ScanSchedule = {
+    id: "s1", audience: "member", name: "", categories: ["startup"], region: "Ghana", focus: "", sites: [],
+    interval_hours: 168, paused: false, pause_reason: null, next_run_at: "2026-11-24T09:00:00Z",
+    last_run_at: "2026-11-17T09:00:00Z", runs: 1, last_run: null, created_at: "2026-11-10T09:00:00Z",
+  }
+  const now = Date.parse("2026-11-21T09:00:00Z")
+
+  it("says when the next run is", () => {
+    expect(scheduleStatus(base, now)).toBe("Next run in 3 days")
+    expect(scheduleStatus({ ...base, next_run_at: "2026-11-21T08:00:00Z" }, now)).toBe("Next run today")
+  })
+
+  it("says why it paused", () => {
+    expect(scheduleStatus({ ...base, paused: true, next_run_at: null, pause_reason: "empty" }, now)).toBe("Paused after weeks with nothing new")
+    expect(scheduleStatus({ ...base, paused: true, next_run_at: null, pause_reason: "inactive" }, now)).toBe("Paused while you were away")
+    expect(scheduleStatus({ ...base, paused: true, next_run_at: null }, now)).toBe("Paused")
+  })
+
+  it("sums up a run", () => {
+    expect(runSummary({ new: 3, updated: 2 })).toBe("3 new, 2 updated")
+    expect(runSummary({ new: 0, updated: 1 })).toBe("1 updated")
+    expect(runSummary({ new: 0, updated: 0 })).toBe("Nothing new")
   })
 })
