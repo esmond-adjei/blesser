@@ -89,8 +89,9 @@ def user_message(
     if member:
         steps = (
             "This scan is for one member. Work in this order:\n"
-            "1. search_catalogue with key words from the member's request, and "
-            "add_catalogue_match for each listing that clearly fits it.\n"
+            "1. search_catalogue with key words from the member's request, only "
+            "to learn what the catalogue already lists. The member can already see "
+            "those, so do not record them: look for what is new to them.\n"
             + (
                 "2. Read the member's sites below with fetch_page, follow links on "
                 "them to opportunity pages, and save what fits.\n"
@@ -282,7 +283,7 @@ async def _run_agent(
     if not sources_only:
         tools.insert(0, "search_web")
     if member:
-        tools += ["search_catalogue", "add_catalogue_match"]
+        tools += ["search_catalogue"]
     result = await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
         message,

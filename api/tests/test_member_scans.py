@@ -90,7 +90,7 @@ class Script:
         )
 
 
-def test_member_scan_matches_the_catalogue_and_skips_the_crawler(monkeypatch):
+def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch):
     word = "agritech" + _token()
     script = Script(
         [
@@ -131,17 +131,15 @@ def test_member_scan_matches_the_catalogue_and_skips_the_crawler(monkeypatch):
             assert "search_catalogue" in first_prompt and word in first_prompt
 
             detail = await scans.scan_detail(session, TEST_USER_ID, scan.id)
-            assert detail["opportunities_found"] == 1
+            assert detail["opportunities_found"] == 0
             assert detail["opportunities_added"] == 0
-            assert [(f["opportunity_id"], f["source"]) for f in detail["finds"]] == [
-                (listing.id, "catalog")
-            ]
+            assert detail["finds"] == []
             bodies = (
                 await session.execute(
                     select(Notification.body).where(Notification.entity_id == scan.id)
                 )
             ).scalars()
-            assert scan_summary(scan.region, 1, 0) in list(bodies)
+            assert scan_summary(scan.region, 0, 0) in list(bodies)
             candidate.status = "rejected"
             await session.commit()
 

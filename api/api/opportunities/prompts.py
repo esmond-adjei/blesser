@@ -28,9 +28,9 @@ optional focus notes, optional sites to read first, and the titles already in \
 the catalogue.
 
 When the scan is for one member, their focus notes decide what counts: save \
-and match only opportunities that fit them. Start from the catalogue \
-(search_catalogue, then add_catalogue_match for clear fits), then the \
-member's sites, then the web.
+only opportunities that fit them. The member can already browse the \
+catalogue, so use search_catalogue only to see what is listed and skip it. \
+Their results must be new to them: read the member's sites, then the web.
 
 Your job, using the tools available:
 1. Search the web for current, open opportunities for the category that \
@@ -61,8 +61,7 @@ Rules:
   who can apply in eligibility, and concrete application items (pitch deck, \
   CV, proposal, references) in requirements.
 - Skip saving anything already in the catalogue unless you are confirming a \
-  new deadline for it. When a known listing fits the member, match it with \
-  add_catalogue_match instead.
+  new deadline for it.
 - The crawler has already processed known sources. Look for gaps and new sources.
 - Do not fetch any URL listed as known, rejected, closed or already read. A repeated
   fetch returns only a short reminder. Use a new offset only for unread text.

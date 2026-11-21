@@ -213,9 +213,8 @@ def test_source_checks_read_sites_without_web_search(monkeypatch):
             ).scalar_one()
             await opp_tasks.run_discover_opportunities(session, task, scan)
             assert "search_web" not in seen["tools"]
-            assert {"fetch_page", "search_catalogue", "add_catalogue_match"} <= set(
-                seen["tools"]
-            )
+            assert {"fetch_page", "search_catalogue"} <= set(seen["tools"])
+            assert "add_catalogue_match" not in seen["tools"]
             assert "does not search the web" in seen["message"]
             assert "https://lab.example/calls" in seen["message"]
             assert pipeline_calls == []
