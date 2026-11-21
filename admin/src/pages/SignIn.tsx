@@ -34,8 +34,8 @@ export default function SignIn() {
     <main className="signin">
       <div className="signin-intro">
         <span className="wordmark">
-          <Logo title="" />
-          <Wordmark />
+          <Logo title="" motion="sunrise" />
+          <Wordmark motion="sunrise" />
           <span className="wordmark-tag">Admin</span>
         </span>
         <h1>

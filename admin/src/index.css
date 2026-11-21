@@ -1058,6 +1058,7 @@
     margin-left: -140px;
     border-radius: 140px 140px 0 0;
     background: var(--sun);
+    animation: signin-sunrise 600ms var(--ease-out) both;
   }
   .signin-form {
     display: flex;
@@ -1228,7 +1229,16 @@
     padding: 8px 4px 24px;
   }
 }
+/* The big sun rises over the panel's edge while the logo plays its Sunrise. */
+@keyframes signin-sunrise {
+  from {
+    transform: translateY(100%);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .signin-sun {
+    animation: none;
+  }
   .page-enter > *,
   .bulk-bar,
   .side-panel[open] {

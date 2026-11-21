@@ -49,6 +49,7 @@ class DocumentStorage(Protocol):
     async def delete_member(self, user_id: str) -> None: ...
     def download(self, key: str, filename: str, content_type: str) -> FileResponse: ...
     async def preview(self, key: str, content_type: str) -> Response: ...
+    async def read_text(self, key: str, content_type: str) -> dict: ...
 
 
 def detect_type(path: Path) -> str:
@@ -239,6 +240,15 @@ class LocalDocumentStorage:
         if media is None:
             return Response(status_code=204, headers=headers)
         return FileResponse(file, media_type=media, headers=headers)
+
+    async def read_text(self, key: str, content_type: str) -> dict:
+        """The text and links of a stored CV, for filling the profile."""
+        from api.applicant_kit import cv_import
+
+        path = self._path(key)
+        if not path.is_file():
+            raise NotFoundError("Document not found")
+        return await cv_import.read_text(path, content_type)
 
 
 def get_storage() -> DocumentStorage:

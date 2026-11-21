@@ -41,6 +41,18 @@ function Moved({ moved }: { moved: NonNullable<Review["moved"]> }) {
   )
 }
 
+// The header logo plays its Sunrise the first time the panel ever opens, then stays still.
+const SUNRISE_PLAYED = "blesser.sunrise-played"
+const sunrise = (() => {
+  try {
+    if (localStorage.getItem(SUNRISE_PLAYED)) return false
+    localStorage.setItem(SUNRISE_PLAYED, "1")
+    return true
+  } catch {
+    return false
+  }
+})()
+
 export function Panel() {
   const [status, setStatus] = React.useState<Status | null>(null)
   const { tabId, pageTitle, review } = usePanelTab()
@@ -162,8 +174,8 @@ export function Panel() {
         <header className="sticky top-0 z-20 border-b border-separator bg-canvas">
           <div className="mx-auto flex max-w-reading items-center justify-between gap-3 px-4 py-3">
             <div className="flex shrink-0 items-center gap-1.5">
-              <Logo className="size-[22px]" title="" />
-              <Wordmark className="text-[22px]" />
+              <Logo className="size-[22px]" title="" motion={sunrise ? "sunrise" : undefined} />
+              <Wordmark className="text-[22px]" motion={sunrise ? "sunrise" : undefined} />
             </div>
             <div className="flex min-w-0 items-center gap-1.5">
               {me ? <p className="truncate text-right text-footnote text-ink-secondary" title={me.user.display_name || me.user.email}>{me.user.display_name || me.user.email}</p> : null}

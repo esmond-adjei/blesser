@@ -23,8 +23,8 @@ const current = (href: string) => path === href || path.startsWith(`${href}/`)
 <header class={onForest ? "bg-forest text-on-forest" : "border-b border-separator bg-canvas"}>
   <div class="site-container flex h-16 items-center gap-6">
     <a href={withBase("/")} class={cn("flex items-center gap-1 rounded-full no-underline", onForest && "[--logo-ink:#ffffff]")} aria-label="Blesser home">
-      <Logo title="" className="size-8" />
-      <Wordmark />
+      <Logo title="" className="size-8" motion="sunrise" />
+      <Wordmark motion="sunrise" />
     </a>
     <nav aria-label="Main" class="hidden flex-1 lg:block">
       <ul class="m-0 flex list-none items-center gap-1 p-0">

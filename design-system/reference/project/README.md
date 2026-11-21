@@ -59,6 +59,15 @@ Opportunities, made visible. Blesser helps startups, researchers and students in
 - One celebration: when an application moves to Accepted, the track fills `bloom` left to right over 600ms.
 - Respect `prefers-reduced-motion`: fades only, no movement, no lifts.
 
+### Logo motion
+
+The logo has three animations. Only its own parts move (the three steps, the sun, the wordmark), and each ends on the exact static logo.
+
+- Sunrise, 1.6s, `<Logo motion="sunrise" />` with `<Wordmark motion="sunrise" />`: the steps set down bottom first, 110ms apart; the sun rises from behind the middle step; the wordmark slides out from behind the mark. Each part overlaps the last and uses `--ease-unfold`, a soft start with a long settle, so it unfolds as one movement. Plays once: on the public site's header once per visit, on the admin sign-in, and on the extension's first open. Never on every page load.
+- Climb, 1.6s loop, `<Logo motion="climb" />`: full-page loaders only. The steps light up bottom to top, the sun rises, then sinks before the steps dim. Fades in after 400ms so quick loads show nothing. Spinners in buttons and rows stay as they are.
+- From the horizon, about 3.2s plus a hold, on a forest ground with a faint grain: video only, for social posts and title slides. The big half sun from the admin sign-in rises over the bottom edge, gathers into the mark, then the steps, wordmark and tagline follow. Source in `motion/horizon.html`; `node scripts/render-intro.mjs` renders `assets/motion/blesser-intro-16x9.mp4` and `-1x1.mp4` with posters.
+- Under reduced motion, Sunrise is a 180ms fade and Climb dims and brightens in place without moving.
+
 ## Focus and accessibility
 
 - Focus ring: 2px solid `focus` with a 2px offset on every interactive element. It is 5:1 or better on every surface in both themes.

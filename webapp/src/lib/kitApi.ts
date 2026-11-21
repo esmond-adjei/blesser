@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { API_BASE, ApiError, getAccessToken, parseDetail, refreshAccessToken, request } from "./api"
+import type { CvProfile } from "./cvImport"
 import { parseExcerpt, type DocumentExcerpt } from "./kit"
 import type { Answer, AnswerInput, Correction, DocumentPatch, KitDocument, Profile, ProfileInput, Project, ProjectInput, StorageUsage } from "./kitTypes"
 
@@ -13,6 +14,9 @@ const qs = (params: Record<string, string | null | undefined>) => {
 
 export const getKitProfile = (reveal = false) => request<Profile>(`/api/app/profile${reveal ? "?reveal=1" : ""}`)
 export const putKitProfile = (body: ProfileInput) => request<Profile>("/api/app/profile", json("PUT", body))
+/** Profile fields read from one of the member's documents. Saves nothing. */
+export const readCv = (documentId: string) =>
+  request<{ profile: CvProfile }>("/api/app/profile/from-cv", json("POST", { document_id: documentId })).then((r) => r.profile)
 
 export const listProjects = () => request<Project[]>("/api/app/projects")
 export const getProject = (id: string) => request<Project>(`/api/app/projects/${encodeURIComponent(id)}`)

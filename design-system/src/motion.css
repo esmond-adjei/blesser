@@ -8,6 +8,8 @@
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 260ms;
+  /* Soft start and a long settle, for the logo unfolding. */
+  --ease-unfold: cubic-bezier(0.37, 0, 0.18, 1);
 }
 
 @keyframes bl-fade-in { from { opacity: 0; } }
@@ -105,4 +107,77 @@
 .bl-indeterminate { animation: bl-indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .bl-indeterminate { animation: none; width: 100%; opacity: 0.6; }
+}
+
+/* The logo's own motion. Only the mark's parts move, and both end on the static logo.
+   Sunrise (1.6s, once): the steps set down bottom first, the sun rises from behind the
+   middle step, then the wordmark slides out from behind the mark. Each part overlaps the
+   last so it unfolds as one movement.
+   Climb (1.6s loop, loaders only): the steps light up bottom to top, the sun rises, then
+   the sun sinks before the steps dim, so it never shows through them. It fades in after
+   400ms so quick loads never flash it.
+   Lengths here are SVG user units on the logo's 32-unit grid. */
+@keyframes bl-logo-step { from { opacity: 0; transform: translateY(3px); } }
+@keyframes bl-logo-sun { from { transform: translateY(7px); } }
+@keyframes bl-logo-name { from { opacity: 0; transform: translateX(-0.5em); } }
+
+.bl-logo-sunrise .bl-logo-step { animation: bl-logo-step 440ms var(--ease-unfold) both; }
+.bl-logo-sunrise .bl-logo-step-2 { animation-delay: 110ms; }
+.bl-logo-sunrise .bl-logo-step-3 { animation-delay: 220ms; }
+.bl-logo-sunrise .bl-logo-sun { animation: bl-logo-sun 860ms var(--ease-unfold) 420ms both; }
+
+/* The mask hides the wordmark behind the mark's edge; the padding keeps glyphs unclipped. */
+.bl-wordmark-mask {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.1em 0.08em 0.12em 0;
+  margin: -0.1em -0.08em -0.12em 0;
+}
+.bl-wordmark-sunrise { display: inline-block; animation: bl-logo-name 600ms var(--ease-unfold) 1000ms both; }
+
+@keyframes bl-climb-1 {
+  0% { opacity: 0.2; animation-timing-function: var(--ease-out); }
+  12.5% { opacity: 1; }
+  87.5% { opacity: 1; animation-timing-function: var(--ease-in); }
+  100% { opacity: 0.2; }
+}
+@keyframes bl-climb-2 {
+  0%, 10% { opacity: 0.2; animation-timing-function: var(--ease-out); }
+  22.5% { opacity: 1; }
+  87.5% { opacity: 1; animation-timing-function: var(--ease-in); }
+  100% { opacity: 0.2; }
+}
+@keyframes bl-climb-3 {
+  0%, 20% { opacity: 0.2; animation-timing-function: var(--ease-out); }
+  32.5% { opacity: 1; }
+  87.5% { opacity: 1; animation-timing-function: var(--ease-in); }
+  100% { opacity: 0.2; }
+}
+@keyframes bl-climb-sun {
+  0%, 30% { transform: translateY(7px); animation-timing-function: var(--ease-out); }
+  56.25% { transform: translateY(0); }
+  71.875% { transform: translateY(0); animation-timing-function: var(--ease-in); }
+  87.5%, 100% { transform: translateY(7px); }
+}
+.bl-logo-climb { animation: bl-fade-in var(--dur-base) var(--ease-out) 400ms both; }
+.bl-logo-climb .bl-logo-step-1 { animation: bl-climb-1 1.6s linear infinite; }
+.bl-logo-climb .bl-logo-step-2 { animation: bl-climb-2 1.6s linear infinite; }
+.bl-logo-climb .bl-logo-step-3 { animation: bl-climb-3 1.6s linear infinite; }
+.bl-logo-climb .bl-logo-sun { animation: bl-climb-sun 1.6s linear infinite; }
+
+/* Pages that play Sunrise once per visit set this on <html> after the first play. */
+.bl-motion-seen .bl-logo-sunrise .bl-logo-step,
+.bl-motion-seen .bl-logo-sunrise .bl-logo-sun,
+.bl-motion-seen .bl-wordmark-sunrise { animation: none; }
+
+@keyframes bl-climb-calm { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .bl-logo-sunrise .bl-logo-step,
+  .bl-logo-sunrise .bl-logo-sun { animation: none; }
+  .bl-logo-sunrise, .bl-wordmark-sunrise { animation: bl-fade-in var(--dur-base) var(--ease-out); }
+  .bl-motion-seen .bl-logo-sunrise, .bl-motion-seen .bl-wordmark-sunrise { animation: none; }
+  .bl-logo-climb .bl-logo-sun { animation: none; }
+  .bl-logo-climb .bl-logo-step-1,
+  .bl-logo-climb .bl-logo-step-2,
+  .bl-logo-climb .bl-logo-step-3 { animation: bl-climb-calm 1.6s ease-in-out infinite; }
 }
