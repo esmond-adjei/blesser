@@ -17,6 +17,8 @@ import {
 import { ApiError, apiMessage } from "../../lib/api"
 import { LINEAR_OK, springEasing } from "../../lib/motion"
 import { useShellHeader } from "../layout/shellHeader"
+import { useIsMobile } from "../../hooks/use-mobile"
+import { usePaneSize } from "../../lib/paneSize"
 import guideArt from "../../assets/illustrations/guide.webp"
 import { ChatSkeleton } from "./ChatSkeleton"
 import { AgentSteps } from "./AgentSteps"
@@ -27,6 +29,7 @@ import { PendingCard, QuestionnaireDialog } from "./Questionnaire"
 import { RecordCards } from "./RecordCards"
 import { useRecordPreview } from "./useRecordPreview"
 
+const LIST_KEY = "blesser.assistant.history"
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
 const chatsKey = (userId: string) => ["assistant", userId, "chats"]
@@ -173,6 +176,18 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   })
   const { reply, error, start } = useLiveReply(userId)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const phone = useIsMobile()
+  const docked = variant === "page" && !phone
+  const [listOpen, setListOpen] = useState(() => {
+    try { return localStorage.getItem(LIST_KEY) !== "closed" } catch { return true }
+  })
+  const toggleList = () => setListOpen((open) => {
+    try { localStorage.setItem(LIST_KEY, open ? "closed" : "open") } catch { /* resets on reload */ }
+    return !open
+  })
+  const [listWidth, setListWidth] = usePaneSize("blesser.assistant.history.width", 288, 220, 420)
+  const [resizing, setResizing] = useState(false)
+  const listPane = useRef<HTMLElement>(null)
   const [edit, setEdit] = useState<ChatEdit | null>(null)
   const [draft, setDraft] = useState("")
   const [problem, setProblem] = useState("")
@@ -320,12 +335,12 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   useEffect(() => { selectRef.current = selectChat })
   const chatButtons = useMemo(() => (
     <>
-      <Button size="sm" variant="quiet" icon={<MessagesSquare />} onClick={() => setHistoryOpen((open) => !open)}>
+      <Button size="sm" variant="quiet" icon={<MessagesSquare />} onClick={() => (docked ? toggleList() : setHistoryOpen((open) => !open))} aria-pressed={docked ? listOpen : undefined}>
         <span className={embedded ? "sr-only" : "max-sm:sr-only"}>Chats</span>
       </Button>
       {chatId ? <Button size="sm" variant="quiet" icon={<Plus />} onClick={() => selectRef.current()}><span className={embedded ? "sr-only" : "max-sm:sr-only"}>New chat</span></Button> : null}
     </>
-  ), [embedded, chatId])
+  ), [embedded, chatId, docked, listOpen])
   const header = useMemo(() => (embedded ? null : { title, actions: chatButtons }), [embedded, title, chatButtons])
   useShellHeader(header)
 
@@ -365,8 +380,50 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
       </form>
   )
 
+  const nudgeList = (event: React.KeyboardEvent) => {
+    const step = event.shiftKey ? 48 : 16
+    if (event.key === "ArrowLeft") setListWidth(listWidth - step)
+    else if (event.key === "ArrowRight") setListWidth(listWidth + step)
+    else return
+    event.preventDefault()
+  }
+
   return (
-    <div className="@container/chat relative flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1">
+      {docked ? (
+        <aside
+          ref={listPane}
+          aria-label="Chats"
+          aria-hidden={!listOpen}
+          inert={!listOpen}
+          style={{ width: listOpen ? listWidth : 0 }}
+          className={cn("relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none", resizing ? "transition-none" : "transition-[width] duration-200", listOpen && "border-r")}
+        >
+          <div style={{ width: listWidth }} className="flex min-h-0 shrink-0 flex-col gap-3 p-3">
+            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
+            {list}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the chat list"
+            aria-valuemin={220}
+            aria-valuemax={420}
+            aria-valuenow={Math.round(listWidth)}
+            tabIndex={0}
+            onPointerDown={(event) => { setResizing(true); event.currentTarget.setPointerCapture(event.pointerId) }}
+            onPointerMove={(event) => { if (resizing) setListWidth(event.clientX - (listPane.current?.getBoundingClientRect().left ?? 0)) }}
+            onPointerUp={() => setResizing(false)}
+            onPointerCancel={() => setResizing(false)}
+            onDoubleClick={() => setListWidth(288)}
+            onKeyDown={nudgeList}
+            className="group absolute inset-y-0 right-0 z-10 flex w-2 translate-x-1 cursor-col-resize touch-none items-center justify-center focus:outline-none"
+          >
+            <span className={cn("h-10 w-0.5 rounded-full transition-colors", resizing ? "bg-focus" : "bg-transparent group-hover:bg-separator group-focus-visible:bg-focus")} />
+          </div>
+        </aside>
+      ) : null}
+    <div className="@container/chat relative flex min-h-0 min-w-0 flex-1 flex-col">
       {embedded ? (
         <header className="flex h-12 shrink-0 items-center gap-1 border-b border-separator px-3">
           <h2 className="min-w-0 flex-1 truncate text-callout font-semibold text-ink">{title}</h2>
@@ -437,7 +494,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
             {list}
           </div>
         ) : null
-      ) : (
+      ) : docked ? null : (
         <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
           <SheetContent side="right" className="w-full gap-0 sm:max-w-sm">
             <SheetHeader className="border-b border-separator p-5 pr-14">
@@ -464,6 +521,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
         {edit ? <EditChat key={edit.chat.id + edit.type} edit={edit} problem={problem} saving={editing} onClose={() => { if (!editing) setEdit(null) }}
           onSave={(title) => void saveEdit(title)} /> : null}
       </Dialog>
+    </div>
     </div>
   )
 }
