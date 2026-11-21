@@ -30,6 +30,9 @@
 .bl-modal[data-state="open"] { animation: bl-modal-in var(--dur-slow) var(--ease-out); }
 .bl-modal[data-state="closed"] { animation: bl-modal-out var(--dur-fast) var(--ease-in) forwards; }
 
+/* Fade only: safe on elements that carry their own transform or a Radix data-state. */
+.bl-appear { animation: bl-fade-in var(--dur-slow) var(--ease-out); }
+
 /* Menus, popovers and tooltips grow from their trigger. */
 .bl-pop {
   transform-origin: var(--radix-popper-transform-origin, var(--radix-context-menu-content-transform-origin, center));

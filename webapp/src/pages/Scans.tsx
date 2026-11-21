@@ -9,6 +9,7 @@ import {
   Database,
   GripVertical,
   Globe,
+  Info,
   Link2,
   LayoutGrid,
   Loader2,
@@ -365,7 +366,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
         "transition-[box-shadow,border-color] duration-150 hover:border-input-border-hover hover:shadow-elevation-2",
         raised ? "z-20" : "z-10",
         dragging && "cursor-grabbing shadow-elevation-3",
-        fresh ? "bl-pop border-focus" : "border-separator",
+        fresh ? "bl-appear border-focus" : "border-separator",
         hidden && "invisible",
       )}
     >
@@ -463,6 +464,8 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
   const blocked = !!a?.enabled && (a.left_this_hour === 0 || a.left_today === 0)
   const submit = () => { if (!blocked && !start.isPending) start.mutate() }
   return (
+    <>
+        {showAllowance ? <span className="text-right italic"><AllowanceNote /></span> : null}
     <form
       onSubmit={(e) => { e.preventDefault(); submit() }}
       className={cn("rounded-lg border border-input-border bg-surface p-2.5 pl-4 transition-[border-color,box-shadow] duration-150", className)}
@@ -480,9 +483,19 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
       />
       {showSites ? (
         <div className="mt-1 rounded-md bg-surface-sunk px-2.5 py-2">
-          <label htmlFor="scan-sites" className="text-caption font-medium text-ink-secondary">
-            Sites to check first <span className="text-ink-tertiary">({sites.length} of {MAX_SITES})</span>
-          </label>
+          <div className="flex items-center gap-1">
+            <label htmlFor="scan-sites" className="text-caption font-medium text-ink-secondary">
+              Sites to check first <span className="text-ink-tertiary">({sites.length} of {MAX_SITES})</span>
+            </label>
+            <button
+              type="button"
+              aria-label="About sites to check first"
+              data-tooltip="The agent reads these before it searches the web. New finds from them stay visible only to you until our team has reviewed them."
+              className="grid size-5 cursor-pointer place-items-center rounded-full text-ink-tertiary transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+            >
+              <Info className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {sites.map((site) => (
               <span key={site} className="inline-flex max-w-full items-center gap-1 rounded-full bg-surface py-0.5 pl-2.5 pr-1 text-footnote text-ink shadow-elevation-1">
@@ -525,7 +538,6 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
               />
             ) : null}
           </div>
-          <p className="mt-1 text-caption text-ink-tertiary">The agent reads these before it searches the web. New finds from them are checked by our team before they go public.</p>
         </div>
       ) : null}
       <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -561,7 +573,6 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
         >
           {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}
         </Button>
-        {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
         <Button
           type="submit"
           size="sm"
@@ -571,10 +582,11 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
           title={blocked ? "No scans left for now" : undefined}
           disabled={blocked || start.isPending}
           icon={start.isPending ? <Loader2 className="motion-safe:animate-spin" /> : <ArrowUp />}
-          className={cn("size-9", !showAllowance && "ml-auto")}
+          className={"size-9 shrink-0 ml-auto"}
         />
       </div>
     </form>
+    </>
   )
 }
 
@@ -752,7 +764,7 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
     const ghost = source?.cloneNode(true) as HTMLElement | undefined
     if (ghost) {
       ghost.removeAttribute("data-scan-card")
-      ghost.classList.remove("invisible", "bl-pop")
+      ghost.classList.remove("invisible", "bl-pop", "bl-appear")
       Object.assign(ghost.style, { transform: "none", inset: "0 auto auto 0", border: "0", boxShadow: "none", background: "transparent", pointerEvents: "none" })
       s.appendChild(ghost)
       moves.push(direction === "open"
