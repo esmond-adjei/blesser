@@ -382,3 +382,29 @@ def test_member_prompt_lists_sites_and_order():
         region="Ghana", category="student", focus="", today="2026-11-20", known=[]
     )
     assert "search_catalogue" not in sweep and "member's sites" not in sweep
+
+
+def test_scan_results_leave_out_listings_already_in_the_catalogue():
+    async def check():
+        async with SessionLocal() as session:
+            old = await _listing(session, f"Already listed {_token()}")
+            new = await _listing(session, f"Newly found {_token()}", status="in_review")
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            session.add_all(
+                [
+                    ScanFind(
+                        scan_id=scan.id,
+                        opportunity_id=old.id,
+                        created=False,
+                        updated=True,
+                    ),
+                    ScanFind(scan_id=scan.id, opportunity_id=new.id, created=True),
+                ]
+            )
+            await session.commit()
+            detail = await scans.scan_detail(session, TEST_USER_ID, scan.id)
+            assert [f["opportunity_id"] for f in detail["finds"]] == [new.id]
+            assert detail["opportunities_found"] == 1
+            await scans.cancel_scan(session, TEST_USER_ID, scan.id)
+
+    run(check())

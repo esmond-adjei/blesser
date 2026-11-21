@@ -198,10 +198,10 @@ def task_out(task: m.ScanTask) -> dict:
 
 
 def _visible_find():
-    """Finds a member may see: published listings, and ones this scan created that
-    wait for review."""
-    return (Opportunity.status == "published") | (
-        m.ScanFind.created.is_(True) & (Opportunity.status == "in_review")
+    """Finds a member may see: listings this scan newly added, published or waiting for
+    review. Listings already in the catalogue are on their feed, so a scan doesn't list them."""
+    return m.ScanFind.created.is_(True) & Opportunity.status.in_(
+        ("published", "in_review")
     )
 
 
