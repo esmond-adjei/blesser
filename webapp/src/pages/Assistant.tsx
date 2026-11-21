@@ -500,7 +500,7 @@ function recordDetail(source: AssistantSource) {
   return [opp.organization, due].filter(Boolean).join(", ")
 }
 
-const SHOWN_RECORDS = 4
+const SHOWN_RECORDS = 10
 
 /** Records a turn cited or created, each opening where it lives. */
 function RecordCards({ sources }: { sources: AssistantSource[] }) {

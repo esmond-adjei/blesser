@@ -141,8 +141,10 @@ export function Applications() {
         ? data?.filter((a) => a.status !== "accepted" && a.status !== "rejected").length
         : data?.filter((a) => a.status === value).length
 
+  const board = view === "board"
   return (
-    <div className="space-y-5">
+    <div className={cn("nice-scroll flex min-h-0 flex-1 flex-col", board ? "overflow-hidden" : "overflow-y-auto")}>
+    <div className={cn("mx-auto flex w-full max-w-content flex-1 flex-col gap-5 px-4 pt-5 sm:px-8 md:pt-8", board ? "min-h-0 pb-4" : "pb-12")}>
       <PageHeader
         title="Applications"
         description="Everything you're applying for. Saved and preparing applications get reminders 14, 7 and 1 days before the deadline."
@@ -228,6 +230,7 @@ export function Applications() {
       <ApplicationSheet id={drawer.id} onClose={drawer.close} />
       <AddDialog open={adding} onClose={() => setAdding(false)} />
     </div>
+    </div>
   )
 }
 
@@ -267,8 +270,8 @@ function Board({
   })
 
   return (
-    <div className="nice-scroll -mx-4 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8">
-      <div className="grid snap-x snap-mandatory auto-cols-[minmax(248px,85vw)] grid-flow-col items-start gap-3 sm:auto-cols-[minmax(232px,1fr)]">
+    <div className="nice-scroll -mx-4 min-h-0 flex-1 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8">
+      <div className="grid h-full snap-x snap-mandatory auto-cols-[minmax(248px,85vw)] grid-flow-col grid-rows-[minmax(0,1fr)] gap-3 sm:auto-cols-[minmax(232px,1fr)]">
         {COLUMNS.map((col) => {
           const items = apps.filter((a) => col.statuses.includes(a.status))
           const decision = col.id === "decision"
@@ -278,7 +281,7 @@ function Board({
               aria-label={col.label}
               {...(decision ? {} : { ...target(col.id), onDrop: drop(col.statuses[0]) })}
               className={cn(
-                "flex min-h-64 snap-start flex-col gap-2 rounded-lg bg-surface-sunk p-2 transition-[box-shadow,background-color] duration-150",
+                "flex min-h-0 snap-start flex-col gap-2 rounded-lg bg-surface-sunk p-2 transition-[box-shadow,background-color] duration-150",
                 over === col.id && "bg-forest-soft/60 shadow-[inset_0_0_0_1.5px_var(--forest)]",
               )}
             >
@@ -287,6 +290,7 @@ function Board({
                 {col.label}
                 <span className="ml-auto text-ink-tertiary tabular-nums">{items.length}</span>
               </h2>
+              <div className="nice-scroll scroll-on-hover flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
               {decision && dragging ? (
                 <div className="grid grid-cols-2 gap-2">
                   {(["accepted", "rejected"] as const).map((status) => (
@@ -328,6 +332,7 @@ function Board({
                   Drag an application here
                 </p>
               ) : null}
+              </div>
             </section>
           )
         })}

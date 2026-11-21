@@ -126,6 +126,14 @@
   background: transparent;
 }
 
+.scroll-on-hover {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.scroll-on-hover:hover {
+  scrollbar-color: var(--separator) transparent;
+}
+
 .shimmer-text {
   background: linear-gradient(90deg, var(--ink-tertiary) 0%, var(--ink-tertiary) 42%, var(--sun) 50%, var(--ink-tertiary) 58%, var(--ink-tertiary) 100%);
   background-size: 200% 100%;

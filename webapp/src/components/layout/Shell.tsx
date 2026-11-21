@@ -35,7 +35,7 @@ function useDocumentTitle() {
 
 // Pages that manage their own scrolling, like the Assistant's pinned composer.
 const FULL_BLEED = ["/assistant"]
-const FULL_BLEED_EXACT = ["/scans", "/calendar"]
+const FULL_BLEED_EXACT = ["/scans", "/calendar", "/applications"]
 
 export function Shell() {
   useDocumentTitle()
@@ -57,15 +57,15 @@ export function Shell() {
         </header>
         <ShellHeaderContext.Provider value={setPageHeader}>
         {fullBleed ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <React.Suspense fallback={pathname.startsWith("/assistant/") ? <ChatSkeleton /> : <LoadingScreen />}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-clip">
+            <React.Suspense fallback={pathname.startsWith("/assistant/") ? <ChatSkeleton /> : <LoadingScreen fill />}>
               <ErrorBoundary className="min-h-0 flex-1"><RouteFade className="flex min-h-0 flex-1 flex-col"><Outlet /></RouteFade></ErrorBoundary>
             </React.Suspense>
           </div>
         ) : (
           <div className="nice-scroll min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto flex min-h-full w-full max-w-content flex-col">
-              <React.Suspense fallback={<LoadingScreen />}>
+            <div className="mx-auto flex min-h-full w-full max-w-content flex-col overflow-clip">
+              <React.Suspense fallback={<LoadingScreen fill />}>
                 <ErrorBoundary className="min-h-0 flex-1">
                   <RouteFade className="px-4 pt-5 pb-12 sm:px-8 md:pt-8"><Outlet /></RouteFade>
                 </ErrorBoundary>
