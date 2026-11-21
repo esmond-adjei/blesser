@@ -103,7 +103,7 @@ async def tokens_today(session, now: datetime | None = None) -> int:
 
 def _visible():
     return (Opportunity.status == "published") | (
-        m.ScanFind.created.is_(True) & (Opportunity.status == "in_review")
+        m.ScanFind.created.is_(True) & Opportunity.status.in_(("in_review", "draft"))
     )
 
 

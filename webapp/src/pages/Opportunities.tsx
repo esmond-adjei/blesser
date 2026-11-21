@@ -572,7 +572,8 @@ export function secondaryActions(opp: Opportunity, { onOpen, onTodo, onShare }: 
       },
     )
   }
-  actions.push({ label: "Share", icon: <Share2 />, onSelect: () => onShare(opp) })
+  // Others can't open it until it's reviewed, so there's nothing to share yet.
+  if (!opp.in_review) actions.push({ label: "Share", icon: <Share2 />, onSelect: () => onShare(opp) })
   if (official) actions.push({ kind: "separator" }, { label: "Official page", icon: <ArrowUpRight />, href: official })
   return actions
 }

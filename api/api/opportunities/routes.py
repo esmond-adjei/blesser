@@ -89,17 +89,23 @@ async def submit_opportunity(
 
 @router.get("/opportunities/{opportunity_id}", response_model=MemberOpportunity)
 async def get_opportunity(
-    opportunity_id: str, session: AsyncSession = Depends(get_session)
+    opportunity_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
 ):
-    return opp_service.to_out(await opp_service.get_or_404(session, opportunity_id))
+    return opp_service.to_out(
+        await opp_service.get_for_member(session, current.id, opportunity_id)
+    )
 
 
 @router.get("/opportunities/{opportunity_id}/calendar.ics", include_in_schema=False)
 async def opportunity_ics(
-    opportunity_id: str, session: AsyncSession = Depends(get_session)
+    opportunity_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
 ):
     """One all-day event on the deadline, to download or open in a calendar app."""
-    opp = await opp_service.get_or_404(session, opportunity_id)
+    opp = await opp_service.get_for_member(session, current.id, opportunity_id)
     events = []
     if opp.deadline_date is not None:
         events.append(

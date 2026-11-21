@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowUpRight, ChevronRight, Lock, MapPin } from "lucide-react"
+import { ArrowUpRight, ChevronRight, EyeOff, Lock, MapPin } from "lucide-react"
 import { Chip, Countdown, buttonVariants, cn, formatDay } from "@blesser/ui"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { ShareDialog } from "../components/share/ShareDialog"
@@ -55,8 +55,10 @@ export function OpportunityPage() {
           <div className="flex flex-wrap gap-2">
             <Chip>{CATEGORY_LABELS[opp.category]}</Chip>
             {opp.location ? <Chip icon={<MapPin aria-hidden="true" />} className="h-auto min-h-6 max-w-full whitespace-normal wrap-anywhere">{opp.location}</Chip> : null}
-            {opp.audience === "members" ? <Chip icon={<Lock aria-hidden="true" />}>Members only</Chip> : null}
-            {opp.is_new ? <Chip>New</Chip> : null}
+            {opp.in_review ? (
+              <Chip icon={<EyeOff aria-hidden="true" />}>Only you can see this</Chip>
+            ) : opp.audience === "members" ? <Chip icon={<Lock aria-hidden="true" />}>Members only</Chip> : null}
+            {opp.is_new && !opp.in_review ? <Chip>New</Chip> : null}
           </div>
         </div>
         <Art opp={opp} shape="banner" className="rounded-lg" />

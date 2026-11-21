@@ -255,6 +255,8 @@ export interface MemberOpportunity {
   found_by: "agent" | "community" | "staff"
   created_at: string
   is_new: boolean
+  /** Found by the member's own scan; others can't see it until it's reviewed. */
+  in_review?: boolean
   /** Only with sort=for_you. */
   match_score?: number | null
   match_terms?: string[]

@@ -408,3 +408,42 @@ def test_scan_results_leave_out_listings_already_in_the_catalogue():
             await scans.cancel_scan(session, TEST_USER_ID, scan.id)
 
     run(check())
+
+
+def test_a_member_can_open_their_own_scan_finds_before_review():
+    from api.auth.models import User
+
+    other_id = "owner-" + uuid.uuid4().hex[:10]
+
+    async def setup():
+        async with SessionLocal() as session:
+            session.add(
+                User(
+                    id=other_id,
+                    email=f"{other_id}@example.com",
+                    password_hash="x",
+                    email_verified_at=utcnow_naive(),
+                )
+            )
+            mine = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            theirs = await scans.start_scan(session, other_id, categories=["startup"])
+            own = await _listing(
+                session, f"Mine {_token()}", status="in_review", scan_id=mine.id
+            )
+            other = await _listing(
+                session, f"Theirs {_token()}", status="in_review", scan_id=theirs.id
+            )
+            session.add(ScanFind(scan_id=mine.id, opportunity_id=own.id, created=True))
+            await session.commit()
+            for scan in (mine, theirs):
+                await scans.cancel_scan(session, scan.user_id, scan.id)
+            return own.id, other.id, mine.id
+
+    own, other, scan_id = run(setup())
+    client = TestClient(app)
+    opened = client.get(f"/api/app/opportunities/{own}")
+    assert opened.status_code == 200 and opened.json()["in_review"] is True
+    assert client.get(f"/api/app/opportunities/{other}").status_code == 404
+    assert client.get(f"/api/app/opportunities/{own}/calendar.ics").status_code == 200
+    [find] = client.get(f"/api/app/scans/{scan_id}").json()["finds"]
+    assert find["opportunity_id"] == own and find["in_review"] is True

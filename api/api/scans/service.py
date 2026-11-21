@@ -264,10 +264,10 @@ def task_out(task: m.ScanTask) -> dict:
 
 
 def _visible_find():
-    """Finds a member may see: listings this scan newly added, published or waiting for
-    review. Listings already in the catalogue are on their feed, so a scan doesn't list them."""
+    """Finds a member may see: listings this scan newly added, whether or not they've
+    been reviewed. Listings already in the catalogue are on their feed, so a scan doesn't list them."""
     return m.ScanFind.created.is_(True) & Opportunity.status.in_(
-        ("published", "in_review")
+        ("published", "in_review", "draft")
     )
 
 
@@ -448,7 +448,7 @@ async def _scan_finds(session, scan: m.Scan) -> list[dict]:
                 "source_domain": domain if created else None,
                 "official_url": official_url or source_url,
                 "is_new": not already_seen,
-                "in_review": opportunity.status == "in_review",
+                "in_review": opportunity.status in ("in_review", "draft"),
             }
         )
     return finds
