@@ -112,6 +112,8 @@ export interface Scan {
   region: string
   categories: OpportunityCategory[]
   focus: string
+  /** Listing types to look for; empty means any. */
+  kinds?: OpportunityKind[]
   /** Sites the member asked the agent to read first. */
   sites?: string[]
   kind?: "member" | "sweep" | "sources" | "scheduled"
@@ -168,6 +170,7 @@ export interface ScanRequest {
   categories?: OpportunityCategory[]
   region?: string
   focus?: string
+  kinds?: OpportunityKind[]
   sites?: string[]
   /** Repeat this scan every week from now on. */
   repeat?: boolean

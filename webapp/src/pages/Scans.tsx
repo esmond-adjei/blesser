@@ -37,7 +37,9 @@ import {
 } from "../lib/scanLog"
 import { toastError, toastSuccess } from "../lib/toast"
 import { LINEAR_OK, springEasing } from "../lib/motion"
-import type { OpportunityCategory, Scan, ScanFind, ScanTask } from "../lib/types"
+import type { OpportunityCategory, OpportunityKind, Scan, ScanFind, ScanTask } from "../lib/types"
+import { kindsPhrase, scanKinds } from "../lib/scanKinds"
+import { KindSelect } from "../components/scans/KindSelect"
 import { Button, Chip, Countdown, OpportunityArt, buttonVariants, cn, daysUntil } from "@blesser/ui"
 import {
   Dialog,
@@ -73,9 +75,15 @@ function audiences(scan: Scan): string {
   return scan.categories.map((c) => CATEGORY_LABELS[c] ?? c).join(", ")
 }
 
-function scanTitle(scan: Scan): string {
+/** Who it's for and what it looks for, e.g. "Students, scholarships". */
+function scanWhat(scan: Scan): string {
   if (scan.kind === "sources") return `Your sources for ${audiences(scan).toLowerCase()}`
-  return scan.region ? `${audiences(scan)} in ${scan.region}` : audiences(scan)
+  const kinds = scanKinds(scan.kinds, scanFocus(scan))
+  return kinds.length ? `${audiences(scan)}, ${kindsPhrase(kinds)}` : audiences(scan)
+}
+
+function scanTitle(scan: Scan): string {
+  return scan.region && scan.kind !== "sources" ? `${scanWhat(scan)} in ${scan.region}` : scanWhat(scan)
 }
 
 // Early scans stored the agents' default instruction as their focus; it isn't something the member typed.
@@ -415,7 +423,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
           {running ? <Radar className="size-4 motion-safe:animate-pulse" strokeWidth={1.75} aria-hidden="true" /> : <Radar className="size-4" strokeWidth={1.75} aria-hidden="true" />}
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-callout font-semibold text-ink">{audiences(scan)}</h2>
+          <h2 title={scanWhat(scan)} className="truncate text-callout font-semibold text-ink">{scanWhat(scan)}</h2>
           <p className="flex min-w-0 items-center gap-1 text-caption text-ink-tertiary">
             <span className="truncate">{scan.region || "Anywhere"}</span>
             {scan.schedule_id ? (
@@ -474,6 +482,7 @@ function ScanComposer({ onStarted, className, showAllowance = false, from }: { o
   const [category, setCategory] = React.useState<OpportunityCategory>(from?.categories[0] ?? "startup")
   const [region, setRegion] = React.useState(from ? from.region : "Ghana")
   const [focus, setFocus] = React.useState(from ? scanFocus(from) : "")
+  const [kinds, setKinds] = React.useState<OpportunityKind[]>(from?.kinds ?? [])
   const [sites, setSites] = React.useState<string[]>(from?.sites ?? [])
   const [siteDraft, setSiteDraft] = React.useState("")
   const [showSites, setShowSites] = React.useState(!!from?.sites?.length)
@@ -496,6 +505,7 @@ function ScanComposer({ onStarted, className, showAllowance = false, from }: { o
         categories: [category],
         region: region.trim(),
         focus: focus.trim(),
+        kinds,
         sites: [...sites, ...parseSites(siteDraft)].slice(0, MAX_SITES),
       }
       return from ? api.rerunScan(from.id, brief) : api.startScan({ ...brief, repeat: weekly })
@@ -508,6 +518,7 @@ function ScanComposer({ onStarted, className, showAllowance = false, from }: { o
         return
       }
       setFocus("")
+      setKinds([])
       setSites([])
       setSiteDraft("")
       setShowSites(false)
@@ -609,6 +620,7 @@ function ScanComposer({ onStarted, className, showAllowance = false, from }: { o
             </button>
           ))}
         </div>
+        <KindSelect value={kinds} onChange={setKinds} side={from ? "bottom" : "top"} />
         <CountrySelect value={region} onChange={setRegion} side={from ? "bottom" : "top"} />
         <Button
           type="button"
@@ -693,7 +705,7 @@ function useRerunActions(scan: Scan): { actions: MenuAction[]; dialog: React.Rea
 }
 
 /** Tell the agent what to change; it runs again on the same scan with that note. */
-function SteerBar({ scan }: { scan: Scan }) {
+function SteerBar({ scan, floating = false }: { scan: Scan; floating?: boolean }) {
   const client = useQueryClient()
   const [prompt, setPrompt] = React.useState("")
   const running = scan.status === "running"
@@ -711,7 +723,7 @@ function SteerBar({ scan }: { scan: Scan }) {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); send() }}
-      className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2 pr-2 pl-4"
+      className={cn("flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2 pr-2 pl-4", floating && "shadow-elevation-2")}
     >
       <label htmlFor={`steer-${scan.id}`} className="sr-only">Tell the agent what to change</label>
       <textarea
@@ -867,7 +879,7 @@ function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () =
           <ActionMenuButton label="Scan actions" actions={[...again.actions, ...repeatAction, { label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
         )}
       />
-      <SteerBar scan={scan} />
+      {log ? <SteerBar scan={scan} /> : null}
       {log ? <ActivityLog tasks={scan.tasks ?? []} /> : null}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent className="max-w-sm">
@@ -907,6 +919,7 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
   const content = React.useRef<HTMLDivElement>(null)
   const body = React.useRef<HTMLDivElement>(null)
   const scan = useScan(id)
+  const steerable = !!scan.data && (scan.data.kind ?? "member") !== "sources"
   const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
   const play = React.useCallback((rect: DOMRect, direction: "open" | "close") => {
@@ -1007,7 +1020,7 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
           </button>
         </header>
         <div ref={body} className="flex min-h-0 flex-1 flex-col">
-          <div className="nice-scroll min-h-0 flex-1 overflow-y-auto p-5">
+          <div className={cn("nice-scroll min-h-0 flex-1 overflow-y-auto p-5", steerable && "pb-24")}>
             {scan.isLoading ? (
               <div className="h-40 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
             ) : scan.isError || !scan.data ? (
@@ -1016,6 +1029,13 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
               <ScanBody scan={scan.data} onDeleted={onClosed} log={false} />
             )}
           </div>
+          {steerable && scan.data ? (
+            <div className="relative z-20 h-0 shrink-0">
+              <div className="absolute inset-x-5 bottom-3">
+                <SteerBar scan={scan.data} floating />
+              </div>
+            </div>
+          ) : null}
           {scan.data?.tasks?.length ? <DockedLog tasks={scan.data.tasks} container={body} /> : null}
         </div>
       </div>
