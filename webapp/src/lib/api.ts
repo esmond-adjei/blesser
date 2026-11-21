@@ -56,18 +56,32 @@ async function reqRaw(path: string, init?: RequestInit): Promise<Response> {
   })
 }
 
+function fieldLine(entry: unknown): string | null {
+  if (!entry || typeof entry !== "object") return null
+  const { loc, msg } = entry as { loc?: unknown; msg?: unknown }
+  if (typeof msg !== "string") return null
+  const name = Array.isArray(loc) ? loc.filter((p): p is string => typeof p === "string" && !["body", "query", "path"].includes(p)).pop() : undefined
+  const label = name ? `${name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}: ` : ""
+  const text = msg.replace(/^Value error, /, "")
+  return `${label}${text.charAt(0).toUpperCase()}${text.slice(1)}${/[.!?]$/.test(text) ? "" : "."}`
+}
+
 function parseDetail(text: string): { message: string; detail: unknown } {
   try {
     const parsed = JSON.parse(text) as { detail?: unknown }
     if (typeof parsed.detail === "string") return { message: parsed.detail, detail: parsed.detail }
-    if (parsed.detail && typeof parsed.detail === "object") {
+    if (Array.isArray(parsed.detail)) {
+      const lines = parsed.detail.map(fieldLine).filter((l): l is string => !!l)
+      if (lines.length) return { message: lines.slice(0, 3).join(" "), detail: parsed.detail }
+    } else if (parsed.detail && typeof parsed.detail === "object") {
       const d = parsed.detail as { message?: unknown }
       if (typeof d.message === "string") return { message: d.message, detail: parsed.detail }
     }
+    return { message: "Something went wrong. Try again.", detail: parsed.detail }
   } catch {
-    /* keep raw text */
+    /* not JSON: plain text from a proxy or server */
   }
-  return { message: text, detail: undefined }
+  return { message: /^\s*[<{[]/.test(text) ? "Something went wrong. Try again." : text, detail: undefined }
 }
 
 // Token store lives here so every endpoint shares one token without import cycles.

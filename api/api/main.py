@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +15,7 @@ from api.banner import print_banner
 from api.core.body_limit import BodySizeLimitMiddleware
 from api.core.config import log_config_warnings, settings
 from api.core.db import init_db
-from api.core.errors import UnhandledErrorMiddleware
+from api.core.errors import UnhandledErrorMiddleware, describe_validation_errors
 from api.core.exceptions import AuthError, DomainError, RateLimitError
 from api.extension_auth.policy import enforce_extension_boundary
 from api.extension_auth.routes import router as extension_router
@@ -61,6 +62,20 @@ async def _domain_error(request: Request, exc: DomainError):
         headers = {"Retry-After": str(exc.retry_after)}
     return JSONResponse(
         status_code=exc.status_code, content={"detail": detail}, headers=headers
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": describe_validation_errors(exc.errors()),
+            "fields": [
+                {"loc": list(e.get("loc", ())), "msg": str(e.get("msg", ""))}
+                for e in exc.errors()
+            ],
+        },
     )
 
 
