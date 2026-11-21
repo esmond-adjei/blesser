@@ -62,19 +62,23 @@ def test_stored_trace_without_kind_still_parses_as_tool_steps():
     assert message.model_dump(mode="json")["trace"][0]["kind"] == "tool"
 
 
-def test_tools_only_offer_web_after_catalog_and_writes_after_enable():
+def test_tools_offer_web_only_after_catalog_and_changes_until_the_card_limit():
     def offered(**flags):
         return {d["name"] for d in tools.definitions(**flags)}
 
-    initial = offered(catalog_checked=False, changes_enabled=False, web_allowed=True)
+    initial = offered(catalog_checked=False, web_allowed=True)
     assert "search_catalog" in initial
     assert "search_web" not in initial
-    assert not tools.WRITES & initial
-    later = offered(catalog_checked=True, changes_enabled=True, web_allowed=True)
+    assert tools.WRITES <= initial
+    assert "enable_changes" not in initial
+    later = offered(catalog_checked=True, web_allowed=True)
     assert "search_web" in later
-    assert tools.WRITES <= later
-    private = offered(catalog_checked=True, changes_enabled=False, web_allowed=False)
+    private = offered(catalog_checked=True, web_allowed=False)
     assert "search_web" not in private
+    capped = offered(catalog_checked=True, web_allowed=True, changes_allowed=False)
+    assert not tools.WRITES & capped
+    assert tools.ASK not in capped
+    assert "list_scans" in capped
 
 
 async def _test_live_turn_survives_a_disconnect_and_replays_to_its_owner():
@@ -211,7 +215,10 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
         "Seed Fund closes on 8 Sep 2040.",
         "\n\nAsk me any time.",
     ]
-    assert events[-2]["message"]["content"] == "Seed Fund closes on 8 Sep 2040.\n\nAsk me any time."
+    assert (
+        events[-2]["message"]["content"]
+        == "Seed Fund closes on 8 Sep 2040.\n\nAsk me any time."
+    )
     reply = events[-2]["message"]
     assert reply["trace"][0] == {
         "kind": "thought",
@@ -236,10 +243,16 @@ def test_stop_emits_a_terminal_event_and_does_cleanup():
 
 
 def test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(monkeypatch):
-    asyncio.run(_test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(monkeypatch))
+    asyncio.run(
+        _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
+            monkeypatch
+        )
+    )
 
 
-async def _test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch):
+async def _test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(
+    monkeypatch,
+):
     from api.agent.llm.base import LLMResponse, ToolCall
     from api.assistant import service
 
@@ -252,7 +265,13 @@ async def _test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(
             if self.calls == 1:
                 for piece in ["Let me look.\n", "Checking"]:
                     yield "text", piece
-                yield "done", LLMResponse(text="Let me look.\nChecking", tool_calls=[ToolCall("t", "nope", {})])
+                yield (
+                    "done",
+                    LLMResponse(
+                        text="Let me look.\nChecking",
+                        tool_calls=[ToolCall("t", "nope", {})],
+                    ),
+                )
                 return
             for piece in ["First", " line.\nSec", "ond line."]:
                 yield "text", piece
@@ -292,12 +311,22 @@ def _message(role, content):
     from api.core.time import utcnow_naive
 
     return MessageOut(
-        id=role, role=role, content=content, trace=[], sources=[], cited_deadlines=False, created_at=utcnow_naive()
+        id=role,
+        role=role,
+        content=content,
+        trace=[],
+        sources=[],
+        cited_deadlines=False,
+        created_at=utcnow_naive(),
     )
 
 
 def test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch):
-    asyncio.run(_test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(monkeypatch))
+    asyncio.run(
+        _test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(
+            monkeypatch
+        )
+    )
 
 
 def test_unwraps_values_local_models_wrap_and_explains_bad_inputs():
