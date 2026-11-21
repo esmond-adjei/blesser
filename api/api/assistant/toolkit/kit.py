@@ -21,6 +21,7 @@ from .base import (
     RecordId,
     Tool,
     ToolInput,
+    bulk,
     field_lines,
     matching,
     preview,
@@ -350,6 +351,15 @@ async def apply_add_answer(session, user_id, arguments):
     )
 
 
+class AddAnswers(ToolInput):
+    items: list[AddAnswer] = Field(min_length=1, max_length=10)
+
+
+propose_add_answers, apply_add_answers = bulk(
+    propose_add_answer, apply_add_answer, noun="answer", plural="answers"
+)
+
+
 async def _answer(session, user_id, answer_id):
     return kit.answer_out(
         await kit.owned(session, kit_models.Answer, user_id, answer_id)
@@ -513,6 +523,15 @@ TOOLS = [
         "change",
         propose=propose_add_answer,
         apply=apply_add_answer,
+    ),
+    Tool(
+        "add_answers",
+        AddAnswers,
+        "Propose saving several answers to application questions in the member's Apply kit at once, up to ten. One approval covers them all. Use this instead of add_answer when there is more than one.",
+        "Save answers",
+        "change",
+        propose=propose_add_answers,
+        apply=apply_add_answers,
     ),
     Tool(
         "update_answer",

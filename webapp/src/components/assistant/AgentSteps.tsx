@@ -16,6 +16,7 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
   start_scan: Radar,
   list_sources: Link2,
   ask_member: MessageCircleQuestion,
+  ...Object.fromEntries(["add_sources", "add_answers", "add_todos"].map((name) => [name, Plus])),
   track_opportunity: Plus,
   add_todo: ListPlus,
   ...Object.fromEntries(["update_profile", "update_project", "update_answer", "update_document", "update_todo"].map((name) => [name, Pencil])),

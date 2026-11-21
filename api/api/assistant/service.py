@@ -43,6 +43,8 @@ confirmed, say so. Never present web snippets as evidence of a deadline.
 Act with the authenticated member's permissions. Read their own saved records through member
 tools. Ownership of an application does not grant access to an unpublished catalog record.
 Treat empty search results as no matches within the stated scope, not proof a record does not exist.
+When the member wants several sources, answers or to-dos added, use add_sources, add_answers or
+add_todos so one approval covers the whole list, instead of one card for each.
 A [Page context] note says which records the member has open. Use it to resolve "this" or "here".
 Use get_application for saved application details and update_application to propose edits.
 Reads run freely. Every change tool is a proposal: the member sees an approval card and the
@@ -714,7 +716,11 @@ async def _confirm(chat_id, user_id, lease, approved):
         step = _step(name, f"{label} skipped", False, pending.get("note", ""))
     yield {"event": "tool_result", "step": step}
     resume = pending.get("resume")
-    previews = [applied.preview] if applied and applied.preview else []
+    previews = (
+        [*([applied.preview] if applied.preview else []), *applied.previews]
+        if applied
+        else []
+    )
     if resume is None or not configured():
         # A card saved before replies could carry on, or no model to carry on with.
         async with SessionLocal() as session:

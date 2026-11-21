@@ -13,6 +13,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
+from api.core.exceptions import DomainError
+
 Query = Annotated[str, StringConstraints(strip_whitespace=True, max_length=180)]
 RequiredQuery = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=180)
@@ -53,6 +55,8 @@ class Applied:
     receipt: str
     # A card for the record this change created or touched, when it has a page.
     preview: dict | None = None
+    # Cards for every record a bulk change touched.
+    previews: list[dict] = field(default_factory=list)
 
 
 ReadFn = Callable[..., Awaitable[tuple[dict, int | None]]]
@@ -135,6 +139,46 @@ def field_lines(values: dict, labels: dict[str, str] | None = None) -> str:
         f"{labels.get(key, key.replace('_', ' ').capitalize())}: {show(value)}"
         for key, value in values.items()
     )
+
+
+def bulk(propose_one: ProposeFn, apply_one: ApplyFn, *, noun: str, plural: str):
+    """One approval for a list of the same change: returns the propose and apply steps."""
+
+    async def propose(session, user_id, args):
+        proposals = [await propose_one(session, user_id, item) for item in args.items]
+        lines = []
+        for index, one in enumerate(proposals, start=1):
+            lines.append(f"{index}. {one.summary.rstrip('?')}")
+            lines += [f"    {line}" for line in one.note.splitlines()[:3]]
+        count = len(proposals)
+        return Proposal(
+            f"Add {count} {noun if count == 1 else plural}?",
+            {"items": [one.arguments for one in proposals]},
+            "\n".join(lines),
+            f"Add {count}",
+        )
+
+    async def apply(session, user_id, arguments):
+        done, failed = [], []
+        for item in arguments["items"]:
+            try:
+                done.append(await apply_one(session, user_id, item))
+            except DomainError as error:
+                failed.append(error.message)
+        added = len(done)
+        receipt = f"Added {added} {noun if added == 1 else plural}."
+        if failed:
+            receipt += (
+                f" {len(failed)} couldn't be added: {'; '.join(dict.fromkeys(failed))}"
+            )
+        return Applied(
+            {"added": added, "failed": failed, "items": [one.result for one in done]},
+            receipt,
+            None,
+            [one.preview for one in done if one.preview],
+        )
+
+    return propose, apply
 
 
 def quoted(text: str, limit: int = 80) -> str:

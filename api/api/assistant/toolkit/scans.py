@@ -14,6 +14,7 @@ from .base import (
     RecordId,
     Tool,
     ToolInput,
+    bulk,
     field_lines,
     matching,
     preview,
@@ -316,6 +317,15 @@ async def apply_add_source(session, user_id, arguments):
     )
 
 
+class AddSources(ToolInput):
+    items: list[AddSource] = Field(min_length=1, max_length=10)
+
+
+propose_add_sources, apply_add_sources = bulk(
+    propose_add_source, apply_add_source, noun="source", plural="sources"
+)
+
+
 async def propose_update_source(session, user_id, args):
     row = await _source(session, user_id, args.source_id)
     changes = args.changes.model_dump(
@@ -463,6 +473,15 @@ TOOLS = [
         "change",
         propose=propose_add_source,
         apply=apply_add_source,
+    ),
+    Tool(
+        "add_sources",
+        AddSources,
+        "Propose adding several public sites to the member's sources at once, up to ten, each with a category and an optional note. One approval covers them all. Use this instead of add_source when there is more than one site.",
+        "Add sources",
+        "change",
+        propose=propose_add_sources,
+        apply=apply_add_sources,
     ),
     Tool(
         "update_source",

@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, StringConstraints
+from pydantic import ConfigDict, Field, StringConstraints
 
 from api.applications import service as applications
 from api.applications.schemas import ApplicationCreate, ApplicationUpdate
@@ -21,6 +21,7 @@ from .base import (
     RequiredQuery,
     Tool,
     ToolInput,
+    bulk,
     field_lines,
     matching,
     preview,
@@ -279,6 +280,15 @@ async def apply_add_todo(session, user_id, arguments):
     )
 
 
+class AddTodos(ToolInput):
+    items: list[AddTodo] = Field(min_length=1, max_length=15)
+
+
+propose_add_todos, apply_add_todos = bulk(
+    propose_add_todo, apply_add_todo, noun="to-do", plural="to-dos"
+)
+
+
 async def _todo(session, user_id, todo_id):
     return await todos._get_or_404(session, user_id, todo_id)
 
@@ -384,6 +394,15 @@ TOOLS = [
         "Checked your to-dos",
         "read",
         read=list_todos,
+    ),
+    Tool(
+        "add_todos",
+        AddTodos,
+        "Propose adding several to-dos at once, up to fifteen. One approval covers them all. Use this instead of add_todo when there is more than one.",
+        "Add to-dos",
+        "change",
+        propose=propose_add_todos,
+        apply=apply_add_todos,
     ),
     Tool(
         "add_todo",
