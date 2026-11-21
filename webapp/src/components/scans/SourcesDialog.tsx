@@ -8,6 +8,7 @@ import { CATEGORIES, CATEGORY_LABELS } from "../../lib/opportunities"
 import { siteLabel, sourceStatus } from "../../lib/scanLog"
 import { toastError, toastSuccess } from "../../lib/toast"
 import type { MemberSource, OpportunityCategory } from "../../lib/types"
+import { PasteSources } from "./PasteSources"
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog"
 
 const KEY = ["member-sources"]
@@ -18,6 +19,7 @@ export function SourcesDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [url, setUrl] = React.useState("")
   const [note, setNote] = React.useState("")
   const [category, setCategory] = React.useState<OpportunityCategory>("startup")
+  const [pasting, setPasting] = React.useState(false)
   const refresh = () => void client.invalidateQueries({ queryKey: KEY })
   const add = useMutation({
     mutationFn: () => api.addSource({ url: url.trim(), category, note: note.trim() }),
@@ -60,6 +62,26 @@ export function SourcesDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           ) : (
             <p className="text-footnote text-ink-secondary">No sources yet. Add a university, funder or agency page you trust.</p>
           )}
+          <div role="tablist" aria-label="How to add" className="flex w-fit rounded-full bg-surface-sunk p-0.5">
+            {([["One site", false], ["Paste text", true]] as const).map(([label, value]) => (
+              <button
+                key={label}
+                type="button"
+                role="tab"
+                aria-selected={pasting === value}
+                onClick={() => setPasting(value)}
+                className={cn(
+                  "h-7 cursor-pointer rounded-full px-3 text-footnote font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-focus",
+                  pasting === value ? "bg-surface text-ink shadow-elevation-1" : "text-ink-secondary hover:text-ink",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {pasting ? (
+            <PasteSources existing={rows.map((source) => source.url)} slots={Math.max(0, (data?.max_sources ?? 10) - rows.length)} category={category} onAdded={refresh} />
+          ) : (
           <form
             onSubmit={(e) => { e.preventDefault(); if (url.trim() && !full) add.mutate() }}
             className="flex flex-col gap-2 rounded-md bg-surface-sunk p-3"
@@ -113,6 +135,7 @@ export function SourcesDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             </div>
             {full ? <p className="text-caption text-ink-tertiary">Remove a source to add another.</p> : null}
           </form>
+          )}
         </DialogBody>
         <DialogFooter className="pt-3">
           <Button variant="quiet" onClick={() => onOpenChange(false)}>Close</Button>
