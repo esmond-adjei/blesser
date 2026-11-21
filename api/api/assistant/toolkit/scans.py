@@ -170,9 +170,21 @@ async def get_scan(session, user_id, args, registry):
 async def propose_start(session, user_id, args):
     left = await scans.scan_allowance(session, user_id)
     if left["enabled"] and (left["left_this_hour"] < 1 or left["left_today"] < 1):
-        raise RateLimitError(
-            "The member has no scans left for now. Say when more are available instead of proposing one."
+        error = RateLimitError(
+            "The member has no scans left for now. A card in your reply already shows when "
+            "they can start the next one, so don't repeat the time or the limits. Say in one "
+            "short sentence that you can start it then, and offer anything else that helps meanwhile."
         )
+        today = left["left_today"] < 1
+        error.card = {
+            "kind": "scan_limit",
+            "id": "scan-limit",
+            "title": "No scans left today" if today else "No scans left this hour",
+            "detail": f"You can start {left['per_hour']} scans an hour and {left['per_day']} a day.",
+            "url": "/scans",
+            "available_at": left["next_at"].isoformat() if left["next_at"] else None,
+        }
+        raise error
     sites = await scans.check_sites(args.sites)
     region = args.region
     values = {

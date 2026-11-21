@@ -111,6 +111,7 @@ class Source(BaseModel):
         "saved_search",
         "profile",
         "settings",
+        "scan_limit",
     ]
     id: str
     title: str
@@ -119,6 +120,8 @@ class Source(BaseModel):
     opportunity: MemberOpportunity | None = None
     # A record this turn created, shown as a card that opens it.
     preview: bool = False
+    # scan_limit: when the member can start another scan.
+    available_at: datetime | None = None
 
 
 class Question(BaseModel):

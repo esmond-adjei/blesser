@@ -69,7 +69,7 @@ export function activitySummary(entries: TraceEntry[]): string {
 
 type RecordKind =
   | "application" | "todo" | "project" | "document" | "answer" | "web" | "opportunity"
-  | "scan" | "find" | "site" | "saved_search" | "profile" | "settings"
+  | "scan" | "find" | "site" | "saved_search" | "profile" | "settings" | "scan_limit"
 
 export interface AssistantSource {
   key: string
@@ -80,6 +80,8 @@ export interface AssistantSource {
   url: string | null
   opportunity: Opportunity | null
   preview?: boolean
+  /** scan_limit: when the member can start another scan. */
+  available_at?: string | null
 }
 
 export interface ContextChip {

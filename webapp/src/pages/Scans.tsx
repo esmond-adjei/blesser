@@ -1139,7 +1139,7 @@ function FindRow({ find, tracking, index }: { find: ScanFind; tracking: boolean;
 
 function taskName(task: ScanTask): string {
   const steer = task.metrics?.steer
-  if (steer) return `Follow-up: ${steer.length > 40 ? `${steer.slice(0, 40)}…` : steer}`
+  if (steer) return `steer: ${steer.length > 40 ? `${steer.slice(0, 20)}…` : steer}`
   const category = CATEGORIES.find((value) => task.target === `category:${value}`)
   return category ? `Searching for ${CATEGORY_LABELS[category].toLowerCase()}` : "Searching"
 }
@@ -1238,7 +1238,7 @@ function ActivityLog({ tasks, docked = false }: { tasks: ScanTask[]; docked?: bo
   if (!current) return null
   return (
     <section aria-label="Activity log" className={cn("overflow-hidden bg-console text-console-ink", docked ? "flex h-full min-h-0 flex-col" : "rounded-lg shadow-elevation-1")}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-console-line bg-console-bar px-4 py-2.5">
+      <div className="flex flex-nowrap items-center gap-x-3 gap-y-2 border-b border-console-line bg-console-bar px-4 py-2.5">
         <span className="flex items-center gap-2 font-mono text-[12px] text-console-dim">
           <span aria-hidden="true" className={cn("size-2 rounded-full", live ? "bg-console-ok motion-safe:animate-pulse" : "bg-console-line")} />
           activity.log
@@ -1253,7 +1253,7 @@ function ActivityLog({ tasks, docked = false }: { tasks: ScanTask[]; docked?: bo
                 aria-selected={t.id === current.id}
                 onClick={() => setPicked(t.id)}
                 className={cn(
-                  "h-6 cursor-pointer rounded-[6px] px-2 font-mono text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-focus",
+                  "h-6 text-ellipsis truncate text-nowrap cursor-pointer rounded-[6px] px-2 font-mono text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-focus",
                   t.id === current.id ? "bg-console-line text-console-ink" : "text-console-dim hover:text-console-ink",
                 )}
               >
@@ -1266,7 +1266,7 @@ function ActivityLog({ tasks, docked = false }: { tasks: ScanTask[]; docked?: bo
           type="button"
           aria-pressed={notes}
           onClick={() => setNotes((v) => !v)}
-          className="ml-auto h-6 cursor-pointer rounded-[6px] px-2 font-mono text-[12px] text-console-dim transition-colors hover:text-console-ink focus-visible:outline-2 focus-visible:outline-focus aria-pressed:text-console-ink"
+          className="ml-auto text-nowrap h-6 cursor-pointer rounded-[6px] px-2 font-mono text-[12px] text-console-dim transition-colors hover:text-console-ink focus-visible:outline-2 focus-visible:outline-focus aria-pressed:text-console-ink"
         >
           {notes ? "[x]" : "[ ]"} notes
         </button>

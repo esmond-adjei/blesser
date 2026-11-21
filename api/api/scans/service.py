@@ -528,19 +528,30 @@ async def scan_allowance(session, user_id: str) -> dict:
 
     limits = (await get_settings(session))["member_scan_limits"]
     now = utcnow_naive()
-    left = {}
+    left, frees = {}, []
     for key, seconds in (("per_hour", 3600), ("per_day", 86400)):
-        used = await session.scalar(
-            select(func.count())
-            .select_from(m.Scan)
-            .where(
-                m.Scan.user_id == user_id,
-                m.Scan.kind == "member",
-                m.Scan.created_at > now - timedelta(seconds=seconds),
+        window = timedelta(seconds=seconds)
+        started = (
+            (
+                await session.execute(
+                    select(m.Scan.created_at)
+                    .where(
+                        m.Scan.user_id == user_id,
+                        m.Scan.kind == "member",
+                        m.Scan.created_at > now - window,
+                    )
+                    .order_by(m.Scan.created_at)
+                )
             )
+            .scalars()
+            .all()
         )
-        left[key] = max(0, limits[key] - (used or 0))
+        left[key] = max(0, limits[key] - len(started))
+        if not left[key] and started and limits[key] > 0:
+            # A slot frees when the scan that fills the limit leaves the window.
+            frees.append(started[len(started) - limits[key]] + window)
     return {
+        "next_at": max(frees) if frees else None,
         "enabled": settings.rate_limits_enabled,
         "per_hour": limits["per_hour"],
         "left_this_hour": left["per_hour"],

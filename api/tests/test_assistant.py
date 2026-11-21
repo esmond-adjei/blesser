@@ -315,6 +315,7 @@ def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
                     "url": None,
                     "opportunity": None,
                     "preview": True,
+                    "available_at": None,
                 }
             ]
             if approved
@@ -669,6 +670,41 @@ def test_each_message_has_a_limit_of_approval_cards(monkeypatch):
         assert "add_todo" not in {tool["name"] for tool in calls[1]["tools"]}
         assert "limit of approval cards" in calls[1]["system"]
         assert _last_tool_results(calls[2])[-1]["code"] == "tool_unavailable"
+
+
+def test_a_used_up_scan_allowance_shows_a_card_with_the_next_free_time(monkeypatch):
+    from datetime import datetime
+
+    from api.scans import service as scans
+
+    free_at = datetime(2026, 11, 21, 21, 39)
+
+    async def used_up(session, user_id):
+        return {
+            "enabled": True,
+            "per_hour": 3,
+            "left_this_hour": 0,
+            "per_day": 10,
+            "left_today": 4,
+            "next_at": free_at,
+        }
+
+    monkeypatch.setattr(scans, "scan_allowance", used_up)
+    calls = _model(
+        monkeypatch,
+        _tool("start_scan", category="student"),
+        LLMResponse(text="I can start it once a slot frees up."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Scan for me."}))
+        assert not any(e["event"] == "confirm_required" for e in events)
+        assert "don't repeat the time" in _last_tool_results(calls[1])[-1]["error"]
+        [card] = [
+            s for s in events[-2]["message"]["sources"] if s["kind"] == "scan_limit"
+        ]
+        assert card["title"] == "No scans left this hour"
+        assert card["available_at"].startswith("2026-11-21T21:39")
 
 
 QUESTIONS = {

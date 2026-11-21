@@ -174,9 +174,13 @@ def test_scan_proposals_check_sites_and_the_allowance(monkeypatch):
             for _ in range(3)
         ]
     )
-    assert read(user, "scan_allowance")["left_this_hour"] == 0
-    with pytest.raises(RateLimitError):
+    allowance = read(user, "scan_allowance")
+    assert allowance["left_this_hour"] == 0 and allowance["next_at"] is not None
+    with pytest.raises(RateLimitError) as limit:
         propose(user, "start_scan", category="research")
+    card = limit.value.card
+    assert card["kind"] == "scan_limit" and card["title"] == "No scans left this hour"
+    assert card["available_at"] == allowance["next_at"].isoformat()
 
 
 def test_an_approved_scan_still_counts_against_the_limit(monkeypatch):

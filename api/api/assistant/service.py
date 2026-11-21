@@ -572,6 +572,10 @@ async def _run(chat_id, user_id, lease, turn):
                     DomainError,
                     web.SearchUnavailable,
                 ) as exc:
+                    if (card := getattr(exc, "card", None)) and not any(
+                        p["kind"] == card["kind"] for p in turn.previews
+                    ):
+                        turn.previews.append(card)
                     result = {
                         "error": "Web search is unavailable."
                         if isinstance(exc, web.SearchUnavailable)
