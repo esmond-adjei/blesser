@@ -235,7 +235,7 @@ An agent no longer has to spend turns trying to save something when no useful le
 
 A member's scan is about that member's request: their focus note, category, region and up to five sites.
 
-1. The agent searches the catalogue first (`search_catalogue`) and records clear fits with `add_catalogue_match`. Fetching a known catalogue URL returns its listing id, so the agent can match it instead of re-saving it.
+1. The agent searches the catalogue first (`search_catalogue`) only to learn what is already listed. It does not record those as finds, because the member can already browse them; a scan returns what is new to them.
 2. When the member listed sites, the agent reads them next (`fetch_page`), follows links to opportunity pages and saves what fits. Sites must be public http(s) addresses: `scans.service.check_sites` runs the egress guard before the scan starts, and every fetch runs it again, redirects included. A site the crawl rejected earlier is still read when a member asks for it.
 3. Then it searches the web.
 
@@ -247,7 +247,7 @@ New listings saved from a member's site whose host is not an enabled staff sourc
 
 Members can save up to `MEMBER_SOURCES_MAX` sites (default 10) in "My sources" on the Scans page (`/api/app/sources`). Each has an audience and an optional note on what to look for. Rows live in `member_sources`, private to the member and apart from the staff `sources` registry; the same site can be saved by several members.
 
-The worker's hourly pass checks members whose sources are due (`next_check_at`), up to `MEMBER_SOURCE_CHECKS_PER_HOUR` members per pass (default 20; 0 pauses checks), skipping disabled accounts and members with a check still running. A check is a scan of kind `sources`, one per audience, whose sites are the member's sources and whose focus is their notes. It uses the same agent without web search: catalogue matches, then the member's sites and the pages they link to. Sources are then due again after `MEMBER_SOURCE_CHECK_DAYS` (default 7). "Check now" starts the same check at most once an hour. Source checks never use the member's scan quota, and a check that finds nothing sends no notification.
+The worker's hourly pass checks members whose sources are due (`next_check_at`), up to `MEMBER_SOURCE_CHECKS_PER_HOUR` members per pass (default 20; 0 pauses checks), skipping disabled accounts and members with a check still running. A check is a scan of kind `sources`, one per audience, whose sites are the member's sources and whose focus is their notes. It uses the same agent without web search: the member's sites and the pages they link to. Sources are then due again after `MEMBER_SOURCE_CHECK_DAYS` (default 7). "Check now" starts the same check at most once an hour. Source checks never use the member's scan quota, and a check that finds nothing sends no notification.
 
 Finds follow the member-site rule above: new listings wait for staff review unless the site is an enabled staff source. Each saved domain also becomes a disabled staff source proposal through the usual save path, with its save count, so staff can enable strong member sources from the Sources page. A source's `finds` counts the new listings its checks found.
 
