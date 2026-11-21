@@ -123,7 +123,7 @@ async def steer_scan(session, user_id: str, scan_id: str, prompt: str) -> m.Scan
                 user_id=user_id,
                 task_type=TASK_TYPE,
                 target=f"category:{category}",
-                metrics={"steer": prompt.strip()},
+                metrics={"steer": prompt.strip(), "pipeline_complete": True},
             )
         )
     scan.status = "running"

@@ -67,6 +67,11 @@ def test_steer_waits_for_a_running_scan_then_queues_a_followup():
     body = steered.json()
     assert body["status"] == "running"
     assert [t["metrics"].get("steer") for t in body["tasks"]].count("Only Ghana") == 1
+    assert all(
+        t["metrics"].get("pipeline_complete")
+        for t in body["tasks"]
+        if t["metrics"].get("steer")
+    )
     _stop(client, scan_id)
 
 
