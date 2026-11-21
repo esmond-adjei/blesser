@@ -62,6 +62,7 @@ const opportunityFields = {
   dedupe_key: s.text,
   checked_at: s.optional(s.nullable(s.text)),
   check_outcome: s.optional(s.text),
+  found_via_url: s.optional(s.text),
 };
 const opportunitySchema = s.shape(opportunityFields);
 const duplicatePairSchema = s.shape({
@@ -147,6 +148,8 @@ const settingsSchema = s.shape({
       max_agent_checks: s.number,
     }),
   ),
+  aggregators: s.optional(s.array(s.text)),
+  official_backfill: s.optional(s.boolean),
 });
 export const sourceKindSchema = s.choice("rss", "sitemap", "listing");
 const sourceSchema = s.shape({

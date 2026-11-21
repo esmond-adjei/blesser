@@ -3,7 +3,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from datetime import date
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import trafilatura
 from lxml import html as lxml_html
@@ -90,6 +90,39 @@ class Page:
     cached: bool = False
 
 
+#: Links to other sites kept per page, for following aggregator posts (official.py).
+MAX_OUTBOUND = 60
+
+
+def outbound_links(tree, url: str) -> list[dict]:
+    """Links in the page body to other hosts, with their labels, in page order."""
+    own = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    links: dict[str, dict] = {}
+    for node in tree.xpath("//body//a[@href]"):
+        try:
+            href = urljoin(url, node.get("href", "").strip())
+            parts = urlsplit(href)
+        except ValueError:
+            continue
+        host = (parts.hostname or "").lower().removeprefix("www.")
+        if parts.scheme not in {"http", "https"} or not host or host == own:
+            continue
+        label = " ".join(
+            (
+                node.text_content() or node.get("title") or node.get("aria-label") or ""
+            ).split()
+        )[:200]
+        key = normalized_url(href)
+        if key in links:
+            if label and not links[key]["label"]:
+                links[key]["label"] = label
+            continue
+        links[key] = {"url": href[:2000], "label": label}
+        if len(links) >= MAX_OUTBOUND:
+            break
+    return list(links.values())
+
+
 def parse_page(raw: str, url: str) -> Page:
     tree = lxml_html.fromstring(raw)
     title = " ".join(
@@ -129,6 +162,7 @@ def parse_page(raw: str, url: str) -> Page:
             metadata["published_date"] = node.get("content", "")[:10]
     for node in tree.xpath("//nav|//footer|//body/header|//script|//style|//noscript"):
         node.drop_tree()
+    metadata["outbound"] = outbound_links(tree, url)
     clean = lxml_html.tostring(tree, encoding="unicode")
     text = trafilatura.extract(clean, include_links=True) or tree.text_content()
     headings = "\n".join(tree.xpath("//h1//text()"))[:2000]

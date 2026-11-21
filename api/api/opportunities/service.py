@@ -72,6 +72,7 @@ def to_out(opp: m.Opportunity, on: date | None = None) -> dict:
         "verified_at": opp.verified_at,
         "checked_at": opp.checked_at,
         "check_outcome": opp.check_outcome or "",
+        "found_via_url": opp.found_via_url or "",
         "created_at": opp.created_at,
         "updated_at": opp.updated_at,
         "is_open": is_open(opp, on),
@@ -376,11 +377,17 @@ async def upsert_from_agent(
     data: schemas.AgentOpportunityIn,
     low_confidence: bool = False,
     review_note: str = "",
+    found_via: str = "",
+    review_reason: str | None = None,
 ) -> tuple[m.Opportunity, bool, list[str]]:
     """Return the grounded row, whether created, and the fields refreshed.
 
     A `review_note` (a find from a member-supplied site) holds a new listing for
     staff review, whatever the editorial default, with the note for the editor.
+    `found_via` is the aggregator post the find was followed from (official.py).
+    `review_reason` holds a new listing for review for that reason; with
+    `no_official_link` (an aggregator find without an official page) an existing
+    listing is returned unchanged, since an aggregator's copy must not refresh it.
     """
     key = await dedupe.key_for(session, data.organization, data.title)
     now = utcnow_naive()
@@ -391,6 +398,8 @@ async def upsert_from_agent(
 
     source_key = normalized_url(data.source_url)
     urls = {source_key, normalized_url(data.link)} if data.link else {source_key}
+    if found_via:
+        urls.add(normalized_url(found_via))
     for url in sorted(urls):
         await session.execute(
             select(func.pg_advisory_xact_lock(func.hashtext("source-save:" + url)))
@@ -404,6 +413,7 @@ async def upsert_from_agent(
                     or_(
                         m.Opportunity.source_url_key.in_(urls),
                         m.Opportunity.link_key.in_(urls),
+                        m.Opportunity.found_via_url.in_(urls),
                     )
                 )
                 .order_by(m.Opportunity.created_at, m.Opportunity.id)
@@ -416,7 +426,7 @@ async def upsert_from_agent(
         from api.editorial.service import get_settings, new_slug
 
         default = (await get_settings(session))["agent_default"]
-        if low_confidence or review_note:
+        if low_confidence or review_note or review_reason:
             default = {**default, "status": "in_review"}
         opp = m.Opportunity(
             title=data.title.strip(),
@@ -438,10 +448,15 @@ async def upsert_from_agent(
             status=default["status"],
             audience=default["audience"],
             slug=await new_slug(session, data.title),
-            review_reason="agent_find" if default["status"] == "in_review" else None,
+            review_reason=(
+                review_reason
+                or ("agent_find" if default["status"] == "in_review" else None)
+            ),
             editor_note=review_note,
             published_at=now if default["status"] == "published" else None,
             source=m.OpportunitySource.agent.value,
+            found_via_url=normalized_url(found_via) if found_via else "",
+            official_checked_at=now if found_via else None,
             dedupe_key=key,
             created_by=user_id,
             scan_id=scan_id,
@@ -450,6 +465,8 @@ async def upsert_from_agent(
         session.add(opp)
         await session.flush()
         return opp, True, []
+    if review_reason == "no_official_link":
+        return opp, False, []
     updated: list[str] = []
     # Only a listing closed by its date (or by a check) may reopen; a staff archive of a
     # listing with a future deadline is a deliberate close.
