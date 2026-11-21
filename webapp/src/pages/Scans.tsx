@@ -39,7 +39,7 @@ import { toastError, toastSuccess } from "../lib/toast"
 import { LINEAR_OK, springEasing } from "../lib/motion"
 import type { OpportunityCategory, OpportunityKind, Scan, ScanFind, ScanTask } from "../lib/types"
 import { kindsPhrase, scanKinds } from "../lib/scanKinds"
-import { KindSelect } from "../components/scans/KindSelect"
+import { TargetSelect } from "../components/scans/TargetSelect"
 import { Button, Chip, Countdown, OpportunityArt, buttonVariants, cn, daysUntil } from "@blesser/ui"
 import {
   Dialog,
@@ -603,30 +603,15 @@ function ScanComposer({ onStarted, className, showAllowance = false, from }: { o
         </div>
       ) : null}
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <div role="radiogroup" aria-label="Audience" className="flex rounded-full bg-surface-sunk p-0.5">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={category === c}
-              onClick={() => setCategory(c)}
-              className={cn(
-                "h-7 cursor-pointer rounded-full px-3 text-footnote font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-focus",
-                category === c ? "bg-surface text-ink shadow-elevation-1" : "text-ink-secondary hover:text-ink",
-              )}
-            >
-              {CATEGORY_LABELS[c]}
-            </button>
-          ))}
-        </div>
-        <KindSelect value={kinds} onChange={setKinds} side={from ? "bottom" : "top"} />
+        <TargetSelect category={category} kinds={kinds} onCategory={setCategory} onKinds={setKinds} side={from ? "bottom" : "top"} />
         <CountrySelect value={region} onChange={setRegion} side={from ? "bottom" : "top"} />
         <Button
           type="button"
           size="sm"
           variant="quiet"
           icon={<Link2 />}
+          aria-label={sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"} to check first` : "Add sites to check first"}
+          title={sites.length ? undefined : "Add sites to check first"}
           aria-expanded={showSites}
           aria-controls={showSites ? `${uid}-sites` : undefined}
           onClick={() => {
@@ -634,20 +619,19 @@ function ScanComposer({ onStarted, className, showAllowance = false, from }: { o
             if (!showSites) requestAnimationFrame(() => siteInput.current?.focus())
           }}
         >
-          {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}
+          {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : undefined}
         </Button>
         {from ? null : <Button
           type="button"
           size="sm"
           variant="quiet"
           icon={<Repeat />}
+          aria-label="Repeat weekly"
           aria-pressed={weekly}
           title={weekly ? "This scan will run again every week" : "Run this scan again every week"}
           onClick={() => setWeekly((v) => !v)}
           className={cn(weekly && "bg-forest-soft text-link hover:bg-forest-soft")}
-        >
-          Weekly
-        </Button>}
+        />}
         {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
         <Button
           type="submit"
