@@ -382,47 +382,14 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
 
   const nudgeList = (event: React.KeyboardEvent) => {
     const step = event.shiftKey ? 48 : 16
-    if (event.key === "ArrowLeft") setListWidth(listWidth - step)
-    else if (event.key === "ArrowRight") setListWidth(listWidth + step)
+    if (event.key === "ArrowLeft") setListWidth(listWidth + step)
+    else if (event.key === "ArrowRight") setListWidth(listWidth - step)
     else return
     event.preventDefault()
   }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
-      {docked ? (
-        <aside
-          ref={listPane}
-          aria-label="Chats"
-          aria-hidden={!listOpen}
-          inert={!listOpen}
-          style={{ width: listOpen ? listWidth : 0 }}
-          className={cn("relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none", resizing ? "transition-none" : "transition-[width] duration-200", listOpen && "border-r")}
-        >
-          <div style={{ width: listWidth }} className="flex min-h-0 shrink-0 flex-col gap-3 p-3">
-            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
-            {list}
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize the chat list"
-            aria-valuemin={220}
-            aria-valuemax={420}
-            aria-valuenow={Math.round(listWidth)}
-            tabIndex={0}
-            onPointerDown={(event) => { setResizing(true); event.currentTarget.setPointerCapture(event.pointerId) }}
-            onPointerMove={(event) => { if (resizing) setListWidth(event.clientX - (listPane.current?.getBoundingClientRect().left ?? 0)) }}
-            onPointerUp={() => setResizing(false)}
-            onPointerCancel={() => setResizing(false)}
-            onDoubleClick={() => setListWidth(288)}
-            onKeyDown={nudgeList}
-            className="group absolute inset-y-0 right-0 z-10 flex w-2 translate-x-1 cursor-col-resize touch-none items-center justify-center focus:outline-none"
-          >
-            <span className={cn("h-10 w-0.5 rounded-full transition-colors", resizing ? "bg-focus" : "bg-transparent group-hover:bg-separator group-focus-visible:bg-focus")} />
-          </div>
-        </aside>
-      ) : null}
     <div className="@container/chat relative flex min-h-0 min-w-0 flex-1 flex-col">
       {embedded ? (
         <header className="flex h-12 shrink-0 items-center gap-1 border-b border-separator px-3">
@@ -522,6 +489,39 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
           onSave={(title) => void saveEdit(title)} /> : null}
       </Dialog>
     </div>
+      {docked ? (
+        <aside
+          ref={listPane}
+          aria-label="Chats"
+          aria-hidden={!listOpen}
+          inert={!listOpen}
+          style={{ width: listOpen ? listWidth : 0 }}
+          className={cn("relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none", resizing ? "transition-none" : "transition-[width] duration-200", listOpen && "border-l")}
+        >
+          <div style={{ width: listWidth }} className="flex min-h-0 shrink-0 flex-col gap-3 p-3">
+            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
+            {list}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the chat list"
+            aria-valuemin={220}
+            aria-valuemax={420}
+            aria-valuenow={Math.round(listWidth)}
+            tabIndex={0}
+            onPointerDown={(event) => { setResizing(true); event.currentTarget.setPointerCapture(event.pointerId) }}
+            onPointerMove={(event) => { if (resizing) setListWidth((listPane.current?.getBoundingClientRect().right ?? window.innerWidth) - event.clientX) }}
+            onPointerUp={() => setResizing(false)}
+            onPointerCancel={() => setResizing(false)}
+            onDoubleClick={() => setListWidth(288)}
+            onKeyDown={nudgeList}
+            className="group absolute inset-y-0 left-0 z-10 flex w-2 -translate-x-1 cursor-col-resize touch-none items-center justify-center focus:outline-none"
+          >
+            <span className={cn("h-10 w-0.5 rounded-full transition-colors", resizing ? "bg-focus" : "bg-transparent group-hover:bg-separator group-focus-visible:bg-focus")} />
+          </div>
+        </aside>
+      ) : null}
     </div>
   )
 }
