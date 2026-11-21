@@ -80,6 +80,7 @@ export interface AssistantMessage {
 
 export interface PendingCall {
   id: string
+  tool?: string
   summary: string
   trace: TraceEntry[]
   note: string

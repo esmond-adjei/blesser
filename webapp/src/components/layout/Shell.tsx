@@ -8,6 +8,7 @@ import { Logo, Wordmark, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { ChatSkeleton } from "../assistant/ChatSkeleton"
+import { AssistantDock, AssistantDockProvider, AssistantMascot, AssistantPanel } from "../assistant/AssistantHost"
 import { AccountMenu } from "./AccountMenu"
 import { ShellHeaderContext, type ShellHeader } from "./shellHeader"
 import { NAV_GROUPS } from "./nav"
@@ -43,6 +44,7 @@ export function Shell() {
   const fullBleed = FULL_BLEED_EXACT.includes(pathname) || FULL_BLEED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
   const [pageHeader, setPageHeader] = React.useState<ShellHeader | null>(null)
   return (
+    <AssistantDockProvider>
     <SidebarProvider defaultOpen={document.cookie.split("; ").find((entry) => entry.startsWith("sidebar_state=")) !== "sidebar_state=false"} className="h-dvh min-h-0 bg-canvas">
       <AppSidebar />
       <SidebarInset className="min-h-0 min-w-0 bg-canvas">
@@ -75,7 +77,11 @@ export function Shell() {
         )}
         </ShellHeaderContext.Provider>
       </SidebarInset>
+      <AssistantPanel />
     </SidebarProvider>
+    <AssistantMascot />
+    <AssistantDock />
+    </AssistantDockProvider>
   )
 }
 

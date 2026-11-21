@@ -648,7 +648,7 @@ function OpportunityRow({ opp, applicationId, index, ...handlers }: ItemProps) {
   )
 }
 
-function OpportunityDetail({
+export function OpportunityDetail({
   id,
   tracked,
   onClose,

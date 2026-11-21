@@ -68,6 +68,7 @@ class Source(BaseModel):
 
 class PendingCall(BaseModel):
     id: str
+    tool: str = ""
     summary: str
     trace: list[TraceEntry]
     note: str = ""

@@ -8,7 +8,7 @@ export interface ShellHeader {
 export const ShellHeaderContext = React.createContext<(header: ShellHeader | null) => void>(() => {})
 
 /** Puts a page's title and actions in the app's top bar instead of a second header. */
-export function useShellHeader(header: ShellHeader) {
+export function useShellHeader(header: ShellHeader | null) {
   const set = React.useContext(ShellHeaderContext)
   React.useEffect(() => {
     set(header)
