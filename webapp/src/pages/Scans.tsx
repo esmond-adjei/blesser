@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ArrowUpRight,
   Check,
+  ChevronDown,
   Database,
   GripVertical,
   Globe,
@@ -568,8 +569,20 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
           <p className="mt-1 text-caption text-ink-tertiary">The agent reads these before it searches the web. New finds from them are checked by our team before they go public.</p>
         </div>
       ) : null}
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <div role="radiogroup" aria-label="Audience" className="flex rounded-full bg-surface-sunk p-0.5">
+      <div className="mt-1 flex flex-wrap items-center gap-2 max-sm:flex-nowrap max-sm:gap-1.5">
+        <label htmlFor="scan-audience" className="sr-only">Audience</label>
+        <span className="relative min-w-0 sm:hidden">
+          <select
+            id="scan-audience"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as OpportunityCategory)}
+            className="h-8 max-w-full cursor-pointer appearance-none truncate rounded-full bg-surface-sunk pr-7 pl-3 text-footnote font-medium text-ink focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+          </select>
+          <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-ink-tertiary" aria-hidden="true" />
+        </span>
+        <div role="radiogroup" aria-label="Audience" className="flex rounded-full bg-surface-sunk p-0.5 max-sm:hidden">
           {CATEGORIES.map((c) => (
             <button
               key={c}
@@ -586,34 +599,38 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
             </button>
           ))}
         </div>
-        <CountrySelect value={region} onChange={setRegion} side="top" />
+        <CountrySelect value={region} onChange={setRegion} side="top" compact className="shrink-0 max-sm:gap-1 max-sm:px-2.5" />
         <Button
           type="button"
           size="sm"
           variant="quiet"
           icon={<Link2 />}
+          aria-label={sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"} to check first` : "Add sites"}
           aria-expanded={showSites}
           aria-controls={showSites ? "scan-sites" : undefined}
+          className="shrink-0 max-sm:px-2"
           onClick={() => {
             setShowSites((v) => !v)
             if (!showSites) requestAnimationFrame(() => siteInput.current?.focus())
           }}
         >
-          {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}
+          <span className="max-sm:sr-only">{sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}</span>
+          {sites.length ? <span className="tabular-nums sm:hidden" aria-hidden="true">{sites.length}</span> : null}
         </Button>
         <Button
           type="button"
           size="sm"
           variant="quiet"
           icon={<Repeat />}
+          aria-label="Weekly"
           aria-pressed={weekly}
           title={weekly ? "This scan will run again every week" : "Run this scan again every week"}
           onClick={() => setWeekly((v) => !v)}
-          className={cn(weekly && "bg-forest-soft text-link hover:bg-forest-soft")}
+          className={cn("shrink-0 max-sm:px-2", weekly && "bg-forest-soft text-link hover:bg-forest-soft")}
         >
-          Weekly
+          <span className="max-sm:sr-only">Weekly</span>
         </Button>
-        {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
+        {showAllowance ? <span className="ml-auto max-sm:hidden"><AllowanceNote /></span> : null}
         <Button
           type="submit"
           size="sm"
@@ -623,7 +640,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
           title={blocked ? "No scans left for now" : undefined}
           disabled={blocked || start.isPending}
           icon={start.isPending ? <Loader2 className="motion-safe:animate-spin" /> : <ArrowUp />}
-          className={cn("size-9", !showAllowance && "ml-auto")}
+          className={cn("size-9 shrink-0", !showAllowance && "ml-auto", showAllowance && "max-sm:ml-auto")}
         />
       </div>
     </form>
