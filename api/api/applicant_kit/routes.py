@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile
 
-from api.applicant_kit import models, schemas, service
+from api.applicant_kit import cv_import, models, schemas, service
 from api.applicant_kit.storage import get_storage
 from api.auth.routes import get_current_user
 from api.auth.schemas import UserOut
@@ -44,6 +44,22 @@ async def put_profile(
     req: schemas.ProfileIn, session: Session, current: Member, reveal: bool = False
 ):
     return await service.profile(session, current.id, req, reveal)
+
+
+@router.post(
+    "/profile/from-cv",
+    response_model=schemas.CvImportOut,
+    dependencies=[Depends(rate_limit("kit_cv"))],
+)
+async def profile_from_cv(req: schemas.CvImportIn, session: Session, current: Member):
+    """Profile fields read from one of the member's documents. Saves nothing."""
+    row = await service.owned(session, models.Document, current.id, req.document_id)
+    key, content_type = row.storage_key, row.content_type
+    # Reading the file and asking the model take seconds; free the connection.
+    await session.close()
+    cv = await get_storage().read_text(key, content_type)
+    fields = await cv_import.ask_model(cv)
+    return {"profile": cv_import.to_profile(fields)}
 
 
 @router.get("/projects", response_model=list[schemas.ProjectOut])

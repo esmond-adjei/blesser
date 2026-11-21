@@ -14,6 +14,7 @@
 - A public site (Astro) for the catalogue, and an admin console for review, editing, collections, sources, users and settings.
 - The Assistant: ask about opportunities, applications and to-dos; it proposes tracking or a to-do and acts once the member confirms.
 - The Apply kit (profile, projects, documents, saved answers) and a browser extension that fills application forms from it for review.
+- Fill the Apply kit profile from a CV: pick one from Documents or upload a PDF or Word file, check what Blesser found, and add only the details you tick. Fields the CV lacks stay empty, existing values are never replaced unless you choose, and national ID and passport details are never read.
 - Notifications: an in-app inbox with select and delete, browser push and email for deadline reminders and scan results, with quiet hours, a daily digest and per-kind settings.
 - The web app builds on Node 26 LTS.
 - The crawler reads the newest pages first: feed items by publish date, sitemaps by last-updated date, then sources that have produced saves. Duplicate URL checks use a stored, indexed normalized URL.

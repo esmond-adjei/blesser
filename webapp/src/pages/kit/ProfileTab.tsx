@@ -1,7 +1,9 @@
 import * as React from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Lock } from "lucide-react"
+import { FileText, Lock } from "lucide-react"
+import { Button } from "@blesser/ui"
 import { SettingsSection } from "../../components/settings/controls"
+import { CvImportDialog } from "../../components/kit/CvImportDialog"
 import { ErrorState } from "../../components/feedback/EmptyState"
 import {
   CheckField,
@@ -33,7 +35,8 @@ import {
 import { getKitProfile, kitKeys, putKitProfile, useKitProfile } from "../../lib/kitApi"
 import type { LanguageLevel, Profile, ProfileInput, Sensitive } from "../../lib/kitTypes"
 import { useDraft } from "../../lib/useDraft"
-import { toastError } from "../../lib/toast"
+import { filledMessage } from "../../lib/cvImport"
+import { toastError, toastSuccess } from "../../lib/toast"
 
 const SECTIONS = [
   { id: "kit-identity", label: "Identity" },
@@ -75,6 +78,7 @@ function ProfileForm({ initial }: { initial: Profile }) {
   const plainRef = React.useRef<Promise<Sensitive> | null>(null)
   const [revealed, setRevealed] = React.useState(false)
   const [revealing, setRevealing] = React.useState(false)
+  const [importing, setImporting] = React.useState(false)
 
   const loadPlain = React.useCallback(() => {
     plainRef.current ??= getKitProfile(true).then((p) => {
@@ -130,6 +134,23 @@ function ProfileForm({ initial }: { initial: Profile }) {
     <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-10">
       <div className="min-w-0 space-y-8">
         <KitMeterCard completeness={completeness} hint={hint} />
+
+        <div className="flex flex-col gap-3 rounded-lg border border-separator bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <p className="text-callout text-ink-secondary">Have a CV? Blesser can read it and suggest details for you to check.</p>
+          <Button className="self-start sm:self-auto" icon={<FileText />} onClick={() => setImporting(true)}>
+            Fill from CV
+          </Button>
+        </div>
+        <CvImportDialog
+          open={importing}
+          onClose={() => setImporting(false)}
+          profile={p}
+          onApply={(next, count) => {
+            set(next)
+            setImporting(false)
+            toastSuccess(filledMessage(count))
+          }}
+        />
 
         <KitGroup id="kit-identity" title="Identity" description="As it appears on your passport or national ID.">
           <FormGrid>
