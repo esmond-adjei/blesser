@@ -437,7 +437,6 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
           <div ref={end} />
         </div>
       </div>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-linear-to-t from-surface to-transparent" />
       {farFromEnd ? (
         <button
           type="button"
@@ -446,7 +445,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
             followScroll.current = true
             scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" })
           }}
-          className="bl-pop absolute bottom-3 left-1/2 z-20 grid size-9 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-separator bg-surface text-ink-secondary shadow-elevation-2 transition-colors hover:text-ink"
+          className="bl-pop absolute bottom-3 left-1/2 grid size-9 -translate-x-1/2 cursor-pointer place-items-center rounded-full border border-separator bg-surface text-ink-secondary shadow-elevation-2 transition-colors hover:text-ink"
         >
           <ArrowDown className="size-4" aria-hidden="true" />
         </button>
