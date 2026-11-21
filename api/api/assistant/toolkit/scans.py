@@ -3,7 +3,7 @@ from typing import Annotated
 from pydantic import Field, StringConstraints
 
 from api.core.exceptions import BadRequestError, RateLimitError
-from api.opportunities.models import OpportunityCategory
+from api.opportunities.models import OpportunityCategory, OpportunityKind
 from api.scans import service as scans
 from api.scans import sources
 
@@ -35,6 +35,11 @@ class ScanLookup(ToolInput):
 
 class StartScan(ToolInput):
     category: OpportunityCategory
+    kinds: list[OpportunityKind] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Listing types to look for, such as scholarship or job. Leave empty for any.",
+    )
     region: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] = (
         ""
     )
@@ -86,8 +91,10 @@ SCAN_FIELDS = (
 
 
 def _scan_title(scan):
-    categories = ", ".join(_category_label(c) for c in scan["categories"])
-    return f"{categories} in {scan['region']}" if scan.get("region") else categories
+    title = ", ".join(_category_label(c) for c in scan["categories"])
+    if kinds := scans.scan_kinds(scan.get("kinds"), scan.get("focus") or ""):
+        title += f", {scans.kinds_phrase(kinds)}"
+    return f"{title} in {scan['region']}" if scan.get("region") else title
 
 
 def _scan_record(scan):
@@ -170,6 +177,7 @@ async def propose_start(session, user_id, args):
     region = args.region
     values = {
         "category": args.category.value,
+        "kinds": [k.value for k in args.kinds],
         "region": region,
         "focus": args.focus,
         "sites": sites,
@@ -177,6 +185,15 @@ async def propose_start(session, user_id, args):
     # The category and region are already in the question above.
     note = field_lines(
         {
+            **(
+                {
+                    "looking for": scans.kinds_phrase(
+                        [k.value for k in args.kinds]
+                    ).capitalize()
+                }
+                if args.kinds
+                else {}
+            ),
             **({} if region else {"region": "Your default region"}),
             **({"focus": args.focus} if args.focus else {}),
             **({"sites": sites} if sites else {}),
@@ -204,8 +221,16 @@ async def apply_start(session, user_id, arguments):
         region=arguments["region"],
         focus=arguments["focus"],
         sites=await scans.check_sites(arguments["sites"]),
+        kinds=arguments.get("kinds") or [],
     )
-    title = _scan_title({"categories": scan.categories, "region": scan.region})
+    title = _scan_title(
+        {
+            "categories": scan.categories,
+            "region": scan.region,
+            "kinds": scan.kinds,
+            "focus": scan.focus,
+        }
+    )
     return Applied(
         {
             "scan_id": scan.id,

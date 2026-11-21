@@ -13,7 +13,7 @@ from api.core.config import settings
 from api.core.db import get_session
 from api.core.exceptions import ConflictError
 from api.core.ratelimit import enforce_scan_limit
-from api.opportunities.models import OpportunityCategory
+from api.opportunities.models import OpportunityCategory, OpportunityKind
 from api.scans import schedules, service, sources
 
 router = APIRouter(tags=["scans"])
@@ -23,6 +23,11 @@ class ScanCreate(BaseModel):
     # One audience per scan keeps each agent's search precise.
     categories: list[OpportunityCategory] = Field(min_length=1, max_length=1)
     region: str = Field(default="", max_length=120)
+    kinds: list[OpportunityKind] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Optional: listing types to look for, such as scholarship or job.",
+    )
     focus: str = Field(
         default="",
         max_length=2000,
@@ -47,6 +52,7 @@ class ScanRerun(BaseModel):
         default=None, min_length=1, max_length=1
     )
     region: str | None = Field(default=None, max_length=120)
+    kinds: list[OpportunityKind] | None = Field(default=None, max_length=3)
     focus: str | None = Field(default=None, max_length=2000)
     sites: list[Annotated[str, Field(max_length=2000)]] | None = Field(
         default=None, max_length=service.MAX_SCAN_SITES
@@ -98,6 +104,7 @@ class ScanOut(BaseModel):
     region: str
     categories: list[str]
     focus: str
+    kinds: list[str] = Field(default_factory=list)
     sites: list[str] = Field(default_factory=list)
     kind: str = "member"
     status: str
@@ -132,6 +139,7 @@ async def start_scan(
             region=req.region,
             focus=req.focus,
             sites=sites,
+            kinds=[k.value for k in req.kinds],
         )
     scan = await service.start_scan(
         session,
@@ -139,6 +147,7 @@ async def start_scan(
         categories=categories,
         region=req.region,
         focus=req.focus,
+        kinds=[k.value for k in req.kinds],
         sites=sites,
     )
     if req.repeat:
@@ -177,6 +186,9 @@ async def rerun_scan(
         categories=categories,
         region=fields.get("region") if "region" in fields else original.region,
         focus=fields.get("focus") if "focus" in fields else original.focus,
+        kinds=[k.value for k in req.kinds]
+        if req.kinds is not None
+        else list(original.kinds or []),
         sites=sites,
     )
     return await service.scan_detail(session, current.id, scan.id)
@@ -233,6 +245,7 @@ class ScheduleOut(BaseModel):
     categories: list[str]
     region: str
     focus: str
+    kinds: list[str] = Field(default_factory=list)
     sites: list[str]
     interval_hours: int
     paused: bool

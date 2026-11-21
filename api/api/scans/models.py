@@ -50,6 +50,8 @@ class Scan(Base):
     region: Mapped[str] = mapped_column(String)
     categories: Mapped[list] = mapped_column(JSON, default=list)
     focus: Mapped[str] = mapped_column(Text, default="")
+    # Listing types to look for, such as scholarship or job; empty means any.
+    kinds: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     # member: a person's request; sweep: the scheduled catalogue refresh.
     kind: Mapped[str] = mapped_column(String, default="member", server_default="member")
     # Up to five public sites the member asked the agent to read first.
@@ -210,6 +212,7 @@ class ScanSchedule(Base):
     categories: Mapped[list] = mapped_column(JSON, default=list)
     region: Mapped[str] = mapped_column(String(120), default="")
     focus: Mapped[str] = mapped_column(Text, default="")
+    kinds: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     sites: Mapped[list] = mapped_column(JSON, default=list)
     interval_hours: Mapped[int] = mapped_column(Integer, default=168)
     paused: Mapped[bool] = mapped_column(default=False)

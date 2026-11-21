@@ -81,6 +81,7 @@ def user_message(
     member: bool = False,
     sources_only: bool = False,
     repeat: bool = False,
+    kinds: list[str] | None = None,
 ) -> str:
     known_block = "\n".join(f"- {k}" for k in known) if known else "(none yet)"
     focus = (focus or "").strip()
@@ -110,6 +111,14 @@ def user_message(
         f"Target region: {region}\n"
         f"Category: {category}: {CATEGORY_BRIEFS[category]}\n"
         f"Today's date: {today}\n"
+        + (
+            "Listing types the member wants: "
+            + ", ".join(k.replace("_", " ") for k in kinds)
+            + ". Save only listings of these types; skip others even when they fit "
+            "the category.\n"
+            if kinds
+            else ""
+        )
         + (
             f"Focus notes from the person who started this scan:\n{focus}\n"
             if focus
@@ -232,6 +241,7 @@ async def _run_agent(
         member=member,
         sources_only=sources_only,
         repeat=bool(scan.schedule_id) and scan.kind != "member",
+        kinds=list(scan.kinds or []),
     )
     ctx = ToolContext(session=session, run=scan)
     ctx.category = category

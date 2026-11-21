@@ -60,6 +60,47 @@ async def check_sites(raw: list[str]) -> list[str]:
     return sites
 
 
+KIND_PLURALS = {
+    "grant": "grants",
+    "fellowship": "fellowships",
+    "scholarship": "scholarships",
+    "accelerator": "accelerators",
+    "incubator": "incubators",
+    "competition": "competitions",
+    "internship": "internships",
+    "call_for_proposals": "calls for proposals",
+    "training": "training",
+    "conference": "conferences",
+    "job": "jobs",
+}
+_KIND_WORDS = {
+    "scholarship": ("scholarship", "bursar", "tuition"),
+    "fellowship": ("fellowship",),
+    "grant": ("grant", "funding", "seed fund"),
+    "job": (" job", "jobs", "hiring", "career", "vacanc", "engineer role"),
+    "internship": ("internship", "intern "),
+    "accelerator": ("accelerator",),
+    "incubator": ("incubat",),
+    "competition": ("competition", "challenge", "prize", "hackathon"),
+    "conference": ("conference", "summit"),
+    "training": ("training", "bootcamp", "course"),
+    "call_for_proposals": ("call for proposals", "proposals"),
+}
+
+
+def scan_kinds(kinds, focus: str = "") -> list[str]:
+    """The listing types a scan is for: the ones picked, else any its focus names."""
+    if kinds:
+        return list(kinds)
+    text = f" {(focus or '').casefold()} "
+    return [k for k, words in _KIND_WORDS.items() if any(w in text for w in words)][:3]
+
+
+def kinds_phrase(kinds) -> str:
+    words = [KIND_PLURALS.get(k, k.replace("_", " ")) for k in kinds]
+    return words[0] if len(words) < 2 else f"{', '.join(words[:-1])} and {words[-1]}"
+
+
 async def start_scan(
     session,
     user_id: str,
@@ -68,6 +109,7 @@ async def start_scan(
     region: str = "",
     focus: str = "",
     sites: list[str] | None = None,
+    kinds: list[str] | None = None,
     kind: str = "member",
     schedule_id: str | None = None,
     commit: bool = True,
@@ -85,6 +127,7 @@ async def start_scan(
         region=region.strip() or settings.opportunity_default_region,
         categories=ordered,
         focus=focus.strip(),
+        kinds=list(dict.fromkeys(kinds or [])),
         kind=kind,
         sites=list(sites or []),
         schedule_id=schedule_id,
@@ -235,6 +278,7 @@ def _scan_out(
         "region": scan.region,
         "categories": scan.categories or [],
         "focus": scan.focus,
+        "kinds": scan.kinds or [],
         "sites": scan.sites or [],
         "kind": scan.kind,
         "status": scan.status,

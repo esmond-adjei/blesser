@@ -171,6 +171,7 @@ async def schedule_out(session, row: m.ScanSchedule) -> dict:
         "categories": row.categories or [],
         "region": row.region,
         "focus": row.focus,
+        "kinds": row.kinds or [],
         "sites": row.sites or [],
         "interval_hours": row.interval_hours,
         "paused": row.paused,
@@ -219,7 +220,7 @@ async def _get_member(session, user_id: str, schedule_id: str) -> m.ScanSchedule
     return row
 
 
-def _request_key(categories, region, focus, sites) -> tuple:
+def _request_key(categories, region, focus, sites, kinds=None) -> tuple:
     from api.core.config import settings
 
     return (
@@ -227,11 +228,12 @@ def _request_key(categories, region, focus, sites) -> tuple:
         ((region or "").strip() or settings.opportunity_default_region).casefold(),
         (focus or "").strip(),
         tuple(sorted(sites or [])),
+        tuple(sorted(kinds or [])),
     )
 
 
 async def ensure_can_repeat(
-    session, user_id: str, *, categories, region, focus, sites
+    session, user_id: str, *, categories, region, focus, sites, kinds=None
 ) -> None:
     """Raise unless the member may add a schedule for this request. Takes a lock
     held until the caller commits, so two requests cannot both pass."""
@@ -239,8 +241,11 @@ async def ensure_can_repeat(
         select(func.pg_advisory_xact_lock(func.hashtext("scan-schedules:" + user_id)))
     )
     rows = await list_member(session, user_id)
-    key = _request_key(categories, region, focus, sites)
-    if any(_request_key(r.categories, r.region, r.focus, r.sites) == key for r in rows):
+    key = _request_key(categories, region, focus, sites, kinds)
+    if any(
+        _request_key(r.categories, r.region, r.focus, r.sites, r.kinds) == key
+        for r in rows
+    ):
         raise ConflictError("This scan already repeats.")
     limit = await member_limit(session)
     if len(rows) >= limit:
@@ -261,6 +266,7 @@ async def repeat_scan(session, user_id: str, scan_id: str) -> m.ScanSchedule:
         region=scan.region,
         focus=scan.focus,
         sites=scan.sites,
+        kinds=scan.kinds,
     )
     now = utcnow_naive()
     row = m.ScanSchedule(
@@ -271,6 +277,7 @@ async def repeat_scan(session, user_id: str, scan_id: str) -> m.ScanSchedule:
         categories=list(scan.categories or []),
         region=scan.region,
         focus=scan.focus or "",
+        kinds=list(scan.kinds or []),
         sites=list(scan.sites or []),
         interval_hours=MEMBER_INTERVAL_HOURS,
         paused=False,
@@ -485,6 +492,7 @@ async def run_due(session, now: datetime | None = None) -> int:
             categories=list(row.categories or []),
             region=row.region,
             focus=row.focus,
+            kinds=list(row.kinds or []),
             sites=sites,
             kind=kind,
             schedule_id=row.id,

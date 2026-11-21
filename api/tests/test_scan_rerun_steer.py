@@ -107,3 +107,41 @@ def test_timing_follows_the_latest_run_after_a_steer():
         "started_at": later,
         "finished_at": later + timedelta(minutes=2),
     }
+
+
+def test_scan_keeps_its_listing_types_and_names_them():
+    from api.scans.service import kinds_phrase, scan_kinds
+
+    client = TestClient(app)
+    first = _start(client, categories=["student"], kinds=["scholarship", "job"])
+    _stop(client, first)
+    again = client.post(f"/api/app/scans/{first}/rerun", json={}).json()
+    assert again["kinds"] == ["scholarship", "job"]
+    changed = client.post(f"/api/app/scans/{first}/rerun", json={"kinds": []}).json()
+    assert changed["kinds"] == []
+    _stop(client, again["id"], changed["id"])
+    assert (
+        client.post(
+            "/api/app/scans", json={"categories": ["student"], "kinds": ["x"]}
+        ).status_code
+        == 422
+    )
+
+    assert scan_kinds([], "job applications in software engineering") == ["job"]
+    assert (
+        kinds_phrase(["scholarship", "job", "grant"]) == "scholarships, jobs and grants"
+    )
+
+
+def test_agent_brief_names_the_listing_types():
+    from api.opportunities.tasks import user_message
+
+    text = user_message(
+        region="Ghana",
+        category="student",
+        focus="",
+        today="2026-11-21",
+        known=[],
+        kinds=["internship"],
+    )
+    assert "Listing types the member wants: internship." in text
