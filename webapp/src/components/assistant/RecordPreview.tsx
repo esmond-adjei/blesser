@@ -60,7 +60,7 @@ function KitPreview({ target, onClose }: { target: Ref | null; onClose: () => vo
     title = project?.name ?? ""
     subtitle = project?.tagline ?? ""
     href = `/kit/projects/${target?.id}`
-    body = project ? <Fields rows={[["Stage", project.stage.replace("_", " ")], ["Sector", project.sector], ...PROJECT_FIELDS.map(([key, label]): [string, string] => [label, String((project as unknown as Record<string, unknown>)[key] ?? "")])]} /> : null
+    body = project ? <Fields rows={[["Stage", sentence(project.stage)], ["Sector", project.sector], ...PROJECT_FIELDS.map(([key, label]): [string, string] => [label, String((project as unknown as Record<string, unknown>)[key] ?? "")])]} /> : null
   } else if (kind === "answer") {
     const answer = answers.data?.find((row) => row.id === target?.id)
     title = answer?.question ?? ""
@@ -71,7 +71,7 @@ function KitPreview({ target, onClose }: { target: Ref | null; onClose: () => vo
   } else if (kind === "document") {
     const doc = documents.data?.find((row) => row.id === target?.id)
     title = doc?.title ?? ""
-    subtitle = doc ? doc.kind.replace("_", " ") : ""
+    subtitle = doc ? sentence(doc.kind) : ""
     href = "/kit/documents"
     body = doc ? <Fields rows={[["File", doc.filename], ["Size", `${Math.max(1, Math.round(doc.size_bytes / 1024))} KB`], ["Default", doc.is_default ? "Yes" : "No"]]} /> : null
   }
@@ -82,7 +82,7 @@ function KitPreview({ target, onClose }: { target: Ref | null; onClose: () => vo
         <SheetContent side={phone ? "bottom" : "right"} className="gap-0 max-sm:h-[92dvh] sm:w-full sm:max-w-xl">
           <SheetHeader className="border-b border-separator p-5 pr-16">
             <SheetTitle className="wrap-anywhere">{title || (loading ? "Loading" : "Not found")}</SheetTitle>
-            <SheetDescription className="capitalize">{subtitle || (kind ? `Apply kit ${kind}` : "")}</SheetDescription>
+            <SheetDescription>{subtitle || (kind ? `Apply kit ${kind}` : "")}</SheetDescription>
           </SheetHeader>
           <div className="nice-scroll min-h-0 flex-1 overflow-y-auto p-5">
             {body ?? <p className="text-callout text-ink-secondary">{loading ? "Loading" : "This record may have been deleted."}</p>}
@@ -96,6 +96,8 @@ function KitPreview({ target, onClose }: { target: Ref | null; onClose: () => vo
     </Sheet>
   )
 }
+
+const sentence = (value: string) => value.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
 
 function CopyText({ text }: { text: string }) {
   const { copied, copy } = useCopy(() => text)

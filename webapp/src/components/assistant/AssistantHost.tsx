@@ -87,30 +87,36 @@ function EmbeddedChat() {
   return <AssistantChat key={user?.id} userId={user?.id ?? ""} chatId={chatId} onChatChange={setChatId} variant="embedded" actions={<WindowActions />} />
 }
 
-/** The sun, bottom right: one click opens the Assistant. */
+/** The sun, bottom right: click to open in the last layout, or pick a layout from the buttons beside it. */
 export function AssistantMascot() {
-  const { mode } = useDock()
+  const { mode, setMode } = useDock()
   const open = useOpenAssistant()
   const onPage = useOnAssistantPage()
   const { pathname } = useLocation()
   const t = useOpenTransition(mode === "closed" && !onPage, 150)
   if (!t.render) return null
+  const pick = "grid size-8 cursor-pointer place-items-center rounded-full border border-separator bg-surface text-ink-secondary shadow-elevation-2 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
   return (
-    <button
-      type="button"
-      aria-label="Ask the Assistant"
-      onClick={open}
+    <div
       className={cn(
-        "group fixed right-4 z-50 grid size-16 cursor-pointer place-items-center rounded-full transition-all duration-150 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus motion-reduce:transition-none",
+        "group fixed right-4 z-50 flex items-center gap-2 transition-all duration-150 motion-reduce:transition-none sm:right-5",
         pathname.startsWith("/scans") ? "bottom-28 sm:bottom-5" : "bottom-4 sm:bottom-5",
         t.shown ? "scale-100 opacity-100" : "scale-75 opacity-0",
       )}
     >
-      <SunMascot size={64} className="drop-shadow-md" />
-      <span className="pointer-events-none absolute right-full mr-2 hidden whitespace-nowrap rounded-md bg-ink px-2.5 py-1 text-caption text-canvas opacity-0 shadow-elevation-2 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:block">
-        Ask the Assistant
-      </span>
-    </button>
+      <div className="hidden items-center gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
+        <button type="button" aria-label="Open as a floating window" title="Floating window" onClick={() => setMode("dock")} className={pick}><PictureInPicture2 className="size-4" aria-hidden="true" /></button>
+        <button type="button" aria-label="Open as a side panel" title="Side panel" onClick={() => setMode("panel")} className={pick}><PanelRight className="size-4" aria-hidden="true" /></button>
+      </div>
+      <button
+        type="button"
+        aria-label="Ask the Assistant"
+        onClick={open}
+        className="grid size-16 cursor-pointer place-items-center rounded-full transition-transform duration-150 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      >
+        <SunMascot size={64} className="drop-shadow-md" />
+      </button>
+    </div>
   )
 }
 
