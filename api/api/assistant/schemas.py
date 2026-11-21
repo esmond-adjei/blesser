@@ -156,6 +156,8 @@ class MessageOut(APIModel):
     sources: list[Source]
     cited_deadlines: bool
     chips: list[ContextChip] = Field(default_factory=list)
+    # The reply stopped at a step or approval limit; one tap carries on.
+    can_continue: bool = False
     created_at: datetime
 
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 import {
-  ArrowDown, ArrowUp, Check, Copy, MessageCircle, MessagesSquare, Pencil, Plus, RotateCcw, Square, Trash2,
+  ArrowDown, ArrowUp, Check, Copy, MessageCircle, MessagesSquare, Pencil, Play, Plus, RotateCcw, Square, Trash2,
 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../ui/menu"
@@ -252,6 +252,8 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
     setHistoryOpen(false)
   }
 
+  const carryOn = () => void send("Continue")
+
   async function send(value: string) {
     const content = value.trim()
     if (!content || pending || active || thread.data?.running || submitLock.current) return
@@ -422,8 +424,9 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
           {visibleRows.map((message, index) => message.role === "user"
             ? <UserBubble key={message.id} content={message.content} chips={message.chips} />
             : <AssistantReply key={message.id} message={message} onOpenRecord={preview.open}
-                onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined} />)}
-          {visibleAnswer ? <AssistantReply message={visibleAnswer} onOpenRecord={preview.open} /> : null}
+                onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined}
+                onContinue={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending && !active ? carryOn : undefined} />)}
+          {visibleAnswer ? <AssistantReply message={visibleAnswer} onOpenRecord={preview.open} onContinue={!working && !pending && !active ? carryOn : undefined} /> : null}
           {active && !active.answer && !pending ? (
             <AssistantReply text={active.text} status={active.status} entries={active.trace} live onOpenRecord={preview.open} />
           ) : null}
@@ -645,10 +648,11 @@ function UserBubble({ content, chips }: { content: string; chips?: ContextChip[]
   )
 }
 
-function AssistantReply({ message, text, status, entries = [], live, onRetry, onOpenRecord, children }: {
+function AssistantReply({ message, text, status, entries = [], live, onRetry, onContinue, onOpenRecord, children }: {
   message?: AssistantMessage
   onOpenRecord: (source: AssistantSource) => void
   onRetry?: () => void
+  onContinue?: () => void
   text?: string
   status?: string
   entries?: TraceEntry[]
@@ -669,6 +673,9 @@ function AssistantReply({ message, text, status, entries = [], live, onRetry, on
         ) : null}
         {records.length ? <RecordCards sources={records} onOpen={onOpenRecord} /> : null}
         {children}
+        {message?.can_continue && onContinue ? (
+          <Button size="sm" variant="secondary" icon={<Play />} onClick={onContinue} className="self-start">Continue</Button>
+        ) : null}
         {content && !live ? (
           <div className="-ml-1.5 -mt-1 flex">
             <CopyButton text={content} label="Copy reply" />

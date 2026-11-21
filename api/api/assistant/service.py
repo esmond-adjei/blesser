@@ -165,7 +165,9 @@ async def _remember_private(chat_id, user_id, lease):
         await session.commit()
 
 
-async def _save_reply(chat_id, user_id, lease, reply, trace, sources, cited_deadlines):
+async def _save_reply(
+    chat_id, user_id, lease, reply, trace, sources, cited_deadlines, can_continue=False
+):
     async with SessionLocal() as session:
         chat = await conversations.held(session, chat_id, user_id, lease)
         message = await conversations.append(
@@ -176,6 +178,7 @@ async def _save_reply(chat_id, user_id, lease, reply, trace, sources, cited_dead
             trace=trace,
             sources=sources,
             cited_deadlines=cited_deadlines,
+            context={"can_continue": True} if can_continue else None,
         )
         await session.commit()
     return message
@@ -418,6 +421,7 @@ async def _run(chat_id, user_id, lease, turn):
         )
         if step > MAX_STEPS:
             offered = []
+        stopped = step > MAX_STEPS or not changes_allowed
         allowed = {definition["name"] for definition in offered}
         extra = turn.note + (
             ""
@@ -603,6 +607,7 @@ async def _run(chat_id, user_id, lease, turn):
         turn.trace,
         _final_sources(turn, sources),
         cited_deadlines,
+        can_continue=stopped,
     )
     async for event in _finish(message, draft.shown if reply_streamed else ""):
         yield event

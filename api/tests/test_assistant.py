@@ -217,6 +217,9 @@ def test_lookup_budget_reserves_a_final_answer_round(monkeypatch):
             events[-2]["message"]["content"]
             == "No published catalog matches were found. Your saved records may still be available."
         )
+        assert events[-2]["message"]["can_continue"] is True
+        stored = client.get(path).json()["messages"][-1]
+        assert stored["can_continue"] is True
 
 
 def test_catalog_turn_streams_and_persists_grounded_citations(monkeypatch):

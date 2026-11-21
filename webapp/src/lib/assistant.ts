@@ -108,6 +108,8 @@ export interface AssistantMessage {
   trace: TraceEntry[]
   sources: AssistantSource[]
   cited_deadlines: boolean
+  /** The reply stopped at a limit and can carry on. */
+  can_continue?: boolean
   created_at: string
 }
 
