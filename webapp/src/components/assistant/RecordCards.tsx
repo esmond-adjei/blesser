@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Award, Bookmark, Briefcase, FileText, FolderOpen, Globe, Link2, ListChecks, MessageSquareText, Radar, Settings2, UserRound } from "lucide-react"
 import { cn, formatDay } from "@blesser/ui"
+import { useQuery } from "@tanstack/react-query"
+import * as api from "../../lib/api"
 import type { AssistantSource } from "../../lib/assistant"
 
 const RECORD_ICONS: Record<AssistantSource["kind"], typeof Briefcase> = {
@@ -55,9 +57,28 @@ export function RecordCards({ sources, onOpen }: { sources: AssistantSource[]; o
   )
 }
 
+const SCAN_STATUS: Record<string, string> = {
+  running: "Running", pending: "Queued", done: "Finished", error: "Stopped early", cancelled: "Stopped",
+}
+
+/** A scan's status as it is now, since the card was written when the scan started. */
+function useScanDetail(source: AssistantSource) {
+  const live = useQuery({
+    queryKey: ["scan", source.id],
+    queryFn: () => api.getScan(source.id),
+    enabled: source.kind === "scan",
+    refetchInterval: ({ state: { data } }) => (data && data.status !== "running" ? false : 5000),
+  })
+  if (!live.data) return source.detail
+  const found = live.data.opportunities_found ?? live.data.opportunities_added
+  const status = SCAN_STATUS[live.data.status] ?? source.detail
+  return live.data.status === "running" || !found ? status : `${status}, ${found} found`
+}
+
 function RecordCard({ source, onOpen }: { source: AssistantSource; onOpen: (source: AssistantSource) => void }) {
   const Icon = RECORD_ICONS[source.kind]
-  const detail = recordDetail(source)
+  const scanDetail = useScanDetail(source)
+  const detail = source.kind === "scan" ? scanDetail : recordDetail(source)
   const body = (
     <>
       <span className={cn("grid size-10 shrink-0 place-items-center rounded-md", source.kind === "todo" ? "bg-sun-soft text-ink" : "bg-forest-soft/40 text-link")}>
