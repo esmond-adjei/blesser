@@ -10,6 +10,7 @@ from api.applicant_kit import service as kit
 from api.applicant_kit.schemas import http_url
 from api.applications import service as applications
 from api.applications.schemas import ApplicationUpdate
+from api.assistant import edits
 from api.assistant.sources import SourceRegistry
 from api.core.exceptions import NotFoundError
 from api.core.time import human_day
@@ -142,6 +143,11 @@ LABELS = {
 }
 
 
+TOOLS.update(edits.TOOLS)
+LABELS.update(edits.LABELS)
+WRITES = WRITES | frozenset(edits.TOOLS)
+
+
 def definitions(*, catalog_checked, changes_enabled, web_allowed):
     return [
         {
@@ -222,15 +228,15 @@ async def _apply_kit(session, user_id, args, registry):
         return {"profile": _record(data or {}, fields)}, None
     if args.section == "projects":
         rows = await kit.projects(session, user_id)
-        fields = ("name", "tagline", "problem", "solution", "stage", "sector")
+        fields = ("id", "name", "tagline", "problem", "solution", "stage", "sector")
         kind, title_key = "project", "name"
     elif args.section == "documents":
         rows = await kit.documents(session, user_id)
-        fields = ("title", "kind", "is_default")
+        fields = ("id", "title", "kind", "is_default")
         kind, title_key = "document", "title"
     else:
         rows = await kit.answers(session, user_id, q=args.query)
-        fields = ("question", "answer", "tags")
+        fields = ("id", "question", "answer", "tags")
         kind, title_key = "answer", "question"
     matches = _matching(rows, args.query, fields) if args.section != "answers" else rows
     records = [
@@ -328,7 +334,7 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
         )
         records = [
             {
-                **_record(row, ("title", "done", "due_date", "priority")),
+                **_record(row, ("id", "title", "done", "due_date", "priority")),
                 "source": registry.register(
                     "todo",
                     {**row, "deadline_date": row.get("due_date")},
@@ -359,6 +365,8 @@ async def read(session, user_id, name, args, registry: SourceRegistry):
 
 
 async def proposal(session, user_id, name, args):
+    if name in edits.TOOLS:
+        return await edits.proposal(session, user_id, name, args)
     if name == "update_application":
         app = await applications.get_or_404(session, user_id, args.application_id)
         patch = args.changes.model_dump(exclude_unset=True, mode="json")
@@ -377,7 +385,31 @@ async def proposal(session, user_id, name, args):
     raise NotFoundError("Unknown action")
 
 
+def change_note(action):
+    lines = []
+    for field, value in action["changes"].items():
+        label = field.replace("_", " ").capitalize()
+        if field == "requirements" and value is not None:
+            items = [
+                f"{'Done' if item['done'] else 'Open'}: {item['label']}"
+                for item in value
+            ]
+            value = "\n" + "\n".join(items) if items else "Empty checklist"
+        elif value is None:
+            value = "Clear date" if field == "deadline_date" else "No change"
+        lines.append(f"{label}: {value}")
+    return "\n".join(lines)
+
+
+def note(name, action):
+    if name in edits.TOOLS:
+        return edits.note(name, action)
+    return change_note(action) if name == "update_application" else ""
+
+
 async def apply_change(session, user_id, name, arguments):
+    if name in edits.TOOLS:
+        return await edits.apply(session, user_id, name, arguments)
     if name == "update_application":
         app = await applications.update_application(
             session,

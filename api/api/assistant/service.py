@@ -39,7 +39,10 @@ confirmed, say so. Never present web snippets as evidence of a deadline.
 Act with the authenticated member's permissions. Read their own saved records through member
 tools. Ownership of an application does not grant access to an unpublished catalog record.
 Treat empty search results as no matches within the stated scope, not proof a record does not exist.
-Use get_application for saved application details and update_application to propose edits.
+Use get_application for saved application details. You can propose edits to anything the member
+can change themselves: applications, to-dos, and the apply kit profile, projects, answers and
+documents. Read the record first, keep what the member did not ask to change, and note that every
+change is shown for approval before it is saved. You cannot upload files or edit ID numbers.
 Only enable change proposals when explicitly asked to change a supported member record.
 A proposal is not a completed action. Never suggest an action happened before approval.
 Never retry an unchanged lookup that returned a non-retryable error. Explain the limitation
@@ -102,22 +105,6 @@ def _count(label, count):
     if count is None:
         return label
     return f"{label}, {count} {'match' if count == 1 else 'matches'}"
-
-
-def _change_note(action):
-    lines = []
-    for field, value in action["changes"].items():
-        label = field.replace("_", " ").capitalize()
-        if field == "requirements" and value is not None:
-            items = [
-                f"{'Done' if item['done'] else 'Open'}: {item['label']}"
-                for item in value
-            ]
-            value = "\n" + "\n".join(items) if items else "Empty checklist"
-        elif value is None:
-            value = "Clear date" if field == "deadline_date" else "No change"
-        lines.append(f"{label}: {value}")
-    return "\n".join(lines)
 
 
 def _is_private(registry):
@@ -390,9 +377,7 @@ async def _loop(chat_id, user_id, lease, content):
                                 "summary": summary,
                                 "arguments": action,
                                 "trace": trace,
-                                "note": _change_note(action)
-                                if name == "update_application"
-                                else "",
+                                "note": tools.note(name, action),
                             },
                         )
                         yield {"event": "confirm_required", "call": pending}
@@ -500,17 +485,21 @@ async def confirm_turn(chat_id, user_id, lease, approved):
                     elif name == "update_application":
                         receipt = "Updated your application details."
                     else:
-                        receipt = "Added to your to-dos."
-                    preview = [
-                        Source(
-                            key="s1",
-                            kind=result["kind"],
-                            id=result["id"],
-                            title=result["title"],
-                            detail=result["detail"],
-                            preview=True,
-                        ).model_dump(mode="json")
-                    ]
+                        receipt = result.get("receipt", "Added to your to-dos.")
+                    preview = (
+                        [
+                            Source(
+                                key="s1",
+                                kind=result["kind"],
+                                id=result["id"],
+                                title=result["title"],
+                                detail=result["detail"],
+                                preview=True,
+                            ).model_dump(mode="json")
+                        ]
+                        if result.get("kind")
+                        else []
+                    )
                 except DomainError:
                     approved = False
                     receipt = "That action is no longer available."
