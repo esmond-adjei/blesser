@@ -401,7 +401,8 @@ async def _wait(event: asyncio.Event, timeout: float) -> None:
 
 
 async def hourly_jobs(session) -> None:
-    """Deadline reminders, match alerts, email digests, trace pruning and the scheduled sweep."""
+    """Deadline reminders, match alerts, email digests, trace pruning, the scheduled sweep,
+    member source checks and the official-link backfill."""
     from api.notifications.deadlines import check_deadlines, send_digests
     from api.opportunities.sweep import maybe_sweep
     from api.scans.service import prune_traces
@@ -424,6 +425,10 @@ async def hourly_jobs(session) -> None:
 
     if checks := await check_due_sources(session):
         print(f"[worker] started {checks} member source check(s)", flush=True)
+    from api.opportunities.official_backfill import scheduled_pass
+
+    if moved := await scheduled_pass(session):
+        print(f"[worker] official links: {moved}", flush=True)
 
 
 async def main_loop(concurrency: int = 1, poll_seconds: float = 2.0) -> None:

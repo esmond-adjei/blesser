@@ -31,7 +31,13 @@ async def duplicate_url(session, url: str) -> bool:
     return (
         await session.execute(
             select(Opportunity.id)
-            .where(or_(Opportunity.source_url_key == key, Opportunity.link_key == key))
+            .where(
+                or_(
+                    Opportunity.source_url_key == key,
+                    Opportunity.link_key == key,
+                    Opportunity.found_via_url == key,
+                )
+            )
             .limit(1)
         )
     ).first() is not None

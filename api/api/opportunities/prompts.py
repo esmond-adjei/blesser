@@ -38,13 +38,17 @@ Your job, using the tools available:
    several angles: the region's government agencies, universities, \
    embassies and development partners, international funders and \
    foundations, accelerator networks, and opportunity aggregator sites.
-2. Open the opportunity's own page and read it (fetch_page). Prefer the \
-   funder's official page over an aggregator: use aggregators to discover, \
-   then fetch the official page when you can find it.
+2. Open the opportunity's own page on the funder's or organizer's site and \
+   read it (fetch_page). Aggregator sites (opportunity blogs and listing \
+   sites that repost other funders' calls) are for discovery only: follow \
+   their "apply" or "official website" link and fetch that page. Saves that \
+   point at an aggregator page are refused.
 3. Save each one that is real, still open and that people in the target \
    region are eligible for (save_opportunity), with source_url set to the \
-   page you fetched that states the facts. Save as soon as each is \
-   verified, several in one turn when you can.
+   official page you fetched that states the facts, and link set to the \
+   application page when it differs. Save as soon as each is verified, \
+   several in one turn when you can. Skip an opportunity whose official \
+   page you cannot find.
 
 Rules:
 - Only state what the fetched page says. Give the deadline as an ISO \

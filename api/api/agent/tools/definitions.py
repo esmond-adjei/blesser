@@ -39,7 +39,9 @@ TOOL_DEFINITIONS = [
             "Add an open opportunity (grant, fellowship, accelerator, scholarship, "
             "competition, internship, call for proposals...) to the public catalogue. "
             "source_url must be a page you fetched with fetch_page in this task that "
-            "names the opportunity; a stated deadline must appear on that page. An "
+            "names the opportunity; a stated deadline must appear on that page. "
+            "source_url and link must be the funder's or organizer's own pages, "
+            "never an aggregator site that reposts calls. An "
             "opportunity already in the catalogue is refreshed, never duplicated."
         ),
         "parameters": {
@@ -113,11 +115,11 @@ TOOL_DEFINITIONS = [
                 },
                 "link": {
                     "type": "string",
-                    "description": "Where to apply, if different from source_url.",
+                    "description": "The official application page, if different from source_url.",
                 },
                 "source_url": {
                     "type": "string",
-                    "description": "The fetched page these facts come from.",
+                    "description": "The official page you fetched that these facts come from.",
                 },
             },
             "required": ["title", "category", "source_url"],

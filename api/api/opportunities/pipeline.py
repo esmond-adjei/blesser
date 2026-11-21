@@ -16,6 +16,12 @@ from api.opportunities.crawl_models import CrawlCandidate, Source
 from api.opportunities.crawler import crawl_due, record_candidate
 from api.opportunities.dedupe import key_for
 from api.opportunities.extraction import extract_page
+from api.opportunities.official import (
+    aggregator_hosts,
+    host_of,
+    is_aggregator,
+    resolve_official,
+)
 from api.opportunities.page_cache import get_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
 from api.opportunities.triage import is_listing, triage_page, triage_url
@@ -85,6 +91,45 @@ async def claim_candidate(session, category: str, region: str):
     return row
 
 
+async def follow_aggregator(ctx, page, data, hosts, metrics: dict):
+    """Swap an aggregator post for the official page it links to, when one checks out.
+
+    Returns the data to save and the extra save arguments: where it was found, and a
+    hold for review when no official page was found."""
+    resolution = await resolve_official(
+        page,
+        title=data.title,
+        organization=data.organization,
+        deadline=data.deadline,
+        preferred_link=data.link,
+        hosts=hosts,
+        fetch=get_page,
+    )
+    if resolution.page is None:
+        metrics["official_missing"] = metrics.get("official_missing", 0) + 1
+        return data, {
+            "found_via": page.url,
+            "review_reason": "no_official_link",
+            "review_note": (
+                f"Found on {host_of(page.url)}, an aggregator, and no official page "
+                "could be confirmed from it. Add the official link before publishing."
+            ),
+        }
+    metrics["official_found"] = metrics.get("official_found", 0) + 1
+    official = resolution.url
+    record_fetch(ctx, official, resolution.page.text)
+    link = data.link
+    if not link or is_aggregator(link, hosts) or host_of(link) != host_of(official):
+        link = official
+    changes = {"source_url": official, "link": link}
+    if resolution.deadline_changed:
+        changes["deadline"] = resolution.deadline or ""
+    if resolution.deadline_unclear:
+        # The official page does not settle the date: an editor decides.
+        ctx.extraction_confidence = 0
+    return data.model_copy(update=changes), {"found_via": page.url}
+
+
 async def run_pipeline(session, task, scan, category: str, on_event=None) -> dict:
     started = time.monotonic()
     metrics = dict(task.metrics or {})
@@ -99,6 +144,7 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     ctx.save_via = "crawler"
     ctx.opportunities_saved = metrics.get("crawler_saved", 0)
     limit = (await get_settings(session))["crawler"]["max_candidates_per_task"]
+    hosts = await aggregator_hosts(session)
     attempts = 0
     for _ in range(limit * 10):
         if (
@@ -122,7 +168,11 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
         page = None
         if reason is None:
             await session.commit()
-            page = await get_page(candidate.url)
+            page = (
+                await get_page(candidate.url, need="outbound")
+                if is_aggregator(candidate.url, hosts)
+                else await get_page(candidate.url)
+            )
             metrics["cache_hits"] = metrics.get("cache_hits", 0) + int(page.cached)
             if not await lock_claim(session, candidate, token):
                 continue
@@ -209,8 +259,15 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                     else:
                         record_fetch(ctx, page.url, page.text)
                         ctx.extraction_confidence = result.confidence
+                        follow = {}
+                        if is_aggregator(page.url, hosts):
+                            data, follow = await follow_aggregator(
+                                ctx, page, data, hosts, metrics
+                            )
+                            if not await lock_claim(session, candidate, token):
+                                continue
                         saved = await handle_save_opportunity(
-                            data.model_dump(mode="json"), ctx, commit=False
+                            data.model_dump(mode="json"), ctx, commit=False, **follow
                         )
                         if "error" in saved:
                             candidate.status, candidate.reason = (

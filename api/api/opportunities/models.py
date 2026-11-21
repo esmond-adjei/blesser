@@ -84,7 +84,7 @@ class Opportunity(Base):
             "audience IN ('public','members')", name="ck_opportunity_audience"
         ),
         CheckConstraint(
-            "review_reason IS NULL OR review_reason IN ('new_submission','agent_find','reported','source_changed')",
+            "review_reason IS NULL OR review_reason IN ('new_submission','agent_find','reported','source_changed','no_official_link')",
             name="ck_opportunity_review_reason",
         ),
         Index(
@@ -132,6 +132,15 @@ class Opportunity(Base):
     # normalized_url() of link and source_url, kept in step by the hooks below.
     link_key: Mapped[str] = mapped_column(String, default="", index=True)
     source_url_key: Mapped[str] = mapped_column(String, default="", index=True)
+    # The aggregator post (normalized) this listing was first found on, for staff only;
+    # members get the official page in link and source_url (official.py).
+    found_via_url: Mapped[str] = mapped_column(
+        String, default="", server_default="", index=True
+    )
+    # When the aggregator backfill last tried to find this listing's official page.
+    official_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     status: Mapped[str] = mapped_column(
         String, default=OpportunityStatus.published.value, index=True
     )
