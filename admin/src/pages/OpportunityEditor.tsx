@@ -193,7 +193,7 @@ function EditorForm({
   ][];
   return (
     <Panel
-      title={item ? "Edit opportunity" : "Create opportunity"}
+      title={item ? "Edit opportunity" : "Add opportunity"}
       onClose={requestClose}
       wide
     >
@@ -363,7 +363,7 @@ function EditorForm({
                   ? "Saving…"
                   : item
                     ? "Save opportunity"
-                    : "Create opportunity"}
+                    : "Add opportunity"}
               </Button>
               <Button onClick={requestClose} disabled={busy}>
                 Cancel

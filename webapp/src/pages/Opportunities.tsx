@@ -79,6 +79,7 @@ import { ShareDialog } from "../components/share/ShareDialog"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
 import { ScanDialog } from "./Scans"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
+import discoverArt from "../assets/illustrations/discover.webp"
 import { useIsMobile } from "../hooks/use-mobile"
 
 const SORTS: { value: OpportunitySort; label: string }[] = [
@@ -191,7 +192,7 @@ export function Opportunities() {
         description="Grants, accelerators, fellowships and scholarships open to people in Ghana, checked against each opportunity's own page."
         actions={
           <>
-            <Button size="sm" variant="quiet" onClick={() => setSubmitOpen(true)} icon={<Plus />}>
+            <Button size="sm" variant="brand" onClick={() => setSubmitOpen(true)} icon={<Plus />}>
               Share one
             </Button>
             <Button size="sm" variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
@@ -869,7 +870,7 @@ function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }))
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" onClose={() => onOpenChange(false)}>
+      <DialogContent className="max-w-2xl" onClose={() => onOpenChange(false)}>
         <form
           className="flex min-h-0 flex-auto flex-col"
           onSubmit={async (e) => {
@@ -887,8 +888,13 @@ function SubmitDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
           }}
         >
           <DialogHeader>
-            <DialogTitle>Share an opportunity</DialogTitle>
-            <DialogDescription>Help others find it. Shared opportunities are reviewed before they go public.</DialogDescription>
+            <div className="flex items-center gap-2 md:gap-4">
+              <img src={discoverArt} alt="" width={500} height={500} className="bl-pop h-10 w-auto sm:h-20" />
+              <div>
+                <DialogTitle className="text-title-2">Share an opportunity</DialogTitle>
+                <DialogDescription>Help others find it. Shared opportunities are reviewed before they go public.</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
           <DialogBody className="grid gap-3 sm:grid-cols-2">
             <Field label="Name" className="sm:col-span-2">

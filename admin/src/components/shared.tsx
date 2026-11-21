@@ -254,6 +254,8 @@ export function Pagination({
   count: number;
   onChange: (offset: number) => void;
 }) {
+  if (total === undefined && count < limit || total === 0) return null;
+
   return (
     <footer className="pagination">
       <span>

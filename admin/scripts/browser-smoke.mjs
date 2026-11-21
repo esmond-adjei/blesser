@@ -513,7 +513,7 @@ try {
   await click("Cancel");
   await click("Clear selection");
   pass("Opportunity table and bulk hide confirmation");
-  await click("Create opportunity");
+  await click("Add opportunity");
   await until("document.querySelector('dialog input')", "new opportunity form");
   for (const [label, value] of [
     ["Title", "New staff opportunity"],
@@ -523,7 +523,7 @@ try {
     ["Source link", "https://example.test/source"],
   ])
     await fill(label, value);
-  await click("Create opportunity", "document.querySelector('dialog')");
+  await click("Add opportunity", "document.querySelector('dialog')");
   await until(
     "document.querySelector('dialog .detail-heading h2')?.textContent === 'New staff opportunity'",
     "opportunity created",

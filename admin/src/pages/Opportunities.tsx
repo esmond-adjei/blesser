@@ -210,7 +210,7 @@ export default function Opportunities({
             icon={<Plus />}
             onClick={() => open("new", true)}
           >
-            Create opportunity
+            Add opportunity
           </Button>
         }
       />
