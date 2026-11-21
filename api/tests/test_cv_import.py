@@ -34,8 +34,10 @@ def pdf_with_text(lines: list[str]) -> bytes:
     objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-        "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+            "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
         f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
     ]
@@ -345,7 +347,9 @@ def test_child_reads_docx_tables_and_tabs(tmp_path):
             "wordprocessingml.document.main+xml",
             {
                 "word/document.xml": f'<w:document xmlns:w="{W}"><w:body>'
-                + "".join(f"<w:p><w:r><w:t>{line}</w:t></w:r></w:p>" for line in CV_LINES)
+                + "".join(
+                    f"<w:p><w:r><w:t>{line}</w:t></w:r></w:p>" for line in CV_LINES
+                )
                 + body
                 + "</w:body></w:document>"
             },
