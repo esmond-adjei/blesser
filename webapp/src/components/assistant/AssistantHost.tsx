@@ -99,12 +99,12 @@ export function AssistantMascot() {
   return (
     <div
       className={cn(
-        "group fixed right-4 z-50 flex items-center gap-2 transition-all duration-150 motion-reduce:transition-none sm:right-5",
+        "group fixed right-4 z-50 transition-all duration-150 motion-reduce:transition-none sm:right-5",
         pathname.startsWith("/scans") ? "bottom-28 sm:bottom-5" : "bottom-4 sm:bottom-5",
         t.shown ? "scale-100 opacity-100" : "scale-75 opacity-0",
       )}
     >
-      <div className="hidden items-center gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
+      <div className="absolute right-0 bottom-full hidden items-center gap-1.5 pb-2 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
         <button type="button" aria-label="Open as a floating window" title="Floating window" onClick={() => setMode("dock")} className={pick}><PictureInPicture2 className="size-4" aria-hidden="true" /></button>
         <button type="button" aria-label="Open as a side panel" title="Side panel" onClick={() => setMode("panel")} className={pick}><PanelRight className="size-4" aria-hidden="true" /></button>
       </div>
@@ -112,7 +112,7 @@ export function AssistantMascot() {
         type="button"
         aria-label="Ask the Assistant"
         onClick={open}
-        className="grid size-16 cursor-pointer place-items-center rounded-full transition-transform duration-150 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="grid h-8 w-16 cursor-pointer place-items-end rounded-t-full transition-transform duration-150 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         <SunMascot size={64} className="drop-shadow-md" />
       </button>

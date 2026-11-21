@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react"
 import { cn } from "@blesser/ui"
 
-const RAYS = Array.from({ length: 8 }, (_, i) => i * 45)
-
-/** The Assistant's face: a sun whose eyes follow the pointer. */
+/** The logo's half sun with a face; its eyes follow the pointer. */
 export function SunMascot({ size = 64, className }: { size?: number; className?: string }) {
   const eyes = useRef<SVGGElement>(null)
   const root = useRef<SVGSVGElement>(null)
@@ -18,7 +16,7 @@ export function SunMascot({ size = 64, className }: { size?: number; className?:
         const dx = event.clientX - (box.left + box.width / 2)
         const dy = event.clientY - (box.top + box.height / 2)
         const distance = Math.hypot(dx, dy) || 1
-        const reach = Math.min(2.6, distance / 90)
+        const reach = Math.min(2.4, distance / 90)
         eyes.current.style.transform = `translate(${(dx / distance) * reach}px, ${(dy / distance) * reach}px)`
       })
     }
@@ -29,18 +27,13 @@ export function SunMascot({ size = 64, className }: { size?: number; className?:
     }
   }, [])
   return (
-    <svg ref={root} viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" className={cn("overflow-visible", className)}>
-      <g className="origin-center motion-safe:animate-[spin_40s_linear_infinite]" style={{ transformOrigin: "32px 32px" }}>
-        {RAYS.map((angle) => (
-          <rect key={angle} x="30" y="2" width="4" height="9" rx="2" className="fill-sun" transform={`rotate(${angle} 32 32)`} />
-        ))}
-      </g>
-      <circle cx="32" cy="32" r="19" className="fill-sun" />
+    <svg ref={root} viewBox="0 0 64 32" width={size} height={size / 2} aria-hidden="true" className={cn("overflow-visible", className)}>
+      <path d="M2 32a30 30 0 0 1 60 0Z" className="fill-sun" />
       <g ref={eyes} className="transition-transform duration-100 ease-out">
-        <ellipse cx="25.5" cy="30" rx="2.4" ry="3.2" className="fill-on-sun" />
-        <ellipse cx="38.5" cy="30" rx="2.4" ry="3.2" className="fill-on-sun" />
+        <ellipse cx="23" cy="21" rx="2.3" ry="3.1" className="fill-on-sun" />
+        <ellipse cx="41" cy="21" rx="2.3" ry="3.1" className="fill-on-sun" />
       </g>
-      <path d="M26 38.5c2.2 2.6 9.8 2.6 12 0" fill="none" strokeWidth="2.2" strokeLinecap="round" className="stroke-on-sun" />
+      <path d="M27 27c2.2 2.4 7.8 2.4 10 0" fill="none" strokeWidth="2.1" strokeLinecap="round" className="stroke-on-sun" />
     </svg>
   )
 }
