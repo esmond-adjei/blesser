@@ -392,7 +392,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
     <div className="flex min-h-0 min-w-0 flex-1">
     <div className="@container/chat relative flex min-h-0 min-w-0 flex-1 flex-col">
       {embedded ? (
-        <header className="flex h-12 shrink-0 items-center gap-1 border-b border-separator px-3">
+        <header className="flex h-14 shrink-0 items-center gap-1 border-b border-separator px-3">
           <h2 className="min-w-0 flex-1 truncate text-callout font-semibold text-ink">{title}</h2>
           {chatButtons}
           {actions}
@@ -456,7 +456,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
 
       {embedded ? (
         historyOpen ? (
-          <div className="bl-appear absolute inset-x-0 top-12 bottom-0 z-10 flex flex-col gap-3 bg-surface p-3">
+          <div className="bl-appear absolute inset-x-0 top-14 bottom-0 z-10 flex flex-col gap-3 bg-surface p-3">
             <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
             {list}
           </div>
