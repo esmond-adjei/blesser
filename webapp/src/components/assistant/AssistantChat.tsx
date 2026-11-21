@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import {
   CHAT_PAGE, assistantHref, createChat, deleteChat, getChat, isToolStep, listChats, renameChat,
   stopTurn, streamTurn,
-  type AssistantChat as ChatRow, type AssistantEvent, type AssistantMessage, type AssistantSource, type AssistantThread, type PendingCall, type TraceEntry,
+  type AssistantChat as ChatRow, type AssistantEvent, type AssistantMessage, type AssistantSource, type AssistantThread, type ContextChip, type PendingCall, type TraceEntry,
   type TurnRequest,
 } from "../../lib/assistant"
 import { ApiError, apiMessage } from "../../lib/api"
@@ -21,6 +21,8 @@ import guideArt from "../../assets/illustrations/guide.webp"
 import { ChatSkeleton } from "./ChatSkeleton"
 import { AgentSteps } from "./AgentSteps"
 import { Markdown } from "./Markdown"
+import { ContextChips } from "./ContextChips"
+import { usePageContext } from "./pageContextState"
 import { RecordCards } from "./RecordCards"
 import { useRecordPreview } from "./useRecordPreview"
 
@@ -151,6 +153,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
 }) {
   const cache = useQueryClient()
   const preview = useRecordPreview()
+  const pageContext = usePageContext()
   const embedded = variant === "embedded"
   const thread = useQuery({
     queryKey: chatKey(userId, chatId),
@@ -243,7 +246,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
         selectChat(id)
       }
       setDraft("")
-      await start(id, { type: "chat", content })
+      await start(id, { type: "chat", content, context: pageContext.take() })
     } catch (err) {
       setProblem(apiMessage(err))
       setDraft(content)
@@ -331,6 +334,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
             {replyError && !working ? <button type="button" onClick={retry} className="cursor-pointer font-semibold text-link hover:underline">Try again</button> : null}
           </p>
         ) : null}
+        <ContextChips />
         <div className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2.5 pr-2.5 pl-4 shadow-elevation-1 transition-[border-color,box-shadow] duration-150">
           <textarea
             aria-label="Ask the Assistant"
@@ -388,7 +392,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
           ) : null}
 
           {visibleRows.map((message, index) => message.role === "user"
-            ? <UserBubble key={message.id} content={message.content} />
+            ? <UserBubble key={message.id} content={message.content} chips={message.chips} />
             : <AssistantReply key={message.id} message={message} onOpenRecord={preview.open}
                 onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined} />)}
           {visibleAnswer ? <AssistantReply message={visibleAnswer} onOpenRecord={preview.open} /> : null}
@@ -561,12 +565,17 @@ function Morph({ className, children }: { className?: string; children: React.Re
   )
 }
 
-function UserBubble({ content }: { content: string }) {
+function UserBubble({ content, chips }: { content: string; chips?: ContextChip[] }) {
   return (
     <div className="group/turn bl-enter flex flex-col items-end gap-1">
       <p className="max-w-[85%] rounded-[20px_20px_6px_20px] bg-surface-sunk px-4 py-2.5 text-body whitespace-pre-wrap text-ink wrap-anywhere sm:max-w-[70%]">
         <span className="sr-only">You said </span>{content}
       </p>
+      {chips?.length ? (
+        <p className="max-w-[85%] truncate text-caption text-ink-tertiary sm:max-w-[70%]">
+          <span className="sr-only">With context: </span>{chips.map((chip) => chip.detail ?? chip.label).join(", ")}
+        </p>
+      ) : null}
       <div className={TURN_ACTIONS}><CopyButton text={content} label="Copy message" /></div>
     </div>
   )

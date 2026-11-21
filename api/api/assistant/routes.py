@@ -126,7 +126,7 @@ async def chat(
         live.start(
             chat_id,
             current.id,
-            service.chat_turn(chat_id, current.id, lease, req.content),
+            service.chat_turn(chat_id, current.id, lease, req.content, req.context),
         )
     )
 

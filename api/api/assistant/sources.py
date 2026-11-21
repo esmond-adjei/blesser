@@ -73,7 +73,9 @@ class SourceRegistry:
     def render_line(self, paragraph, used=None):
         """(grounded line or None when dropped, whether it cited a deadline)."""
         used = {} if used is None else used
-        paragraph = re.sub(r"\brejected\b", "Not this time", paragraph, flags=re.IGNORECASE)
+        paragraph = re.sub(
+            r"\brejected\b", "Not this time", paragraph, flags=re.IGNORECASE
+        )
         paragraph = re.sub(r"[ \t]*[—·][ \t]*", ", ", paragraph)
         cited_deadlines = False
 

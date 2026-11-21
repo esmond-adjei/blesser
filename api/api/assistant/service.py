@@ -10,8 +10,8 @@ from api import web
 from api.agent.llm.base import ROOMY_MAX_TOKENS
 from api.agent.llm.factory import SUPPORTED_PROVIDERS, get_provider
 from api.agent.llm.slots import model_slot
-from api.assistant import conversations, tools
-from api.assistant.schemas import PendingCall, Source
+from api.assistant import conversations, page_context, tools
+from api.assistant.schemas import PendingCall, Source, UiContext
 from api.assistant.sources import SourceRegistry
 from api.core.config import settings
 from api.core.db import SessionLocal
@@ -39,6 +39,7 @@ confirmed, say so. Never present web snippets as evidence of a deadline.
 Act with the authenticated member's permissions. Read their own saved records through member
 tools. Ownership of an application does not grant access to an unpublished catalog record.
 Treat empty search results as no matches within the stated scope, not proof a record does not exist.
+A [Page context] note says which records the member has open. Use it to resolve "this" or "here".
 Use get_application for saved application details. You can propose edits to anything the member
 can change themselves: applications, to-dos, and the apply kit profile, projects, answers and
 documents. Read the record first, keep what the member did not ask to change, and note that every
@@ -129,13 +130,19 @@ def _model_history(previous):
     return history
 
 
-async def _begin(chat_id, user_id, lease, content):
+async def _begin(chat_id, user_id, lease, content, context):
     async with SessionLocal() as session:
         chat = await conversations.held(session, chat_id, user_id, lease)
         previous = await conversations.messages(session, chat_id, limit=16)
         if not previous and chat.title == conversations.NEW_TITLE:
             chat.title = " ".join(content.split())[:80]
-        message = await conversations.append(session, chat, "user", content)
+        message = await conversations.append(
+            session,
+            chat,
+            "user",
+            content,
+            context=context.model_dump(mode="json") if context else None,
+        )
         private_context = chat.private_context
         await session.commit()
     return message, _model_history(previous), private_context
@@ -173,7 +180,7 @@ async def _save_reply(chat_id, user_id, lease, reply, trace, sources, cited_dead
     return message
 
 
-async def _model_stream(provider, history, definitions, max_tokens):
+async def _model_stream(provider, history, definitions, max_tokens, note=""):
     call_deadline = settings.llm_call_deadline_seconds
     names = {definition["name"] for definition in definitions}
     boundaries = (
@@ -193,6 +200,7 @@ async def _model_stream(provider, history, definitions, max_tokens):
                 messages=history,
                 system=SYSTEM
                 + boundaries
+                + note
                 + f"\nToday's catalog date is {today():%Y-%m-%d}.",
                 tools=definitions,
                 max_tokens=max_tokens,
@@ -252,21 +260,29 @@ async def _finish(message, streamed=""):
 async def _rewind(chat_id, user_id, lease):
     async with SessionLocal() as session:
         chat = await conversations.held(session, chat_id, user_id, lease)
-        message, previous = await conversations.rewind(session, chat_id)
+        message, previous, stored = await conversations.rewind(session, chat_id)
         private_context = chat.private_context
         await session.commit()
-    return message, _model_history(previous), private_context
+    return message, _model_history(previous), private_context, stored
 
 
-async def _loop(chat_id, user_id, lease, content):
+async def _loop(chat_id, user_id, lease, content, context=None):
     provider = get_provider()
     if content is None:
-        user_message, history, private_context = await _rewind(chat_id, user_id, lease)
+        user_message, history, private_context, stored = await _rewind(
+            chat_id, user_id, lease
+        )
         content = user_message.content
+        context = UiContext.model_validate(stored) if stored else None
     else:
         user_message, history, private_context = await _begin(
-            chat_id, user_id, lease, content
+            chat_id, user_id, lease, content, context
         )
+    async with SessionLocal() as session:
+        note, private_note = await page_context.describe(session, user_id, context)
+    if private_note and not private_context:
+        private_context = True
+        await _remember_private(chat_id, user_id, lease)
     history.append({"role": "user", "content": content})
     history_has_contact = any(
         _CONTACT.search(item["content"]) for item in history if item["role"] == "user"
@@ -302,7 +318,9 @@ async def _loop(chat_id, user_id, lease, content):
         draft = _Draft(registry)
         response = None
         for limit in (settings.llm_max_tokens, ROOMY_MAX_TOKENS):
-            async for kind, value in _model_stream(provider, history, offered, limit):
+            async for kind, value in _model_stream(
+                provider, history, offered, limit, note
+            ):
                 if kind == "done":
                     response = value
                 elif piece := draft.feed(value):
@@ -450,12 +468,12 @@ async def _loop(chat_id, user_id, lease, content):
         yield event
 
 
-async def chat_turn(chat_id, user_id, lease, content):
+async def chat_turn(chat_id, user_id, lease, content, context=None):
     """A new question, or None to answer the last one again."""
     try:
         async with (
             asyncio.timeout(TURN_TIMEOUT),
-            aclosing(_loop(chat_id, user_id, lease, content)) as events,
+            aclosing(_loop(chat_id, user_id, lease, content, context)) as events,
         ):
             async for event in events:
                 yield event

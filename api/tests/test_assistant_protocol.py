@@ -134,7 +134,7 @@ async def _test_streamed_turn_replays_tool_calls_and_publishes_grounded_answer(
             created_at=utcnow_naive(),
         )
 
-    async def begin(chat_id, user_id, lease, content):
+    async def begin(chat_id, user_id, lease, content, context=None):
         return message("user", content), [], False
 
     async def read(user_id, name, args, registry):
@@ -258,7 +258,7 @@ async def _test_reply_streams_line_by_line_and_retracts_text_before_a_tool_call(
                 yield "text", piece
             yield "done", LLMResponse(text="First line.\nSecond line.")
 
-    async def begin(chat_id, user_id, lease, content):
+    async def begin(chat_id, user_id, lease, content, context=None):
         return _message("user", content), [], False
 
     async def save(chat_id, user_id, lease, content, *rest):

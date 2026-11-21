@@ -9,6 +9,8 @@ import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { ChatSkeleton } from "../assistant/ChatSkeleton"
 import { AssistantDock, AssistantDockProvider, AssistantMascot, AssistantPanel } from "../assistant/AssistantHost"
+import { PageContextProvider } from "../assistant/PageContextProvider"
+import { SelectionPrompt } from "../assistant/SelectionPrompt"
 import { AccountMenu } from "./AccountMenu"
 import { ShellHeaderContext, type ShellHeader } from "./shellHeader"
 import { NAV_GROUPS } from "./nav"
@@ -45,6 +47,7 @@ export function Shell() {
   const [pageHeader, setPageHeader] = React.useState<ShellHeader | null>(null)
   return (
     <AssistantDockProvider>
+    <PageContextProvider>
     <SidebarProvider defaultOpen={document.cookie.split("; ").find((entry) => entry.startsWith("sidebar_state=")) !== "sidebar_state=false"} className="h-dvh min-h-0 bg-canvas">
       <AppSidebar />
       <SidebarInset className="min-h-0 min-w-0 bg-canvas">
@@ -81,6 +84,8 @@ export function Shell() {
     </SidebarProvider>
     <AssistantMascot />
     <AssistantDock />
+    <SelectionPrompt />
+    </PageContextProvider>
     </AssistantDockProvider>
   )
 }

@@ -58,7 +58,15 @@ async def messages(session, chat_id, *, limit=None, before=None):
 
 
 async def append(
-    session, chat, role, content, *, trace=None, sources=None, cited_deadlines=False
+    session,
+    chat,
+    role,
+    content,
+    *,
+    trace=None,
+    sources=None,
+    cited_deadlines=False,
+    context=None,
 ):
     last = await session.scalar(
         select(func.max(AssistantMessage.position)).where(
@@ -73,6 +81,7 @@ async def append(
         trace=trace or [],
         sources=sources or [],
         cited_deadlines=cited_deadlines,
+        context=context,
     )
     chat.updated_at = utcnow_naive()
     session.add(row)
@@ -105,7 +114,7 @@ async def rewind(session, chat_id):
         )
     )
     previous = await messages(session, chat_id, limit=16, before=last.position)
-    return MessageOut.model_validate(last), previous
+    return MessageOut.model_validate(last), previous, last.context
 
 
 async def claim(session, chat_id, user_id, *, call_id=None):

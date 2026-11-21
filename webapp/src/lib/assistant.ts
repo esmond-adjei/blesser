@@ -68,8 +68,27 @@ export interface AssistantSource {
   preview?: boolean
 }
 
+export interface ContextChip {
+  key: string
+  label: string
+  detail?: string
+}
+
+/** What the member has open when they ask, so "this one" can be resolved. */
+export interface UiContext {
+  page: string
+  opportunity_id?: string
+  application_id?: string
+  todo_id?: string
+  project_id?: string
+  answer_id?: string
+  selection?: string
+  chips: ContextChip[]
+}
+
 export interface AssistantMessage {
   id: string
+  chips?: ContextChip[]
   role: "user" | "assistant"
   content: string
   trace: TraceEntry[]
@@ -125,7 +144,7 @@ export const deleteChat = (id: string) => request<void>(pathFor(id), { method: "
 export const stopTurn = (id: string) => request<{ stopped: boolean }>(`${pathFor(id)}/stop`, { method: "POST" })
 
 export type TurnRequest =
-  | { type: "chat"; content: string }
+  | { type: "chat"; content: string; context?: UiContext }
   | { type: "confirm"; call_id: string; approved: boolean }
   | { type: "live" }
   | { type: "retry" }

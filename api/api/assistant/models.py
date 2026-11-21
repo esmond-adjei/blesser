@@ -43,4 +43,9 @@ class AssistantMessage(Base):
     trace: Mapped[list[dict]] = mapped_column(JSON, default=list)
     sources: Mapped[list[dict]] = mapped_column(JSON, default=list)
     cited_deadlines: Mapped[bool] = mapped_column(default=False)
+    context: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    @property
+    def chips(self) -> list[dict]:
+        return (self.context or {}).get("chips", [])
