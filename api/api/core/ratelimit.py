@@ -25,6 +25,8 @@ LIMITS: dict[str, list[tuple[int, int]]] = {
     "extension_connect": [(10, 3600)],
     "extension_refresh": [(120, 60)],
     "kit_upload": [(20, 3600), (100, 86400)],
+    # Reading a CV into the profile is one model call each.
+    "kit_cv": [(10, 3600), (30, 86400)],
     "public_submit": [(5, 3600)],
     "public_report": [(10, 3600)],
     # Agent scans spend model tokens and search calls.
@@ -46,6 +48,7 @@ _LABEL = {
     "extension_connect": "browser connections",
     "extension_refresh": "browser refresh requests",
     "kit_upload": "document uploads",
+    "kit_cv": "CV readings",
     "public_submit": "submissions",
     "public_report": "reports",
     "scan": "scans",

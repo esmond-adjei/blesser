@@ -204,6 +204,16 @@ class ProfileOut(ProfileIn):
     updated_at: datetime
 
 
+class CvImportIn(Input):
+    document_id: ID
+
+
+class CvImportOut(BaseModel):
+    """Profile fields found in a CV, keyed like ProfileIn. Missing keys were not found."""
+
+    profile: dict
+
+
 class TeamMember(Input):
     name: Short = ""
     role: Short = ""
