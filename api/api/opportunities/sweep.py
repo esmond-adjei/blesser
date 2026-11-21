@@ -1,15 +1,13 @@
-"""Scheduled catalogue refresh: OPPORTUNITY_SWEEP_EMAIL + OPPORTUNITY_SWEEP_HOURS.
+"""The scheduled scans account: OPPORTUNITY_SWEEP_EMAIL.
 
-Once an hour the worker checks whether that account's newest scan is older than
-the interval and, if so, scans every category in OPPORTUNITY_DEFAULT_REGION.
+Staff scan schedules (the catalogue sweep among them) and listing checks run as this
+account; see api/scans/schedules.py. Without it they run as the first active admin.
 """
 
 from sqlalchemy import func, select
 
 from api.auth import models as auth_models
 from api.core.config import settings
-from api.opportunities.models import OpportunityCategory
-from api.scans import models as scan_models
 
 
 async def sweep_user_id(session) -> str | None:
@@ -24,46 +22,3 @@ async def sweep_user_id(session) -> str | None:
             )
         )
     ).scalar_one_or_none()
-
-
-async def sweep_configured(session) -> bool:
-    """Whether a scheduled sweep account exists to extract crawler candidates."""
-    from api.editorial.service import get_settings
-
-    if (await get_settings(session))["sweep_hours"] <= 0:
-        return False
-    return await sweep_user_id(session) is not None
-
-
-async def maybe_sweep(session) -> str | None:
-    """Start a scheduled scan when the last one is old enough; returns its id, or None."""
-    from api.editorial.service import get_settings
-    from api.scans.service import start_scan
-
-    hours = (await get_settings(session))["sweep_hours"]
-    if hours <= 0:
-        return None
-    user_id = await sweep_user_id(session)
-    if user_id is None:
-        return None
-    last = (
-        await session.execute(
-            select(func.max(scan_models.Scan.created_at)).where(
-                scan_models.Scan.user_id == user_id
-            )
-        )
-    ).scalar()
-    if last is not None:
-        from datetime import timedelta
-
-        from api.core.time import utcnow_naive
-
-        if utcnow_naive() - last < timedelta(hours=hours):
-            return None
-    scan = await start_scan(
-        session,
-        user_id,
-        categories=[c.value for c in OpportunityCategory],
-        kind="sweep",
-    )
-    return scan.id

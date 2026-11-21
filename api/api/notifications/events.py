@@ -26,6 +26,24 @@ async def scan_finished(session, scan: scan_models.Scan) -> bool:
     if scan.kind == "sources" and found == 0:
         # A scheduled check of the member's sources that found nothing is not news.
         return False
+    if scan.kind == "scheduled":
+        # A repeat of the member's scan: only listings they have not seen are news.
+        from api.scans.schedules import fresh_for_member
+
+        fresh = await fresh_for_member(session, scan)
+        if fresh == 0:
+            return False
+        noun = "opportunity" if fresh == 1 else "opportunities"
+        return await notify(
+            session,
+            user_id=scan.user_id,
+            kind="scan_finished",
+            title="Weekly scan finished",
+            body=f"Your weekly scan in {scan.region} found {fresh} new {noun} for you.",
+            link=f"/scans/{scan.id}",
+            entity_id=scan.id,
+            dedupe_key=f"scan:{scan.id}:done:{tasks}",
+        )
     return await notify(
         session,
         user_id=scan.user_id,
@@ -60,4 +78,24 @@ async def scan_attention(session, scan: scan_models.Scan) -> bool:
         link=f"/scans/{scan.id}",
         entity_id=scan.id,
         dedupe_key=f"scan:{scan.id}:attention:{day}",
+    )
+
+
+async def schedule_paused(
+    session, schedule: scan_models.ScanSchedule, scan: scan_models.Scan
+) -> bool:
+    """A member's weekly scan stopped itself after runs that found nothing new."""
+    return await notify(
+        session,
+        user_id=scan.user_id,
+        kind="scan_attention",
+        title="Weekly scan paused",
+        body=(
+            f"Your weekly scan in {scan.region} found nothing new "
+            f"{schedule.empty_runs} weeks in a row, so it is paused. "
+            "Resume it from Scans whenever you like."
+        ),
+        link="/scans",
+        entity_id=schedule.id,
+        dedupe_key=f"schedule:{schedule.id}:paused:{schedule.runs}",
     )

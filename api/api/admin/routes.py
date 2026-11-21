@@ -27,9 +27,10 @@ from api.opportunities.models import (
 )
 from api.opportunities.source_routes import router as sources_router
 from api.public.schemas import CollectionOut, SiteContent
+from api.scans import schedules
 from api.scans import service as scans
 from api.scans.models import Scan
-from api.scans.routes import ScanCreate, ScanOut
+from api.scans.routes import ScanCreate, ScanOut, ScheduleOut
 
 router = APIRouter(tags=["admin"])
 
@@ -308,7 +309,9 @@ async def put_organization_alias(
     if not alias or not canonical or alias == canonical:
         raise BadRequestError("Give two different organization names.")
     if await session.get(OrganizationAlias, canonical) is not None:
-        raise BadRequestError("That name is itself an alias: map to its canonical name.")
+        raise BadRequestError(
+            "That name is itself an alias: map to its canonical name."
+        )
     row = await session.get(OrganizationAlias, alias)
     before = {"alias": row.alias, "canonical": row.canonical} if row else None
     if row is None:
@@ -797,6 +800,124 @@ async def start_scan(
         request,
     )
     return await scans.scan_detail(session, staff.id, scan.id)
+
+
+@router.get("/scan-schedules", response_model=s.StaffSchedulesOut)
+async def list_scan_schedules(
+    session: AsyncSession = Depends(get_session), staff: User = Depends(get_admin)
+):
+    """Staff schedules, how many members repeat scans, and today's scheduled spend."""
+    from datetime import timedelta
+
+    from api.core.time import utcnow_naive
+    from api.scans.models import ScanSchedule
+
+    rows = await schedules.list_staff(session)
+    member_count, member_active = (
+        await session.execute(
+            select(
+                func.count(),
+                func.count().filter(ScanSchedule.paused.is_(False)),
+            ).where(ScanSchedule.audience == schedules.MEMBER)
+        )
+    ).one()
+    week = (
+        await session.execute(
+            select(func.count()).where(
+                Scan.schedule_id.is_not(None),
+                Scan.kind != "member",
+                Scan.created_at > utcnow_naive() - timedelta(days=7),
+            )
+        )
+    ).scalar_one()
+    return {
+        "schedules": [await schedules.schedule_out(session, r) for r in rows],
+        "member_schedules": member_count,
+        "member_schedules_active": member_active,
+        "runs_last_7_days": week,
+        "tokens_today": await schedules.tokens_today(session),
+        "run_as": await _run_as_email(session),
+        "intervals": list(schedules.STAFF_INTERVAL_HOURS),
+    }
+
+
+async def _run_as_email(session) -> str | None:
+    owner = await schedules.run_as_staff(session)
+    if owner is None:
+        return None
+    return await session.scalar(select(User.email).where(User.id == owner))
+
+
+@router.post("/scan-schedules", response_model=ScheduleOut, status_code=201)
+async def create_scan_schedule(
+    req: s.StaffScheduleIn,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_admin),
+):
+    row = await schedules.create_staff(session, staff.id, req.model_dump(mode="json"))
+    await service.write_audit(
+        session,
+        staff,
+        "scan_schedule.create",
+        "scan_schedule",
+        row.id,
+        None,
+        service.snapshot(row),
+        request,
+    )
+    return await schedules.schedule_out(session, row)
+
+
+@router.patch("/scan-schedules/{schedule_id}", response_model=ScheduleOut)
+async def edit_scan_schedule(
+    schedule_id: str,
+    req: s.StaffSchedulePatch,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_admin),
+):
+    before = None
+    from api.scans.models import ScanSchedule
+
+    if (current := await session.get(ScanSchedule, schedule_id)) is not None:
+        before = service.snapshot(current)
+    row = await schedules.update_staff(
+        session,
+        schedule_id,
+        req.model_dump(mode="json", exclude_unset=True, exclude_none=True),
+    )
+    await service.write_audit(
+        session,
+        staff,
+        "scan_schedule.update",
+        "scan_schedule",
+        row.id,
+        before,
+        service.snapshot(row),
+        request,
+    )
+    return await schedules.schedule_out(session, row)
+
+
+@router.delete("/scan-schedules/{schedule_id}", status_code=204)
+async def delete_scan_schedule(
+    schedule_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(get_admin),
+):
+    row = await schedules.delete_staff(session, schedule_id)
+    await service.write_audit(
+        session,
+        staff,
+        "scan_schedule.delete",
+        "scan_schedule",
+        schedule_id,
+        service.snapshot(row),
+        None,
+        request,
+    )
 
 
 @router.get("/users", response_model=s.UserPage)

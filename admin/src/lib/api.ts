@@ -126,7 +126,11 @@ const settingsSchema = s.shape({
   community_default: s.shape({ status: statusSchema }),
   auto_archive: s.boolean,
   member_scan_limits: s.shape({ per_hour: s.number, per_day: s.number }),
-  sweep_hours: s.number,
+  scheduled_scans: s.shape({
+    member_max: s.number,
+    runs_per_hour: s.number,
+    daily_token_budget: s.number,
+  }),
   crawler: s.optional(
     s.shape({
       hours: s.number,
@@ -151,6 +155,49 @@ const settingsSchema = s.shape({
   aggregators: s.optional(s.array(s.text)),
   official_backfill: s.optional(s.boolean),
 });
+const scheduleSchema = s.shape({
+  id: s.text,
+  audience: s.choice("member", "staff"),
+  name: s.text,
+  categories: s.array(s.text),
+  region: s.text,
+  focus: s.text,
+  sites: s.array(s.text),
+  interval_hours: s.number,
+  paused: s.boolean,
+  pause_reason: s.nullable(s.text),
+  next_run_at: s.nullable(s.text),
+  last_run_at: s.nullable(s.text),
+  runs: s.number,
+  last_run: s.nullable(
+    s.shape({
+      scan_id: s.text,
+      status: s.text,
+      created_at: s.text,
+      new: s.number,
+      updated: s.number,
+    }),
+  ),
+  created_at: s.text,
+});
+export type ScanSchedule = ReturnType<typeof scheduleSchema>;
+const schedulesSchema = s.shape({
+  schedules: s.array(scheduleSchema),
+  member_schedules: s.number,
+  member_schedules_active: s.number,
+  runs_last_7_days: s.number,
+  tokens_today: s.number,
+  run_as: s.nullable(s.text),
+  intervals: s.array(s.number),
+});
+export type ScanScheduleInput = {
+  name: string;
+  categories: string[];
+  region: string;
+  focus: string;
+  interval_hours: number;
+  paused?: boolean;
+};
 export const sourceKindSchema = s.choice("rss", "sitemap", "listing");
 const sourceSchema = s.shape({
   id: s.text,
@@ -550,6 +597,16 @@ export const audit = (params: {
   limit: number;
   offset: number;
 }) => request(`/audit${query(params)}`, page(auditSchema));
+
+export const scanSchedules = () => request("/scan-schedules", schedulesSchema);
+export const createScanSchedule = (body: ScanScheduleInput) =>
+  request("/scan-schedules", scheduleSchema, "POST", body);
+export const updateScanSchedule = (
+  id: string,
+  body: Partial<ScanScheduleInput>,
+) => request(`/scan-schedules/${idPath(id)}`, scheduleSchema, "PATCH", body);
+export const deleteScanSchedule = (id: string) =>
+  request(`/scan-schedules/${idPath(id)}`, () => undefined, "DELETE");
 
 export const sources = () => request("/sources", s.array(sourceSchema));
 export const createSource = (body: SourceInput) =>

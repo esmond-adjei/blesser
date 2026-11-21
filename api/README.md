@@ -27,7 +27,7 @@ Every setting is in [`.env.example`](.env.example). The ones you need:
 | `DATABASE_URL` | Postgres, the only supported database. |
 | `AUTH_SECRET` | Signs sign-in tokens and encrypts calendar links. Required in production. |
 | `MAIL_BACKEND`, `SMTP_*`, `APP_BASE_URL` | Password resets, verification and reminder emails ([docs/email.md](../docs/email.md)). |
-| `OPPORTUNITY_SWEEP_EMAIL` | Account used for scheduled discovery; configure `sweep_hours` in admin settings. |
+| `OPPORTUNITY_SWEEP_EMAIL` | Account staff scan schedules and listing checks run as (else the first admin); schedules are set in admin Settings. |
 | `OPS_ADMIN_EMAILS` | Verified member accounts seeded as admins on boot. |
 
 ## Layout
