@@ -30,10 +30,10 @@ export function SunMascot({ size = 64, className }: { size?: number; className?:
     <svg ref={root} viewBox="0 0 64 32" width={size} height={size / 2} aria-hidden="true" className={cn("overflow-visible", className)}>
       <path d="M2 32a30 30 0 0 1 60 0Z" className="fill-sun" />
       <g ref={eyes} className="transition-transform duration-100 ease-out">
-        <ellipse cx="23" cy="21" rx="2.3" ry="3.1" className="fill-on-sun" />
-        <ellipse cx="41" cy="21" rx="2.3" ry="3.1" className="fill-on-sun" />
+        <ellipse cx="23" cy="22" rx="2.3" ry="3.1" className="fill-on-sun" />
+        <ellipse cx="41" cy="22" rx="2.3" ry="3.1" className="fill-on-sun" />
+        <path d="M19.5 14.6 26.5 16.2M44.5 14.6 37.5 16.2" fill="none" strokeWidth="2.2" strokeLinecap="round" className="stroke-on-sun" />
       </g>
-      <path d="M27 27c2.2 2.4 7.8 2.4 10 0" fill="none" strokeWidth="2.1" strokeLinecap="round" className="stroke-on-sun" />
     </svg>
   )
 }
