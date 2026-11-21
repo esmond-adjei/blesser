@@ -109,15 +109,13 @@ export function AssistantMascot() {
   const { mode, setMode } = useDock()
   const open = useOpenAssistant()
   const onPage = useOnAssistantPage()
-  const { pathname } = useLocation()
   const t = useOpenTransition(mode === "closed" && !onPage, 150)
   if (!t.render) return null
   const pick = "grid size-8 cursor-pointer place-items-center rounded-full border border-separator bg-surface text-ink-secondary shadow-elevation-2 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
   return (
     <div
       className={cn(
-        "group fixed right-4 z-50 transition-all duration-150 motion-reduce:transition-none sm:right-5",
-        pathname.startsWith("/scans") ? "bottom-28 sm:bottom-5" : "bottom-4 sm:bottom-5",
+        "group fixed right-5 bottom-5 z-50 transition-all duration-150 max-sm:hidden motion-reduce:transition-none",
         t.shown ? "scale-100 opacity-100" : "scale-75 opacity-0",
       )}
     >
@@ -134,6 +132,25 @@ export function AssistantMascot() {
         <SunMascot size={64} className="drop-shadow-md" />
       </button>
     </div>
+  )
+}
+
+/** On phones the sun sits in the app header instead of floating over the page. */
+export function AssistantHeaderMascot({ className }: { className?: string }) {
+  const { mode } = useDock()
+  const open = useOpenAssistant()
+  const onPage = useOnAssistantPage()
+  if (mode !== "closed" || onPage) return null
+  return (
+    <button
+      type="button"
+      aria-label="Ask the Assistant"
+      title="Ask the Assistant"
+      onClick={open}
+      className={cn("grid h-9 w-11 shrink-0 cursor-pointer place-items-center rounded-md focus-visible:outline-2 focus-visible:outline-focus", className)}
+    >
+      <SunMascot size={36} />
+    </button>
   )
 }
 

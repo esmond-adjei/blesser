@@ -8,7 +8,7 @@ import { Logo, Wordmark, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { ChatSkeleton } from "../assistant/ChatSkeleton"
-import { AssistantDock, AssistantDockProvider, AssistantMascot, AssistantPanel } from "../assistant/AssistantHost"
+import { AssistantDock, AssistantDockProvider, AssistantHeaderMascot, AssistantMascot, AssistantPanel } from "../assistant/AssistantHost"
 import { PageContextProvider } from "../assistant/PageContextProvider"
 import { SelectionPrompt } from "../assistant/SelectionPrompt"
 import { AccountMenu } from "./AccountMenu"
@@ -58,6 +58,7 @@ export function Shell() {
           ) : <ShellTitle />}
           <div className="ml-auto flex shrink-0 items-center gap-1">
             {pageHeader?.actions}
+            <AssistantHeaderMascot className="sm:hidden" />
           </div>
         </header>
         <ShellHeaderContext.Provider value={setPageHeader}>
