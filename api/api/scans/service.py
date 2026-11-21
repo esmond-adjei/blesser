@@ -8,7 +8,7 @@ from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import aliased
 
 from api.core.config import settings
-from api.core.exceptions import NotFoundError
+from api.core.exceptions import ConflictError, NotFoundError
 from api.core.time import utcnow_naive
 from api.opportunities.models import Opportunity, OpportunityCategory
 from api.scans import models as m
@@ -104,6 +104,32 @@ async def start_scan(
     await notify_work(session, scan.id)
     if commit:
         await session.commit()
+    return scan
+
+
+async def steer_scan(session, user_id: str, scan_id: str, prompt: str) -> m.Scan:
+    """Queue a follow-up run on a finished scan, steered by what the member said."""
+    scan = await get_or_404(session, user_id, scan_id)
+    if scan.kind not in ("member", "scheduled"):
+        raise ConflictError("This scan can't be steered.")
+    if scan.status == "running":
+        raise ConflictError(
+            "Wait for this scan to finish, or stop it, before steering it."
+        )
+    for category in scan.categories:
+        session.add(
+            m.ScanTask(
+                scan_id=scan.id,
+                user_id=user_id,
+                task_type=TASK_TYPE,
+                target=f"category:{category}",
+                metrics={"steer": prompt.strip()},
+            )
+        )
+    scan.status = "running"
+    await session.flush()
+    await notify_work(session, scan.id)
+    await session.commit()
     return scan
 
 

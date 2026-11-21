@@ -195,6 +195,17 @@ async def run_discover_opportunities(
     }
 
 
+def _focus(scan, task) -> str:
+    focus = scan.focus or ""
+    steer = (task.metrics or {}).get("steer")
+    if not steer:
+        return focus
+    return (
+        f"{focus}\n\nThe member has steered this run. Their note comes first and "
+        f"overrides the notes above where they differ:\n{steer}"
+    ).strip()
+
+
 async def _run_agent(
     session,
     task,
@@ -214,7 +225,7 @@ async def _run_agent(
     message = user_message(
         region=region,
         category=category,
-        focus=scan.focus or "",
+        focus=_focus(scan, task),
         today=opp_service.today().isoformat(),
         known=await _known(session, category, region),
         sites=sites,
