@@ -158,6 +158,10 @@ def test_crawler_skips_links_that_name_only_other_countries():
     )
     assert not names_other_country(nigerian, "Ghana / West Africa / pan-Africa")
     assert not names_other_country("https://example.org/bursary-2027", "Ghana")
+    east = "https://example.org/east-and-southern-africa-incubator"
+    assert names_other_country(east, "Ghana")
+    assert not names_other_country(east, "Kenya")
+    assert names_other_country("https://example.org/sadc-essay-competition", "Ghana")
 
 
 def test_a_steered_run_hears_what_earlier_runs_tried():

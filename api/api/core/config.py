@@ -239,5 +239,15 @@ def config_warnings(s: Settings | None = None) -> list[str]:
 
 
 def log_config_warnings() -> None:
+    app_log = logging.getLogger("api")
+    # Uvicorn only sets up its own loggers; this lets the app's info lines reach the terminal.
+    if not app_log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter("%(levelname)s:     %(name)s: %(message)s")
+        )
+        app_log.addHandler(handler)
+        app_log.setLevel(logging.INFO)
+        app_log.propagate = False
     for warning in config_warnings():
         log.warning(warning)

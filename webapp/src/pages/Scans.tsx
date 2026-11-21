@@ -191,17 +191,31 @@ export function Scans() {
   const collapse = () => closeMorph.current?.() ?? Promise.resolve()
   useTick(!!scans.data?.some((s) => s.status === "running"))
 
+  const loaded = React.useRef(false)
   // Oldest first, so a new scan takes the next free spot without moving older cards.
+  // Deleted scans give their spot back, and a scan that arrives later is panned into view.
   React.useEffect(() => {
     if (!scans.data) return
-    const missing = [...scans.data].reverse().filter((s) => !layout[s.id])
-    if (!missing.length) return
+    const live = new Set(scans.data.map((s) => s.id))
+    const next = Object.fromEntries(Object.entries(layout).filter(([id]) => live.has(id)))
+    const missing = [...scans.data].reverse().filter((s) => !next[s.id])
+    const pruned = Object.keys(next).length !== Object.keys(layout).length
+    const first = !loaded.current
+    loaded.current = true
+    if (!missing.length && !pruned) return
     const width = viewport.current?.clientWidth ?? 1200
-    const next = { ...layout }
     for (const s of missing) next[s.id] = freeSlot(Object.values(next), width)
     setLayout(next)
     saveLayout(next)
-  }, [scans.data, layout])
+    const newest = missing[missing.length - 1]
+    if (first || !newest) return
+    const spot = next[newest.id]
+    const height = viewport.current?.clientHeight ?? 800
+    // Leave room for the composer floating over the bottom of the canvas.
+    if (spot.y + CARD_H > height - 160 - offset.y || spot.y < -offset.y) setOffset({ x: 0, y: Math.min(0, GAP - spot.y) })
+    setFresh(newest.id)
+    setFront(newest.id)
+  }, [scans.data, layout, offset.y])
 
   const move = React.useCallback((id: string, pos: Pos, commit: boolean) => {
     setLayout((prev) => {
@@ -233,7 +247,6 @@ export function Scans() {
   const onStarted = (scan: Scan) => {
     setFresh(scan.id)
     setFront(scan.id)
-    setOffset({ x: 0, y: 0 })
   }
 
   const pan = (e: React.PointerEvent<HTMLDivElement>) => {

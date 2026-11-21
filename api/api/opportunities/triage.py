@@ -137,6 +137,33 @@ _COUNTRIES = {
     "pakistan": ("pakistan", "pakistani", "pakistanis"),
     "bangladesh": ("bangladesh", "bangladeshi"),
     "philippines": ("philippines", "filipino", "filipinos"),
+    "united states": ("usa", "nyc", "new york", "us citizens", "american citizens"),
+    "united kingdom": ("uk residents", "uk citizens", "london"),
+}
+# Areas a listing may name instead of a country, by the countries they cover.
+_AREAS = {
+    "east africa": (
+        (
+            "east africa",
+            "east african",
+            "eastern africa",
+            "east and southern africa",
+            "eac",
+        ),
+        {"kenya", "uganda", "tanzania", "rwanda", "ethiopia"},
+    ),
+    "southern africa": (
+        ("southern africa", "sadc"),
+        {
+            "south africa",
+            "zambia",
+            "zimbabwe",
+            "malawi",
+            "botswana",
+            "namibia",
+            "mozambique",
+        },
+    ),
 }
 
 
@@ -160,6 +187,10 @@ def names_other_country(text: str, region: str) -> bool:
     ):
         return False
     named = _countries_in(text)
+    clean = re.sub(r"[-_/]+", " ", text.casefold())
+    for words, members in _AREAS.values():
+        if any(re.search(rf"\b{re.escape(w)}\b", clean) for w in words):
+            named |= members
     return bool(named) and not (named & targets)
 
 

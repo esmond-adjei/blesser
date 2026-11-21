@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import timedelta
 
@@ -58,6 +59,9 @@ def claim_order():
         source_yield.desc(),
         CrawlCandidate.created_at.desc(),
     )
+
+
+log = logging.getLogger(__name__)
 
 
 async def claim_candidate(session, category: str, region: str):
@@ -340,4 +344,15 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     metrics["pipeline_seconds"] = round(time.monotonic() - started, 2)
     task.metrics = metrics
     await session.commit()
+    log.info(
+        "crawler: scan %s %s in %s: %s checked, %s read, %s saved, skipped %s (%ss)",
+        scan.id[:8],
+        category,
+        scan.region,
+        metrics.get("candidates_considered", 0),
+        metrics.get("extracted", 0),
+        metrics.get("crawler_saved", 0),
+        metrics.get("triaged_out", {}),
+        metrics["pipeline_seconds"],
+    )
     return metrics
