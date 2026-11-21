@@ -13,7 +13,9 @@ import {
   LayoutGrid,
   Loader2,
   PanelRightOpen,
+  Pencil,
   Radar,
+  RotateCcw,
   Plus,
   Repeat,
   Square,
@@ -52,6 +54,7 @@ import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../compone
 import { SourcesDialog } from "../components/scans/SourcesDialog"
 import { SchedulesDialog } from "../components/scans/SchedulesDialog"
 import { SCHEDULES_KEY } from "../lib/schedules"
+import { useDrawerParam } from "../lib/urlParams"
 
 type Status = ScanTask["status"] | Scan["status"]
 
@@ -170,7 +173,9 @@ export function Scans() {
   const [offset, setOffset] = React.useState<Pos>({ x: 0, y: 0 })
   const [front, setFront] = React.useState<string | null>(null)
   const [fresh, setFresh] = React.useState<string | null>(null)
-  const [expanded, setExpanded] = React.useState<{ id: string; from: DOMRect } | null>(null)
+  const prev = useDrawerParam("prev")
+  const [fromRect, setFromRect] = React.useState<DOMRect | null>(null)
+  const expanded = prev.id ? { id: prev.id, from: fromRect } : null
   const [sourcesOpen, setSourcesOpen] = React.useState(false)
   const [schedulesOpen, setSchedulesOpen] = React.useState(false)
   const closeMorph = React.useRef<(() => Promise<void>) | null>(null)
@@ -265,10 +270,16 @@ export function Scans() {
               onRaise={() => setFront(scan.id)}
               hidden={expanded?.id === scan.id}
               onExpand={(from) => {
-                if (!expanded) return setExpanded({ id: scan.id, from })
+                if (!expanded) {
+                  setFromRect(from)
+                  return prev.open(scan.id)
+                }
                 void collapse().then(() => {
                   const el = document.querySelector(`[data-scan-card="${scan.id}"]`)
-                  if (el) setExpanded({ id: scan.id, from: el.getBoundingClientRect() })
+                  if (el) {
+                    setFromRect(el.getBoundingClientRect())
+                    prev.open(scan.id)
+                  }
                 })
               }}
             />
@@ -286,7 +297,7 @@ export function Scans() {
           </div>
         ) : null}
       </div>
-      {expanded ? <ScanMorph key={expanded.id} id={expanded.id} from={expanded.from} closeRef={closeMorph} onClosed={() => setExpanded(null)} /> : null}
+      {expanded ? <ScanMorph key={expanded.id} id={expanded.id} from={expanded.from} closeRef={closeMorph} onClosed={() => { setFromRect(null); prev.close() }} /> : null}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-4 sm:px-6 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
         <ScanComposer onStarted={onStarted} className="pointer-events-auto mx-auto max-w-[760px] shadow-elevation-3" />
       </div>
@@ -361,8 +372,10 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
     onError: (e) => toastError(e),
   })
   const repeat = useRepeat(scan)
+  const again = useRerunActions(scan)
   const actions: MenuAction[] = [
     { label: "Open scan", icon: <PanelRightOpen />, onSelect: open },
+    ...again.actions,
     ...(canRepeat(scan) ? [{ label: "Repeat weekly", icon: <Repeat />, onSelect: () => repeat.mutate() }] : []),
     running
       ? { label: "Stop", icon: <Square />, onSelect: () => cancel.mutate() }
@@ -437,6 +450,7 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
       </div>
     </article>
     </ActionContextMenu>
+    {again.dialog}
     <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
       <AlertDialogContent className="max-w-sm">
         <DialogHeader>
@@ -453,17 +467,18 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
   )
 }
 
-function ScanComposer({ onStarted, className, showAllowance = false }: { onStarted?: (scan: Scan) => void; className?: string; showAllowance?: boolean }) {
+function ScanComposer({ onStarted, className, showAllowance = false, from }: { onStarted?: (scan: Scan) => void; className?: string; showAllowance?: boolean; from?: Scan }) {
   const client = useQueryClient()
   const allowance = useAllowance()
-  const [category, setCategory] = React.useState<OpportunityCategory>("startup")
-  const [region, setRegion] = React.useState("Ghana")
-  const [focus, setFocus] = React.useState("")
-  const [sites, setSites] = React.useState<string[]>([])
+  const [category, setCategory] = React.useState<OpportunityCategory>(from?.categories[0] ?? "startup")
+  const [region, setRegion] = React.useState(from ? from.region : "Ghana")
+  const [focus, setFocus] = React.useState(from ? scanFocus(from) : "")
+  const [sites, setSites] = React.useState<string[]>(from?.sites ?? [])
   const [siteDraft, setSiteDraft] = React.useState("")
-  const [showSites, setShowSites] = React.useState(false)
+  const [showSites, setShowSites] = React.useState(!!from?.sites?.length)
   const [weekly, setWeekly] = React.useState(false)
   const siteInput = React.useRef<HTMLInputElement>(null)
+  const uid = React.useId()
   const addSites = (text: string) => {
     const typed = parseSites(text)
     if (!typed.length) return
@@ -475,15 +490,22 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
     setSiteDraft("")
   }
   const start = useMutation({
-    mutationFn: () => api.startScan({
-      categories: [category],
-      region: region.trim(),
-      focus: focus.trim(),
-      sites: [...sites, ...parseSites(siteDraft)].slice(0, MAX_SITES),
-      repeat: weekly,
-    }),
+    mutationFn: () => {
+      const brief = {
+        categories: [category],
+        region: region.trim(),
+        focus: focus.trim(),
+        sites: [...sites, ...parseSites(siteDraft)].slice(0, MAX_SITES),
+      }
+      return from ? api.rerunScan(from.id, brief) : api.startScan({ ...brief, repeat: weekly })
+    },
     onSuccess: (scan) => {
       void client.invalidateQueries({ queryKey: ["scans"] })
+      if (from) {
+        toastSuccess("Agent sent out again with your changes")
+        onStarted?.(scan)
+        return
+      }
       setFocus("")
       setSites([])
       setSiteDraft("")
@@ -507,9 +529,9 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
       onSubmit={(e) => { e.preventDefault(); submit() }}
       className={cn("rounded-lg border border-input-border bg-surface p-2.5 pl-4 transition-[border-color,box-shadow] duration-150", className)}
     >
-      <label htmlFor="scan-focus" className="sr-only">What should this agent look for?</label>
+      <label htmlFor={`${uid}-focus`} className="sr-only">What should this agent look for?</label>
       <textarea
-        id="scan-focus"
+        id={`${uid}-focus`}
         rows={1}
         value={focus}
         maxLength={2000}
@@ -520,7 +542,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
       />
       {showSites ? (
         <div className="mt-1 rounded-md bg-surface-sunk px-2.5 py-2">
-          <label htmlFor="scan-sites" className="text-caption font-medium text-ink-secondary">
+          <label htmlFor={`${uid}-sites`} className="text-caption font-medium text-ink-secondary">
             Sites to check first <span className="text-ink-tertiary">({sites.length} of {MAX_SITES})</span>
           </label>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -539,7 +561,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
             ))}
             {sites.length < MAX_SITES ? (
               <input
-                id="scan-sites"
+                id={`${uid}-sites`}
                 ref={siteInput}
                 type="text"
                 inputMode="url"
@@ -586,14 +608,14 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
             </button>
           ))}
         </div>
-        <CountrySelect value={region} onChange={setRegion} side="top" />
+        <CountrySelect value={region} onChange={setRegion} side={from ? "bottom" : "top"} />
         <Button
           type="button"
           size="sm"
           variant="quiet"
           icon={<Link2 />}
           aria-expanded={showSites}
-          aria-controls={showSites ? "scan-sites" : undefined}
+          aria-controls={showSites ? `${uid}-sites` : undefined}
           onClick={() => {
             setShowSites((v) => !v)
             if (!showSites) requestAnimationFrame(() => siteInput.current?.focus())
@@ -601,7 +623,7 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
         >
           {sites.length ? `${sites.length} ${sites.length === 1 ? "site" : "sites"}` : "Add sites"}
         </Button>
-        <Button
+        {from ? null : <Button
           type="button"
           size="sm"
           variant="quiet"
@@ -612,20 +634,106 @@ function ScanComposer({ onStarted, className, showAllowance = false }: { onStart
           className={cn(weekly && "bg-forest-soft text-link hover:bg-forest-soft")}
         >
           Weekly
-        </Button>
+        </Button>}
         {showAllowance ? <span className="ml-auto"><AllowanceNote /></span> : null}
         <Button
           type="submit"
           size="sm"
           variant="primary"
           iconOnly
-          aria-label={blocked ? "No scans left for now" : "Start scan"}
+          aria-label={blocked ? "No scans left for now" : from ? "Run again" : "Start scan"}
           title={blocked ? "No scans left for now" : undefined}
           disabled={blocked || start.isPending}
           icon={start.isPending ? <Loader2 className="motion-safe:animate-spin" /> : <ArrowUp />}
           className={cn("size-9", !showAllowance && "ml-auto")}
         />
       </div>
+    </form>
+  )
+}
+
+function EditScanDialog({ scan, open, onOpenChange }: { scan: Scan; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl rounded-xl" onClose={() => onOpenChange(false)}>
+        <DialogHeader>
+          <DialogTitle>Change this scan and run it again</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="pb-6">
+          <ScanComposer from={scan} showAllowance onStarted={() => onOpenChange(false)} />
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Run again, and change it first; for scans that are not running. */
+function useRerunActions(scan: Scan): { actions: MenuAction[]; dialog: React.ReactNode } {
+  const client = useQueryClient()
+  const [editing, setEditing] = React.useState(false)
+  const rerun = useMutation({
+    mutationFn: () => api.rerunScan(scan.id),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["scans"] })
+      toastSuccess("Agent sent out again")
+    },
+    onError: (e) => toastError(e, "Couldn't run this scan again"),
+  })
+  const allowed = (scan.kind ?? "member") !== "sources" && scan.status !== "running"
+  return {
+    actions: allowed
+      ? [
+          { label: "Run again", icon: <RotateCcw />, onSelect: () => rerun.mutate() },
+          { label: "Edit and run again", icon: <Pencil />, onSelect: () => setEditing(true) },
+        ]
+      : [],
+    dialog: allowed ? <EditScanDialog scan={scan} open={editing} onOpenChange={setEditing} /> : null,
+  }
+}
+
+/** Tell the agent what to change; it runs again on the same scan with that note. */
+function SteerBar({ scan }: { scan: Scan }) {
+  const client = useQueryClient()
+  const [prompt, setPrompt] = React.useState("")
+  const running = scan.status === "running"
+  const steer = useMutation({
+    mutationFn: () => api.steerScan(scan.id, prompt.trim()),
+    onSuccess: (next) => {
+      client.setQueryData(["scan", scan.id], next)
+      void client.invalidateQueries({ queryKey: ["scans"] })
+      setPrompt("")
+    },
+    onError: (e) => toastError(e, "Couldn't send that to the agent"),
+  })
+  if ((scan.kind ?? "member") === "sources") return null
+  const send = () => { if (prompt.trim() && !running && !steer.isPending) steer.mutate() }
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); send() }}
+      className="flex items-end gap-2 rounded-lg border border-input-border bg-surface py-2 pr-2 pl-4"
+    >
+      <label htmlFor={`steer-${scan.id}`} className="sr-only">Tell the agent what to change</label>
+      <textarea
+        id={`steer-${scan.id}`}
+        rows={1}
+        value={prompt}
+        maxLength={2000}
+        disabled={running}
+        onChange={(e) => setPrompt(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }}
+        placeholder={running ? "You can steer it once this scan finishes" : "Steer it, e.g. only programmes open to Ghanaian students"}
+        className="max-h-32 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-body text-ink outline-none [field-sizing:content] placeholder:text-ink-tertiary disabled:cursor-not-allowed"
+      />
+      <Button
+        type="submit"
+        size="sm"
+        variant="primary"
+        iconOnly
+        aria-label="Send to the agent"
+        disabled={running || !prompt.trim() || steer.isPending}
+        icon={steer.isPending ? <Loader2 className="motion-safe:animate-spin" /> : <ArrowUp />}
+        className="size-9"
+      />
     </form>
   )
 }
@@ -743,8 +851,10 @@ function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () =
   const repeat = useRepeat(scan)
   useTick(running)
   const repeatAction: MenuAction[] = canRepeat(scan) ? [{ label: "Repeat weekly", icon: <Repeat />, onSelect: () => repeat.mutate() }] : []
+  const again = useRerunActions(scan)
   return (
     <div className="space-y-5">
+      {again.dialog}
       <ScanPanel
         scan={scan}
         actions={running ? (
@@ -753,9 +863,10 @@ function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () =
             {repeatAction.length ? <ActionMenuButton label="Scan actions" actions={repeatAction} /> : null}
           </>
         ) : (
-          <ActionMenuButton label="Scan actions" actions={[...repeatAction, { label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
+          <ActionMenuButton label="Scan actions" actions={[...again.actions, ...repeatAction, { label: "Delete scan", icon: <Trash2 />, danger: true, onSelect: () => setConfirmDelete(true) }]} />
         )}
       />
+      <SteerBar scan={scan} />
       {log ? <ActivityLog tasks={scan.tasks ?? []} /> : null}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent className="max-w-sm">
@@ -786,7 +897,7 @@ type Box = { left: number; top: number; width: number; height: number }
  */
 function ScanMorph({ id, from, onClosed, closeRef }: {
   id: string
-  from: DOMRect
+  from: DOMRect | null
   onClosed: () => void
   closeRef: React.RefObject<(() => Promise<void>) | null>
 }) {
@@ -837,7 +948,7 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
   }, [id])
 
   React.useLayoutEffect(() => {
-    if (reduced) return
+    if (reduced || !from) return
     void play(from, "open")
   }, [from, play, reduced])
 
@@ -1001,6 +1112,8 @@ function FindRow({ find, tracking, index }: { find: ScanFind; tracking: boolean;
 }
 
 function taskName(task: ScanTask): string {
+  const steer = task.metrics?.steer
+  if (steer) return `Follow-up: ${steer.length > 40 ? `${steer.slice(0, 40)}…` : steer}`
   const category = CATEGORIES.find((value) => task.target === `category:${value}`)
   return category ? `Searching for ${CATEGORY_LABELS[category].toLowerCase()}` : "Searching"
 }

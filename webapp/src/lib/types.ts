@@ -91,6 +91,8 @@ export interface ScanTask {
   created_at: string
   started_at: string | null
   finished_at: string | null
+  /** `steer` is the member's note on a follow-up run. */
+  metrics?: { steer?: string }
 }
 
 export type ScanFind = {
