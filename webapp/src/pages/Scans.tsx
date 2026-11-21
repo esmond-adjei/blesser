@@ -12,6 +12,7 @@ import {
   Link2,
   LayoutGrid,
   Loader2,
+  Maximize2,
   PanelRightOpen,
   Pencil,
   Radar,
@@ -993,6 +994,14 @@ function ScanMorph({ id, from, onClosed, closeRef }: {
             <h2 className="truncate type-title-3 text-ink">{scan.data ? scanTitle(scan.data) : "Scan"}</h2>
             {scan.data ? <p className="text-footnote text-ink-secondary">Started {formatAgo(scan.data.created_at)}</p> : null}
           </div>
+          <Link
+            to={`/scans/${encodeURIComponent(id)}`}
+            aria-label="Open full page"
+            title="Open full page"
+            className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            <Maximize2 className="size-4" aria-hidden="true" />
+          </Link>
           <button type="button" aria-label="Close" onClick={() => void close()} className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full bg-surface-sunk text-ink-secondary transition-colors hover:bg-separator hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">
             <X className="size-4" />
           </button>
