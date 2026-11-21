@@ -173,17 +173,16 @@ async def propose_start(session, user_id, args):
         "focus": args.focus,
         "sites": sites,
     }
+    # The category and region are already in the question above.
     note = field_lines(
         {
-            "category": _category_label(args.category.value),
-            "region": region or "Your default region",
+            **({} if region else {"region": "Your default region"}),
             **({"focus": args.focus} if args.focus else {}),
             **({"sites": sites} if sites else {}),
-        },
-        {"category": "Looking for"},
+        }
     )
     if left["enabled"]:
-        note += f"\nUses 1 of the {left['left_today']} scans you have left today."
+        note += f"{chr(10) if note else ''}Uses 1 of the {left['left_today']} scans you have left today."
     where = f" in {region}" if region else ""
     return Proposal(
         f"Start a scan for {args.category.value} opportunities{where}?",
