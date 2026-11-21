@@ -27,6 +27,13 @@ function recordDetail(source: AssistantSource) {
 }
 
 const SHOWN_RECORDS = 10
+const MAX_SINGLE_COLUMN = 3
+
+function groupByKind(sources: AssistantSource[]) {
+  const groups = new Map<AssistantSource["kind"], AssistantSource[]>()
+  for (const source of sources) groups.set(source.kind, [...(groups.get(source.kind) ?? []), source])
+  return [...groups.values()]
+}
 
 /** Records a turn cited or created; each opens a preview beside the chat, and web results open in a new tab. */
 export function RecordCards({ sources, onOpen }: { sources: AssistantSource[]; onOpen: (source: AssistantSource) => void }) {
@@ -34,9 +41,11 @@ export function RecordCards({ sources, onOpen }: { sources: AssistantSource[]; o
   const shown = all ? sources : sources.slice(0, SHOWN_RECORDS)
   return (
     <div className="flex flex-col gap-2">
-      <ul className="grid gap-2 @md/chat:grid-cols-2" aria-label="Records">
-        {shown.map((source) => <li key={source.key} className="min-w-0"><RecordCard source={source} onOpen={onOpen} /></li>)}
-      </ul>
+      {groupByKind(shown).map((group) => (
+        <ul key={group[0].kind} className={cn("grid gap-2", group.length > MAX_SINGLE_COLUMN && "@md/chat:grid-cols-2")} aria-label="Records">
+          {group.map((source) => <li key={source.key} className="min-w-0"><RecordCard source={source} onOpen={onOpen} /></li>)}
+        </ul>
+      ))}
       {sources.length > SHOWN_RECORDS && !all ? (
         <button type="button" onClick={() => setAll(true)} className="cursor-pointer self-start text-footnote font-semibold text-link hover:underline">
           Show {sources.length - SHOWN_RECORDS} more
