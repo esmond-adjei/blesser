@@ -1056,6 +1056,9 @@ def test_claims_reach_the_regions_own_sites_and_skip_capped_sources():
                     )
                 return row
 
+            assert (await claim(urls=[dated.url])).id == dated.id
+            dated.claimed_until = None
+            await session.commit()
             assert (await claim()).id == local.id
             assert (await claim(skip_sources=frozenset({feed.id}))) is None
             assert (await claim()).id == dated.id

@@ -14,7 +14,12 @@ from api.core.time import utcnow_naive
 from api.editorial.service import get_settings
 from api.opportunities import service
 from api.opportunities.crawl_models import CrawlCandidate, Source
-from api.opportunities.crawler import crawl_due, credit_source, record_candidate
+from api.opportunities.crawler import (
+    HUB_LINKS,
+    crawl_due,
+    credit_source,
+    record_candidate,
+)
 from api.opportunities.dedupe import key_for
 from api.opportunities.extraction import cached_extraction, extract_page
 from api.opportunities.official import (
@@ -24,6 +29,7 @@ from api.opportunities.official import (
     resolve_official,
 )
 from api.opportunities.page_cache import get_page
+from api.opportunities.page_content import normalized_url
 from api.opportunities.screening import screen_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
 from api.opportunities.triage import (
@@ -95,6 +101,7 @@ async def claim_candidate(
     *,
     prefer_local: bool = True,
     skip_sources: frozenset[str] = frozenset(),
+    urls: list[str] | None = None,
 ):
     now = utcnow_naive()
     query = (
@@ -123,6 +130,7 @@ async def claim_candidate(
             )
             if skip_sources
             else true(),
+            CrawlCandidate.url.in_(urls) if urls is not None else true(),
         )
         .outerjoin(Source, Source.id == CrawlCandidate.source_id)
         .order_by(*claim_order(local_domains(region) if prefer_local else None))
@@ -176,10 +184,36 @@ async def follow_aggregator(ctx, page, data, hosts, metrics: dict):
     return data.model_copy(update=changes), {"found_via": page.url}
 
 
-async def run_pipeline(session, task, scan, category: str, on_event=None) -> dict:
+async def hand_off(session, pages: list[str], category: str) -> list[str]:
+    """Candidates for the pages the agent read: a page listing many opportunities
+    hands over its links instead of itself."""
+    from api.opportunities.crawl_models import PageCache
+
+    urls: list[str] = []
+    for url in pages:
+        row = await session.get(PageCache, normalized_url(url))
+        links = ((row.metadata_json or {}).get("links") or []) if row else []
+        for target in [i["url"] for i in links] if len(links) >= HUB_LINKS else [url]:
+            await record_candidate(
+                session, target, category_hints=[category], reason="agent_read"
+            )
+            urls.append(normalized_url(target))
+    await session.commit()
+    return list(dict.fromkeys(urls))
+
+
+async def run_pipeline(
+    session, task, scan, category: str, on_event=None, *, urls: list[str] | None = None
+) -> dict:
+    """Extract crawler candidates for this scan; with `urls`, only those pages (the
+    ones the agent read and left unsaved) and without crawling sources first."""
     started = time.monotonic()
     metrics = dict(task.metrics or {})
-    crawl = await crawl_due(session, categories=[category])
+    crawl = (
+        {"candidates_found": 0, "sources": {}}
+        if urls is not None
+        else await crawl_due(session, categories=[category])
+    )
     metrics["candidates_found"] = (
         metrics.get("candidates_found", 0) + crawl["candidates_found"]
     )
@@ -190,6 +224,9 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     ctx.save_via = "crawler"
     ctx.opportunities_saved = metrics.get("crawler_saved", 0)
     limit = (await get_settings(session))["crawler"]["max_candidates_per_task"]
+    if urls is not None:
+        urls = [normalized_url(u) for u in urls]
+        limit = min(limit, len(urls))
     hosts = await aggregator_hosts(session)
     attempts = local_attempts = 0
     # No one feed takes every slot, and local sites get up to half of them.
@@ -215,6 +252,7 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
             scan.region,
             prefer_local=local_attempts < limit // 2,
             skip_sources=frozenset(s for s, n in per_source.items() if n >= source_cap),
+            urls=urls,
         )
         if candidate is None:
             break

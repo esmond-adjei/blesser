@@ -125,6 +125,8 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
         )
         if verdict != "fetch failed" and getattr(ctx, "scan_task", None) is not None:
             await _note_links(ctx, tool_input["url"])
+        if verdict == "read" and tool_input["url"] not in ctx.read_pages:
+            ctx.read_pages.append(tool_input["url"])
         if closed:
             from api.core.db import SessionLocal
             from api.opportunities.crawler import record_candidate

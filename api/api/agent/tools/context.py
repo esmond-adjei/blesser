@@ -28,6 +28,8 @@ class ToolContext:
         self.fetch_windows: set[tuple[str, int]] = set()
         # {url_key: link keys} of pages read, to credit a save to the page it was found on.
         self.page_links: dict[str, set[str]] = {}
+        # Pages read in full; the ones left unsaved are extracted after the agent stops.
+        self.read_pages: list[str] = []
         self.fetch_locks: dict = {}
         self.saved_titles: list[str] = []
         self.category: str = "startup"

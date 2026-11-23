@@ -387,3 +387,67 @@ def test_a_member_can_open_their_own_scan_finds_before_review():
     assert client.get(f"/api/app/opportunities/{own}/calendar.ics").status_code == 200
     [find] = client.get(f"/api/app/scans/{scan_id}").json()["finds"]
     assert find["opportunity_id"] == own and find["in_review"] is True
+
+
+def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
+    import uuid
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from api.core.time import utcnow_naive
+    from api.opportunities.crawl_models import CrawlCandidate, PageCache
+    from api.opportunities.page_content import normalized_url
+
+    tag = uuid.uuid4().hex[:8]
+    single = f"https://{tag}.example/call"
+    hub = f"https://{tag}.example/calls"
+    hub_links = [{"url": f"{hub}/c{n}", "label": "Call"} for n in range(6)]
+    handed = []
+
+    async def fake_pipeline(session, task, scan, category, on_event=None, urls=None):
+        handed.append(urls)
+        return {}
+
+    async def fake_agent(session, task, scan, category, **kwargs):
+        return {"final_text": "done", "turns": 1, "read_pages": [single, hub]}
+
+    async def crawler_off(session):
+        return False
+
+    monkeypatch.setattr(opp_tasks, "run_pipeline", fake_pipeline)
+    monkeypatch.setattr(opp_tasks, "_run_agent", fake_agent)
+    monkeypatch.setattr(opp_tasks, "_crawler_runs_in_member_scans", crawler_off)
+
+    async def check():
+        async with SessionLocal() as session:
+            session.add(
+                PageCache(
+                    url=normalized_url(hub),
+                    metadata_json={"links": hub_links},
+                    expires_at=utcnow_naive() + timedelta(days=1),
+                )
+            )
+            await session.commit()
+            scan = await scans.start_scan(
+                session, TEST_USER_ID, categories=["research"], kind="member"
+            )
+            task = await queue.claim_next_task(session, scan_id=scan.id)
+            await opp_tasks.run_discover_opportunities(session, task, scan)
+            expected = [normalized_url(single)] + [
+                normalized_url(i["url"]) for i in hub_links
+            ]
+            assert handed == [expected]
+            assert "agent_read" not in task.metrics
+            rows = (
+                (
+                    await session.execute(
+                        select(CrawlCandidate).where(CrawlCandidate.url.in_(expected))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert {r.reason for r in rows} == {"agent_read"} and len(rows) == 7
+
+    run(check())

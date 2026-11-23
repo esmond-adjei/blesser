@@ -128,8 +128,27 @@ async def run_discover_opportunities(
             resume_messages=resume_messages,
             on_checkpoint=on_checkpoint,
         )
-        task.metrics = {**(task.metrics or {}), "agent_result": result}
+        task.metrics = {
+            **(task.metrics or {}),
+            "agent_result": result,
+            "agent_read": result.pop("read_pages", []),
+        }
         task.messages_json = None
+        await session.commit()
+    if read := (task.metrics or {}).get("agent_read"):
+        from api.opportunities.pipeline import hand_off
+
+        await run_pipeline(
+            session,
+            task,
+            scan,
+            category,
+            on_event,
+            urls=await hand_off(session, read, category),
+        )
+        task.metrics = {
+            k: v for k, v in (task.metrics or {}).items() if k != "agent_read"
+        }
         await session.commit()
     if (
         scan.kind == "member"
@@ -270,7 +289,11 @@ async def _run_agent(
         no_yield_turns=settings.discovery_no_yield_turns,
     )
     await session.commit()
-    return {"final_text": result["final_text"], "turns": result.get("turns")}
+    return {
+        "final_text": result["final_text"],
+        "turns": result.get("turns"),
+        "read_pages": ctx.read_pages,
+    }
 
 
 async def member_only_hosts(session, sites: list[str]) -> set[str]:
