@@ -159,7 +159,7 @@ PUBLIC_FIELDS = {
     "days_left",
     "closed",
 }
-MEMBER_FIELDS = PUBLIC_FIELDS | {"audience", "found_by", "created_at", "is_new", "match_score", "match_terms"}
+MEMBER_FIELDS = PUBLIC_FIELDS | {"audience", "found_by", "created_at", "is_new", "match_score", "match_terms", "in_review"}
 
 
 @pytest.mark.parametrize(
