@@ -88,12 +88,12 @@ def test_steer_needs_a_prompt():
 
 
 def test_timing_follows_the_latest_run_after_a_steer():
-    from datetime import datetime, timedelta
+    from datetime import UTC, datetime, timedelta
     from types import SimpleNamespace
 
     from api.scans.service import _timing
 
-    t0 = datetime(2026, 11, 20, 10, 0, 0)
+    t0 = datetime(2026, 11, 20, 10, 0, 0, tzinfo=UTC)
     first = SimpleNamespace(
         created_at=t0, started_at=t0, finished_at=t0 + timedelta(minutes=5)
     )

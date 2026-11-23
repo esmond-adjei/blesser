@@ -673,11 +673,11 @@ def test_each_message_has_a_limit_of_approval_cards(monkeypatch):
 
 
 def test_a_used_up_scan_allowance_shows_a_card_with_the_next_free_time(monkeypatch):
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     from api.scans import service as scans
 
-    free_at = datetime(2026, 11, 21, 21, 39)
+    free_at = datetime(2026, 11, 21, 21, 39, tzinfo=UTC)
 
     async def used_up(session, user_id):
         return {
