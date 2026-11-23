@@ -248,6 +248,18 @@ def _extraction(source, link=""):
     )
 
 
+def test_overlong_model_prose_is_clipped_not_rejected():
+    payload = json.loads(
+        _extraction("https://volta.example.org/fellowship").model_dump_json()
+    )
+    payload["reason"] = "Open now. " * 80
+    payload["opportunity"]["benefits"] = "Monthly stipend for living costs, " * 20
+    result = extraction.Extraction.model_validate_json(json.dumps(payload))
+    benefits = result.opportunity.benefits
+    assert len(benefits) <= 300 and benefits.endswith("…")
+    assert len(result.reason) <= 500
+
+
 def _run_pipeline(monkeypatch, post, pages):
     from api.scans import service as scans
     from tests.conftest import TEST_USER_ID

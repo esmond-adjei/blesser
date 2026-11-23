@@ -116,6 +116,16 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
                     reason="deadline_passed",
                 )
                 await session.commit()
+            # The model pays for every character it reads; a closed call is worth one line.
+            rest = (
+                f" A newer cycle further down would be at offset={offset + settings.fetch_max_chars}."
+                if "more characters. Call fetch_page" in text
+                else ""
+            )
+            text = (
+                "[Closed: every deadline in this part of the page has passed and it does"
+                f" not say rolling. Move on unless you expect a newer cycle.{rest}]"
+            )
         result = {"text": text, "page_note": ctx.page_notes[key]}
         if verdict == "fetch failed":
             result["error"] = text

@@ -299,6 +299,28 @@ def test_refetch_suppression_keeps_grounding_and_unread_offsets(monkeypatch):
     run(check())
 
 
+def test_closed_page_costs_one_line_not_its_text(monkeypatch):
+    source = url()
+    closed = "Old Accra Grant. Application deadline: 30 April 2025. " + "Details. " * 900
+
+    async def fetch(target, max_chars, offset, **kwargs):
+        return closed[offset : offset + max_chars] + (
+            "\n[... 99 more characters. Call fetch_page with the same url and offset=6000 to read on.]"
+        )
+
+    from api import web
+
+    monkeypatch.setattr(web, "fetch_page", fetch)
+
+    async def check():
+        ctx = ToolContext(None, None)
+        result = await _fetch_page({"url": source}, ctx)
+        assert result["text"].startswith("[Closed:") and len(result["text"]) < 300
+        assert "offset=" in result["text"] and "closed" in result["page_note"]
+
+    run(check())
+
+
 def test_agent_stops_without_yield_and_summarizes(monkeypatch):
     calls = []
 

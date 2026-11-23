@@ -1,4 +1,5 @@
 import json
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -7,7 +8,7 @@ from api.agent.orchestrator import _add_usage, _chat_with_retry
 from api.agent.untrusted import UNTRUSTED_CONTENT_RULE
 from api.core.config import settings
 from api.opportunities.page_content import Page, deadline_dates
-from api.opportunities.schemas import AgentOpportunityIn
+from api.opportunities.schemas import AgentOpportunityIn, clipped
 
 
 class ExtractedOpportunity(AgentOpportunityIn):
@@ -27,7 +28,7 @@ class Extraction(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     relevant: bool
     region_eligible: bool
-    reason: str = Field(max_length=500)
+    reason: Annotated[str, clipped(500)] = Field(max_length=500)
     confidence: float = Field(ge=0, le=1)
     opportunity: ExtractedOpportunity | None
 
