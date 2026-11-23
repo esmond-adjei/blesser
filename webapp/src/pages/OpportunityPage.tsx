@@ -56,7 +56,7 @@ export function OpportunityPage() {
             <Chip>{CATEGORY_LABELS[opp.category]}</Chip>
             {opp.location ? <Chip icon={<MapPin aria-hidden="true" />} className="h-auto min-h-6 max-w-full whitespace-normal wrap-anywhere">{opp.location}</Chip> : null}
             {opp.in_review ? (
-              <Chip icon={<EyeOff aria-hidden="true" />}>Only you can see this</Chip>
+              <Chip icon={<EyeOff aria-hidden="true" />}>Private</Chip>
             ) : opp.audience === "members" ? <Chip icon={<Lock aria-hidden="true" />}>Members only</Chip> : null}
             {opp.is_new && !opp.in_review ? <Chip>New</Chip> : null}
           </div>
