@@ -3,7 +3,7 @@ import time
 from datetime import timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import cast, func, or_, select, update
+from sqlalchemy import case, cast, func, or_, select, true, update
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.agent.orchestrator import TaskHalted, _halt_reason
@@ -14,7 +14,7 @@ from api.core.time import utcnow_naive
 from api.editorial.service import get_settings
 from api.opportunities import service
 from api.opportunities.crawl_models import CrawlCandidate, Source
-from api.opportunities.crawler import crawl_due, record_candidate
+from api.opportunities.crawler import crawl_due, credit_source, record_candidate
 from api.opportunities.dedupe import key_for
 from api.opportunities.extraction import extract_page
 from api.opportunities.official import (
@@ -27,6 +27,7 @@ from api.opportunities.page_cache import get_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
 from api.opportunities.triage import (
     is_listing,
+    local_domains,
     names_other_country,
     triage_page,
     triage_url,
@@ -46,15 +47,37 @@ async def lock_claim(session, candidate, token) -> bool:
     return False
 
 
-def claim_order():
-    """Newest items first, then sources that have yielded saves, then newest found.
+def claim_order(local: list[str] | None = None):
+    """The region's own sites first when `local` names their country domains, then
+    newest items, then sources that have yielded saves, then newest found.
 
     Yield is smoothed ((saved + 1) / (found + 2)) so a new source starts at one half.
     """
     source_yield = (func.coalesce(Source.opportunities_saved, 0) + 1.0) / (
         func.coalesce(Source.candidates_found, 0) + 2.0
     )
+    on_local = (
+        [
+            case(
+                (
+                    or_(
+                        *[
+                            CrawlCandidate.url.op("~*")(
+                                rf"^https?://[^/]*\.{d}(:\d+)?(/|$)"
+                            )
+                            for d in local
+                        ]
+                    ),
+                    0,
+                ),
+                else_=1,
+            )
+        ]
+        if local
+        else []
+    )
     return (
+        *on_local,
         CrawlCandidate.published_date.desc().nulls_last(),
         source_yield.desc(),
         CrawlCandidate.created_at.desc(),
@@ -64,7 +87,14 @@ def claim_order():
 log = logging.getLogger(__name__)
 
 
-async def claim_candidate(session, category: str, region: str):
+async def claim_candidate(
+    session,
+    category: str,
+    region: str,
+    *,
+    prefer_local: bool = True,
+    skip_sources: frozenset[str] = frozenset(),
+):
     now = utcnow_naive()
     query = (
         select(CrawlCandidate)
@@ -86,9 +116,15 @@ async def claim_candidate(session, category: str, region: str):
                 cast(CrawlCandidate.category_hints, JSONB) == [],
                 cast(CrawlCandidate.category_hints, JSONB).contains([category]),
             ),
+            or_(
+                CrawlCandidate.source_id.is_(None),
+                CrawlCandidate.source_id.not_in(skip_sources),
+            )
+            if skip_sources
+            else true(),
         )
         .outerjoin(Source, Source.id == CrawlCandidate.source_id)
-        .order_by(*claim_order())
+        .order_by(*claim_order(local_domains(region) if prefer_local else None))
         .with_for_update(skip_locked=True, of=CrawlCandidate)
         .limit(1)
     )
@@ -154,7 +190,11 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     ctx.opportunities_saved = metrics.get("crawler_saved", 0)
     limit = (await get_settings(session))["crawler"]["max_candidates_per_task"]
     hosts = await aggregator_hosts(session)
-    attempts = 0
+    attempts = local_attempts = 0
+    # No one feed takes every slot, and local sites get up to half of them.
+    per_source: dict[str, int] = {}
+    source_cap = max(2, -(-limit // 3))
+    local = local_domains(scan.region)
     for _ in range(limit * 10):
         if (
             attempts >= limit
@@ -168,7 +208,13 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
             break
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
-        candidate = await claim_candidate(session, category, scan.region)
+        candidate = await claim_candidate(
+            session,
+            category,
+            scan.region,
+            prefer_local=local_attempts < limit // 2,
+            skip_sources=frozenset(s for s, n in per_source.items() if n >= source_cap),
+        )
         if candidate is None:
             break
         token = candidate.claim_token
@@ -229,6 +275,12 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
             )
         else:
             attempts += 1
+            if candidate.source_id:
+                per_source[candidate.source_id] = (
+                    per_source.get(candidate.source_id, 0) + 1
+                )
+            if local and any(host_of(candidate.url).endswith("." + d) for d in local):
+                local_attempts += 1
             metrics["extraction_attempts"] = metrics.get("extraction_attempts", 0) + 1
             task.metrics = dict(metrics)
             await session.commit()
@@ -306,14 +358,7 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                                 "crawler_saved", 0
                             ) + int(saved["created"])
                             if candidate.source_id and saved["created"]:
-                                await session.execute(
-                                    update(Source)
-                                    .where(Source.id == candidate.source_id)
-                                    .values(
-                                        opportunities_saved=Source.opportunities_saved
-                                        + 1
-                                    )
-                                )
+                                await credit_source(session, candidate.source_id)
             except (ValueError, ValidationError) as exc:
                 if not await lock_claim(session, candidate, token):
                     continue

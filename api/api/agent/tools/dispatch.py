@@ -49,6 +49,30 @@ def unreadable_host(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in UNREADABLE_HOSTS)
 
 
+async def _note_links(ctx: ToolContext, url: str) -> None:
+    """Remember the page's links, and suggest it as a source when it lists opportunities."""
+    from api.core.db import SessionLocal
+    from api.opportunities.crawl_models import PageCache
+    from api.opportunities.crawler import HUB_LINKS, propose_source
+    from api.opportunities.page_content import normalized_url
+
+    async with SessionLocal() as session:
+        row = await session.get(PageCache, normalized_url(url))
+        if row is None or row.error:
+            return
+        metadata = row.metadata_json or {}
+        listed = metadata.get("links") or []
+        ctx.page_links[opportunity_tools.url_key(url)] = {
+            opportunity_tools.url_key(link["url"])
+            for link in listed + (metadata.get("outbound") or [])
+        }
+        if len(listed) >= HUB_LINKS:
+            await propose_source(
+                session, url, ctx.category, feeds=metadata.get("feeds") or []
+            )
+            await session.commit()
+
+
 async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
     from api.opportunities.page_content import Page, expired, page_note
 
@@ -99,6 +123,8 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
             Page(url=key, text=text, title=text.splitlines()[0][:120] if text else ""),
             verdict,
         )
+        if verdict != "fetch failed" and getattr(ctx, "scan_task", None) is not None:
+            await _note_links(ctx, tool_input["url"])
         if closed:
             from api.core.db import SessionLocal
             from api.opportunities.crawler import record_candidate

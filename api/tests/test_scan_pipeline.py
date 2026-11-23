@@ -1019,3 +1019,120 @@ def test_opportunity_url_keys_follow_edits():
             await session.rollback()
 
     run(check())
+
+
+def test_claims_reach_the_regions_own_sites_and_skip_capped_sources():
+    from api.opportunities.triage import local_domains
+
+    assert local_domains("Ghana") == ["gh"] and local_domains("Anywhere") == []
+
+    async def check():
+        async with SessionLocal() as session:
+            feed = Source(url=url(), kind="rss")
+            session.add(feed)
+            await session.flush()
+            tag = uuid.uuid4().hex[:8]
+            dated = CrawlCandidate(
+                url=f"https://feed.example/{tag}",
+                published_date=date(2026, 11, 20),
+                source_id=feed.id,
+                category_hints=["student"],
+            )
+            local = CrawlCandidate(
+                url=f"https://scholarships.gov.gh/{tag}",
+                category_hints=["student"],
+            )
+            session.add_all([dated, local])
+            await session.commit()
+            ids = {dated.id, local.id}
+
+            async def claim(**kwargs):
+                row = await pipeline.claim_candidate(
+                    session, "student", "Ghana", **kwargs
+                )
+                while row is not None and row.id not in ids:
+                    row = await pipeline.claim_candidate(
+                        session, "student", "Ghana", **kwargs
+                    )
+                return row
+
+            assert (await claim()).id == local.id
+            assert (await claim(skip_sources=frozenset({feed.id}))) is None
+            assert (await claim()).id == dated.id
+
+    run(check())
+
+
+def test_suggested_sources_are_pages_on_trial_not_homepages():
+    async def check():
+        async with SessionLocal() as session:
+            tag = uuid.uuid4().hex[:8]
+            assert await crawler.propose_source(
+                session, f"https://{tag}.example/", "research"
+            ) is None
+            hub = f"https://{tag}.example/funding/calls"
+            source_id = await crawler.propose_source(
+                session,
+                hub,
+                "research",
+                feeds=[f"https://{tag}.example/feed/", f"{hub}/feed/"],
+            )
+            source = await session.get(Source, source_id)
+            assert source.url == f"{hub}/feed/" and source.kind == "rss"
+            assert source.proposed and not source.enabled
+            on_trial = (
+                await session.execute(
+                    select(Source.id).where(Source.id == source_id, crawler.on_trial())
+                )
+            ).scalar_one_or_none()
+            assert on_trial == source_id
+
+            await crawler.credit_source(session, source_id)
+            await session.refresh(source)
+            assert source.enabled and not source.proposed
+            assert source.opportunities_saved == 1
+
+            covered = f"https://{tag}.covered.example/feed/"
+            feed = Source(url=covered, kind="rss", enabled=True)
+            session.add(feed)
+            await session.flush()
+            assert (
+                await crawler.propose_source(
+                    session, f"https://{tag}.covered.example/grants", "research"
+                )
+                == feed.id
+            )
+            await session.rollback()
+
+    run(check())
+
+
+def test_a_hub_page_the_agent_reads_is_suggested_and_its_links_kept():
+    from api.agent.tools.dispatch import _note_links
+
+    tag = uuid.uuid4().hex[:8]
+    hub = f"https://{tag}.example/grants"
+    links = [{"url": f"{hub}/call-{n}", "label": "Call"} for n in range(6)]
+
+    async def check():
+        async with SessionLocal() as session:
+            session.add(
+                PageCache(
+                    url=normalized_url(hub),
+                    text="Grants",
+                    metadata_json={"links": links, "outbound": []},
+                    expires_at=utcnow_naive() + timedelta(days=1),
+                )
+            )
+            await session.commit()
+        ctx = ToolContext(None, None)
+        ctx.category, ctx.scan_task = "research", object()
+        await _note_links(ctx, hub)
+        assert f"{hub}/call-0" in {k for v in ctx.page_links.values() for k in v}
+        async with SessionLocal() as session:
+            source = (
+                await session.execute(select(Source).where(Source.url == hub))
+            ).scalar_one()
+            assert source.proposed and source.category_hints == ["research"]
+
+    run(check())

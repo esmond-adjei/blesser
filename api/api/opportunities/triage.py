@@ -167,6 +167,44 @@ _AREAS = {
 }
 
 
+#: Country-code domains, so a scan can favour a country's own sites (.gov.gh, .edu.gh).
+_COUNTRY_DOMAINS = {
+    "nigeria": "ng",
+    "south africa": "za",
+    "kenya": "ke",
+    "ghana": "gh",
+    "uganda": "ug",
+    "tanzania": "tz",
+    "rwanda": "rw",
+    "ethiopia": "et",
+    "egypt": "eg",
+    "morocco": "ma",
+    "zambia": "zm",
+    "zimbabwe": "zw",
+    "cameroon": "cm",
+    "senegal": "sn",
+    "malawi": "mw",
+    "botswana": "bw",
+    "namibia": "na",
+    "mozambique": "mz",
+    "sierra leone": "sl",
+    "liberia": "lr",
+    "india": "in",
+    "pakistan": "pk",
+    "bangladesh": "bd",
+    "philippines": "ph",
+}
+
+
+def local_domains(region: str) -> list[str]:
+    """Country-code domains of the countries a region names, such as ["gh"] for Ghana."""
+    return sorted(
+        _COUNTRY_DOMAINS[c]
+        for c in _countries_in(region or "")
+        if c in _COUNTRY_DOMAINS
+    )
+
+
 def _countries_in(text: str) -> set[str]:
     text = re.sub(r"[-_/]+", " ", text.casefold())
     return {

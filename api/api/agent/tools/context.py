@@ -26,6 +26,8 @@ class ToolContext:
         self.page_notes: dict[str, str] = {}
         self.known_pages: dict[str, str] = {}
         self.fetch_windows: set[tuple[str, int]] = set()
+        # {url_key: link keys} of pages read, to credit a save to the page it was found on.
+        self.page_links: dict[str, set[str]] = {}
         self.fetch_locks: dict = {}
         self.saved_titles: list[str] = []
         self.category: str = "startup"

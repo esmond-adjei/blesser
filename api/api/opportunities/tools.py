@@ -250,9 +250,27 @@ async def handle_save_opportunity(
             if updated
             else find.on_conflict_do_nothing()
         )
-    from api.opportunities.crawler import propose_source, record_candidate
+    from api.opportunities.crawler import (
+        credit_source,
+        propose_source,
+        record_candidate,
+        source_for_host,
+    )
 
-    source_id = await propose_source(ctx.session, data.source_url, data.category.value)
+    saved_keys = {url_key(u) for u in (data.source_url, data.link) if u}
+    found_on = next(
+        (
+            page
+            for page, links in getattr(ctx, "page_links", {}).items()
+            if page not in saved_keys and links & saved_keys
+        ),
+        None,
+    )
+    source_id = (
+        await propose_source(ctx.session, found_on, data.category.value)
+        if found_on
+        else None
+    ) or await source_for_host(ctx.session, data.source_url)
     added = await record_candidate(
         ctx.session,
         data.source_url,
@@ -262,16 +280,14 @@ async def handle_save_opportunity(
         status="extracted",
         reason="agent_save",
     )
-    if getattr(ctx, "scan_task", None) is not None and created:
+    if getattr(ctx, "scan_task", None) is not None and created and source_id:
         from api.opportunities.crawl_models import Source
 
+        await credit_source(ctx.session, source_id)
         await ctx.session.execute(
             update(Source)
             .where(Source.id == source_id)
-            .values(
-                opportunities_saved=Source.opportunities_saved + 1,
-                candidates_found=Source.candidates_found + int(added),
-            )
+            .values(candidates_found=Source.candidates_found + int(added))
         )
     if created and getattr(ctx, "scan_task", None) is not None:
         ctx.scan_task.metrics = {
