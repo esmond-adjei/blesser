@@ -21,6 +21,12 @@ from api.core.db import Base
 from api.core.ids import new_id
 from api.core.time import utcnow_naive
 
+#: Scheduled listing checks and staff re-verifies: system work, never shown or counted as a scan.
+CHECK_KIND = "check"
+#: Kinds a member sees in their own scan list: their requests, weekly runs and site checks.
+#: "sweep" is the staff catalogue refresh.
+MEMBER_KINDS = ("member", "scheduled", "sources")
+
 
 class TaskStatus(str, enum.Enum):
     pending = "pending"
@@ -52,8 +58,8 @@ class Scan(Base):
     focus: Mapped[str] = mapped_column(Text, default="")
     # Listing types to look for, such as scholarship or job; empty means any.
     kinds: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
-    # member: a person's request; sweep: the scheduled catalogue refresh.
-    kind: Mapped[str] = mapped_column(String, default="member", server_default="member")
+    # Required, so system work can't pass as a member's scan. See MEMBER_KINDS.
+    kind: Mapped[str] = mapped_column(String)
     # Up to five public sites the member asked the agent to read first.
     sites: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     # Set on each run of a scan schedule.

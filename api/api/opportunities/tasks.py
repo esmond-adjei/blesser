@@ -324,7 +324,7 @@ async def _run_agent(
         resume_messages=resume_messages,
         on_checkpoint=on_checkpoint,
         tools=tools,
-        max_turns=min(settings.discovery_max_turns, settings.max_agent_turns),
+        max_turns=settings.discovery_max_turns,
         no_yield_turns=settings.discovery_no_yield_turns,
     )
     await session.commit()
@@ -368,13 +368,16 @@ async def run_reverify_opportunity(
     )
     result = await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
-        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url or row.link}. Save only this opportunity if the source still confirms it.{cycle} Today: {opp_service.today().isoformat()}.",
+        f"Re-verify only {row.title} by {row.organization}. Read {row.source_url or row.link}. Save only this opportunity if the source still confirms it.{cycle}"
+        " If neither the official page nor the application page it links to can be read,"
+        " stop and say so: not saving is a valid answer, and search engines, proxies and"
+        f" archives are not sources. Today: {opp_service.today().isoformat()}.",
         ctx,
         on_event=on_event,
         resume_messages=resume_messages,
         on_checkpoint=on_checkpoint,
         tools=["fetch_page", "save_opportunity"],
-        progress_tools={"save_opportunity"},
+        max_turns=settings.reverify_max_turns,
     )
     await record_agent_check(session, task, started)
     await session.commit()

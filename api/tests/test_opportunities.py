@@ -139,6 +139,7 @@ def _run_id() -> str:
                 region="Ghana",
                 categories=["startup"],
                 status="running",
+                kind="member",
             )
             session.add(run)
             await session.commit()

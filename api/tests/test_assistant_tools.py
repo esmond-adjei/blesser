@@ -170,7 +170,7 @@ def test_scan_proposals_check_sites_and_the_allowance(monkeypatch):
     monkeypatch.setattr(settings, "rate_limits_enabled", True)
     add(
         *[
-            Scan(user_id=user, region="Ghana", categories=["research"], status="done")
+            Scan(user_id=user, region="Ghana", categories=["research"], status="done", kind="member")
             for _ in range(3)
         ]
     )
@@ -189,7 +189,7 @@ def test_an_approved_scan_still_counts_against_the_limit(monkeypatch):
     monkeypatch.setattr(settings, "rate_limits_enabled", True)
     add(
         *[
-            Scan(user_id=user, region="Ghana", categories=["student"], status="done")
+            Scan(user_id=user, region="Ghana", categories=["student"], status="done", kind="member")
             for _ in range(3)
         ]
     )
@@ -200,7 +200,7 @@ def test_an_approved_scan_still_counts_against_the_limit(monkeypatch):
 def test_scan_finds_can_be_read_and_tracked_by_their_owner_only():
     user, other = member(), member()
     [scan_id] = add(
-        Scan(user_id=user, region="Ghana", categories=["startup"], status="done")
+        Scan(user_id=user, region="Ghana", categories=["startup"], status="done", kind="member")
     )
     [opp_id] = add(
         Opportunity(

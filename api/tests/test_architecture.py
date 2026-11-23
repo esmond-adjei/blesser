@@ -21,7 +21,7 @@ from api.opportunities import service as opportunities
 from api.opportunities.archive import auto_archive
 from api.opportunities.models import Opportunity
 from api.opportunities.schemas import AgentOpportunityIn
-from api.scans.models import ScanTask
+from api.scans.models import CHECK_KIND, Scan, ScanTask
 from api.todos.models import Todo
 
 pytestmark = pytest.mark.real_auth
@@ -573,6 +573,12 @@ def test_merge_repoints_tracking_and_reverify_queues_one_task():
         and queued[0].task_type == "reverify_opportunity"
         and queued[0].target == target["id"]
     )
+
+    async def kind():
+        async with SessionLocal() as session:
+            return (await session.get(Scan, response.json()["scan_id"])).kind
+
+    assert run(kind()) == CHECK_KIND
 
 
 def test_collections_site_sitemap_and_resolved_reports():

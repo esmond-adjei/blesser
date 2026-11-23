@@ -277,7 +277,7 @@ def _run_pipeline(monkeypatch, post, pages):
             )
             await session.commit()
             scan = await scans.start_scan(
-                session, TEST_USER_ID, categories=["research"]
+                session, TEST_USER_ID, categories=["research"], kind="member"
             )
             task = (
                 await session.execute(

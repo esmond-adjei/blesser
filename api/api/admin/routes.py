@@ -787,6 +787,7 @@ async def start_scan(
         region=req.region,
         focus=req.focus,
         sites=await scans.check_sites(req.sites),
+        kind="member",
         commit=False,
     )
     await service.write_audit(

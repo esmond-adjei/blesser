@@ -70,6 +70,7 @@ def _new_run(user_id: str, status: str = "running") -> str:
                 categories=["startup"],
                 focus=SECRET_FOCUS,
                 status=status,
+                kind="member",
             )
             session.add(run)
             await session.commit()

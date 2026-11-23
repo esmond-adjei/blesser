@@ -110,7 +110,7 @@ async def start_scan(
     focus: str = "",
     sites: list[str] | None = None,
     kinds: list[str] | None = None,
-    kind: str = "member",
+    kind: str,
     schedule_id: str | None = None,
     commit: bool = True,
 ) -> m.Scan:
@@ -213,9 +213,7 @@ async def note_tasks_drained(session, scan_id: str) -> None:
     ).scalar() or 0
     if open_tasks == 0:
         scan.status = "done"
-        from api.opportunities.freshness import CHECK_FOCUS
-
-        if scan.focus == CHECK_FOCUS:
+        if scan.kind == m.CHECK_KIND:
             # Scheduled checks report through the listings themselves, not a notification.
             return
         from api.notifications import events
@@ -364,7 +362,7 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
         (
             await session.execute(
                 select(m.Scan)
-                .where(m.Scan.user_id == user_id)
+                .where(m.Scan.user_id == user_id, m.Scan.kind.in_(m.MEMBER_KINDS))
                 .order_by(m.Scan.created_at.desc(), m.Scan.id)
                 .limit(limit)
             )

@@ -17,6 +17,27 @@ import httpx
 MAX_REDIRECTS = 5
 
 
+#: Read-through proxies and readers: fetching through them would get round robots.txt.
+PROXY_HOSTS = frozenset(
+    {
+        "r.jina.ai",
+        "allorigins.win",
+        "corsproxy.io",
+        "codetabs.com",
+        "12ft.io",
+        "archive.ph",
+        "archive.is",
+        "archive.today",
+        "translate.goog",
+    }
+)
+
+
+def on_proxy(host: str) -> bool:
+    host = host.lower().removeprefix("www.")
+    return any(host == h or host.endswith("." + h) for h in PROXY_HOSTS)
+
+
 class EgressBlocked(Exception):
     """The URL points somewhere this process must not reach."""
 
@@ -54,6 +75,8 @@ async def check_url(url: str | httpx.URL) -> httpx.URL:
     host = parsed.host
     if not host:
         raise EgressBlocked("the URL has no host")
+    if on_proxy(host):
+        raise EgressBlocked(f"{host} is a proxy, which would bypass robots.txt")
     literal = _literal_ip(host)
     if literal is not None:
         addresses = [literal]

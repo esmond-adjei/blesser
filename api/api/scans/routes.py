@@ -148,6 +148,7 @@ async def start_scan(
         region=req.region,
         focus=req.focus,
         kinds=[k.value for k in req.kinds],
+        kind="member",
         sites=sites,
     )
     if req.repeat:
@@ -190,6 +191,7 @@ async def rerun_scan(
         if req.kinds is not None
         else list(original.kinds or []),
         sites=sites,
+        kind="member",
     )
     return await service.scan_detail(session, current.id, scan.id)
 

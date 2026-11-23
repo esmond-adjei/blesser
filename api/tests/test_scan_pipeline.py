@@ -322,7 +322,11 @@ def test_agent_stops_without_yield_and_summarizes(monkeypatch):
     monkeypatch.setattr(orchestrator, "dispatch_batch", dispatch)
     result = run(
         orchestrator.run_agent_task(
-            "sys", "go", SimpleNamespace(session=None, run=None), no_yield_turns=3
+            "sys",
+            "go",
+            SimpleNamespace(session=None, run=None),
+            max_turns=10,
+            no_yield_turns=3,
         )
     )
     assert len(calls) == 3
@@ -404,7 +408,7 @@ def test_worker_crawls_extracts_and_holds_low_confidence(monkeypatch):
                     next_crawl_at=utcnow_naive() - timedelta(days=10000),
                 )
             )
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await queue.process_claimed(session, task)
             assert task.status.value == "done", task.error
@@ -645,7 +649,7 @@ def test_stale_candidate_claim_cannot_save(monkeypatch, invalid_response):
                 created_at=utcnow_naive() - timedelta(days=10000),
             )
             session.add(candidate)
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             task = (
                 await session.execute(
                     select(ScanTask).where(ScanTask.scan_id == scan.id)
@@ -707,7 +711,7 @@ def test_agent_save_metrics_survive_a_later_failure(monkeypatch):
 
     async def check():
         async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await queue.process_claimed(session, task)
             assert task.status.value == "error"

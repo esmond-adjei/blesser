@@ -234,6 +234,7 @@ async def apply_start(session, user_id, arguments):
         focus=arguments["focus"],
         sites=await scans.check_sites(arguments["sites"]),
         kinds=arguments.get("kinds") or [],
+        kind="member",
     )
     title = _scan_title(
         {

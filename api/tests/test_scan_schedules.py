@@ -96,7 +96,7 @@ def _user(role: str = "member", **fields) -> str:
 
 async def _scan(session, user_id: str, **kwargs) -> Scan:
     return await scans.start_scan(
-        session, user_id, categories=kwargs.pop("categories", ["startup"]), **kwargs
+        session, user_id, categories=kwargs.pop("categories", ["startup"]), **{"kind": "member", **kwargs}
     )
 
 

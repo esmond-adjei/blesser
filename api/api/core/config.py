@@ -37,7 +37,6 @@ class Settings(BaseSettings):
     # --- Agent budgets ---
     max_agent_turns: int = 40
     # Finishing without saving anything is nudged back to work this many times.
-    max_empty_finish_nudges: int = 2
     # Tool results older than this many turns become a marker; <=0 disables.
     max_tool_result_age_turns: int = 2
     # Compaction moves in blocks of this many turns so prompt caches keep hitting.
@@ -72,6 +71,7 @@ class Settings(BaseSettings):
     extraction_max_chars: int = 10000
     extraction_min_confidence: float = 0.85
     discovery_no_yield_turns: int = 5
+    reverify_max_turns: int = 8
     discovery_max_turns: int = 12
     # "My sources": sites a member saves for scheduled checks.
     member_sources_max: int = 10

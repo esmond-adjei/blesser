@@ -5,6 +5,7 @@ A new tool needs a HANDLERS row and a definition in definitions.py (parity is te
 
 import asyncio
 import json
+from urllib.parse import urlsplit
 
 from api import web
 from api.agent.tools.context import ToolContext
@@ -22,9 +23,41 @@ async def _search_web(tool_input: dict, ctx: ToolContext) -> dict:
     return {"results": web.brief_results(results)}
 
 
+#: Search engines, caches and archives are never a source; search_web covers search and
+#: fetch_page already falls back to the Internet Archive. Proxies are blocked in egress.
+UNREADABLE_HOSTS = frozenset(
+    {
+        "google.com",
+        "cache.google.com",
+        "webcache.googleusercontent.com",
+        "bing.com",
+        "duckduckgo.com",
+        "yandex.com",
+        "yandex.ru",
+        "search.brave.com",
+        "startpage.com",
+        "mojeek.com",
+        "search.yahoo.com",
+        "baidu.com",
+        "archive.org",
+    }
+)
+
+
+def unreadable_host(url: str) -> bool:
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    return any(host == h or host.endswith("." + h) for h in UNREADABLE_HOSTS)
+
+
 async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
     from api.opportunities.page_content import Page, expired, page_note
 
+    if unreadable_host(tool_input["url"]):
+        message = (
+            "[Not fetched: search engines, caches and archives are not sources. Use"
+            " search_web to find pages, or stop if there is no other source.]"
+        )
+        return {"text": message, "error": message}
     key = opportunity_tools.url_key(tool_input["url"])
     if key in ctx.known_pages and not ctx.reverify_id:
         note = ctx.known_pages[key]

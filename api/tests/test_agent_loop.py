@@ -1,4 +1,4 @@
-"""The agent loop and dispatcher: nudges, resumes, concurrency, ordering and failures."""
+"""The agent loop and dispatcher: budgets, resumes, concurrency, ordering and failures."""
 
 import asyncio
 import json
@@ -47,40 +47,27 @@ def _run_task(monkeypatch, script, **kwargs):
     return result, seen
 
 
-def test_empty_finish_is_nudged_back_to_work(monkeypatch):
-    result, seen = _run_task(
-        monkeypatch,
-        [("final", "done already"), ("call", "save_opportunity", {}), ("final", "saved one")],
-        progress_tools={"save_opportunity"},
-    )
-    assert result["nudges"] == 1
-    assert result["final_text"] == "saved one"
-    assert orch.EMPTY_FINISH_NUDGE in json.dumps(seen[1])
+def test_a_final_answer_ends_the_task(monkeypatch):
+    result, seen = _run_task(monkeypatch, [("final", "nothing to save")], max_turns=8)
+    assert result["final_text"] == "nothing to save" and result["turns"] == 1
+    assert len(seen) == 1
 
 
-def test_nudges_are_bounded(monkeypatch):
-    monkeypatch.setattr(orch.settings, "max_empty_finish_nudges", 2)
-    result, _ = _run_task(
-        monkeypatch, [("final", "a"), ("final", "b"), ("final", "c")], progress_tools={"save_opportunity"}
-    )
-    assert result["nudges"] == 2 and result["final_text"] == "c"
+def test_turn_budget_is_capped_by_the_global_ceiling(monkeypatch):
+    monkeypatch.setattr(orch.settings, "max_agent_turns", 2)
+    script = [("call", "fetch_page", {"url": f"https://x.org/{n}"}) for n in range(5)]
+    result, seen = _run_task(monkeypatch, script, max_turns=4)
+    assert result["turns"] == 2 and len(seen) == 2
 
 
-def test_no_nudge_without_progress_tools(monkeypatch):
-    result, _ = _run_task(monkeypatch, [("final", "nothing to do")])
-    assert result["nudges"] == 0
-
-
-def test_resume_counts_prior_saves_and_turns(monkeypatch):
+def test_resume_counts_prior_turns(monkeypatch):
     history = [
         {"role": "user", "content": "go"},
         {"role": "assistant", "content": "", "tool_calls": [{"id": "t1", "name": "save_opportunity", "arguments": {}}]},
         {"role": "tool", "tool_call_id": "t1", "name": "save_opportunity", "content": "{}"},
     ]
-    result, _ = _run_task(
-        monkeypatch, [("final", "wrapped up")], resume_messages=history, progress_tools={"save_opportunity"}
-    )
-    assert result["nudges"] == 0 and result["turns"] == 2
+    result, _ = _run_task(monkeypatch, [("final", "wrapped up")], resume_messages=history, max_turns=8)
+    assert result["turns"] == 2
 
 
 def test_closing_format_is_asked_for_once():

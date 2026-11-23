@@ -118,7 +118,7 @@ def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch
             await session.commit()
             script.turns[1][0][1]["opportunity_id"] = listing.id
             scan = await scans.start_scan(
-                session, TEST_USER_ID, categories=["startup"], focus=word + " grants"
+                session, TEST_USER_ID, categories=["startup"], focus=word + " grants", kind="member"
             )
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await queue.process_claimed(session, task)
@@ -151,7 +151,7 @@ def test_catalogue_search_lists_only_open_published_listings_in_the_category():
 
     async def check():
         async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             fits = await _listing(session, f"{word} Processing Grant")
             await _listing(session, f"{word} Fellowship", category="research")
             await _listing(session, f"{word} Hidden", status="in_review")
@@ -174,7 +174,7 @@ def test_catalogue_search_lists_only_open_published_listings_in_the_category():
 def test_catalogue_matches_only_open_published_listings():
     async def check():
         async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             held = await _listing(session, "Held " + _token(), status="in_review")
             closed = await _listing(
                 session,
@@ -207,7 +207,7 @@ def test_crawler_saves_do_not_use_the_agents_budget(monkeypatch):
 
     async def check():
         async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             crawled = await _listing(session, "Crawled " + _token())
             session.add(
                 ScanFind(
@@ -266,7 +266,7 @@ def test_sweep_scans_run_the_pipeline_before_the_agent(monkeypatch):
                 session, TEST_USER_ID, categories=["startup"], kind="sweep"
             )
             member = await scans.start_scan(
-                session, TEST_USER_ID, categories=["startup"]
+                session, TEST_USER_ID, categories=["startup"], kind="member"
             )
             for scan in (sweep, member):
                 task = await queue.claim_next_task(session, scan_id=scan.id)
@@ -334,7 +334,7 @@ def test_finds_on_member_sites_wait_for_review(monkeypatch):
     async def check():
         async with SessionLocal() as session:
             scan = await scans.start_scan(
-                session, TEST_USER_ID, categories=["startup"], sites=[site]
+                session, TEST_USER_ID, categories=["startup"], sites=[site], kind="member"
             )
             ctx = ToolContext(session=session, run=scan)
             ctx.member_hosts = await opp_tasks.member_only_hosts(session, scan.sites)
@@ -389,7 +389,7 @@ def test_scan_results_leave_out_listings_already_in_the_catalogue():
         async with SessionLocal() as session:
             old = await _listing(session, f"Already listed {_token()}")
             new = await _listing(session, f"Newly found {_token()}", status="in_review")
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             session.add_all(
                 [
                     ScanFind(
@@ -425,8 +425,8 @@ def test_a_member_can_open_their_own_scan_finds_before_review():
                     email_verified_at=utcnow_naive(),
                 )
             )
-            mine = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
-            theirs = await scans.start_scan(session, other_id, categories=["startup"])
+            mine = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
+            theirs = await scans.start_scan(session, other_id, categories=["startup"], kind="member")
             own = await _listing(
                 session, f"Mine {_token()}", status="in_review", scan_id=mine.id
             )
