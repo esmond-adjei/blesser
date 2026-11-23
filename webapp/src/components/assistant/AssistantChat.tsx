@@ -335,14 +335,17 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   const title = thread.data?.title || "Assistant"
   const selectRef = useRef(selectChat)
   useEffect(() => { selectRef.current = selectChat })
-  const chatButtons = useMemo(() => (
-    <>
-      <Button size="sm" variant="quiet" icon={<MessagesSquare />} onClick={() => (docked ? toggleList() : setHistoryOpen((open) => !open))} aria-pressed={docked ? listOpen : undefined}>
-        <span className={embedded ? "sr-only" : "max-sm:sr-only"}>Chats</span>
-      </Button>
-      {chatId ? <Button size="sm" variant="quiet" icon={<Plus />} onClick={() => selectRef.current()}><span className={embedded ? "sr-only" : "max-sm:sr-only"}>New chat</span></Button> : null}
-    </>
-  ), [embedded, chatId, docked, listOpen])
+  const chatsButton = useMemo(() => (
+    <Button size="sm" variant="quiet" iconOnly={embedded} className="shrink-0" icon={<MessagesSquare />} onClick={() => (docked ? toggleList() : setHistoryOpen((open) => !open))} aria-pressed={docked ? listOpen : undefined}>
+      <span className={embedded ? "sr-only" : "max-sm:sr-only"}>Chats</span>
+    </Button>
+  ), [embedded, docked, listOpen])
+  const newChatButton = useMemo(() => chatId ? (
+    <Button size="sm" variant="quiet" iconOnly={embedded} className="shrink-0" icon={<Plus />} onClick={() => selectRef.current()}>
+      <span className={embedded ? "sr-only" : "max-sm:sr-only"}>New chat</span>
+    </Button>
+  ) : null, [embedded, chatId])
+  const chatButtons = useMemo(() => <>{chatsButton}{newChatButton}</>, [chatsButton, newChatButton])
   const header = useMemo(() => (embedded ? null : { title, actions: chatButtons }), [embedded, title, chatButtons])
   useShellHeader(header)
 
@@ -395,8 +398,11 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
     <div className="@container/chat relative flex min-h-0 min-w-0 flex-1 flex-col">
       {embedded ? (
         <header className="flex h-14 shrink-0 items-center gap-1 border-b border-separator px-3">
-          <h2 className="min-w-0 flex-1 truncate text-callout font-semibold text-ink">{title}</h2>
-          {chatButtons}
+          {chatsButton}
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <h2 className="min-w-0 truncate text-callout font-semibold text-ink">{title}</h2>
+            {newChatButton}
+          </div>
           {actions}
         </header>
       ) : null}
@@ -460,7 +466,6 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
       {embedded ? (
         historyOpen ? (
           <div className="bl-appear absolute inset-x-0 top-14 bottom-0 z-10 flex flex-col gap-3 bg-surface p-3">
-            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
             {list}
           </div>
         ) : null
@@ -688,6 +693,8 @@ function AssistantReply({ message, text, status, entries = [], live, onRetry, on
 }
 
 
+const ROW_ACTIONS = "shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+
 function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, onEdit, onRetry }: {
   rows: ChatRow[]
   activeId?: string
@@ -712,7 +719,7 @@ function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, on
           ]
           return (
             <ActionContextMenu key={chat.id} actions={actions}>
-              <li className={cn("flex min-w-0 items-center rounded-md hover:bg-highlight", chat.id === activeId && "bg-forest-soft text-link")}>
+              <li className={cn("group flex min-w-0 items-center rounded-md hover:bg-highlight", chat.id === activeId && "bg-forest-soft text-link")}>
                 <Link to={assistantHref(chat.id)} aria-current={chat.id === activeId ? "page" : undefined}
                   onClick={(event) => {
                     if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
@@ -726,7 +733,7 @@ function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, on
                   <span className="truncate">{chat.title}</span>
                   {chat.pending_call ? <span className="size-1.5 shrink-0 rounded-full bg-sun" role="img" aria-label="Waiting for approval" /> : null}
                 </Link>
-                <ActionMenuButton actions={actions} label={`Actions for ${chat.title}`} className="shrink-0" />
+                <ActionMenuButton actions={actions} label={`Actions for ${chat.title}`} className={ROW_ACTIONS} />
               </li>
             </ActionContextMenu>
           )

@@ -213,7 +213,7 @@ export function AssistantPanel() {
       aria-label="Assistant"
       style={phone ? undefined : { width: t.shown ? width : 0 }}
       className={cn(
-        "relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none",
+        "relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-canvas motion-reduce:transition-none",
         active ? "transition-none" : "transition-[width,opacity] duration-200",
         phone ? "fixed inset-0 z-50" : "border-l",
         t.shown ? "opacity-100" : "opacity-0",
