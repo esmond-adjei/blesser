@@ -6,9 +6,10 @@ on:
   push:
     branches: [develop, main]
   pull_request:
+  workflow_call:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
