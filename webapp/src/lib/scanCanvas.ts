@@ -42,3 +42,22 @@ export function revealOffset(spot: Pos, offset: Pos, width: number, height: numb
   if (!offX && !offY) return null
   return clampOffset({ x: offX ? GAP - spot.x : offset.x, y: offY ? GAP - spot.y : offset.y }, width, height)
 }
+
+/** The offset that centres these cards in the view above the composer; when they don't fit, the first one. */
+export function focusOffset(spots: Pos[], width: number, height: number): Pos | null {
+  if (!spots.length) return null
+  const room = height - COMPOSER_ROOM
+  const box = (ps: Pos[]) => ({
+    left: Math.min(...ps.map((p) => p.x)),
+    top: Math.min(...ps.map((p) => p.y)),
+    right: Math.max(...ps.map((p) => p.x + CARD_W)),
+    bottom: Math.max(...ps.map((p) => p.y + CARD_H)),
+  })
+  let b = box(spots)
+  if (b.right - b.left > width - 2 * GAP || b.bottom - b.top > room - 2 * GAP) b = box(spots.slice(0, 1))
+  return clampOffset(
+    { x: Math.round(width / 2 - (b.left + b.right) / 2), y: Math.round(room / 2 - (b.top + b.bottom) / 2) },
+    width,
+    height,
+  )
+}

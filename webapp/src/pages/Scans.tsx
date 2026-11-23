@@ -58,7 +58,7 @@ import { SourcesDialog } from "../components/scans/SourcesDialog"
 import { SchedulesDialog } from "../components/scans/SchedulesDialog"
 import { SCHEDULES_KEY } from "../lib/schedules"
 import { useDrawerParam } from "../lib/urlParams"
-import { CARD_H, CARD_W, clampCard, clampOffset, freeSlot, revealOffset, type Pos } from "../lib/scanCanvas"
+import { CARD_H, CARD_W, clampCard, clampOffset, focusOffset, freeSlot, revealOffset, type Pos } from "../lib/scanCanvas"
 
 type Status = ScanTask["status"] | Scan["status"]
 
@@ -183,6 +183,7 @@ export function Scans() {
   const loaded = React.useRef(false)
   // Oldest first, so a new scan takes the next free spot without moving older cards.
   // Deleted scans give their spot back, and a scan that arrives later is panned into view.
+  // On open the view centres on running scans, else the last batch to finish.
   React.useEffect(() => {
     if (!scans.data) return
     const live = new Set(scans.data.map((s) => s.id))
@@ -191,14 +192,25 @@ export function Scans() {
     const pruned = Object.keys(next).length !== Object.keys(layout).length
     const first = !loaded.current
     loaded.current = true
-    if (!missing.length && !pruned) return
     const width = viewport.current?.clientWidth ?? 1200
+    const height = viewport.current?.clientHeight ?? 800
     for (const s of missing) next[s.id] = freeSlot(Object.values(next), width)
-    setLayout(next)
-    saveLayout(next)
+    if (missing.length || pruned) {
+      setLayout(next)
+      saveLayout(next)
+    }
+    if (first) {
+      const running = scans.data.filter((s) => s.status === "running")
+      const ends = scans.data.map((s) => Date.parse(s.finished_at ?? "") || 0)
+      const latest = Math.max(...ends)
+      const recent = running.length ? running : scans.data.filter((_, i) => ends[i] && latest - ends[i] < 3_600_000)
+      const focus = focusOffset((recent.length ? recent : scans.data.slice(0, 1)).map((s) => next[s.id]), width, height)
+      if (focus) setOffset(focus)
+      return
+    }
     const newest = missing[missing.length - 1]
-    if (first || !newest) return
-    const reveal = revealOffset(next[newest.id], offset, width, viewport.current?.clientHeight ?? 800)
+    if (!newest) return
+    const reveal = revealOffset(next[newest.id], offset, width, height)
     if (reveal) setOffset(reveal)
     setFresh(newest.id)
     setFront(newest.id)
@@ -262,6 +274,23 @@ export function Scans() {
     el.addEventListener("pointercancel", onEnd)
   }
 
+  // Two-finger trackpad swipes and mouse wheels pan; pinch (ctrl + wheel) is left to the browser.
+  const collapsed = !expanded
+  React.useEffect(() => {
+    const el = viewport.current
+    if (!el || !collapsed) return
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return
+      e.preventDefault()
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1
+      const dx = (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * unit
+      const dy = (e.shiftKey && !e.deltaX ? 0 : e.deltaY) * unit
+      setOffset((o) => clampOffset({ x: o.x - dx, y: o.y - dy }, el.clientWidth, el.clientHeight))
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [collapsed])
+
   const pan = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget || e.button !== 0) return
     if (expanded) return void collapse()
@@ -273,7 +302,7 @@ export function Scans() {
       <div
         ref={viewport}
         role="region"
-        aria-label="Scan canvas. Drag empty space to pan, drag a card or its handle to move it."
+        aria-label="Scan canvas. Drag empty space or swipe to pan, drag a card or its handle to move it."
         onPointerDown={pan}
         className="relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden bg-canvas data-[panning=true]:cursor-grabbing"
         style={{
