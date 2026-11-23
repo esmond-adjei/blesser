@@ -9,7 +9,6 @@ from sqlalchemy.dialects.postgresql import insert
 from api.agent.tools.context import ToolContext
 from api.applications.dates import parse_deadline
 from api.core.config import settings
-from api.opportunities import models as m
 from api.opportunities import schemas
 from api.opportunities import service as opp_service
 from api.opportunities.page_content import dates_in, expired, normalized_url
@@ -334,84 +333,3 @@ async def handle_reject_candidate(tool_input: dict, ctx: ToolContext) -> dict:
             row.category_hints = []
     await ctx.session.commit()
     return {"url": url, "verdict": status, "reason": reason}
-
-
-#: Catalogue listings one task may match to the member's request.
-MAX_CATALOGUE_MATCHES = 15
-
-
-async def handle_search_catalogue(tool_input: dict, ctx: ToolContext) -> dict:
-    """Open, published listings in this task's category matching the words."""
-    from api.opportunities.service import list_public
-
-    query = str(tool_input.get("query", ""))[:200]
-    page = await list_public(
-        ctx.session,
-        q=query,
-        category=ctx.category,
-        sort="deadline",
-        limit=10,
-    )
-    if not page["items"] and len(query.split()) > 1:
-        # Every word must match; retry on each word alone, best first.
-        seen: dict[str, dict] = {}
-        for word in query.split()[:4]:
-            more = await list_public(
-                ctx.session, q=word, category=ctx.category, limit=5
-            )
-            for item in more["items"]:
-                seen.setdefault(item["id"], item)
-        page = {"items": list(seen.values())[:10]}
-    return {
-        "results": [
-            {
-                "opportunity_id": item["id"],
-                "title": item["title"],
-                "organization": item["organization"],
-                "kind": item["kind"],
-                "deadline": item["deadline_date"]
-                or ("rolling" if item["rolling"] else ""),
-                "location": item["location"],
-                "summary": (item["summary"] or "")[:240],
-                "eligibility": (item["eligibility"] or "")[:240],
-            }
-            for item in page["items"]
-        ]
-    }
-
-
-async def handle_add_catalogue_match(tool_input: dict, ctx: ToolContext) -> dict:
-    """Record an existing listing as a result of this member's scan."""
-    scan_id = getattr(getattr(ctx, "run", None), "id", None)
-    if not scan_id:
-        return {"error": "Matches belong to a scan."}
-    matched = getattr(ctx, "catalogue_matches", set())
-    if len(matched) >= MAX_CATALOGUE_MATCHES:
-        return {
-            "error": f"Match limit reached ({MAX_CATALOGUE_MATCHES}). Keep only the best fits."
-        }
-    opp_id = str(tool_input.get("opportunity_id", ""))
-    opp = await ctx.session.get(m.Opportunity, opp_id)
-    if (
-        opp is None
-        or opp.status != m.OpportunityStatus.published.value
-        or not opp_service.is_open(opp)
-    ):
-        return {"error": "Only open, published listings can be matched."}
-    result = await ctx.session.execute(
-        insert(ScanFind)
-        .values(
-            scan_id=scan_id,
-            opportunity_id=opp.id,
-            source_url=None,
-            via="catalog",
-            created=False,
-        )
-        .on_conflict_do_nothing()
-        .returning(ScanFind.opportunity_id)
-    )
-    added = result.scalar_one_or_none() is not None
-    await ctx.session.commit()
-    matched.add(opp.id)
-    ctx.catalogue_matches = matched
-    return {"opportunity_id": opp.id, "title": opp.title, "added": added}

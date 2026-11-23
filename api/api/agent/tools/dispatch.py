@@ -61,10 +61,6 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
     key = opportunity_tools.url_key(tool_input["url"])
     if key in ctx.known_pages and not ctx.reverify_id:
         note = ctx.known_pages[key]
-        if ctx.offered_tools and "add_catalogue_match" in ctx.offered_tools:
-            note += (
-                " If it fits the member's request, record it with add_catalogue_match."
-            )
         return {
             "text": "Skip known URL. " + note,
             "page_note": note,
@@ -137,8 +133,6 @@ HANDLERS = {
     "fetch_page": _fetch_page,
     "save_opportunity": opportunity_tools.handle_save_opportunity,
     "reject_candidate": opportunity_tools.handle_reject_candidate,
-    "search_catalogue": opportunity_tools.handle_search_catalogue,
-    "add_catalogue_match": opportunity_tools.handle_add_catalogue_match,
 }
 
 #: Safe to run concurrently: they never touch the (not concurrency-safe) DB session.

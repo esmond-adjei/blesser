@@ -19,7 +19,6 @@ from api.core.time import utcnow_naive
 from api.main import app
 from api.notifications.events import scan_summary
 from api.notifications.models import Notification
-from api.opportunities import service as opp_service
 from api.opportunities import tasks as opp_tasks
 from api.opportunities import tools as opp_tools
 from api.opportunities.crawl_models import CrawlCandidate, Source
@@ -92,12 +91,7 @@ class Script:
 
 def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch):
     word = "agritech" + _token()
-    script = Script(
-        [
-            [("search_catalogue", {"query": word})],
-            [("add_catalogue_match", {"opportunity_id": "PLACEHOLDER"})],
-        ]
-    )
+    script = Script([[("fetch_page", {"url": "PLACEHOLDER"})]])
     monkeypatch.setattr(orchestrator, "get_provider", script)
 
     async def no_crawler(session):
@@ -116,7 +110,7 @@ def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch
             )
             session.add(candidate)
             await session.commit()
-            script.turns[1][0][1]["opportunity_id"] = listing.id
+            script.turns[0][0][1]["url"] = listing.source_url
             scan = await scans.start_scan(
                 session, TEST_USER_ID, categories=["startup"], focus=word + " grants", kind="member"
             )
@@ -128,7 +122,9 @@ def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch
             assert "pipeline_complete" not in task.metrics
 
             first_prompt = script.messages[0][0]["content"]
-            assert "search_catalogue" in first_prompt and word in first_prompt
+            assert word in first_prompt and listing.title not in first_prompt
+            known_page = script.messages[1][-1]["content"]
+            assert "Skip known URL" in known_page
 
             detail = await scans.scan_detail(session, TEST_USER_ID, scan.id)
             assert detail["opportunities_found"] == 0
@@ -142,62 +138,6 @@ def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch
             assert scan_summary(scan.region, 0, 0) in list(bodies)
             candidate.status = "rejected"
             await session.commit()
-
-    run(check())
-
-
-def test_catalogue_search_lists_only_open_published_listings_in_the_category():
-    word = "cassava" + _token()
-
-    async def check():
-        async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
-            fits = await _listing(session, f"{word} Processing Grant")
-            await _listing(session, f"{word} Fellowship", category="research")
-            await _listing(session, f"{word} Hidden", status="in_review")
-            await _listing(
-                session,
-                f"{word} Closed",
-                deadline_date=opp_service.today() - timedelta(days=3),
-            )
-            await session.commit()
-            ctx = ToolContext(session=session, run=scan)
-            ctx.category = "startup"
-            found = await opp_tools.handle_search_catalogue(
-                {"query": f"{word} unrelatedword"}, ctx
-            )
-            assert [r["opportunity_id"] for r in found["results"]] == [fits.id]
-
-    run(check())
-
-
-def test_catalogue_matches_only_open_published_listings():
-    async def check():
-        async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
-            held = await _listing(session, "Held " + _token(), status="in_review")
-            closed = await _listing(
-                session,
-                "Closed " + _token(),
-                deadline_date=opp_service.today() - timedelta(days=1),
-            )
-            open_ = await _listing(session, "Open " + _token())
-            await session.commit()
-            ctx = ToolContext(session=session, run=scan)
-            for row in (held, closed):
-                result = await opp_tools.handle_add_catalogue_match(
-                    {"opportunity_id": row.id}, ctx
-                )
-                assert "error" in result
-            first = await opp_tools.handle_add_catalogue_match(
-                {"opportunity_id": open_.id}, ctx
-            )
-            again = await opp_tools.handle_add_catalogue_match(
-                {"opportunity_id": open_.id}, ctx
-            )
-            assert first["added"] and not again["added"]
-            find = await session.get(ScanFind, (scan.id, open_.id))
-            assert find.via == "catalog" and not find.created
 
     run(check())
 
@@ -372,16 +312,16 @@ def test_member_prompt_lists_sites_and_order():
         category="student",
         focus="nursing scholarships",
         today="2026-11-20",
-        known=[],
         sites=["https://moh.example/scholarships"],
         member=True,
     )
     assert "https://moh.example/scholarships" in text
-    assert text.index("search_catalogue") < text.index("Read the member's sites")
+    assert "search_catalogue" not in text
+    assert text.index("Read the member's sites") < text.index("Search the web")
     sweep = opp_tasks.user_message(
-        region="Ghana", category="student", focus="", today="2026-11-20", known=[]
+        region="Ghana", category="student", focus="", today="2026-11-20"
     )
-    assert "search_catalogue" not in sweep and "member's sites" not in sweep
+    assert "member's sites" not in sweep
 
 
 def test_scan_results_leave_out_listings_already_in_the_catalogue():

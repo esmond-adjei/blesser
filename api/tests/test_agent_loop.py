@@ -60,6 +60,16 @@ def test_turn_budget_is_capped_by_the_global_ceiling(monkeypatch):
     assert result["turns"] == 2 and len(seen) == 2
 
 
+def test_no_save_clock_starts_at_the_first_page_read(monkeypatch):
+    searches = [("call", "search_web", {"query": f"q{n}"}) for n in range(2)]
+    reads = [("call", "fetch_page", {"url": f"https://x.org/{n}"}) for n in range(8)]
+    result, seen = _run_task(
+        monkeypatch, searches + reads, max_turns=12, no_yield_turns=3
+    )
+    # Two searches, then three turns from the first read (turn 3) without a save.
+    assert len(seen) == 5 and "without a new save" in result["final_text"]
+
+
 def test_resume_counts_prior_turns(monkeypatch):
     history = [
         {"role": "user", "content": "go"},

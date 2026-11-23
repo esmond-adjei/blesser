@@ -141,7 +141,6 @@ def test_agent_brief_names_the_listing_types():
         category="student",
         focus="",
         today="2026-11-21",
-        known=[],
         kinds=["internship"],
     )
     assert "Listing types the member wants: internship." in text

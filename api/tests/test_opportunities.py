@@ -454,18 +454,14 @@ def test_calendar_feed_lists_deadlines_and_todos_and_rotates():
 # --- scans --------------------------------------------------------------------------
 
 
-def test_task_brief_lists_known_titles_and_today():
+def test_task_brief_names_today_and_focus_but_not_the_catalogue():
     _add(title="Known Grant")
     message = opp_tasks.user_message(
-        region="Ghana",
-        category="startup",
-        focus="climate",
-        today="2026-11-07",
-        known=["Known Grant (Accra Ventures)"],
+        region="Ghana", category="startup", focus="climate", today="2026-11-07"
     )
-    assert "Today's date: 2026-11-07" in message
-    assert "- Known Grant (Accra Ventures)" in message
-    assert "climate" in message
+    assert "Today's date: 2026-11-07" in message and "climate" in message
+    # Tools skip known pages and refuse duplicate saves; listing them costs every turn.
+    assert "Known Grant" not in message
 
 
 # --- the agent loop, end to end with a scripted model --------------------------------

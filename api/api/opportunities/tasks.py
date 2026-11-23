@@ -1,7 +1,6 @@
 """discover_opportunities: one agent task per audience category in a scan run."""
 
-from sqlalchemy import cast, or_, select
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import or_, select
 
 from api.agent.orchestrator import run_agent_task
 from api.agent.tools.context import ToolContext
@@ -15,59 +14,11 @@ from api.opportunities.prompts import (
     DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
 )
 
-KNOWN_TITLES = 60
-
 
 def category_of(task) -> str:
     raw = (getattr(task, "target", None) or "").strip()
     category = raw.split(":", 1)[1] if raw.startswith("category:") else raw
     return category if category in CATEGORY_BRIEFS else "startup"
-
-
-async def _known(session, category: str, region: str) -> list[str]:
-    rows = await session.execute(
-        select(
-            m.Opportunity.title,
-            m.Opportunity.source_url,
-            m.Opportunity.deadline,
-            m.Opportunity.status,
-        )
-        .where(
-            m.Opportunity.category == category,
-        )
-        .order_by(m.Opportunity.created_at.desc())
-        .limit(KNOWN_TITLES)
-    )
-    known = [
-        f"{title} | {url} | {deadline or 'undated'} | {status}"
-        for title, url, deadline, status in rows.all()
-    ]
-    rejected = (
-        await session.execute(
-            select(CrawlCandidate.url, CrawlCandidate.status, CrawlCandidate.reason)
-            .where(
-                or_(
-                    ~CrawlCandidate.reason.startswith("scope:"),
-                    CrawlCandidate.reason.startswith(
-                        f"scope:{region.strip().casefold()}:{category}:",
-                        autoescape=True,
-                    ),
-                ),
-                CrawlCandidate.status.in_(
-                    ["closed", "rejected", "duplicate", "extracted"]
-                ),
-                or_(
-                    cast(CrawlCandidate.category_hints, JSONB) == [],
-                    cast(CrawlCandidate.category_hints, JSONB).contains([category]),
-                ),
-            )
-            .order_by(CrawlCandidate.updated_at.desc())
-            .limit(80)
-        )
-    ).all()
-    return known + [
-        f"{url} | {status} | {reason[:80]}" for url, status, reason in rejected
-    ]
 
 
 def user_message(
@@ -76,25 +27,20 @@ def user_message(
     category: str,
     focus: str,
     today: str,
-    known: list[str],
     sites: list[str] | None = None,
     member: bool = False,
     sources_only: bool = False,
     repeat: bool = False,
     kinds: list[str] | None = None,
 ) -> str:
-    known_block = "\n".join(f"- {k}" for k in known) if known else "(none yet)"
     focus = (focus or "").strip()
     sites = sites or []
     steps = ""
     if member:
         steps = (
             "This scan is for one member. Work in this order:\n"
-            "1. search_catalogue with key words from the member's request, only "
-            "to learn what the catalogue already lists. The member can already see "
-            "those, so do not record them: look for what is new to them.\n"
             + (
-                "2. Read the member's sites below with fetch_page, follow links on "
+                "1. Read the member's sites below with fetch_page, follow links on "
                 "them to opportunity pages, and save what fits.\n"
                 if sites
                 else ""
@@ -103,8 +49,8 @@ def user_message(
                 "Only read the member's sites and pages they link to: this "
                 "scheduled check does not search the web.\n\n"
                 if sources_only
-                else f"{3 if sites else 2}. Search the web for more that fit the "
-                "request.\n\n"
+                else f"{2 if sites else 1}. Search the web for listings that fit the "
+                "request and are new to the catalogue.\n\n"
             )
         )
     return (
@@ -139,8 +85,7 @@ def user_message(
             if repeat
             else ""
         )
-        + f"\nAlready in the catalogue for this category:\n{known_block}\n\n"
-        f"Budget: save at most {settings.max_opportunities_per_task} opportunities in "
+        + f"\nBudget: save at most {settings.max_opportunities_per_task} opportunities in "
         f"this task. Save each one as soon as it is verified, then stop and summarize "
         f"what you saved and what you skipped."
     )
@@ -247,7 +192,6 @@ async def _run_agent(
         category=category,
         focus=_focus(scan, task),
         today=opp_service.today().isoformat(),
-        known=await _known(session, category, region),
         sites=sites,
         member=member,
         sources_only=sources_only,
@@ -314,8 +258,6 @@ async def _run_agent(
     tools = ["fetch_page", "save_opportunity", "reject_candidate"]
     if not sources_only:
         tools.insert(0, "search_web")
-    if member:
-        tools += ["search_catalogue"]
     result = await run_agent_task(
         DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
         message,

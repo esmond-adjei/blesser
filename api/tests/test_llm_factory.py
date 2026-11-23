@@ -188,8 +188,6 @@ def test_tool_definitions_are_provider_neutral():
         "fetch_page",
         "save_opportunity",
         "reject_candidate",
-        "search_catalogue",
-        "add_catalogue_match",
     }
     for t in TOOL_DEFINITIONS:
         assert "name" in t and "description" in t and "parameters" in t

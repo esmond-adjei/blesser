@@ -199,7 +199,13 @@ async def run_agent_task(
     turns_used = sum(1 for m in messages if m.get("role") == "assistant")
     usage_in = usage_out = 0
 
-    last_save_turn = turns_used
+    # N turns to reach a first page, then N turns per save: searching first is not a failure.
+    read_before = any(
+        tc.get("name") == "fetch_page"
+        for m in messages
+        for tc in (m.get("tool_calls") or [])
+    )
+    last_save_turn: int | None = turns_used if read_before else None
     if resume_messages and getattr(ctx, "page_notes", None) is not None:
         for message in resume_messages:
             if message.get("_page_url"):
@@ -275,10 +281,10 @@ async def run_agent_task(
         )
         # Request order keeps the trace and replayed history deterministic.
         for tool_use, result in zip(response.tool_calls, results, strict=True):
-            if (
-                tool_use.name == "save_opportunity" and result.get("created")
-            ) or (tool_use.name == "add_catalogue_match" and result.get("added")):
+            if tool_use.name == "save_opportunity" and result.get("created"):
                 last_save_turn = turn + 1
+            elif tool_use.name == "fetch_page" and last_save_turn is None:
+                last_save_turn = turn
             if on_event is not None:
                 await on_event(
                     {
@@ -320,7 +326,7 @@ async def run_agent_task(
                     message["_summary"] = ctx.page_notes.get(
                         url_key(message["_page_url"]), message.get("_summary", "")
                     )
-        if no_yield_turns and turn + 1 - last_save_turn >= no_yield_turns:
+        if no_yield_turns and turn + 1 - (last_save_turn or 0) >= no_yield_turns:
             return _result(
                 summary(f"Stopped after {no_yield_turns} turns without a new save."),
                 turn + 1,

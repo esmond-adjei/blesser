@@ -611,13 +611,12 @@ def test_repeat_runs_tell_the_agent_to_refresh_known_listings():
         category="startup",
         focus="",
         today="2026-11-21",
-        known=[],
         member=True,
         repeat=True,
     )
     assert "repeats on a schedule" in message
     plain = opp_tasks.user_message(
-        region="Ghana", category="startup", focus="", today="2026-11-21", known=[]
+        region="Ghana", category="startup", focus="", today="2026-11-21"
     )
     assert "repeats on a schedule" not in plain
 
