@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     extraction_min_confidence: float = 0.85
     discovery_no_yield_turns: int = 5
     reverify_max_turns: int = 8
+    # Jev screens crawler pages before extraction; it skips a page only when this sure.
+    typesafe_api_key: str = ""
+    typesafe_model: str = "jev-1.13.0"
+    screen_with_jev: bool = False
+    screen_confidence: float = 0.85
+    screen_max_chars: int = 4000
     discovery_max_turns: int = 12
     # "My sources": sites a member saves for scheduled checks.
     member_sources_max: int = 10

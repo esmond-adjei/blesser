@@ -16,7 +16,7 @@ from api.opportunities import service
 from api.opportunities.crawl_models import CrawlCandidate, Source
 from api.opportunities.crawler import crawl_due, credit_source, record_candidate
 from api.opportunities.dedupe import key_for
-from api.opportunities.extraction import extract_page
+from api.opportunities.extraction import cached_extraction, extract_page
 from api.opportunities.official import (
     aggregator_hosts,
     host_of,
@@ -24,6 +24,7 @@ from api.opportunities.official import (
     resolve_official,
 )
 from api.opportunities.page_cache import get_page
+from api.opportunities.screening import screen_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
 from api.opportunities.triage import (
     is_listing,
@@ -273,6 +274,27 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                 if reason.startswith("region_excluded:")
                 else reason,
             )
+        elif not await cached_extraction(page, scan.region) and (
+            screened := (
+                screen := await screen_page(
+                    page,
+                    category=category,
+                    region=scan.region,
+                    today=service.today().isoformat(),
+                )
+            ).skip
+        ):
+            if not await lock_claim(session, candidate, token):
+                continue
+            if screened == "deadline_passed":
+                candidate.status, candidate.reason = "closed", screened
+            elif screened == "region_excluded":
+                candidate.status = "new"
+                candidate.reason = "region_excluded:" + scan.region.strip().casefold()
+            else:
+                candidate.status, candidate.reason = "new", screened
+                candidate.category_hints = [screen.category]
+            add_reason(metrics, f"screen_{screened}")
         else:
             attempts += 1
             if candidate.source_id:

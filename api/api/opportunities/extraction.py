@@ -80,22 +80,30 @@ def trimmed_text(page: Page, region: str = "") -> str:
     return page.text[: limit - len(tail)] + "\n" + tail
 
 
-async def extract_page(
-    page: Page, *, category: str, region: str, today: str
-) -> Extraction:
+def _cache_key(region: str) -> str:
+    return (
+        f"v1:{settings.llm_provider}:{settings.llm_model}:{region.strip().casefold()}"
+    )
+
+
+async def cached_extraction(page: Page, region: str) -> dict | None:
     from api.core.db import SessionLocal
     from api.opportunities.crawl_models import PageCache
 
-    cache_key = (
-        f"v1:{settings.llm_provider}:{settings.llm_model}:{region.strip().casefold()}"
-    )
     async with SessionLocal() as session:
         row = await session.get(PageCache, page.url)
-        cached = (
-            row.metadata_json.get("extractions", {}).get(cache_key)
+        return (
+            row.metadata_json.get("extractions", {}).get(_cache_key(region))
             if row and row.content_hash == page.content_hash
             else None
         )
+
+
+async def extract_page(
+    page: Page, *, category: str, region: str, today: str
+) -> Extraction:
+    cache_key = _cache_key(region)
+    cached = await cached_extraction(page, region)
     if cached:
         return Extraction.model_validate_json(json.dumps(cached))
     schema = extraction_schema()
@@ -147,6 +155,9 @@ async def extract_page(
         )
     else:
         result = Extraction.model_validate_json(response.text)
+    from api.core.db import SessionLocal
+    from api.opportunities.crawl_models import PageCache
+
     async with SessionLocal() as session:
         row = await session.get(PageCache, page.url, with_for_update=True)
         if row and row.content_hash == page.content_hash:
