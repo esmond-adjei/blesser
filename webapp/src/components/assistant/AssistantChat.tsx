@@ -336,10 +336,22 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   const selectRef = useRef(selectChat)
   useEffect(() => { selectRef.current = selectChat })
   const chatsButton = useMemo(() => (
-    <Button size="sm" variant="quiet" iconOnly={embedded} className="shrink-0" icon={<MessagesSquare />} onClick={() => (docked ? toggleList() : setHistoryOpen((open) => !open))} aria-pressed={docked ? listOpen : undefined}>
-      <span className={embedded ? "sr-only" : "max-sm:sr-only"}>Chats</span>
+    <Button size="sm" variant="quiet" className="shrink-0" icon={<MessagesSquare />} onClick={() => (docked ? toggleList() : setHistoryOpen((open) => !open))} aria-pressed={docked ? listOpen : undefined}>
+      <span className="max-sm:sr-only">Chats</span>
     </Button>
-  ), [embedded, docked, listOpen])
+  ), [docked, listOpen])
+  const chatsTrigger = useMemo(() => (
+    <button
+      type="button"
+      onClick={() => setHistoryOpen((open) => !open)}
+      aria-expanded={historyOpen}
+      className="flex min-w-0 cursor-pointer items-center gap-2 rounded-full py-1.5 pr-2 pl-2 text-left transition-colors hover:bg-highlight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+    >
+      <MessagesSquare className="size-[18px] shrink-0" aria-hidden="true" />
+      <span className="sr-only">Chats: </span>
+      <span className="min-w-0 truncate text-callout font-semibold text-ink">{title}</span>
+    </button>
+  ), [historyOpen, title])
   const newChatButton = useMemo(() => chatId ? (
     <Button size="sm" variant="quiet" iconOnly={embedded} className="shrink-0" icon={<Plus />} onClick={() => selectRef.current()}>
       <span className={embedded ? "sr-only" : "max-sm:sr-only"}>New chat</span>
@@ -398,9 +410,8 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
     <div className="@container/chat relative flex min-h-0 min-w-0 flex-1 flex-col">
       {embedded ? (
         <header className="flex h-14 shrink-0 items-center gap-1 border-b border-separator px-3">
-          {chatsButton}
           <div className="flex min-w-0 flex-1 items-center gap-1">
-            <h2 className="min-w-0 truncate text-callout font-semibold text-ink">{title}</h2>
+            {chatsTrigger}
             {newChatButton}
           </div>
           {actions}

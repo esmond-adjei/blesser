@@ -113,7 +113,7 @@ function useView(): [View, (view: View) => void] {
   return [view, choose]
 }
 
-const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @xl:gap-6"
+const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @xl:gap-6"
 const FLOATING_MENU_BUTTON = "size-8 rounded-full bg-surface-sunk text-ink-secondary hover:bg-separator hover:text-ink"
 
 export function Opportunities() {
