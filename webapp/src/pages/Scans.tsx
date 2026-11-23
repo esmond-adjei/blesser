@@ -58,6 +58,7 @@ import { SourcesDialog } from "../components/scans/SourcesDialog"
 import { SchedulesDialog } from "../components/scans/SchedulesDialog"
 import { SCHEDULES_KEY } from "../lib/schedules"
 import { useDrawerParam } from "../lib/urlParams"
+import { CARD_H, CARD_W, clampCard, clampOffset, freeSlot, revealOffset, type Pos } from "../lib/scanCanvas"
 
 type Status = ScanTask["status"] | Scan["status"]
 
@@ -141,11 +142,7 @@ function AllowanceNote() {
   return <span className="text-footnote text-ink-secondary tabular-nums">{text}</span>
 }
 
-const CARD_W = 300
-const CARD_H = 172
-const GAP = 24
 const LAYOUT_KEY = "blesser.scan-canvas"
-type Pos = { x: number; y: number }
 
 function loadLayout(): Record<string, Pos> {
   try {
@@ -160,14 +157,6 @@ function saveLayout(layout: Record<string, Pos>) {
     localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout))
   } catch {
     // Layout is a per-browser convenience; losing it only resets positions.
-  }
-}
-
-function freeSlot(taken: Pos[], width: number): Pos {
-  const cols = Math.max(1, Math.floor((width - GAP) / (CARD_W + GAP)))
-  for (let k = 0; ; k++) {
-    const slot = { x: GAP + (k % cols) * (CARD_W + GAP), y: GAP + Math.floor(k / cols) * (CARD_H + GAP) }
-    if (!taken.some((p) => Math.abs(p.x - slot.x) < CARD_W && Math.abs(p.y - slot.y) < CARD_H)) return slot
   }
 }
 
@@ -209,17 +198,15 @@ export function Scans() {
     saveLayout(next)
     const newest = missing[missing.length - 1]
     if (first || !newest) return
-    const spot = next[newest.id]
-    const height = viewport.current?.clientHeight ?? 800
-    // Leave room for the composer floating over the bottom of the canvas.
-    if (spot.y + CARD_H > height - 160 - offset.y || spot.y < -offset.y) setOffset({ x: 0, y: Math.min(0, GAP - spot.y) })
+    const reveal = revealOffset(next[newest.id], offset, width, viewport.current?.clientHeight ?? 800)
+    if (reveal) setOffset(reveal)
     setFresh(newest.id)
     setFront(newest.id)
-  }, [scans.data, layout, offset.y])
+  }, [scans.data, layout, offset])
 
   const move = React.useCallback((id: string, pos: Pos, commit: boolean) => {
     setLayout((prev) => {
-      const next = { ...prev, [id]: { x: Math.max(0, pos.x), y: Math.max(0, pos.y) } }
+      const next = { ...prev, [id]: clampCard(pos) }
       if (commit) saveLayout(next)
       return next
     })
@@ -249,21 +236,36 @@ export function Scans() {
     setFront(scan.id)
   }
 
+  // A tap (no movement) runs onTap instead, so a swipe that starts on a card still pans.
+  const startPan = (e: React.PointerEvent<HTMLElement>, onTap?: () => void) => {
+    const el = viewport.current
+    if (!el) return
+    const from = { x: e.clientX, y: e.clientY }
+    const start = { x: e.clientX - offset.x, y: e.clientY - offset.y }
+    let moved = false
+    el.setPointerCapture(e.pointerId)
+    const onMove = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 4) return
+      moved = true
+      el.dataset.panning = "true"
+      setOffset(clampOffset({ x: ev.clientX - start.x, y: ev.clientY - start.y }, el.clientWidth, el.clientHeight))
+    }
+    const onEnd = (ev: PointerEvent) => {
+      delete el.dataset.panning
+      el.removeEventListener("pointermove", onMove)
+      el.removeEventListener("pointerup", onEnd)
+      el.removeEventListener("pointercancel", onEnd)
+      if (!moved && ev.type === "pointerup") onTap?.()
+    }
+    el.addEventListener("pointermove", onMove)
+    el.addEventListener("pointerup", onEnd)
+    el.addEventListener("pointercancel", onEnd)
+  }
+
   const pan = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget || e.button !== 0) return
     if (expanded) return void collapse()
-    const start = { x: e.clientX - offset.x, y: e.clientY - offset.y }
-    const el = e.currentTarget
-    el.setPointerCapture(e.pointerId)
-    el.dataset.panning = "true"
-    const onMove = (ev: PointerEvent) => setOffset({ x: Math.min(0, ev.clientX - start.x), y: Math.min(0, ev.clientY - start.y) })
-    const onUp = () => {
-      delete el.dataset.panning
-      el.removeEventListener("pointermove", onMove)
-      el.removeEventListener("pointerup", onUp)
-    }
-    el.addEventListener("pointermove", onMove)
-    el.addEventListener("pointerup", onUp)
+    startPan(e)
   }
 
   return (
@@ -271,7 +273,7 @@ export function Scans() {
       <div
         ref={viewport}
         role="region"
-        aria-label="Scan canvas. Drag empty space to pan, drag a card to move it."
+        aria-label="Scan canvas. Drag empty space to pan, drag a card or its handle to move it."
         onPointerDown={pan}
         className="relative min-h-0 flex-1 cursor-grab touch-none overflow-hidden bg-canvas data-[panning=true]:cursor-grabbing"
         style={{
@@ -287,6 +289,7 @@ export function Scans() {
               scan={scan}
               pos={layout[scan.id]}
               onMove={move}
+              onPan={startPan}
               raised={front === scan.id}
               fresh={fresh === scan.id}
               onRaise={() => setFront(scan.id)}
@@ -329,10 +332,11 @@ export function Scans() {
   )
 }
 
-function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand }: {
+function AgentCard({ scan, pos, onMove, onPan, raised, fresh, onRaise, hidden, onExpand }: {
   scan: Scan
   pos: Pos
   onMove: (id: string, pos: Pos, commit: boolean) => void
+  onPan: (e: React.PointerEvent<HTMLElement>, onTap?: () => void) => void
   raised: boolean
   fresh: boolean
   onRaise: () => void
@@ -354,10 +358,14 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
   const open = () => { if (ref.current) onExpand(ref.current.getBoundingClientRect()) }
 
   const drag = (e: React.PointerEvent<HTMLElement>) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest("button, a, [role=menuitem]")) return
+    const target = e.target as HTMLElement
+    const handle = !!target.closest("[data-drag-handle]")
+    if (e.button !== 0 || (!handle && target.closest("button, a, [role=menuitem]"))) return
     onRaise()
     // Details load only once someone reaches for the card, so they arrive while it grows.
     void client.prefetchQuery({ queryKey: ["scan", scan.id], queryFn: () => api.getScan(scan.id), staleTime: 10_000 })
+    // On touch the card body swipes the canvas; the handle moves the card.
+    if (e.pointerType !== "mouse" && !handle) return onPan(e, open)
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
     const start = { x: e.clientX, y: e.clientY }
@@ -372,15 +380,17 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
       last = { x: pos.x + dx, y: pos.y + dy }
       onMove(scan.id, last, false)
     }
-    const onUp = () => {
+    const onUp = (ev: PointerEvent) => {
       el.removeEventListener("pointermove", onMovePtr)
       el.removeEventListener("pointerup", onUp)
+      el.removeEventListener("pointercancel", onUp)
       setDragging(false)
       if (moved) onMove(scan.id, last, true)
-      else open()
+      else if (!handle && ev.type === "pointerup") open()
     }
     el.addEventListener("pointermove", onMovePtr)
     el.addEventListener("pointerup", onUp)
+    el.addEventListener("pointercancel", onUp)
   }
 
   const [confirmDelete, setConfirmDelete] = React.useState(false)
@@ -447,8 +457,9 @@ function AgentCard({ scan, pos, onMove, raised, fresh, onRaise, hidden, onExpand
         <button
           type="button"
           aria-label={`Move ${scanTitle(scan)} with the arrow keys`}
+          data-drag-handle
           onKeyDown={nudge}
-          className="grid size-7 cursor-grab place-items-center rounded-sm text-ink-tertiary hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+          className="grid size-7 cursor-grab touch-none place-items-center rounded-sm text-ink-tertiary hover:bg-highlight hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
         >
           <GripVertical className="size-4" aria-hidden="true" />
         </button>
