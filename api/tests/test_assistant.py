@@ -323,25 +323,98 @@ def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
         )
 
 
-def test_private_context_cannot_reach_web_search(monkeypatch):
+def test_private_chat_searches_with_a_query_written_without_private_history(
+    monkeypatch,
+):
     monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
+    queries = []
 
-    async def never_search(*args):
-        pytest.fail("Private data must not reach a search provider")
+    async def search(query):
+        queries.append(query)
+        return []
 
-    monkeypatch.setattr(service.web, "search_web", never_search)
+    monkeypatch.setattr(service.web, "search_web", search)
     calls = _model(
         monkeypatch,
         _tool("search_catalog", query="unique-no-match"),
         LLMResponse(
             tool_calls=[
                 ToolCall("private", "list_applications"),
-                ToolCall("web", "search_web", {"query": "private application"}),
+                ToolCall("web", "search_web", {"query": "my private application"}),
             ]
         ),
-        LLMResponse(text="I checked your applications."),
+        LLMResponse(text="astronomy research grants Ghana"),
+        LLMResponse(text="Nothing public turned up."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(
+                f"{path}/chat", json={"content": "Find astronomy grants for me."}
+            )
+        )
+        steps = [e["step"] for e in events if e["event"] == "tool_result"]
+        assert steps[-1]["tool"] == "search_web" and steps[-1]["ok"]
+    assert queries == ["astronomy research grants Ghana"]
+    rewrite = calls[2]
+    assert rewrite["tools"] == [] and rewrite["system"] == service.PUBLIC_QUERY
+    assert rewrite["messages"] == [
+        {"role": "user", "content": "Find astronomy grants for me."}
+    ]
+    searched = json.loads(calls[3]["messages"][-1]["content"])
+    assert searched["query"] == "astronomy research grants Ghana"
+
+
+def test_private_chat_does_not_repeat_a_query_within_a_reply(monkeypatch):
+    monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
+    queries = []
+
+    async def search(query):
+        queries.append(query)
+        return []
+
+    monkeypatch.setattr(service.web, "search_web", search)
+    calls = _model(
+        monkeypatch,
         _tool("search_catalog", query="unique-no-match"),
-        LLMResponse(text="I checked the catalog."),
+        LLMResponse(
+            tool_calls=[
+                ToolCall("private", "list_applications"),
+                ToolCall("web", "search_web", {"query": "grant"}),
+            ]
+        ),
+        LLMResponse(text="IIASA summer program"),
+        _tool("search_web", query="grant again"),
+        LLMResponse(text="iiasa  Summer program"),
+        LLMResponse(text="Nothing new."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Find IIASA."}))
+        steps = [e["step"] for e in events if e["event"] == "tool_result"]
+        assert not steps[-1]["ok"]
+    assert queries == ["IIASA summer program"]
+    assert "Earlier queries: IIASA summer program" in calls[4]["messages"][0]["content"]
+
+
+def test_private_chat_skips_search_when_no_public_query_fits(monkeypatch):
+    monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
+
+    async def never_search(*args):
+        pytest.fail("No search should run")
+
+    monkeypatch.setattr(service.web, "search_web", never_search)
+    _model(
+        monkeypatch,
+        _tool("search_catalog", query="unique-no-match"),
+        LLMResponse(
+            tool_calls=[
+                ToolCall("private", "list_applications"),
+                ToolCall("web", "search_web", {"query": "my application"}),
+            ]
+        ),
+        LLMResponse(text="NONE"),
+        LLMResponse(text="I checked your applications."),
     )
     with TestClient(app) as client:
         path = _chat(client)
@@ -349,13 +422,7 @@ def test_private_context_cannot_reach_web_search(monkeypatch):
             client.post(f"{path}/chat", json={"content": "Check my applications."})
         )
         steps = [e["step"] for e in events if e["event"] == "tool_result"]
-        assert steps[-1]["tool"] == "search_web"
-        assert not steps[-1]["ok"]
-        assert "search_web" in {definition["name"] for definition in calls[1]["tools"]}
-        _events(client.post(f"{path}/chat", json={"content": "Search again."}))
-        assert "search_web" not in {
-            definition["name"] for definition in calls[-1]["tools"]
-        }
+        assert steps[-1]["tool"] == "search_web" and not steps[-1]["ok"]
 
 
 @pytest.mark.real_auth

@@ -55,14 +55,6 @@ def test_another_members_record_is_not_revealed(monkeypatch):
     assert application_id not in calls[0]["system"]
 
 
-def test_private_context_blocks_web_search(monkeypatch):
-    application_id, _ = _saved_application()
-    calls = _model(monkeypatch, LLMResponse(text="Done."))
-    with TestClient(app) as client:
-        _ask(client, {"application_id": application_id})
-    assert "search_web" not in {t["name"] for t in calls[0]["tools"]}
-
-
 def test_context_is_optional_and_bounded(monkeypatch):
     _model(monkeypatch, LLMResponse(text="Hi."))
     with TestClient(app) as client:
