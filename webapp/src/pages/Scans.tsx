@@ -909,7 +909,7 @@ function ScanBody({ scan, onDeleted, log = true }: { scan: Scan; onDeleted: () =
         scan={scan}
         actions={running ? (
           <>
-            <Button size="sm" variant="quiet" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<Square />}>Stop</Button>
+            <Button size="sm" variant="quiet" disabled={cancel.isPending} onClick={() => cancel.mutate()} icon={<span aria-hidden="true" className="size-3.5 rounded-[2px] bg-current" />}>Stop</Button>
             {repeatAction.length ? <ActionMenuButton label="Scan actions" actions={repeatAction} /> : null}
           </>
         ) : (

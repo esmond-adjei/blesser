@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 import {
-  ArrowDown, ArrowUp, Check, Copy, MessageCircle, MessagesSquare, Pencil, Play, Plus, RotateCcw, Square, Trash2,
+  ArrowDown, ArrowUp, Check, Copy, MessageCircle, MessagesSquare, Pencil, Play, Plus, RotateCcw, Trash2,
 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../ui/menu"
@@ -390,7 +390,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
             }}
           />
           {working && chatId ? (
-            <Button type="button" size="sm" variant="secondary" iconOnly aria-label="Stop reply" icon={<Square />} className="size-9"
+            <Button type="button" size="sm" variant="quiet" iconOnly aria-label="Stop reply" icon={<span aria-hidden="true" className="size-3.5 rounded-[2px] bg-current" />} className="size-9"
               onClick={() => void stopTurn(chatId).catch((err) => setProblem(apiMessage(err)))} />
           ) : (
             <Button type="submit" size="sm" variant="primary" disabled={disabled || !draft.trim()} iconOnly aria-label="Send message" icon={<ArrowUp />} className="size-9" />

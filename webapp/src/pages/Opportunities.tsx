@@ -634,7 +634,7 @@ function OpportunityMeta({ opp }: { opp: Opportunity }) {
       <span>{CATEGORY_LABELS[opp.category] ?? opp.category}</span>
       {opp.location ? (
         <span className="inline-flex items-center gap-1">
-          <MapPin aria-hidden="true" className="size-3.5 text-ink-tertiary" />
+          <MapPin aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
           {opp.location}
         </span>
       ) : null}

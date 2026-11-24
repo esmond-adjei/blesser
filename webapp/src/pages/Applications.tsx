@@ -149,33 +149,31 @@ export function Applications() {
         title="Applications"
         description="Everything you're applying for. Saved and preparing applications get reminders 14, 7 and 1 days before the deadline."
         actions={
-          <Button data-tooltip="You can also use the assistant to add applications" size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
-            Add manually
-          </Button>
+          <>
+            <Segmented
+              label="View"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "list", label: "List", icon: <List aria-hidden="true" /> },
+                { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
+              ]}
+            />
+            <Button data-tooltip="You can also use the assistant to add applications" size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
+              Add manually
+            </Button>
+          </>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {view === "list" ? (
-          <Segmented
-            label="Filter by status"
-            value={filter}
-            onChange={setFilter}
-            className="min-w-0 flex-1 sm:flex-none"
-            options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
-          />
-        ) : null}
+      {view === "list" ? (
         <Segmented
-          label="View"
-          value={view}
-          onChange={setView}
-          className="ml-auto"
-          options={[
-            { value: "list", label: "List", icon: <List aria-hidden="true" /> },
-            { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
-          ]}
+          label="Filter by status"
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
         />
-      </div>
+      ) : null}
 
       {isLoading ? (
         <div className="h-48 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />

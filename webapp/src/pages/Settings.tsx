@@ -454,7 +454,7 @@ function ThemePreview({ mode }: { mode: "system" | "light" | "dark" }) {
     </div>
   )
   return (
-    <div aria-hidden="true" className="flex h-20 overflow-hidden rounded-sm border border-separator">
+    <div aria-hidden="true" className="flex h-30   overflow-hidden rounded-sm border border-separator">
       {mode === "system" ? (
         <>
           {pane("light")}
