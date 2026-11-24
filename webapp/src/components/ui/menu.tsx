@@ -1,7 +1,7 @@
 import * as React from "react"
 import { ContextMenu as Ctx, DropdownMenu as Drop } from "radix-ui"
 import { ChevronRight, MoreHorizontal } from "lucide-react"
-import { Button, cn } from "@blesser/ui"
+import { Button, buttonVariants, cn } from "@blesser/ui"
 
 export type MenuAction =
   | { kind?: "item"; label: string; icon?: React.ReactNode; onSelect?: () => void; href?: string; danger?: boolean; disabled?: boolean }
@@ -81,6 +81,43 @@ export function ActionContextMenu({ actions, children }: { actions: MenuAction[]
 
 /** The same menu behind a visible button, for touch and keyboard. */
 export function ActionMenuButton({ actions, label, className }: { actions: MenuAction[]; label: string; className?: string }) {
+  const plain = actions.filter((a): a is Exclude<MenuAction, { kind: "separator" }> => a.kind !== "separator")
+  // Two actions or fewer show as icons; a menu only pays off from three.
+  if (plain.length <= 2 && plain.every((a) => a.kind !== "radio" && a.icon)) {
+    const subject = label.replace(/^(More|Actions) for /, "")
+    const buttons = plain.map((a, i) => {
+      if (a.kind === "radio") return null
+      const name = subject === label ? a.label : `${a.label} ${subject}`
+      const tone = a.danger ? "hover:bg-critical-soft hover:text-critical" : ""
+      return a.href ? (
+        <a
+          key={i}
+          href={a.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={name}
+          data-tooltip={a.label}
+          className={cn(buttonVariants({ size: "sm", variant: "quiet" }), "w-8 px-0 text-ink-secondary", className)}
+        >
+          {a.icon}
+        </a>
+      ) : (
+        <Button
+          key={i}
+          size="sm"
+          variant="quiet"
+          iconOnly
+          aria-label={name}
+          data-tooltip={a.label}
+          disabled={a.disabled}
+          onClick={a.onSelect}
+          icon={a.icon}
+          className={cn("text-ink-secondary", tone, className)}
+        />
+      )
+    })
+    return <span className="inline-flex shrink-0 items-center gap-0.5">{buttons}</span>
+  }
   return (
     <Drop.Root>
       <Drop.Trigger asChild>
