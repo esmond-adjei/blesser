@@ -330,6 +330,8 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   const visibleAnswer = active?.answer && !visibleRows.some((row) => row.id === active.answer?.id) ? active.answer : null
   const working = !!active || !!thread.data?.running || creating
   const replyError = error?.id === chatId ? error?.message : null
+  // A turn cut off by a stop, crash or server restart leaves the question without a reply.
+  const unanswered = !!chatId && thread.isSuccess && !working && !pending && !visibleAnswer && !replyError && visibleRows.at(-1)?.role === "user"
   const disabled = working || !!pending || (!!chatId && thread.isError)
 
   const title = thread.data?.title || "Assistant"
@@ -444,6 +446,12 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
                 onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined}
                 onContinue={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending && !active ? carryOn : undefined} />)}
           {visibleAnswer ? <AssistantReply message={visibleAnswer} onOpenRecord={preview.open} onContinue={!working && !pending && !active ? carryOn : undefined} /> : null}
+          {unanswered ? (
+            <p className="text-footnote text-ink-secondary">
+              No reply to this message.{" "}
+              <button type="button" onClick={retry} className="cursor-pointer font-semibold text-link hover:underline">Try again</button>
+            </p>
+          ) : null}
           {active && !active.answer && !pending ? (
             <AssistantReply text={active.text} status={active.status} entries={active.trace} live onOpenRecord={preview.open} />
           ) : null}
