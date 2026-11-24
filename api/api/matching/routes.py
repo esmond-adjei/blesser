@@ -15,7 +15,7 @@ async def get_match_profile(
     session: AsyncSession = Depends(get_session),
     current: auth_schemas.UserOut = Depends(get_current_user),
 ):
-    """What you're looking for. Before you save one, a suggestion from your Applicant Kit."""
+    """Your feed settings. Before you save one, a suggestion from your Applicant Kit."""
     return await matching.read(session, current.id)
 
 

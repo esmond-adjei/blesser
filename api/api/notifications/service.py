@@ -45,7 +45,7 @@ KINDS: dict[str, Kind] = {
     ),
     "new_match": Kind(
         "New matches for you",
-        "New listings that fit what you're looking for, daily or weekly.",
+        "New listings that fit your feed settings, daily or weekly.",
         push=True,
         email=True,
     ),

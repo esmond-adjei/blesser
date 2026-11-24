@@ -120,6 +120,7 @@ export function Opportunities() {
   const [closedParam, setClosed] = useUrlParam("closed")
   const [newParam, setNew] = useUrlParam("new")
   const [hideParam, setHide] = useUrlParam("hide")
+  const [mineParam, setMine] = useUrlParam("mine")
   const drawer = useDrawerParam()
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
@@ -141,16 +142,26 @@ export function Opportunities() {
     return () => window.clearTimeout(t)
   }, [draft, query, setQuery])
 
-  const list = useOpportunities({
-    q: query || undefined,
-    category,
-    kind,
+  const profile = useMatchProfile()
+  const chosen = profile.data?.saved ? CATEGORIES.filter((c) => profile.data.categories.includes(c)) : []
+  // The feed shows only the audiences picked in Your feed settings; none picked means all.
+  const audiences = chosen.length ? chosen : CATEGORIES
+  const tabs = category && !audiences.includes(category) ? [...audiences, category] : audiences
+  const list = useOpportunities(
+    {
+      q: query || undefined,
+      category,
+      categories: !category && audiences.length < CATEGORIES.length ? audiences : undefined,
+      mine: mineParam ? true : undefined,
+      kind,
     country: country || undefined,
     sort,
     closing_within: soonParam ? 14 : undefined,
-    new: newParam ? true : undefined,
-    include_closed: closedParam ? true : undefined,
-  })
+      new: newParam ? true : undefined,
+      include_closed: closedParam ? true : undefined,
+    },
+    { enabled: !profile.isPending },
+  )
   const tracked = useTrackedOpportunities()
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
   const shown = hideTracked ? items.filter((o) => !tracked.data?.[o.id]) : items
@@ -165,7 +176,7 @@ export function Opportunities() {
     onTodo: setTodoFor,
     onShare: setShareFor,
   }
-  const filtered = !!(query || category || kind || country || soonParam || newParam || closedParam || hideTracked)
+  const filtered = !!(query || category || kind || country || soonParam || newParam || closedParam || hideTracked || mineParam)
   const filters: SearchFilters = {
     q: query || undefined,
     category: category ?? null,
@@ -175,7 +186,6 @@ export function Opportunities() {
   }
   const searchable = !!(query || category || kind || country || soonParam)
   const [saveOpen, setSaveOpen] = React.useState(false)
-  const profile = useMatchProfile()
   const saved = useSavedSearches()
   const current = saved.data?.find((s) => sameFilters(s.filters, filters))
   useSavedSearchLink(saved.data)
@@ -200,6 +210,7 @@ export function Opportunities() {
 
   const [, setParams] = useSearchParams()
   const active: { key: string; label: string }[] = [
+    ...(mineParam ? [{ key: "mine", label: "Found by my scans" }] : []),
     ...(kind ? [{ key: "kind", label: KIND_LABELS[kind] }] : []),
     ...(country ? [{ key: "country", label: country }] : []),
     ...(newParam ? [{ key: "new", label: "New this week" }] : []),
@@ -255,18 +266,17 @@ export function Opportunities() {
               onSave={() => setSaveOpen(true)}
             />
           </div>
-          <div className="min-w-0 max-sm:order-last max-sm:basis-full">
-            <Segmented
-              label="Audience"
-              className="[scrollbar-width:none]"
-              value={category ?? ""}
-              onChange={(v) => setCategory(v)}
-              options={[
-                { value: "", label: "All" },
-                ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c] })),
-              ]}
-            />
-          </div>
+          {tabs.length > 1 ? (
+            <div className="min-w-0 max-sm:order-last max-sm:basis-full">
+              <Segmented
+                label="Audience"
+                className="[scrollbar-width:none]"
+                value={category ?? ""}
+                onChange={(v) => setCategory(v)}
+                options={[{ value: "", label: "All" }, ...tabs.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c] }))]}
+              />
+            </div>
+          ) : null}
           <FiltersPopover
             count={active.length}
             sort={
@@ -277,6 +287,7 @@ export function Opportunities() {
             kind={kind}
             onKind={setKind}
             toggles={[
+              { label: "Found by my scans", on: !!mineParam, set: (on) => setMine(on ? "1" : "") },
               { label: "New this week", on: !!newParam, set: (on) => setNew(on ? "1" : "") },
               { label: "Closing in 2 weeks", on: !!soonParam, set: (on) => setSoon(on ? "1" : "") },
               { label: "Include closed", on: !!closedParam, set: (on) => setClosed(on ? "1" : "") },
@@ -326,7 +337,7 @@ export function Opportunities() {
         <div className="mb-4 flex flex-col gap-3 rounded-lg bg-forest-soft px-4 py-3 sm:flex-row sm:items-center">
           <Target aria-hidden="true" className="hidden size-5 shrink-0 text-link sm:block" />
           <p className="min-w-0 flex-1 text-footnote text-ink">
-            Tell us what you're looking for and this list puts the best fits first. You can also get alerts when new ones are added.
+            Set up your feed and this list puts the best fits first. You can also get alerts when new ones are added.
           </p>
           <Link to="/settings/matching" className={cn(buttonVariants({ size: "sm", variant: "brand" }))}>
             Set it up
@@ -352,8 +363,8 @@ export function Opportunities() {
         <ErrorState title="Opportunities didn't load" description="Check your connection and try again." onRetry={() => void list.refetch()} />
       ) : shown.length === 0 && !list.hasNextPage ? (
         <EmptyState
-          title={filtered ? "Nothing matches these filters" : "No opportunities yet"}
-          description="Send agents to look for new ones, or share one you know about."
+          title={mineParam && active.length === 1 && !query && !category ? "Your scans haven't found anything here yet" : filtered ? "Nothing matches these filters" : "No opportunities yet"}
+          description={mineParam ? "Send agents to look for new ones and what they find shows here." : "Send agents to look for new ones, or share one you know about."}
           action={
             <Button size="sm" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
               Find more
@@ -376,7 +387,7 @@ export function Opportunities() {
                     index={offsets[si] + i}
                     opp={opp}
                     applicationId={tracked.data?.[opp.id]}
-                    showAudience={!category}
+                    showAudience={!category && audiences.length > 1}
                     {...handlers}
                   />
                 ))}

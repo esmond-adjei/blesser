@@ -21,7 +21,7 @@ import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, Dia
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: UserRound, description: "How you appear in Blesser and in the emails it sends." },
   { id: "account", label: "Account and security", icon: ShieldCheck, description: "Your sign-in email, password, connected browsers and account." },
-  { id: "matching", label: "What you're looking for", icon: Target, description: "Your For you list, match alerts and saved searches." },
+  { id: "matching", label: "Your feed", icon: Target, description: "What your feed shows, how For you ranks it, match alerts and saved searches." },
   { id: "notifications", label: "Notifications", icon: Bell, description: "What you hear about, where it reaches you and when it waits." },
   { id: "calendar", label: "Calendar", icon: CalendarDays, description: "Your application deadlines and dated to-dos in your own calendar app." },
   { id: "appearance", label: "Appearance", icon: Palette, description: "How Blesser looks on this device." },

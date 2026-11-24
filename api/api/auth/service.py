@@ -30,6 +30,7 @@ def to_user_out(user: auth_models.User) -> dict:
         "display_name": user.display_name,
         "email_verified": user.email_verified_at is not None,
         "has_password": not user.password_hash.startswith("!"),
+        "feed_set_up": user.feed_setup_at is not None,
     }
 
 

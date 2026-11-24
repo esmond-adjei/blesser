@@ -13,6 +13,8 @@ export interface AuthUser {
   email_verified: boolean
   /** False for accounts created through a sign-in provider only. */
   has_password: boolean
+  /** True once the member finished or skipped the feed setup. */
+  feed_set_up: boolean
 }
 
 export interface AuthTokens {
@@ -304,6 +306,10 @@ export type OpportunitySort = "deadline" | "new" | "relevance" | "for_you"
 export interface OpportunityQuery {
   q?: string
   category?: OpportunityCategory
+  /** Limits an unfiltered list to these audiences. */
+  categories?: OpportunityCategory[]
+  /** Only listings the member's own scans found. */
+  mine?: boolean
   kind?: OpportunityKind
   country?: string
   include_closed?: boolean

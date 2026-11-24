@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -44,6 +45,7 @@ class UserOut(BaseModel):
     email_verified: bool = False
     # False for accounts created through a sign-in provider only.
     has_password: bool = True
+    feed_set_up: bool = False
 
 
 class OAuthStartIn(BaseModel):
@@ -77,6 +79,7 @@ class ProfileUpdate(BaseModel):
     """Empty or whitespace clears the name (identity falls back to email)."""
 
     display_name: str | None = Field(default=None, max_length=200)
+    feed_set_up: Literal[True] | None = None
     # Omitted leaves the model preference as it is.
 
 

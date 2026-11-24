@@ -18,6 +18,7 @@ from api.auth import service as auth_service
 from api.core import mailer
 from api.core.db import get_session
 from api.core.exceptions import AuthError
+from api.core.time import utcnow_naive
 from api.extension_auth.policy import extension_allowed
 
 router = APIRouter(tags=["auth"])
@@ -232,6 +233,8 @@ async def update_me(
     # Only fields sent: toggling the model preference must not clear the name.
     if "display_name" in req.model_fields_set:
         await auth_profile.update_profile(session, user, req.display_name)
+    if req.feed_set_up and user.feed_setup_at is None:
+        user.feed_setup_at = utcnow_naive()
     await session.commit()
     return auth_schemas.UserOut(**auth_service.to_user_out(user))
 

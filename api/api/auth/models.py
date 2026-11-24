@@ -34,6 +34,8 @@ class User(Base):
     # Which Terms + Privacy notice the account agreed to at sign-up.
     terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     terms_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Set once the member finishes or skips the feed setup shown after sign-up.
+    feed_setup_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

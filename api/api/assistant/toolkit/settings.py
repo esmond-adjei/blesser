@@ -154,7 +154,7 @@ async def propose_match(session, user_id, args):
     if "alerts" in shown:
         shown["alerts"] = ALERT_LABELS[shown["alerts"]]
     return Proposal(
-        "Update what you're looking for?",
+        "Update your feed settings?",
         {"changes": changes},
         field_lines(shown, {"closing_soon": "Closing soon email"}),
     )
@@ -168,8 +168,8 @@ async def apply_match(session, user_id, arguments):
     await matching.save(session, user_id, req.model_dump(mode="json"))
     return Applied(
         {"updated": sorted(arguments["changes"])},
-        "Updated what you're looking for.",
-        preview("settings", "matching", "What you're looking for", "Settings"),
+        "Updated your feed settings.",
+        preview("settings", "matching", "Your feed", "Settings"),
     )
 
 
@@ -418,16 +418,16 @@ TOOLS = [
     Tool(
         "get_match_profile",
         ToolInput,
-        "Read what the member is looking for: categories, kinds, fields, levels, countries and match alert frequency.",
-        "Checked what you're looking for",
+        "Read the member's feed settings (Your feed): categories are the audiences their feed shows (none means all), plus kinds, fields, levels, countries and match alert frequency.",
+        "Checked your feed settings",
         "read",
         read=get_match_profile,
     ),
     Tool(
         "update_match_profile",
         UpdateMatch,
-        "Propose changing what the member is looking for. Only supplied fields change; lists replace the whole list.",
-        "Update what you're looking for",
+        "Propose changing the member's feed settings. Categories limit which audiences the feed shows. Only supplied fields change; lists replace the whole list.",
+        "Update your feed settings",
         "change",
         propose=propose_match,
         apply=apply_match,

@@ -95,7 +95,7 @@ def add(title="Climate Grant", **values):
         async with SessionLocal() as session:
             row = Opportunity(
                 title=title,
-                category="startup",
+                category=values.pop("category", "startup"),
                 slug=title.lower().replace(" ", "-"),
                 dedupe_key=opportunities.dedupe_key("", title),
                 **values,
@@ -351,6 +351,57 @@ def test_disabled_user_tokens_and_refresh_stop_working():
         ).status_code
         == 403
     )
+
+
+def test_member_feed_limits_to_audiences_and_own_scan_finds():
+    from api.scans.models import ScanFind
+
+    me, other = user(), user(name="other")
+    found = add("Found Startup Grant")
+    add("Student Grant", category="student")
+    add("Research Grant", category="research")
+    theirs = add("Their Research Grant", category="research")
+
+    async def finds():
+        async with SessionLocal() as session:
+            mine, others = (
+                Scan(user_id=me, region="Ghana", kind="member"),
+                Scan(user_id=other, region="Ghana", kind="member"),
+            )
+            session.add_all([mine, others])
+            await session.flush()
+            session.add_all(
+                [
+                    ScanFind(scan_id=mine.id, opportunity_id=found["id"]),
+                    ScanFind(scan_id=others.id, opportunity_id=theirs["id"]),
+                ]
+            )
+            await session.commit()
+
+    run(finds())
+    c = client(me, "app")
+
+    def titles(**params):
+        items = c.get("/api/app/opportunities", params=params).json()["items"]
+        return sorted(item["title"] for item in items)
+
+    assert titles(categories=["startup", "student"]) == [
+        "Found Startup Grant",
+        "Student Grant",
+    ]
+    assert titles(categories=["student"], category="research") == [
+        "Research Grant",
+        "Their Research Grant",
+    ]
+    assert titles(mine=True) == ["Found Startup Grant"]
+
+
+def test_feed_setup_is_remembered_once_finished_or_skipped():
+    c = client(user(name="setup"), "app")
+    assert c.get("/api/app/auth/me").json()["feed_set_up"] is False
+    body = c.patch("/api/app/auth/me", json={"feed_set_up": True}).json()
+    assert body["feed_set_up"] is True
+    assert c.patch("/api/app/auth/me", json={"feed_set_up": False}).status_code == 422
 
 
 def test_member_catalogue_new_filters_and_aliases():

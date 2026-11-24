@@ -105,6 +105,8 @@ def catalogue_filters(
     public_only: bool = False,
     new: bool = False,
     audience: str | None = None,
+    categories: list[str] | None = None,
+    found_by: str | None = None,
 ) -> list:
     """WHERE clauses for published listings; shared by the list and saved-search alerts."""
     from api.matching import service as matching
@@ -120,6 +122,18 @@ def catalogue_filters(
         filters.append(_open_clause(on))
     if category:
         filters.append(m.Opportunity.category == category)
+    elif categories:
+        filters.append(m.Opportunity.category.in_(categories))
+    if found_by:
+        from api.scans.models import Scan, ScanFind
+
+        filters.append(
+            m.Opportunity.id.in_(
+                select(ScanFind.opportunity_id)
+                .join(Scan, Scan.id == ScanFind.scan_id)
+                .where(Scan.user_id == found_by)
+            )
+        )
     if kind:
         filters.append(m.Opportunity.kind == kind)
     if country:
@@ -155,6 +169,8 @@ async def list_public(
     public_only: bool = False,
     new: bool = False,
     audience: str | None = None,
+    categories: list[str] | None = None,
+    found_by: str | None = None,
     match=None,
 ) -> dict:
     """One page of published listings.
@@ -176,6 +192,8 @@ async def list_public(
         public_only=public_only,
         new=new,
         audience=audience,
+        categories=categories,
+        found_by=found_by,
     )
     tsquery = matching.search_query(q)
     for_you = sort == "for_you" and match is not None

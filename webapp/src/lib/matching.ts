@@ -1,4 +1,4 @@
-/** Match profile ("What you're looking for") and saved searches. */
+/** Match profile ("Your feed" in Settings) and saved searches. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as api from "./api"
 import { CATEGORY_LABELS, KIND_LABELS, isCategory, isKind } from "./opportunities"
