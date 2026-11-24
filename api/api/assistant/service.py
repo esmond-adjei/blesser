@@ -494,7 +494,10 @@ async def _run(chat_id, user_id, lease, turn):
         }
         draft = _Draft(registry)
         response = None
-        for limit in (settings.llm_max_tokens, ROOMY_MAX_TOKENS):
+        # Reasoning models sometimes stop after thinking with nothing written: ask once more.
+        for attempt in range(3):
+            roomy = response is not None and response.empty_at_limit
+            limit = ROOMY_MAX_TOKENS if roomy else settings.llm_max_tokens
             async for kind, value in _model_stream(
                 provider, history, offered, limit, extra
             ):
@@ -502,7 +505,12 @@ async def _run(chat_id, user_id, lease, turn):
                     response = value
                 elif piece := draft.feed(value):
                     yield {"event": "token", "text": piece}
-            if not response.empty_at_limit or limit >= ROOMY_MAX_TOKENS:
+            silent = (
+                not response.text.strip()
+                and not response.tool_calls
+                and not turn.receipt
+            )
+            if not silent or roomy or (attempt and not response.empty_at_limit):
                 break
         if not response.tool_calls and (piece := draft.flush()):
             yield {"event": "token", "text": piece}
@@ -513,7 +521,9 @@ async def _run(chat_id, user_id, lease, turn):
         if not response.tool_calls:
             reply_streamed = True
             reply, sources, cited_deadlines = registry.render(response.text)
-            if not reply:
+            if not response.text.strip() and not turn.receipt:
+                reply = "I didn't get an answer back this time. Send that again."
+            elif not reply:
                 reply = turn.receipt or (
                     "I couldn't confirm a deadline from the records I read."
                     if sources

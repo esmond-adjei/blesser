@@ -365,6 +365,25 @@ def test_private_chat_searches_with_a_query_written_without_private_history(
     assert searched["query"] == "astronomy research grants Ghana"
 
 
+def test_a_reply_with_only_thinking_is_asked_once_more(monkeypatch):
+    calls = _model(
+        monkeypatch,
+        LLMResponse(text="", reasoning="I'll greet them back."),
+        LLMResponse(text="Hi! What can I help you find?"),
+        LLMResponse(text="", reasoning="Greeting."),
+        LLMResponse(text="", reasoning="Greeting again."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        first = _events(client.post(f"{path}/chat", json={"content": "hello"}))
+        assert first[-2]["message"]["content"] == "Hi! What can I help you find?"
+        second = _events(client.post(f"{path}/chat", json={"content": "how are you"}))
+        assert second[-2]["message"]["content"] == (
+            "I didn't get an answer back this time. Send that again."
+        )
+    assert len(calls) == 4
+
+
 def test_private_chat_does_not_repeat_a_query_within_a_reply(monkeypatch):
     monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
     queries = []
