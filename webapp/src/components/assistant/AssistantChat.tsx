@@ -321,7 +321,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
       next={chats.hasNextPage ? () => void chats.fetchNextPage() : undefined}
       fetching={chats.isFetchingNextPage}
       onSelect={selectChat}
-      onEdit={(value) => { setProblem(""); setHistoryOpen(false); setEdit(value) }}
+      onEdit={(value) => { setProblem(""); setEdit(value) }}
       onRetry={() => void chats.refetch()}
     />
   )
