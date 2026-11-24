@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from "react"
-import { Brain, CircleAlert, CircleCheck, ChevronDown, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus, Loader2, MessageSquareText, Pencil, Plus, Trash2, Briefcase, Wrench, Link2, MessageCircleQuestion, Radar } from "lucide-react"
+import { Brain, CircleAlert, ChevronDown, Database, FileText, FolderOpen, Globe, ListChecks, ListPlus, Loader2, MessageSquareText, Pencil, Plus, Trash2, Briefcase, Wrench, Link2, MessageCircleQuestion, Radar } from "lucide-react"
 import { cn } from "@blesser/ui"
 import { activitySummary, type TraceEntry } from "../../lib/assistant"
 
@@ -40,8 +40,8 @@ export function AgentSteps({ entries, live, status }: { entries: TraceEntry[]; l
         onClick={() => setOpen((v) => !v)}
         className="flex w-fit max-w-full cursor-pointer items-center gap-2 rounded-sm text-left text-callout font-medium text-ink-secondary transition-colors duration-150 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-default disabled:hover:text-ink-secondary"
       >
-        {live ? <Loader2 className="size-4 shrink-0 text-link motion-safe:animate-spin" aria-hidden="true" /> : <CircleCheck className="size-4 shrink-0 text-ink-tertiary" aria-hidden="true" />}
-        <span className="min-w-0" role={live ? "status" : undefined}>{live ? <span className="bl-shimmer">{now}</span> : summary}</span>
+        {live && <Loader2 className="size-4 shrink-0 text-link motion-safe:animate-spin" aria-hidden="true" />}
+        <span className="min-w-0 italic opacity-50 inline-block truncate text-ellipsis" role={live ? "status" : undefined}>{live ? <span className="bl-shimmer">{now}</span> : summary}</span>
         {live ? null : <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 transition-transform duration-150", !expanded && "-rotate-90")} />}
       </button>
       {expanded && entries.length ? (
