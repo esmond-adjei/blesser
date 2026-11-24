@@ -19,7 +19,6 @@ from api.core.time import utcnow_naive
 from api.main import app
 from api.notifications.events import scan_summary
 from api.notifications.models import Notification
-from api.opportunities import service as opp_service
 from api.opportunities import tasks as opp_tasks
 from api.opportunities import tools as opp_tools
 from api.opportunities.crawl_models import CrawlCandidate, Source
@@ -90,14 +89,9 @@ class Script:
         )
 
 
-def test_member_scan_matches_the_catalogue_and_skips_the_crawler(monkeypatch):
+def test_member_scan_does_not_return_listings_the_member_already_has(monkeypatch):
     word = "agritech" + _token()
-    script = Script(
-        [
-            [("search_catalogue", {"query": word})],
-            [("add_catalogue_match", {"opportunity_id": "PLACEHOLDER"})],
-        ]
-    )
+    script = Script([[("fetch_page", {"url": "PLACEHOLDER"})]])
     monkeypatch.setattr(orchestrator, "get_provider", script)
 
     async def no_crawler(session):
@@ -116,9 +110,9 @@ def test_member_scan_matches_the_catalogue_and_skips_the_crawler(monkeypatch):
             )
             session.add(candidate)
             await session.commit()
-            script.turns[1][0][1]["opportunity_id"] = listing.id
+            script.turns[0][0][1]["url"] = listing.source_url
             scan = await scans.start_scan(
-                session, TEST_USER_ID, categories=["startup"], focus=word + " grants"
+                session, TEST_USER_ID, categories=["startup"], focus=word + " grants", kind="member"
             )
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await queue.process_claimed(session, task)
@@ -128,78 +122,22 @@ def test_member_scan_matches_the_catalogue_and_skips_the_crawler(monkeypatch):
             assert "pipeline_complete" not in task.metrics
 
             first_prompt = script.messages[0][0]["content"]
-            assert "search_catalogue" in first_prompt and word in first_prompt
+            assert word in first_prompt and listing.title not in first_prompt
+            known_page = script.messages[1][-1]["content"]
+            assert "Skip known URL" in known_page
 
             detail = await scans.scan_detail(session, TEST_USER_ID, scan.id)
-            assert detail["opportunities_found"] == 1
+            assert detail["opportunities_found"] == 0
             assert detail["opportunities_added"] == 0
-            assert [(f["opportunity_id"], f["source"]) for f in detail["finds"]] == [
-                (listing.id, "catalog")
-            ]
+            assert detail["finds"] == []
             bodies = (
                 await session.execute(
                     select(Notification.body).where(Notification.entity_id == scan.id)
                 )
             ).scalars()
-            assert scan_summary(scan.region, 1, 0) in list(bodies)
+            assert scan_summary(scan.region, 0, 0) in list(bodies)
             candidate.status = "rejected"
             await session.commit()
-
-    run(check())
-
-
-def test_catalogue_search_lists_only_open_published_listings_in_the_category():
-    word = "cassava" + _token()
-
-    async def check():
-        async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
-            fits = await _listing(session, f"{word} Processing Grant")
-            await _listing(session, f"{word} Fellowship", category="research")
-            await _listing(session, f"{word} Hidden", status="in_review")
-            await _listing(
-                session,
-                f"{word} Closed",
-                deadline_date=opp_service.today() - timedelta(days=3),
-            )
-            await session.commit()
-            ctx = ToolContext(session=session, run=scan)
-            ctx.category = "startup"
-            found = await opp_tools.handle_search_catalogue(
-                {"query": f"{word} unrelatedword"}, ctx
-            )
-            assert [r["opportunity_id"] for r in found["results"]] == [fits.id]
-
-    run(check())
-
-
-def test_catalogue_matches_only_open_published_listings():
-    async def check():
-        async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
-            held = await _listing(session, "Held " + _token(), status="in_review")
-            closed = await _listing(
-                session,
-                "Closed " + _token(),
-                deadline_date=opp_service.today() - timedelta(days=1),
-            )
-            open_ = await _listing(session, "Open " + _token())
-            await session.commit()
-            ctx = ToolContext(session=session, run=scan)
-            for row in (held, closed):
-                result = await opp_tools.handle_add_catalogue_match(
-                    {"opportunity_id": row.id}, ctx
-                )
-                assert "error" in result
-            first = await opp_tools.handle_add_catalogue_match(
-                {"opportunity_id": open_.id}, ctx
-            )
-            again = await opp_tools.handle_add_catalogue_match(
-                {"opportunity_id": open_.id}, ctx
-            )
-            assert first["added"] and not again["added"]
-            find = await session.get(ScanFind, (scan.id, open_.id))
-            assert find.via == "catalog" and not find.created
 
     run(check())
 
@@ -209,7 +147,7 @@ def test_crawler_saves_do_not_use_the_agents_budget(monkeypatch):
 
     async def check():
         async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             crawled = await _listing(session, "Crawled " + _token())
             session.add(
                 ScanFind(
@@ -268,7 +206,7 @@ def test_sweep_scans_run_the_pipeline_before_the_agent(monkeypatch):
                 session, TEST_USER_ID, categories=["startup"], kind="sweep"
             )
             member = await scans.start_scan(
-                session, TEST_USER_ID, categories=["startup"]
+                session, TEST_USER_ID, categories=["startup"], kind="member"
             )
             for scan in (sweep, member):
                 task = await queue.claim_next_task(session, scan_id=scan.id)
@@ -336,7 +274,7 @@ def test_finds_on_member_sites_wait_for_review(monkeypatch):
     async def check():
         async with SessionLocal() as session:
             scan = await scans.start_scan(
-                session, TEST_USER_ID, categories=["startup"], sites=[site]
+                session, TEST_USER_ID, categories=["startup"], sites=[site], kind="member"
             )
             ctx = ToolContext(session=session, run=scan)
             ctx.member_hosts = await opp_tasks.member_only_hosts(session, scan.sites)
@@ -374,13 +312,309 @@ def test_member_prompt_lists_sites_and_order():
         category="student",
         focus="nursing scholarships",
         today="2026-11-20",
-        known=[],
         sites=["https://moh.example/scholarships"],
         member=True,
     )
     assert "https://moh.example/scholarships" in text
-    assert text.index("search_catalogue") < text.index("Read the member's sites")
+    assert "search_catalogue" not in text
+    assert text.index("Read the member's sites") < text.index("Search the web")
     sweep = opp_tasks.user_message(
-        region="Ghana", category="student", focus="", today="2026-11-20", known=[]
+        region="Ghana", category="student", focus="", today="2026-11-20"
     )
-    assert "search_catalogue" not in sweep and "member's sites" not in sweep
+    assert "member's sites" not in sweep
+
+
+def test_scan_results_leave_out_listings_already_in_the_catalogue():
+    async def check():
+        async with SessionLocal() as session:
+            old = await _listing(session, f"Already listed {_token()}")
+            new = await _listing(session, f"Newly found {_token()}", status="in_review")
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
+            session.add_all(
+                [
+                    ScanFind(
+                        scan_id=scan.id,
+                        opportunity_id=old.id,
+                        created=False,
+                        updated=True,
+                    ),
+                    ScanFind(scan_id=scan.id, opportunity_id=new.id, created=True),
+                ]
+            )
+            await session.commit()
+            detail = await scans.scan_detail(session, TEST_USER_ID, scan.id)
+            assert [f["opportunity_id"] for f in detail["finds"]] == [new.id]
+            assert detail["opportunities_found"] == 1
+            await scans.cancel_scan(session, TEST_USER_ID, scan.id)
+
+    run(check())
+
+
+def test_a_member_can_open_their_own_scan_finds_before_review():
+    from api.auth.models import User
+
+    other_id = "owner-" + uuid.uuid4().hex[:10]
+
+    async def setup():
+        async with SessionLocal() as session:
+            session.add(
+                User(
+                    id=other_id,
+                    email=f"{other_id}@example.com",
+                    password_hash="x",
+                    email_verified_at=utcnow_naive(),
+                )
+            )
+            mine = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
+            theirs = await scans.start_scan(session, other_id, categories=["startup"], kind="member")
+            own = await _listing(
+                session, f"Mine {_token()}", status="in_review", scan_id=mine.id
+            )
+            other = await _listing(
+                session, f"Theirs {_token()}", status="in_review", scan_id=theirs.id
+            )
+            session.add(ScanFind(scan_id=mine.id, opportunity_id=own.id, created=True))
+            await session.commit()
+            for scan in (mine, theirs):
+                await scans.cancel_scan(session, scan.user_id, scan.id)
+            return own.id, other.id, mine.id
+
+    own, other, scan_id = run(setup())
+    client = TestClient(app)
+    opened = client.get(f"/api/app/opportunities/{own}")
+    assert opened.status_code == 200 and opened.json()["in_review"] is True
+    assert client.get(f"/api/app/opportunities/{other}").status_code == 404
+    assert client.get(f"/api/app/opportunities/{own}/calendar.ics").status_code == 200
+    [find] = client.get(f"/api/app/scans/{scan_id}").json()["finds"]
+    assert find["opportunity_id"] == own and find["in_review"] is True
+
+
+def test_open_calls_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
+    import uuid
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from api.core.time import utcnow_naive
+    from api.opportunities.crawl_models import CrawlCandidate, PageCache
+    from api.opportunities.page_content import normalized_url
+
+    tag = uuid.uuid4().hex[:8]
+    single = f"https://{tag}.example/call"
+    closed = f"https://{tag}.example/old-call"
+    hub = f"https://{tag}.example/calls"
+    hub_links = [{"url": f"{hub}/c{n}", "label": "Call"} for n in range(6)]
+    handed = []
+
+    async def fake_pipeline(session, task, scan, category, on_event=None, urls=None):
+        handed.append(urls)
+        return {}
+
+    async def fake_agent(session, task, scan, category, **kwargs):
+        return {
+            "final_text": "done",
+            "turns": 1,
+            "read_pages": [single, closed, hub],
+        }
+
+    async def crawler_off(session):
+        return False
+
+    monkeypatch.setattr(opp_tasks, "run_pipeline", fake_pipeline)
+    monkeypatch.setattr(opp_tasks, "_run_agent", fake_agent)
+    monkeypatch.setattr(opp_tasks, "_crawler_runs_in_member_scans", crawler_off)
+
+    async def check():
+        async with SessionLocal() as session:
+            later = utcnow_naive() + timedelta(days=1)
+            session.add_all(
+                [
+                    PageCache(
+                        url=normalized_url(hub),
+                        text="Calls. Deadline: 30 June 2099",
+                        metadata_json={"links": hub_links},
+                        expires_at=later,
+                    ),
+                    PageCache(
+                        url=normalized_url(single),
+                        text="Research grant. Deadline: 30 June 2099",
+                        expires_at=later,
+                    ),
+                    PageCache(
+                        url=normalized_url(closed),
+                        text="Research grant. Deadline: 30 June 2020",
+                        expires_at=later,
+                    ),
+                ]
+            )
+            await session.commit()
+            scan = await scans.start_scan(
+                session, TEST_USER_ID, categories=["research"], kind="member"
+            )
+            task = await queue.claim_next_task(session, scan_id=scan.id)
+            await opp_tasks.run_discover_opportunities(session, task, scan)
+            expected = [normalized_url(single)]
+            assert handed == [expected]
+            assert "agent_read" not in task.metrics
+            rows = (
+                (
+                    await session.execute(
+                        select(CrawlCandidate).where(CrawlCandidate.url.in_(expected))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert [r.reason for r in rows] == ["agent_read"]
+            for row in rows:
+                await session.delete(row)
+            await session.commit()
+
+    run(check())
+
+
+def test_the_planner_queues_search_results_for_the_pipeline(monkeypatch):
+    from api import web
+    from api.core.config import settings
+
+    monkeypatch.setattr(settings, "scan_agent_mode", "planner")
+    tag = _token()
+    fresh = f"https://{tag}.example/fellowship-2027"
+    script = Script(
+        [
+            [("search_web", {"query": "fellowships Ghana 2027"})],
+            [
+                (
+                    "queue_pages",
+                    {
+                        "pages": [
+                            {"url": fresh, "title": "Fellowship 2027"},
+                            {"url": "KNOWN"},
+                            {"url": "https://twitter.com/x/status/1"},
+                        ]
+                    },
+                )
+            ],
+        ]
+    )
+    offered = []
+
+    async def chat(**kwargs):
+        offered.append({t["name"] for t in kwargs.get("tools") or []})
+        return await Script.chat(script, **kwargs)
+
+    script.chat = chat
+    monkeypatch.setattr(orchestrator, "get_provider", script)
+
+    async def search(query, max_results=8):
+        return [{"url": fresh, "title": "Fellowship 2027", "snippet": "Apply"}]
+
+    monkeypatch.setattr(web, "search_web", search)
+    handed = []
+
+    async def fake_pipeline(session, task, scan, category, on_event=None, urls=None):
+        handed.append(urls)
+        return {}
+
+    async def no_crawler(session):
+        return False
+
+    monkeypatch.setattr(opp_tasks, "run_pipeline", fake_pipeline)
+    monkeypatch.setattr(opp_tasks, "_crawler_runs_in_member_scans", no_crawler)
+
+    async def check():
+        async with SessionLocal() as session:
+            listing = await _listing(session, f"Volta {tag} Grant")
+            await session.commit()
+            script.turns[1][0][1]["pages"][1]["url"] = listing.source_url
+            scan = await scans.start_scan(
+                session, TEST_USER_ID, categories=["research"], kind="member"
+            )
+            task = await queue.claim_next_task(session, scan_id=scan.id)
+            await queue.process_claimed(session, task)
+            assert task.status.value == "done", task.error
+            assert offered[0] == {"search_web", "queue_pages"}
+            result = script.messages[2][-1]["content"]
+            assert '"queued": 1' in result and "known" in result
+            assert handed == [[opp_tools.url_key(fresh)]]
+            assert task.metrics["picked_count"] == 1
+            row = (
+                await session.execute(
+                    select(CrawlCandidate).where(
+                        CrawlCandidate.url == opp_tools.url_key(fresh)
+                    )
+                )
+            ).scalar_one()
+            assert row.reason == "agent_pick" and row.category_hints == ["research"]
+            await session.delete(row)
+            await session.commit()
+
+    run(check())
+
+
+def test_a_thin_region_is_seeded_from_fixed_searches(monkeypatch):
+    from api import web
+    from api.core.config import settings
+    from api.opportunities import pipeline
+
+    monkeypatch.setattr(settings, "seed_when_pool_below", 10_000)
+    tag = _token()
+    queries = []
+
+    async def search(query, max_results=8):
+        queries.append(query)
+        return [
+            {"url": f"https://{tag}.example/{len(queries)}/scholarship", "title": "Scholarship 2027"},
+            {"url": f"https://{tag}.example/{len(queries)}/about", "title": "About us"},
+            {"url": f"https://{tag}.example/{len(queries)}/kenya-award", "title": "Award for Kenyans"},
+        ]
+
+    monkeypatch.setattr(web, "search_web", search)
+
+    async def check():
+        async with SessionLocal() as session:
+            seeded = await pipeline.seed_region(session, "student", "Ghana")
+            assert len(queries) == 3 and any("site:.gh" in q for q in queries)
+            assert seeded == [
+                f"https://{tag}.example/{n}/scholarship" for n in (1, 2, 3)
+            ]
+            rows = (
+                await session.execute(
+                    select(CrawlCandidate).where(CrawlCandidate.url.in_(seeded))
+                )
+            ).scalars().all()
+            assert {r.reason for r in rows} == {"seed"}
+            for row in rows:
+                await session.delete(row)
+            await session.commit()
+
+    run(check())
+
+
+def test_a_planner_that_queues_too_little_hands_over_its_search_leads():
+    from api.opportunities import pipeline
+
+    tag = _token()
+    seen = [
+        {"url": f"https://{tag}.example/gef-small-grants-2026", "title": "2026 Call for Proposals: GEF Small Grants"},
+        {"url": f"https://{tag}.example/top-20", "title": "Top 20 Scholarships for Ghanaians"},
+        {"url": f"https://{tag}.example/about", "title": "About the foundation"},
+        {"url": f"https://{tag}.example/kenya", "title": "Grant for Kenyan farmers"},
+    ]
+
+    async def check():
+        async with SessionLocal() as session:
+            urls = await pipeline.hand_off(
+                session, [], "research", seen=seen, region="Ghana"
+            )
+            assert urls == [opp_tools.url_key(seen[0]["url"])]
+            row = (
+                await session.execute(
+                    select(CrawlCandidate).where(CrawlCandidate.url == urls[0])
+                )
+            ).scalar_one()
+            assert row.reason == "search_lead"
+            await session.delete(row)
+            await session.commit()
+
+    run(check())

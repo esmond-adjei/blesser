@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from urllib.parse import urlsplit
 
@@ -109,6 +110,126 @@ async def triage_page(
         )
     ).first()
     return "content_duplicate" if previous else None
+
+
+_COUNTRIES = {
+    "nigeria": ("nigeria", "nigerian", "nigerians"),
+    "south africa": ("south africa", "south african", "south africans"),
+    "kenya": ("kenya", "kenyan", "kenyans"),
+    "ghana": ("ghana", "ghanaian", "ghanaians"),
+    "uganda": ("uganda", "ugandan", "ugandans"),
+    "tanzania": ("tanzania", "tanzanian", "tanzanians"),
+    "rwanda": ("rwanda", "rwandan", "rwandans"),
+    "ethiopia": ("ethiopia", "ethiopian", "ethiopians"),
+    "egypt": ("egypt", "egyptian", "egyptians"),
+    "morocco": ("morocco", "moroccan", "moroccans"),
+    "zambia": ("zambia", "zambian", "zambians"),
+    "zimbabwe": ("zimbabwe", "zimbabwean", "zimbabweans"),
+    "cameroon": ("cameroon", "cameroonian", "cameroonians"),
+    "senegal": ("senegal", "senegalese"),
+    "malawi": ("malawi", "malawian", "malawians"),
+    "botswana": ("botswana",),
+    "namibia": ("namibia", "namibian", "namibians"),
+    "mozambique": ("mozambique",),
+    "sierra leone": ("sierra leone", "sierra leonean"),
+    "liberia": ("liberia", "liberian", "liberians"),
+    "india": ("india", "indian students"),
+    "pakistan": ("pakistan", "pakistani", "pakistanis"),
+    "bangladesh": ("bangladesh", "bangladeshi"),
+    "philippines": ("philippines", "filipino", "filipinos"),
+    "united states": ("usa", "nyc", "new york", "us citizens", "american citizens"),
+    "united kingdom": ("uk residents", "uk citizens", "london"),
+}
+# Areas a listing may name instead of a country, by the countries they cover.
+_AREAS = {
+    "east africa": (
+        (
+            "east africa",
+            "east african",
+            "eastern africa",
+            "east and southern africa",
+            "eac",
+        ),
+        {"kenya", "uganda", "tanzania", "rwanda", "ethiopia"},
+    ),
+    "southern africa": (
+        ("southern africa", "sadc"),
+        {
+            "south africa",
+            "zambia",
+            "zimbabwe",
+            "malawi",
+            "botswana",
+            "namibia",
+            "mozambique",
+        },
+    ),
+}
+
+
+#: Country-code domains, so a scan can favour a country's own sites (.gov.gh, .edu.gh).
+_COUNTRY_DOMAINS = {
+    "nigeria": "ng",
+    "south africa": "za",
+    "kenya": "ke",
+    "ghana": "gh",
+    "uganda": "ug",
+    "tanzania": "tz",
+    "rwanda": "rw",
+    "ethiopia": "et",
+    "egypt": "eg",
+    "morocco": "ma",
+    "zambia": "zm",
+    "zimbabwe": "zw",
+    "cameroon": "cm",
+    "senegal": "sn",
+    "malawi": "mw",
+    "botswana": "bw",
+    "namibia": "na",
+    "mozambique": "mz",
+    "sierra leone": "sl",
+    "liberia": "lr",
+    "india": "in",
+    "pakistan": "pk",
+    "bangladesh": "bd",
+    "philippines": "ph",
+}
+
+
+def local_domains(region: str) -> list[str]:
+    """Country-code domains of the countries a region names, such as ["gh"] for Ghana."""
+    return sorted(
+        _COUNTRY_DOMAINS[c]
+        for c in _countries_in(region or "")
+        if c in _COUNTRY_DOMAINS
+    )
+
+
+def _countries_in(text: str) -> set[str]:
+    text = re.sub(r"[-_/]+", " ", text.casefold())
+    return {
+        country
+        for country, words in _COUNTRIES.items()
+        if any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
+    }
+
+
+def names_other_country(text: str, region: str) -> bool:
+    """True when a link plainly names only countries outside the scan's region.
+
+    Wide regions (Africa, global) and unknown countries are never ruled out."""
+    targets = _countries_in(region or "")
+    if not targets or re.search(
+        r"africa\b|global|anywhere|world",
+        (region or "").casefold().replace("south africa", ""),
+    ):
+        return False
+    named = _countries_in(text)
+    clean = re.sub(r"[-_/]+", " ", text.casefold())
+    for words, members in _AREAS.values():
+        if any(re.search(rf"\b{re.escape(w)}\b", clean) for w in words):
+            named |= members
+    return bool(named) and not (named & targets)
 
 
 async def triage_url(session, candidate: CrawlCandidate) -> str | None:

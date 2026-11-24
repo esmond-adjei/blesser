@@ -2,11 +2,9 @@ from datetime import date
 from typing import Annotated
 
 from pydantic import Field, StringConstraints
-from sqlalchemy import select
 
 from api import web
 from api.applicant_kit.schemas import http_url
-from api.core.exceptions import NotFoundError
 from api.core.time import human_day
 from api.opportunities import service as opportunities
 from api.opportunities.models import OpportunityCategory, OpportunityKind
@@ -169,20 +167,7 @@ async def search_web(session, user_id, args, registry):
 
 
 async def trackable(session, user_id, opportunity_id):
-    """A published listing, or one of this member's own scan finds still in review."""
-    try:
-        return await opportunities.get_or_404(session, opportunity_id)
-    except NotFoundError:
-        opp = await opportunities.get_or_404(session, opportunity_id, public=False)
-        if opp.status == "in_review" and opp.scan_id:
-            from api.scans.models import Scan
-
-            owner = await session.scalar(
-                select(Scan.user_id).where(Scan.id == opp.scan_id)
-            )
-            if owner == user_id:
-                return opp
-        raise
+    return await opportunities.get_for_member(session, user_id, opportunity_id)
 
 
 async def propose_track(session, user_id, args):

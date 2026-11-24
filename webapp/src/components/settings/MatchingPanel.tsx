@@ -70,7 +70,7 @@ export function MatchingPanel() {
   }
 
   if (!profile.data) {
-    return <SkeletonStack aria-label="Loading what you're looking for" aria-busy="true" className="space-y-3" blocks={["h-24", "h-24", "h-24"]} />
+    return <SkeletonStack aria-label="Loading your feed settings" aria-busy="true" className="space-y-3" blocks={["h-24", "h-24", "h-24"]} />
   }
   const p = profile.data
   const value = toInput(p)
@@ -87,7 +87,7 @@ export function MatchingPanel() {
           <p className="min-w-0 flex-1 text-footnote text-ink">
             {p.countries.length || p.fields.length || p.levels.length
               ? "We filled this in from your Applicant Kit. Check it, then save to turn on For you and match alerts."
-              : "Tell us what you're looking for, then save to turn on For you and match alerts."}
+              : "Tell us what you want to see, then save to turn on For you and match alerts."}
           </p>
           <Button size="sm" variant="primary" onClick={() => void save(value)}>
             Save
@@ -96,7 +96,7 @@ export function MatchingPanel() {
       ) : null}
 
       <SettingsGroup title="Preferences" description="Used to order the For you list and to pick what alerts tell you about.">
-        <SettingRow label="Who it's for">
+        <SettingRow label="Who it's for" description="Your feed shows only these audiences. Leave all off to see every one.">
           <ChipRow>
             {CATEGORIES.map((c) => (
               <Chip key={c} selected={value.categories.includes(c)} onClick={() => set({ categories: toggle(value.categories, c) })}>
@@ -180,8 +180,8 @@ export function MatchingPanel() {
       {p.saved ? (
         <SettingsGroup>
           <SettingRow
-            label="Clear what you're looking for"
-            description="For you goes back to deadline order and match alerts stop. Saved searches stay."
+            label="Clear your feed settings"
+            description="The feed shows every audience again, For you goes back to deadline order and match alerts stop. Saved searches stay."
             control={
               <Button size="sm" variant="quiet" onClick={() => void clear()}>
                 Clear
@@ -194,11 +194,11 @@ export function MatchingPanel() {
   )
 }
 
-function ChipRow({ children }: { children: React.ReactNode }) {
+export function ChipRow({ children }: { children: React.ReactNode }) {
   return <div className="mt-2.5 flex flex-wrap items-center gap-2">{children}</div>
 }
 
-function RemovableChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+export function RemovableChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <Chip tone="forest" className="h-8 pr-1.5">
       {label}
@@ -214,7 +214,7 @@ function RemovableChip({ label, onRemove }: { label: string; onRemove: () => voi
   )
 }
 
-function TermInput({ values, max, onChange }: { values: string[]; max: number; onChange: (next: string[]) => void }) {
+export function TermInput({ values, max, onChange }: { values: string[]; max: number; onChange: (next: string[]) => void }) {
   const [draft, setDraft] = React.useState("")
   const add = () => {
     const terms = draft

@@ -170,13 +170,17 @@ def test_scan_proposals_check_sites_and_the_allowance(monkeypatch):
     monkeypatch.setattr(settings, "rate_limits_enabled", True)
     add(
         *[
-            Scan(user_id=user, region="Ghana", categories=["research"], status="done")
+            Scan(user_id=user, region="Ghana", categories=["research"], status="done", kind="member")
             for _ in range(3)
         ]
     )
-    assert read(user, "scan_allowance")["left_this_hour"] == 0
-    with pytest.raises(RateLimitError):
+    allowance = read(user, "scan_allowance")
+    assert allowance["left_this_hour"] == 0 and allowance["next_at"] is not None
+    with pytest.raises(RateLimitError) as limit:
         propose(user, "start_scan", category="research")
+    card = limit.value.card
+    assert card["kind"] == "scan_limit" and card["title"] == "No scans left this hour"
+    assert card["available_at"] == allowance["next_at"].isoformat()
 
 
 def test_an_approved_scan_still_counts_against_the_limit(monkeypatch):
@@ -185,7 +189,7 @@ def test_an_approved_scan_still_counts_against_the_limit(monkeypatch):
     monkeypatch.setattr(settings, "rate_limits_enabled", True)
     add(
         *[
-            Scan(user_id=user, region="Ghana", categories=["student"], status="done")
+            Scan(user_id=user, region="Ghana", categories=["student"], status="done", kind="member")
             for _ in range(3)
         ]
     )
@@ -196,7 +200,7 @@ def test_an_approved_scan_still_counts_against_the_limit(monkeypatch):
 def test_scan_finds_can_be_read_and_tracked_by_their_owner_only():
     user, other = member(), member()
     [scan_id] = add(
-        Scan(user_id=user, region="Ghana", categories=["startup"], status="done")
+        Scan(user_id=user, region="Ghana", categories=["startup"], status="done", kind="member")
     )
     [opp_id] = add(
         Opportunity(
@@ -578,3 +582,72 @@ def test_reads_of_another_members_records_are_not_found():
             return await session.scalar(select(Todo.id).where(Todo.id == todo_id))
 
     assert run(still_there()) == todo_id
+
+
+def test_bulk_tools_take_one_approval_for_many_items():
+    user = member()
+    proposal, applied = change(
+        user,
+        "add_sources",
+        items=[
+            {"url": "grants.example/a", "category": "research", "note": "PhD calls"},
+            {"url": "funds.example", "category": "startup"},
+        ],
+    )
+    assert proposal.summary == "Add 2 sources?"
+    assert proposal.action == "Add 2"
+    assert "1. Add https://grants.example/a to your sources" in proposal.note
+    assert "2. Add https://funds.example to your sources" in proposal.note
+    assert applied.result["added"] == 2 and applied.result["failed"] == []
+    assert len(applied.previews) == 2
+    assert len(read(user, "list_sources")["items"]) == 2
+
+    _, todos = change(
+        user, "add_todos", items=[{"title": "Draft essay"}, {"title": "Email referee"}]
+    )
+    assert todos.result["added"] == 2
+    assert [card["title"] for card in todos.previews] == [
+        "Draft essay",
+        "Email referee",
+    ]
+
+    _, answers = change(
+        user,
+        "add_answers",
+        items=[
+            {"question": "Why this programme?", "answer": "Because."},
+            {"question": "Biggest win?", "answer": "Shipped it."},
+        ],
+    )
+    assert answers.result["added"] == 2
+
+
+def test_bulk_tools_reject_a_bad_item_before_any_approval_and_report_partial_failures():
+    user = member()
+    with pytest.raises(BadRequestError):
+        propose(
+            user,
+            "add_sources",
+            items=[
+                {"url": "grants.example", "category": "research"},
+                {"url": "admin.internal", "category": "research"},
+            ],
+        )
+    with pytest.raises(ValidationError):
+        propose(user, "add_todos", items=[])
+    first = propose(
+        user, "add_sources", items=[{"url": "one.example", "category": "student"}]
+    )
+    approve(user, "add_sources", first)
+    again = propose(
+        user,
+        "add_sources",
+        items=[
+            {"url": "one.example", "category": "student"},
+            {"url": "two.example", "category": "student"},
+        ],
+    )
+    applied = approve(user, "add_sources", again)
+    assert applied.result["added"] == 1
+    assert len(applied.result["failed"]) == 1
+    assert "couldn't be added" in applied.receipt

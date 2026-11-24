@@ -35,13 +35,6 @@ class TaskHalted(Exception):
 EventCallback = Callable[[dict], Awaitable[None]]
 CheckpointCallback = Callable[[list[dict]], Awaitable[None]]
 
-# Blunt, so even weak models course-correct instead of summarizing an empty task.
-EMPTY_FINISH_NUDGE = (
-    "You are trying to finish without saving anything, which means this "
-    "task accomplished nothing. Do not write another summary yet - keep "
-    "working: search, verify, and save results with your tools first."
-)
-
 CLOSING_FORMAT_BLOCK = (
     "\n\nClose your final summary with these labeled lines "
     "(keep the labels exactly; write None where a section is empty):\n"
@@ -165,12 +158,11 @@ async def _halt_reason(ctx) -> str | None:
     return await run_halted(ctx)
 
 
-def _result(text: str, turns: int, usage_in: int, usage_out: int, nudges: int) -> dict:
+def _result(text: str, turns: int, usage_in: int, usage_out: int) -> dict:
     return {
         "final_text": text,
         "turns": turns,
         "usage": {"input_tokens": usage_in, "output_tokens": usage_out},
-        "nudges": nudges,
     }
 
 
@@ -183,11 +175,11 @@ async def run_agent_task(
     on_event: EventCallback | None = None,
     resume_messages: list[dict] | None = None,
     on_checkpoint: CheckpointCallback | None = None,
-    progress_tools: set[str] | None = None,
-    max_turns: int | None = None,
+    max_turns: int,
     no_yield_turns: int | None = None,
 ) -> dict:
-    """Run a bounded tool loop, resuming checkpointed messages when provided."""
+    """Run a tool loop of at most `max_turns` (never above `max_agent_turns`), resuming
+    checkpointed messages when provided. A final answer without tool calls ends it."""
     definitions = [t for t in TOOL_DEFINITIONS if tools is None or t["name"] in tools]
     try:
         ctx.offered_tools = {t["name"] for t in definitions}
@@ -205,14 +197,15 @@ async def run_agent_task(
         # Replaying this history would 400, so restart fresh; re-saves dedupe.
         messages = fresh
     turns_used = sum(1 for m in messages if m.get("role") == "assistant")
-    usage_in = usage_out = nudges = 0
-    progress_made = any(
-        tc.get("name") in (progress_tools or set())
+    usage_in = usage_out = 0
+
+    # N turns to reach a first page, then N turns per save: searching first is not a failure.
+    read_before = any(
+        tc.get("name") == "fetch_page"
         for m in messages
         for tc in (m.get("tool_calls") or [])
     )
-
-    last_save_turn = turns_used
+    last_save_turn: int | None = turns_used if read_before else None
     if resume_messages and getattr(ctx, "page_notes", None) is not None:
         for message in resume_messages:
             if message.get("_page_url"):
@@ -233,7 +226,7 @@ async def run_agent_task(
             + ("; ".join(notes[-12:]) or "None")
         )
 
-    turn_limit = max_turns or settings.max_agent_turns
+    turn_limit = min(max_turns, settings.max_agent_turns)
     for turn in range(turns_used, turn_limit):
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
@@ -257,20 +250,11 @@ async def run_agent_task(
 
         if not response.tool_calls:
             messages.append({"role": "assistant", "content": response.text})
-            if (
-                progress_tools
-                and not progress_made
-                and nudges < settings.max_empty_finish_nudges
-            ):
-                nudges += 1
-                messages.append({"role": "user", "content": EMPTY_FINISH_NUDGE})
-                continue
             return _result(
                 response.text or summary("Discovery finished."),
                 turn + 1,
                 usage_in,
                 usage_out,
-                nudges,
             )
 
         messages.append(
@@ -297,16 +281,12 @@ async def run_agent_task(
         )
         # Request order keeps the trace and replayed history deterministic.
         for tool_use, result in zip(response.tool_calls, results, strict=True):
-            if (
-                progress_tools
-                and tool_use.name in progress_tools
-                and "error" not in result
+            if (tool_use.name == "save_opportunity" and result.get("created")) or (
+                tool_use.name == "queue_pages" and result.get("queued")
             ):
-                progress_made = True
-            if (
-                tool_use.name == "save_opportunity" and result.get("created")
-            ) or (tool_use.name == "add_catalogue_match" and result.get("added")):
                 last_save_turn = turn + 1
+            elif tool_use.name == "fetch_page" and last_save_turn is None:
+                last_save_turn = turn
             if on_event is not None:
                 await on_event(
                     {
@@ -348,13 +328,12 @@ async def run_agent_task(
                     message["_summary"] = ctx.page_notes.get(
                         url_key(message["_page_url"]), message.get("_summary", "")
                     )
-        if no_yield_turns and turn + 1 - last_save_turn >= no_yield_turns:
+        if no_yield_turns and turn + 1 - (last_save_turn or 0) >= no_yield_turns:
             return _result(
                 summary(f"Stopped after {no_yield_turns} turns without a new save."),
                 turn + 1,
                 usage_in,
                 usage_out,
-                nudges,
             )
 
         if on_checkpoint is not None:
@@ -370,7 +349,6 @@ async def run_agent_task(
         turn_limit,
         usage_in,
         usage_out,
-        nudges,
     )
 
 

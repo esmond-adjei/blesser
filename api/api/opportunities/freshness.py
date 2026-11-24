@@ -14,8 +14,9 @@ A check first reads the source page through the shared page cache (no model call
 
 - Gone (404 or 410) or redirected to a homepage: the listing goes to staff review with
   `review_reason = source_changed`.
-- Unchanged since the facts were last confirmed (same content hash): `verified_at` is
-  stamped.
+- Unchanged since the facts were last confirmed (same content hash), or the page still
+  states the listing's deadline as its latest (or still says rolling): `verified_at` is
+  stamped. Aggregator pages change on every visit, so the deadline is what gets compared.
 - Every deadline on the page has passed: an undated or rolling listing is archived; a
   dated one whose page disagrees goes to review.
 - Changed: a `reverify_opportunity` agent task re-reads the page and saves the current
@@ -41,13 +42,13 @@ from api.opportunities.models import Opportunity, OpportunityStatus
 from api.opportunities.page_cache import get_page
 from api.opportunities.page_content import (
     Page,
+    confirms_deadline,
     expired,
     normalized_url,
     shows_open_cycle,
 )
 from api.scans import models as scan_models
 
-#: Scan focus that marks the scans these checks create (no "scan finished" notification).
 CHECK_FOCUS = "Scheduled listing checks"
 #: A failed or inconclusive check is retried after this long.
 RETRY_AFTER = timedelta(hours=24)
@@ -150,7 +151,8 @@ def moved_to_homepage(url: str, page: Page) -> bool:
 
 def read_outcome(row: Opportunity, page: Page, today) -> str:
     """What the source page says, without a model: missing, moved, unreachable,
-    unchanged, closed, open (archived only: a new cycle is advertised) or changed."""
+    unchanged, closed, open (archived only: a new cycle is advertised), confirmed or
+    changed."""
     if page.error:
         return "missing" if page.error in ("http_404", "http_410") else "unreachable"
     if moved_to_homepage(row.source_url or row.link, page):
@@ -161,6 +163,10 @@ def read_outcome(row: Opportunity, page: Page, today) -> str:
         return "closed"
     if row.status == ARCHIVED:
         return "open" if shows_open_cycle(page.text, page.metadata, today) else "closed"
+    if confirms_deadline(
+        page.text, page.metadata, row.deadline_date, row.rolling, today
+    ):
+        return "confirmed"
     return "changed"
 
 
@@ -190,7 +196,7 @@ async def agent_checks_today(session, now) -> int:
             .select_from(scan_models.ScanTask)
             .join(scan_models.Scan, scan_models.Scan.id == scan_models.ScanTask.scan_id)
             .where(
-                scan_models.Scan.focus == CHECK_FOCUS,
+                scan_models.Scan.kind == scan_models.CHECK_KIND,
                 scan_models.ScanTask.created_at >= now - timedelta(days=1),
             )
         )
@@ -222,6 +228,7 @@ class AgentQueue:
                 region=settings.opportunity_default_region,
                 categories=[],
                 focus=CHECK_FOCUS,
+                kind=scan_models.CHECK_KIND,
                 status="running",
             )
             self.session.add(self.scan)
@@ -253,7 +260,7 @@ async def apply_outcome(
     """Act on a read outcome; returns what was recorded on the listing."""
     now = queue.now
     today = now.date()
-    if outcome in ("unchanged", "closed", "moved"):
+    if outcome in ("unchanged", "confirmed", "closed", "moved"):
         # Settled for this content; "changed" and "open" wait for the agent's verdict.
         row.source_hash = page.content_hash
     if row.status == ARCHIVED:
@@ -262,7 +269,7 @@ async def apply_outcome(
         return outcome
     if outcome in ("missing", "moved"):
         row.status, row.review_reason = REVIEW, "source_changed"
-    elif outcome == "unchanged":
+    elif outcome in ("unchanged", "confirmed"):
         row.verified_at = now
     elif outcome == "closed":
         undated = row.deadline_date is None or row.rolling

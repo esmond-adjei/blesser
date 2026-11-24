@@ -142,7 +142,7 @@ export function PendingCard({ call, working, onDecide, onOpenQuestions }: {
     <div className="space-y-3 rounded-md border border-separator bg-surface p-4">
       <div className="space-y-1">
         <p className="text-callout font-semibold text-ink wrap-anywhere">{call.summary}</p>
-        {call.note ? <p className="text-callout whitespace-pre-wrap text-ink-secondary wrap-anywhere">{call.note}</p> : null}
+        {call.note ? <p className="nice-scroll max-h-64 overflow-y-auto text-callout whitespace-pre-wrap text-ink-secondary wrap-anywhere">{call.note}</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant={call.tone === "danger" ? "danger" : "primary"} disabled={working} onClick={() => onDecide(true)}>

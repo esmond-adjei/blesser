@@ -24,6 +24,7 @@ const KitProject = React.lazy(() => import("./pages/kit/ProjectPage").then((m) =
 const KitDocuments = React.lazy(() => import("./pages/kit/DocumentsTab").then((m) => ({ default: m.DocumentsTab })))
 const KitAnswers = React.lazy(() => import("./pages/kit/AnswersTab").then((m) => ({ default: m.AnswersTab })))
 const KitCorrections = React.lazy(() => import("./pages/kit/CorrectionsTab").then((m) => ({ default: m.CorrectionsTab })))
+const Welcome = React.lazy(() => import("./pages/Welcome").then((m) => ({ default: m.Welcome })))
 const Settings = React.lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })))
 const Login = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.Login })))
 const Register = React.lazy(() => import("./pages/Auth").then((m) => ({ default: m.Register })))
@@ -41,7 +42,9 @@ function RequireAuth() {
   const { user, ready } = useAuth()
   const location = useLocation()
   if (!ready) return <LoadingScreen />
-  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />
+  const here = encodeURIComponent(location.pathname + location.search)
+  if (!user) return <Navigate to={`/login?next=${here}`} replace />
+  if (!user.feed_set_up) return <Navigate to={`/welcome?next=${here}`} replace />
   return <Shell />
 }
 
@@ -102,6 +105,7 @@ export default function App() {
               <Route path="settings/:section" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
+            <Route path="welcome" element={<Welcome />} />
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="forgot-password" element={<ForgotPassword />} />

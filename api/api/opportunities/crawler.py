@@ -183,7 +183,7 @@ async def crawl_due(session, *, categories: list[str] | None = None) -> dict:
         query = (
             select(Source)
             .where(
-                Source.enabled.is_(True),
+                or_(Source.enabled.is_(True), on_trial()),
                 or_(
                     Source.next_crawl_at <= utcnow_naive(),
                     Source.crawl_requested.is_(True),
@@ -288,31 +288,63 @@ async def crawl_due(session, *, categories: list[str] | None = None) -> dict:
     return report
 
 
-async def propose_source(session, url: str, category: str) -> str:
-    origin = urlsplit(url)
-    host = (origin.hostname or "").lower().removeprefix("www.")
-    sources = (
-        (
-            await session.execute(
-                select(Source).order_by(
-                    Source.enabled.desc(), Source.proposed, Source.created_at
-                )
-            )
-        )
-        .scalars()
-        .all()
+#: A suggested page is crawled on trial until it has yielded this many candidates.
+TRIAL_CANDIDATES = 20
+#: Links to opportunities a page needs before it is suggested as a source.
+HUB_LINKS = 6
+
+
+def on_trial():
+    """Suggested pages that are not a site's homepage and are still within their trial."""
+    return (
+        Source.proposed.is_(True)
+        & Source.enabled.is_(False)
+        & Source.url.op("~")(r"^https?://[^/]+/.+")
+        & (Source.candidates_found < TRIAL_CANDIDATES)
     )
-    for source in sources:
+
+
+async def source_for_host(session, url: str) -> str | None:
+    """An existing source on this URL's site, preferring enabled ones."""
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    for source in (
+        await session.execute(
+            select(Source).order_by(Source.enabled.desc(), Source.created_at)
+        )
+    ).scalars():
         if (urlsplit(source.url).hostname or "").lower().removeprefix("www.") == host:
             return source.id
-    root = f"{origin.scheme}://{origin.netloc}/"
-    source_id = new_id()
+    return None
+
+
+async def propose_source(
+    session, url: str, category: str, *, feeds: list[str] | None = None
+) -> str | None:
+    """Suggest this page (or its own section feed) as a source on trial.
+
+    A site already read in full by an enabled feed or sitemap gets no new source."""
+    page = urlsplit(url)
+    host = (page.hostname or "").lower().removeprefix("www.")
+    path = page.path.rstrip("/")
+    if not host or not path:
+        return None
+    for source in (await session.execute(select(Source))).scalars():
+        if (urlsplit(source.url).hostname or "").lower().removeprefix("www.") != host:
+            continue
+        if normalized_url(source.url) == normalized_url(url) or (
+            source.enabled and source.kind in ("rss", "sitemap")
+        ):
+            return source.id
+    feed = next(
+        (f for f in feeds or [] if urlsplit(f).path.startswith(path + "/")), None
+    )
+    target, kind = (feed, "rss") if feed else (url, "listing")
     await session.execute(
         insert(Source)
         .values(
-            id=source_id,
-            url=root,
-            kind="listing",
+            id=new_id(),
+            url=target,
+            kind=kind,
             category_hints=[category],
             enabled=False,
             proposed=True,
@@ -330,5 +362,20 @@ async def propose_source(session, url: str, category: str) -> str:
         .on_conflict_do_nothing(index_elements=[Source.url])
     )
     return (
-        await session.execute(select(Source.id).where(Source.url == root))
+        await session.execute(select(Source.id).where(Source.url == target))
     ).scalar_one()
+
+
+async def credit_source(session, source_id: str) -> None:
+    """Count a new listing for a source; a suggested page on trial that yields one is
+    switched on. Staff can still switch it off."""
+    await session.execute(
+        update(Source)
+        .where(Source.id == source_id)
+        .values(opportunities_saved=Source.opportunities_saved + 1)
+    )
+    await session.execute(
+        update(Source)
+        .where(Source.id == source_id, on_trial())
+        .values(enabled=True, proposed=False)
+    )

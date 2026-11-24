@@ -27,7 +27,7 @@ from api.opportunities.models import (
 from api.opportunities.page_content import Page, normalized_url
 from api.opportunities.schemas import AgentOpportunityIn
 from api.scans import service as scan_service
-from api.scans.models import Scan, ScanFind, ScanTask, TaskStatus
+from api.scans.models import CHECK_KIND, Scan, ScanFind, ScanTask, TaskStatus
 
 pytestmark = pytest.mark.real_auth
 
@@ -431,11 +431,39 @@ def test_changed_page_queues_one_agent_check_within_budget(monkeypatch):
         async with SessionLocal() as session:
             return await session.get(Scan, queued[0].scan_id)
 
-    assert run(scan()).focus == freshness.CHECK_FOCUS
+    assert run(scan()).kind == CHECK_KIND
     # An in-flight check is not claimed again, even once the retry window passes.
     later = utcnow_naive() + timedelta(days=2)
     assert checks(monkeypatch, page(), now=later) == {"queued": 1}
     assert [t.target for t in tasks()] == [first, second]
+
+
+def test_page_still_stating_the_deadline_confirms_without_a_model(monkeypatch):
+    soon = opp_service.today() + timedelta(days=7)
+    id = add(deadline_date=soon, verified_at=days_ago(20))
+    text = f"Seed Grant. Application Deadline: {soon:%B %d, %Y}. Related: other posts."
+    assert checks(monkeypatch, page(text)) == {"confirmed": 1}
+    row = read(id)
+    assert row.status == "published" and row.check_outcome == "confirmed"
+    assert row.verified_at > days_ago(0.01) and tasks() == []
+
+
+def test_rolling_page_confirms_a_rolling_listing(monkeypatch):
+    id = add(rolling=True, verified_at=days_ago(45))
+    checks(
+        monkeypatch, page("Seed Grant. Applications are accepted on a rolling basis.")
+    )
+    assert read(id).check_outcome == "confirmed"
+
+
+def test_page_with_a_later_deadline_still_needs_the_agent(monkeypatch):
+    soon = opp_service.today() + timedelta(days=7)
+    later = soon + timedelta(days=30)
+    add(deadline_date=soon, verified_at=days_ago(20))
+    text = (
+        f"Seed Grant. Deadline: {soon:%B %d, %Y}. Extended deadline: {later:%B %d, %Y}."
+    )
+    assert checks(monkeypatch, page(text)) == {"changed": 1}
 
 
 def test_no_owner_means_no_agent_checks(monkeypatch):
@@ -518,6 +546,7 @@ def test_check_scans_do_not_notify_their_owner():
                 region="Ghana",
                 categories=["startup"],
                 focus=freshness.CHECK_FOCUS,
+                kind=CHECK_KIND,
             )
             session.add(scan)
             await session.flush()
@@ -537,6 +566,104 @@ def test_check_scans_do_not_notify_their_owner():
             return scan.status, calls
 
     assert run(go()) == ("done", [])
+
+
+def test_check_scans_stay_out_of_the_owner_scan_list():
+    owner, _ = staff("admin")
+
+    async def go():
+        async with SessionLocal() as session:
+            for kind in ("member", CHECK_KIND):
+                session.add(
+                    Scan(user_id=owner, region="Ghana", categories=[], kind=kind)
+                )
+            await session.commit()
+            return [s["kind"] for s in await scan_service.list_scans(session, owner)]
+
+    assert run(go()) == ["member"]
+
+
+def _queue_changed_check(monkeypatch):
+    staff("admin")
+    add(verified_at=days_ago(45))
+    assert checks(monkeypatch, page()) == {"queued": 1}
+
+
+def _process_check():
+    from api.scans import queue
+
+    async def go():
+        async with SessionLocal() as session:
+            task = (await session.execute(select(ScanTask))).scalar_one()
+            task.status = TaskStatus.running
+            await session.commit()
+            await queue.process_claimed(session, task)
+
+    run(go())
+
+
+def test_agent_check_that_cannot_confirm_stops_without_a_nudge(monkeypatch):
+    from api.agent import orchestrator
+    from api.agent.llm.base import LLMResponse
+
+    _queue_changed_check(monkeypatch)
+    calls = []
+
+    class Model:
+        async def chat(self, messages, system, tools, max_tokens=4096):
+            calls.append(messages)
+            assert "not saving is a valid answer" in messages[0]["content"]
+            return LLMResponse(text="The official page cannot be read.")
+
+    monkeypatch.setattr(orchestrator, "get_provider", lambda **kwargs: Model())
+    _process_check()
+    assert len(calls) == 1
+
+
+def test_agent_check_is_capped_and_never_reads_search_or_archive_pages(monkeypatch):
+    from api import web
+    from api.agent import orchestrator
+    from api.agent.llm.base import LLMResponse, ToolCall
+    from api.core.config import settings
+
+    _queue_changed_check(monkeypatch)
+    urls = [
+        "https://www.google.com/search?q=seed+grant",
+        "https://lite.duckduckgo.com/lite/?q=seed+grant",
+        "https://web.archive.org/web/2026/https://funder.example.org",
+    ]
+    calls = []
+
+    class Model:
+        async def chat(self, messages, system, tools, max_tokens=4096):
+            calls.append(1)
+            url = urls[len(calls) % len(urls)] + f"&n={len(calls)}"
+            return LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id=str(len(calls)), name="fetch_page", arguments={"url": url}
+                    )
+                ]
+            )
+
+    async def fetch(*args, **kwargs):
+        raise AssertionError("fetched a search or archive page")
+
+    monkeypatch.setattr(web, "fetch_page", fetch)
+    monkeypatch.setattr(orchestrator, "get_provider", lambda **kwargs: Model())
+    _process_check()
+    assert len(calls) == settings.reverify_max_turns
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://corsproxy.io/?url=https://funder.example.org", "https://r.jina.ai/x"],
+)
+def test_proxies_are_blocked_for_every_fetch(url):
+    from api.core import egress
+
+    with pytest.raises(egress.EgressBlocked, match="proxy"):
+        run(egress.check_url(url))
 
 
 # --- Expiry ---------------------------------------------------------------------

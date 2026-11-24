@@ -15,7 +15,7 @@ from api.opportunities import dedupe
 from api.opportunities import service as opportunities
 from api.opportunities.crawl_models import CrawlCandidate
 from api.opportunities.models import Opportunity
-from api.scans.models import Scan, ScanTask
+from api.scans.models import CHECK_KIND, Scan, ScanTask
 from api.todos.models import Todo
 
 
@@ -244,6 +244,7 @@ async def queue_reverify(session, row, actor):
         region=row.location,
         categories=[row.category],
         focus=f"Re-verify only {row.title}: {row.source_url}",
+        kind=CHECK_KIND,
         status="running",
     )
     session.add(scan)

@@ -107,7 +107,10 @@ export function elapsedMs(start: string | null | undefined, end: string | null |
 }
 
 export function scanElapsedMs(scan: Scan, now = Date.now()): number | null {
-  const tasks = scan.tasks ?? []
+  const all = scan.tasks ?? []
+  const newest = Math.max(...all.map((t) => utcMs(t.created_at)))
+  // A retry or a steer queues new tasks on the same scan; only that run counts.
+  const tasks = Number.isFinite(newest) ? all.filter((t) => utcMs(t.created_at) >= newest - 5000) : all
   const starts = tasks.map((t) => utcMs(t.started_at)).filter((n) => !Number.isNaN(n))
   const ends = tasks.map((t) => utcMs(t.finished_at)).filter((n) => !Number.isNaN(n))
   const start = starts.length ? Math.min(...starts) : utcMs(scan.started_at ?? scan.created_at)

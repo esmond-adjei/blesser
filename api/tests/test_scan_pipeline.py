@@ -299,6 +299,28 @@ def test_refetch_suppression_keeps_grounding_and_unread_offsets(monkeypatch):
     run(check())
 
 
+def test_closed_page_costs_one_line_not_its_text(monkeypatch):
+    source = url()
+    closed = "Old Accra Grant. Application deadline: 30 April 2025. " + "Details. " * 900
+
+    async def fetch(target, max_chars, offset, **kwargs):
+        return closed[offset : offset + max_chars] + (
+            "\n[... 99 more characters. Call fetch_page with the same url and offset=6000 to read on.]"
+        )
+
+    from api import web
+
+    monkeypatch.setattr(web, "fetch_page", fetch)
+
+    async def check():
+        ctx = ToolContext(None, None)
+        result = await _fetch_page({"url": source}, ctx)
+        assert result["text"].startswith("[Closed:") and len(result["text"]) < 300
+        assert "offset=" in result["text"] and "closed" in result["page_note"]
+
+    run(check())
+
+
 def test_agent_stops_without_yield_and_summarizes(monkeypatch):
     calls = []
 
@@ -322,7 +344,11 @@ def test_agent_stops_without_yield_and_summarizes(monkeypatch):
     monkeypatch.setattr(orchestrator, "dispatch_batch", dispatch)
     result = run(
         orchestrator.run_agent_task(
-            "sys", "go", SimpleNamespace(session=None, run=None), no_yield_turns=3
+            "sys",
+            "go",
+            SimpleNamespace(session=None, run=None),
+            max_turns=10,
+            no_yield_turns=3,
         )
     )
     assert len(calls) == 3
@@ -404,7 +430,7 @@ def test_worker_crawls_extracts_and_holds_low_confidence(monkeypatch):
                     next_crawl_at=utcnow_naive() - timedelta(days=10000),
                 )
             )
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await queue.process_claimed(session, task)
             assert task.status.value == "done", task.error
@@ -645,7 +671,7 @@ def test_stale_candidate_claim_cannot_save(monkeypatch, invalid_response):
                 created_at=utcnow_naive() - timedelta(days=10000),
             )
             session.add(candidate)
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             task = (
                 await session.execute(
                     select(ScanTask).where(ScanTask.scan_id == scan.id)
@@ -707,7 +733,7 @@ def test_agent_save_metrics_survive_a_later_failure(monkeypatch):
 
     async def check():
         async with SessionLocal() as session:
-            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"])
+            scan = await scans.start_scan(session, TEST_USER_ID, categories=["startup"], kind="member")
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await queue.process_claimed(session, task)
             assert task.status.value == "error"
@@ -991,5 +1017,125 @@ def test_opportunity_url_keys_follow_edits():
             await session.flush()
             assert await duplicate_url(session, base + "/apply?utm_medium=y")
             await session.rollback()
+
+    run(check())
+
+
+def test_claims_reach_the_regions_own_sites_and_skip_capped_sources():
+    from api.opportunities.triage import local_domains
+
+    assert local_domains("Ghana") == ["gh"] and local_domains("Anywhere") == []
+
+    async def check():
+        async with SessionLocal() as session:
+            feed = Source(url=url(), kind="rss")
+            session.add(feed)
+            await session.flush()
+            tag = uuid.uuid4().hex[:8]
+            dated = CrawlCandidate(
+                url=f"https://feed.example/{tag}",
+                published_date=date(2026, 11, 20),
+                source_id=feed.id,
+                category_hints=["student"],
+            )
+            local = CrawlCandidate(
+                url=f"https://scholarships.gov.gh/{tag}",
+                category_hints=["student"],
+            )
+            session.add_all([dated, local])
+            await session.commit()
+            ids = {dated.id, local.id}
+
+            async def claim(**kwargs):
+                row = await pipeline.claim_candidate(
+                    session, "student", "Ghana", **kwargs
+                )
+                while row is not None and row.id not in ids:
+                    row = await pipeline.claim_candidate(
+                        session, "student", "Ghana", **kwargs
+                    )
+                return row
+
+            assert (await claim(urls=[dated.url])).id == dated.id
+            dated.claimed_until = None
+            await session.commit()
+            assert (await claim()).id == local.id
+            assert (await claim(skip_sources=frozenset({feed.id}))) is None
+            assert (await claim()).id == dated.id
+
+    run(check())
+
+
+def test_suggested_sources_are_pages_on_trial_not_homepages():
+    async def check():
+        async with SessionLocal() as session:
+            tag = uuid.uuid4().hex[:8]
+            assert await crawler.propose_source(
+                session, f"https://{tag}.example/", "research"
+            ) is None
+            hub = f"https://{tag}.example/funding/calls"
+            source_id = await crawler.propose_source(
+                session,
+                hub,
+                "research",
+                feeds=[f"https://{tag}.example/feed/", f"{hub}/feed/"],
+            )
+            source = await session.get(Source, source_id)
+            assert source.url == f"{hub}/feed/" and source.kind == "rss"
+            assert source.proposed and not source.enabled
+            on_trial = (
+                await session.execute(
+                    select(Source.id).where(Source.id == source_id, crawler.on_trial())
+                )
+            ).scalar_one_or_none()
+            assert on_trial == source_id
+
+            await crawler.credit_source(session, source_id)
+            await session.refresh(source)
+            assert source.enabled and not source.proposed
+            assert source.opportunities_saved == 1
+
+            covered = f"https://{tag}.covered.example/feed/"
+            feed = Source(url=covered, kind="rss", enabled=True)
+            session.add(feed)
+            await session.flush()
+            assert (
+                await crawler.propose_source(
+                    session, f"https://{tag}.covered.example/grants", "research"
+                )
+                == feed.id
+            )
+            await session.rollback()
+
+    run(check())
+
+
+def test_a_hub_page_the_agent_reads_is_suggested_and_its_links_kept():
+    from api.agent.tools.dispatch import _note_links
+
+    tag = uuid.uuid4().hex[:8]
+    hub = f"https://{tag}.example/grants"
+    links = [{"url": f"{hub}/call-{n}", "label": "Call"} for n in range(6)]
+
+    async def check():
+        async with SessionLocal() as session:
+            session.add(
+                PageCache(
+                    url=normalized_url(hub),
+                    text="Grants",
+                    metadata_json={"links": links, "outbound": []},
+                    expires_at=utcnow_naive() + timedelta(days=1),
+                )
+            )
+            await session.commit()
+        ctx = ToolContext(None, None)
+        ctx.category, ctx.scan_task = "research", object()
+        await _note_links(ctx, hub)
+        assert f"{hub}/call-0" in {k for v in ctx.page_links.values() for k in v}
+        async with SessionLocal() as session:
+            source = (
+                await session.execute(select(Source).where(Source.url == hub))
+            ).scalar_one()
+            assert source.proposed and source.category_hints == ["research"]
 
     run(check())

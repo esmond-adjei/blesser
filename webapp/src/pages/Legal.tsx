@@ -60,6 +60,7 @@ export function Privacy() {
           <li>The opportunity catalogue is public. Nothing else you store is.</li>
           <li>Your calendar link is private: anyone who has it can see your deadlines and dated to-dos. Make a new one in To-dos if it leaks.</li>
           <li>Scans send search queries, including any focus notes you give, to the web search provider and the language model provider this service uses, and fetch public web pages.</li>
+          <li>The Assistant can search the web too. In a chat that has read your own records, the query is written from your latest message alone and leaves out personal details.</li>
         </ul>
         <p className="mt-2">Nothing is sold.</p>
       </section>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "react-router-dom"
 import {
-  ArrowDown, ArrowUp, Check, Copy, MessageCircle, MessagesSquare, Pencil, Plus, RotateCcw, Square, Trash2,
+  ArrowDown, ArrowUp, Check, Copy, MessageCircle, MessagesSquare, Pencil, Play, Plus, RotateCcw, Trash2,
 } from "lucide-react"
 import { Button, Chip, EmptyState, Field, cn } from "@blesser/ui"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../ui/menu"
@@ -17,6 +17,8 @@ import {
 import { ApiError, apiMessage } from "../../lib/api"
 import { LINEAR_OK, springEasing } from "../../lib/motion"
 import { useShellHeader } from "../layout/shellHeader"
+import { useIsMobile } from "../../hooks/use-mobile"
+import { usePaneSize } from "../../lib/paneSize"
 import guideArt from "../../assets/illustrations/guide.webp"
 import { ChatSkeleton } from "./ChatSkeleton"
 import { AgentSteps } from "./AgentSteps"
@@ -27,6 +29,7 @@ import { PendingCard, QuestionnaireDialog } from "./Questionnaire"
 import { RecordCards } from "./RecordCards"
 import { useRecordPreview } from "./useRecordPreview"
 
+const LIST_KEY = "blesser.assistant.history"
 const STARTERS = ["What opportunities are closing soon?", "Find grants for startups", "What should I work on next?"]
 const chatKey = (userId: string, id: string | undefined) => ["assistant", userId, "chat", id]
 const chatsKey = (userId: string) => ["assistant", userId, "chats"]
@@ -173,6 +176,18 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   })
   const { reply, error, start } = useLiveReply(userId)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const phone = useIsMobile()
+  const docked = variant === "page" && !phone
+  const [listOpen, setListOpen] = useState(() => {
+    try { return localStorage.getItem(LIST_KEY) !== "closed" } catch { return true }
+  })
+  const toggleList = () => setListOpen((open) => {
+    try { localStorage.setItem(LIST_KEY, open ? "closed" : "open") } catch { /* resets on reload */ }
+    return !open
+  })
+  const [listWidth, setListWidth] = usePaneSize("blesser.assistant.history.width", 288, 220, 420)
+  const [resizing, setResizing] = useState(false)
+  const listPane = useRef<HTMLElement>(null)
   const [edit, setEdit] = useState<ChatEdit | null>(null)
   const [draft, setDraft] = useState("")
   const [problem, setProblem] = useState("")
@@ -236,6 +251,8 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
     setProblem("")
     setHistoryOpen(false)
   }
+
+  const carryOn = () => void send("Continue")
 
   async function send(value: string) {
     const content = value.trim()
@@ -304,7 +321,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
       next={chats.hasNextPage ? () => void chats.fetchNextPage() : undefined}
       fetching={chats.isFetchingNextPage}
       onSelect={selectChat}
-      onEdit={(value) => { setProblem(""); setHistoryOpen(false); setEdit(value) }}
+      onEdit={(value) => { setProblem(""); setEdit(value) }}
       onRetry={() => void chats.refetch()}
     />
   )
@@ -313,19 +330,36 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
   const visibleAnswer = active?.answer && !visibleRows.some((row) => row.id === active.answer?.id) ? active.answer : null
   const working = !!active || !!thread.data?.running || creating
   const replyError = error?.id === chatId ? error?.message : null
+  // A turn cut off by a stop, crash or server restart leaves the question without a reply.
+  const unanswered = !!chatId && thread.isSuccess && !working && !pending && !visibleAnswer && !replyError && visibleRows.at(-1)?.role === "user"
   const disabled = working || !!pending || (!!chatId && thread.isError)
 
   const title = thread.data?.title || "Assistant"
   const selectRef = useRef(selectChat)
   useEffect(() => { selectRef.current = selectChat })
-  const chatButtons = useMemo(() => (
-    <>
-      <Button size="sm" variant="quiet" icon={<MessagesSquare />} onClick={() => setHistoryOpen((open) => !open)}>
-        <span className={embedded ? "sr-only" : "max-sm:sr-only"}>Chats</span>
-      </Button>
-      {chatId ? <Button size="sm" variant="quiet" icon={<Plus />} onClick={() => selectRef.current()}><span className={embedded ? "sr-only" : "max-sm:sr-only"}>New chat</span></Button> : null}
-    </>
-  ), [embedded, chatId])
+  const chatsButton = useMemo(() => (
+    <Button size="sm" variant="quiet" className="shrink-0" icon={<MessagesSquare />} onClick={() => (docked ? toggleList() : setHistoryOpen((open) => !open))} aria-pressed={docked ? listOpen : undefined}>
+      <span className="max-sm:sr-only">Chats</span>
+    </Button>
+  ), [docked, listOpen])
+  const chatsTrigger = useMemo(() => (
+    <button
+      type="button"
+      onClick={() => setHistoryOpen((open) => !open)}
+      aria-expanded={historyOpen}
+      className="flex min-w-0 cursor-pointer items-center gap-2 rounded-full py-1.5 pr-2 pl-2 text-left transition-colors hover:bg-highlight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+    >
+      <MessagesSquare className="size-[18px] shrink-0" aria-hidden="true" />
+      <span className="sr-only">Chats: </span>
+      <span className="min-w-0 truncate text-callout font-semibold text-ink">{title}</span>
+    </button>
+  ), [historyOpen, title])
+  const newChatButton = useMemo(() => chatId ? (
+    <Button size="sm" variant="quiet" iconOnly={embedded} className="shrink-0" icon={<Plus />} onClick={() => selectRef.current()}>
+      <span className={embedded ? "sr-only" : "max-sm:sr-only"}>New chat</span>
+    </Button>
+  ) : null, [embedded, chatId])
+  const chatButtons = useMemo(() => <>{chatsButton}{newChatButton}</>, [chatsButton, newChatButton])
   const header = useMemo(() => (embedded ? null : { title, actions: chatButtons }), [embedded, title, chatButtons])
   useShellHeader(header)
 
@@ -356,7 +390,7 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
             }}
           />
           {working && chatId ? (
-            <Button type="button" size="sm" variant="secondary" iconOnly aria-label="Stop reply" icon={<Square />} className="size-9"
+            <Button type="button" size="sm" variant="quiet" iconOnly aria-label="Stop reply" icon={<span aria-hidden="true" className="size-3.5 rounded-[2px] bg-current" />} className="size-9"
               onClick={() => void stopTurn(chatId).catch((err) => setProblem(apiMessage(err)))} />
           ) : (
             <Button type="submit" size="sm" variant="primary" disabled={disabled || !draft.trim()} iconOnly aria-label="Send message" icon={<ArrowUp />} className="size-9" />
@@ -365,12 +399,23 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
       </form>
   )
 
+  const nudgeList = (event: React.KeyboardEvent) => {
+    const step = event.shiftKey ? 48 : 16
+    if (event.key === "ArrowLeft") setListWidth(listWidth + step)
+    else if (event.key === "ArrowRight") setListWidth(listWidth - step)
+    else return
+    event.preventDefault()
+  }
+
   return (
-    <div className="@container/chat relative flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1">
+    <div className="@container/chat relative flex min-h-0 min-w-0 flex-1 flex-col">
       {embedded ? (
-        <header className="flex h-12 shrink-0 items-center gap-1 border-b border-separator px-3">
-          <h2 className="min-w-0 flex-1 truncate text-callout font-semibold text-ink">{title}</h2>
-          {chatButtons}
+        <header className="flex h-14 shrink-0 items-center gap-1 border-b border-separator px-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            {chatsTrigger}
+            {newChatButton}
+          </div>
           {actions}
         </header>
       ) : null}
@@ -398,8 +443,15 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
           {visibleRows.map((message, index) => message.role === "user"
             ? <UserBubble key={message.id} content={message.content} chips={message.chips} />
             : <AssistantReply key={message.id} message={message} onOpenRecord={preview.open}
-                onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined} />)}
-          {visibleAnswer ? <AssistantReply message={visibleAnswer} onOpenRecord={preview.open} /> : null}
+                onRetry={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending ? retry : undefined}
+                onContinue={index === visibleRows.length - 1 && !visibleAnswer && !working && !pending && !active ? carryOn : undefined} />)}
+          {visibleAnswer ? <AssistantReply message={visibleAnswer} onOpenRecord={preview.open} onContinue={!working && !pending && !active ? carryOn : undefined} /> : null}
+          {unanswered ? (
+            <p className="text-footnote text-ink-secondary">
+              No reply to this message.{" "}
+              <button type="button" onClick={retry} className="cursor-pointer font-semibold text-link hover:underline">Try again</button>
+            </p>
+          ) : null}
           {active && !active.answer && !pending ? (
             <AssistantReply text={active.text} status={active.status} entries={active.trace} live onOpenRecord={preview.open} />
           ) : null}
@@ -432,12 +484,11 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
 
       {embedded ? (
         historyOpen ? (
-          <div className="bl-appear absolute inset-x-0 top-12 bottom-0 z-10 flex flex-col gap-3 bg-surface p-3">
-            <Button size="sm" variant="secondary" icon={<Plus />} className="self-start" onClick={() => selectChat()}>New chat</Button>
+          <div className="bl-appear absolute inset-x-0 top-14 bottom-0 z-10 flex flex-col gap-3 bg-surface p-3">
             {list}
           </div>
         ) : null
-      ) : (
+      ) : docked ? null : (
         <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
           <SheetContent side="right" className="w-full gap-0 sm:max-w-sm">
             <SheetHeader className="border-b border-separator p-5 pr-14">
@@ -464,6 +515,39 @@ export function AssistantChat({ userId, chatId, onChatChange, variant, actions }
         {edit ? <EditChat key={edit.chat.id + edit.type} edit={edit} problem={problem} saving={editing} onClose={() => { if (!editing) setEdit(null) }}
           onSave={(title) => void saveEdit(title)} /> : null}
       </Dialog>
+    </div>
+      {docked ? (
+        <aside
+          ref={listPane}
+          aria-label="Chats"
+          aria-hidden={!listOpen}
+          inert={!listOpen}
+          style={{ width: listOpen ? listWidth : 0 }}
+          className={cn("relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none", resizing ? "transition-none" : "transition-[width] duration-200", listOpen && "border-l")}
+        >
+          <div style={{ width: listWidth }} className="flex min-h-0 shrink-0 flex-col p-3">
+            {list}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the chat list"
+            aria-valuemin={220}
+            aria-valuemax={420}
+            aria-valuenow={Math.round(listWidth)}
+            tabIndex={0}
+            onPointerDown={(event) => { setResizing(true); event.currentTarget.setPointerCapture(event.pointerId) }}
+            onPointerMove={(event) => { if (resizing) setListWidth((listPane.current?.getBoundingClientRect().right ?? window.innerWidth) - event.clientX) }}
+            onPointerUp={() => setResizing(false)}
+            onPointerCancel={() => setResizing(false)}
+            onDoubleClick={() => setListWidth(288)}
+            onKeyDown={nudgeList}
+            className="group absolute inset-y-0 left-0 z-10 flex w-2 -translate-x-1 cursor-col-resize touch-none items-center justify-center focus:outline-none"
+          >
+            <span className={cn("h-10 w-0.5 rounded-full transition-colors", resizing ? "bg-focus" : "bg-transparent group-hover:bg-separator group-focus-visible:bg-focus")} />
+          </div>
+        </aside>
+      ) : null}
     </div>
   )
 }
@@ -588,10 +672,11 @@ function UserBubble({ content, chips }: { content: string; chips?: ContextChip[]
   )
 }
 
-function AssistantReply({ message, text, status, entries = [], live, onRetry, onOpenRecord, children }: {
+function AssistantReply({ message, text, status, entries = [], live, onRetry, onContinue, onOpenRecord, children }: {
   message?: AssistantMessage
   onOpenRecord: (source: AssistantSource) => void
   onRetry?: () => void
+  onContinue?: () => void
   text?: string
   status?: string
   entries?: TraceEntry[]
@@ -612,8 +697,11 @@ function AssistantReply({ message, text, status, entries = [], live, onRetry, on
         ) : null}
         {records.length ? <RecordCards sources={records} onOpen={onOpenRecord} /> : null}
         {children}
+        {message?.can_continue && onContinue ? (
+          <Button size="sm" variant="secondary" icon={<Play />} onClick={onContinue} className="self-start">Continue</Button>
+        ) : null}
         {content && !live ? (
-          <div className="-ml-1.5 -mt-1 flex">
+          <div className={cn(TURN_ACTIONS, "-ml-1.5 -mt-1")}>
             <CopyButton text={content} label="Copy reply" />
             {onRetry ? <TurnAction label="Retry" onClick={onRetry}><RotateCcw className="size-3.5" aria-hidden="true" /></TurnAction> : null}
           </div>
@@ -623,6 +711,8 @@ function AssistantReply({ message, text, status, entries = [], live, onRetry, on
   )
 }
 
+
+const ROW_ACTIONS = "shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
 
 function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, onEdit, onRetry }: {
   rows: ChatRow[]
@@ -648,7 +738,7 @@ function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, on
           ]
           return (
             <ActionContextMenu key={chat.id} actions={actions}>
-              <li className={cn("flex min-w-0 items-center rounded-md hover:bg-highlight", chat.id === activeId && "bg-forest-soft text-link")}>
+              <li className={cn("group flex min-w-0 items-center rounded-md hover:bg-highlight", chat.id === activeId && "bg-forest-soft text-link")}>
                 <Link to={assistantHref(chat.id)} aria-current={chat.id === activeId ? "page" : undefined}
                   onClick={(event) => {
                     if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
@@ -662,7 +752,7 @@ function ChatList({ rows, activeId, loading, error, next, fetching, onSelect, on
                   <span className="truncate">{chat.title}</span>
                   {chat.pending_call ? <span className="size-1.5 shrink-0 rounded-full bg-sun" role="img" aria-label="Waiting for approval" /> : null}
                 </Link>
-                <ActionMenuButton actions={actions} label={`Actions for ${chat.title}`} className="shrink-0" />
+                <ActionMenuButton actions={actions} label={`Actions for ${chat.title}`} className={ROW_ACTIONS} />
               </li>
             </ActionContextMenu>
           )

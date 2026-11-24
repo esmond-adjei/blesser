@@ -37,7 +37,6 @@ class Settings(BaseSettings):
     # --- Agent budgets ---
     max_agent_turns: int = 40
     # Finishing without saving anything is nudged back to work this many times.
-    max_empty_finish_nudges: int = 2
     # Tool results older than this many turns become a marker; <=0 disables.
     max_tool_result_age_turns: int = 2
     # Compaction moves in blocks of this many turns so prompt caches keep hitting.
@@ -72,6 +71,20 @@ class Settings(BaseSettings):
     extraction_max_chars: int = 10000
     extraction_min_confidence: float = 0.85
     discovery_no_yield_turns: int = 5
+    reverify_max_turns: int = 8
+    # "planner": the scan agent only searches and queues pages; the pipeline reads them.
+    scan_agent_mode: str = "planner"
+    planner_max_picks: int = 12
+    # Each turn resends every earlier search result, so planner cost grows with turns.
+    planner_max_turns: int = 6
+    # Below this many claimable candidates, a scan seeds its region with fixed searches.
+    seed_when_pool_below: int = 10
+    # Jev screens crawler pages before extraction; it skips a page only when this sure.
+    typesafe_api_key: str = ""
+    typesafe_model: str = "jev-1.13.0"
+    screen_with_jev: bool = False
+    screen_confidence: float = 0.85
+    screen_max_chars: int = 4000
     discovery_max_turns: int = 12
     # "My sources": sites a member saves for scheduled checks.
     member_sources_max: int = 10
@@ -239,5 +252,15 @@ def config_warnings(s: Settings | None = None) -> list[str]:
 
 
 def log_config_warnings() -> None:
+    app_log = logging.getLogger("api")
+    # Uvicorn only sets up its own loggers; this lets the app's info lines reach the terminal.
+    if not app_log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter("%(levelname)s:     %(name)s: %(message)s")
+        )
+        app_log.addHandler(handler)
+        app_log.setLevel(logging.INFO)
+        app_log.propagate = False
     for warning in config_warnings():
         log.warning(warning)

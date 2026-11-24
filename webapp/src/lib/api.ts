@@ -189,6 +189,7 @@ export const resetPassword = (token: string, new_password: string) =>
 export const verifyEmail = (token: string) => post<AuthUser>("/api/app/auth/verify", { token })
 export const resendVerification = () => post<{ status: string }>("/api/app/auth/verify/send", {})
 export const updateProfile = (display_name: string | null) => patch<AuthUser>("/api/app/auth/me", { display_name })
+export const finishFeedSetup = () => patch<AuthUser>("/api/app/auth/me", { feed_set_up: true })
 export const changePassword = (current_password: string, new_password: string) =>
   post<{ status: string }>("/api/app/auth/change-password", { current_password, new_password })
 export const deleteAccount = (password: string) => del<{ status: string }>("/api/app/auth/account", { password })
@@ -199,7 +200,8 @@ function query(params: object): string {
   const q = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === "") continue
-    q.set(key, String(value))
+    if (Array.isArray(value)) for (const item of value) q.append(key, String(item))
+    else q.set(key, String(value))
   }
   const text = q.toString()
   return text ? `?${text}` : ""
@@ -262,6 +264,8 @@ export const listScans = () => get<Scan[]>("/api/app/scans")
 export const getScan = (id: string) => get<Scan>(`/api/app/scans/${id}`)
 export const scanAllowance = () => get<ScanAllowance>("/api/app/scans/allowance")
 export const startScan = (body: ScanRequest) => post<Scan>("/api/app/scans", body)
+export const rerunScan = (id: string, body: Omit<ScanRequest, "repeat"> = {}) => post<Scan>(`/api/app/scans/${id}/rerun`, body)
+export const steerScan = (id: string, prompt: string) => post<Scan>(`/api/app/scans/${id}/steer`, { prompt })
 export const cancelScan = (id: string) => post<Scan>(`/api/app/scans/${id}/cancel`)
 export const deleteScan = (id: string) => del<{ status: string }>(`/api/app/scans/${id}`)
 export const listSchedules = () => get<ScanSchedules>("/api/app/scans/schedules")

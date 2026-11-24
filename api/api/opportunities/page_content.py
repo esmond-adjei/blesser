@@ -72,6 +72,18 @@ def expired(text: str, metadata: dict, today: date) -> bool:
     return bool(deadlines) and max(deadlines) < today and not _ROLLING.search(text)
 
 
+def confirms_deadline(
+    text: str, metadata: dict, deadline: date | None, rolling: bool, today: date
+) -> bool:
+    """The page still states this listing's deadline as its latest, or still says rolling."""
+    if rolling:
+        return bool(_ROLLING.search(text)) and not expired(text, metadata, today)
+    if deadline is None or deadline < today:
+        return False
+    deadlines = deadline_dates(text, metadata)
+    return bool(deadlines) and max(deadlines) == deadline
+
+
 def shows_open_cycle(text: str, metadata: dict, today: date) -> bool:
     """The page states a deadline still ahead, or says applications are rolling."""
     return any(d >= today for d in deadline_dates(text, metadata)) or bool(
@@ -160,6 +172,12 @@ def parse_page(raw: str, url: str) -> Page:
             metadata["deadlines"].append(node.get("content"))
         if key in {"article:published_time", "datepublished"}:
             metadata["published_date"] = node.get("content", "")[:10]
+    metadata["feeds"] = [
+        urljoin(url, href)
+        for href in tree.xpath(
+            '//link[@rel="alternate"][contains(@type, "rss") or contains(@type, "atom")]/@href'
+        )[:5]
+    ]
     for node in tree.xpath("//nav|//footer|//body/header|//script|//style|//noscript"):
         node.drop_tree()
     metadata["outbound"] = outbound_links(tree, url)

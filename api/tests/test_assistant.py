@@ -217,6 +217,9 @@ def test_lookup_budget_reserves_a_final_answer_round(monkeypatch):
             events[-2]["message"]["content"]
             == "No published catalog matches were found. Your saved records may still be available."
         )
+        assert events[-2]["message"]["can_continue"] is True
+        stored = client.get(path).json()["messages"][-1]
+        assert stored["can_continue"] is True
 
 
 def test_catalog_turn_streams_and_persists_grounded_citations(monkeypatch):
@@ -312,6 +315,7 @@ def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
                     "url": None,
                     "opportunity": None,
                     "preview": True,
+                    "available_at": None,
                 }
             ]
             if approved
@@ -319,25 +323,117 @@ def test_to_do_proposal_only_writes_after_approval(monkeypatch, approved):
         )
 
 
-def test_private_context_cannot_reach_web_search(monkeypatch):
+def test_private_chat_searches_with_a_query_written_without_private_history(
+    monkeypatch,
+):
     monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
+    queries = []
 
-    async def never_search(*args):
-        pytest.fail("Private data must not reach a search provider")
+    async def search(query):
+        queries.append(query)
+        return []
 
-    monkeypatch.setattr(service.web, "search_web", never_search)
+    monkeypatch.setattr(service.web, "search_web", search)
     calls = _model(
         monkeypatch,
         _tool("search_catalog", query="unique-no-match"),
         LLMResponse(
             tool_calls=[
                 ToolCall("private", "list_applications"),
-                ToolCall("web", "search_web", {"query": "private application"}),
+                ToolCall("web", "search_web", {"query": "my private application"}),
             ]
         ),
-        LLMResponse(text="I checked your applications."),
+        LLMResponse(text="astronomy research grants Ghana"),
+        LLMResponse(text="Nothing public turned up."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(
+            client.post(
+                f"{path}/chat", json={"content": "Find astronomy grants for me."}
+            )
+        )
+        steps = [e["step"] for e in events if e["event"] == "tool_result"]
+        assert steps[-1]["tool"] == "search_web" and steps[-1]["ok"]
+    assert queries == ["astronomy research grants Ghana"]
+    rewrite = calls[2]
+    assert rewrite["tools"] == [] and rewrite["system"] == service.PUBLIC_QUERY
+    assert rewrite["messages"] == [
+        {"role": "user", "content": "Find astronomy grants for me."}
+    ]
+    searched = json.loads(calls[3]["messages"][-1]["content"])
+    assert searched["query"] == "astronomy research grants Ghana"
+
+
+def test_a_reply_with_only_thinking_is_asked_once_more(monkeypatch):
+    calls = _model(
+        monkeypatch,
+        LLMResponse(text="", reasoning="I'll greet them back."),
+        LLMResponse(text="Hi! What can I help you find?"),
+        LLMResponse(text="", reasoning="Greeting."),
+        LLMResponse(text="", reasoning="Greeting again."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        first = _events(client.post(f"{path}/chat", json={"content": "hello"}))
+        assert first[-2]["message"]["content"] == "Hi! What can I help you find?"
+        second = _events(client.post(f"{path}/chat", json={"content": "how are you"}))
+        assert second[-2]["message"]["content"] == (
+            "I didn't get an answer back this time. Send that again."
+        )
+    assert len(calls) == 4
+
+
+def test_private_chat_does_not_repeat_a_query_within_a_reply(monkeypatch):
+    monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
+    queries = []
+
+    async def search(query):
+        queries.append(query)
+        return []
+
+    monkeypatch.setattr(service.web, "search_web", search)
+    calls = _model(
+        monkeypatch,
         _tool("search_catalog", query="unique-no-match"),
-        LLMResponse(text="I checked the catalog."),
+        LLMResponse(
+            tool_calls=[
+                ToolCall("private", "list_applications"),
+                ToolCall("web", "search_web", {"query": "grant"}),
+            ]
+        ),
+        LLMResponse(text="IIASA summer program"),
+        _tool("search_web", query="grant again"),
+        LLMResponse(text="iiasa  Summer program"),
+        LLMResponse(text="Nothing new."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Find IIASA."}))
+        steps = [e["step"] for e in events if e["event"] == "tool_result"]
+        assert not steps[-1]["ok"]
+    assert queries == ["IIASA summer program"]
+    assert "Earlier queries: IIASA summer program" in calls[4]["messages"][0]["content"]
+
+
+def test_private_chat_skips_search_when_no_public_query_fits(monkeypatch):
+    monkeypatch.setattr(service.web, "search_chain", lambda: [{"configured": True}])
+
+    async def never_search(*args):
+        pytest.fail("No search should run")
+
+    monkeypatch.setattr(service.web, "search_web", never_search)
+    _model(
+        monkeypatch,
+        _tool("search_catalog", query="unique-no-match"),
+        LLMResponse(
+            tool_calls=[
+                ToolCall("private", "list_applications"),
+                ToolCall("web", "search_web", {"query": "my application"}),
+            ]
+        ),
+        LLMResponse(text="NONE"),
+        LLMResponse(text="I checked your applications."),
     )
     with TestClient(app) as client:
         path = _chat(client)
@@ -345,13 +441,7 @@ def test_private_context_cannot_reach_web_search(monkeypatch):
             client.post(f"{path}/chat", json={"content": "Check my applications."})
         )
         steps = [e["step"] for e in events if e["event"] == "tool_result"]
-        assert steps[-1]["tool"] == "search_web"
-        assert not steps[-1]["ok"]
-        assert "search_web" in {definition["name"] for definition in calls[1]["tools"]}
-        _events(client.post(f"{path}/chat", json={"content": "Search again."}))
-        assert "search_web" not in {
-            definition["name"] for definition in calls[-1]["tools"]
-        }
+        assert steps[-1]["tool"] == "search_web" and not steps[-1]["ok"]
 
 
 @pytest.mark.real_auth
@@ -666,6 +756,41 @@ def test_each_message_has_a_limit_of_approval_cards(monkeypatch):
         assert "add_todo" not in {tool["name"] for tool in calls[1]["tools"]}
         assert "limit of approval cards" in calls[1]["system"]
         assert _last_tool_results(calls[2])[-1]["code"] == "tool_unavailable"
+
+
+def test_a_used_up_scan_allowance_shows_a_card_with_the_next_free_time(monkeypatch):
+    from datetime import UTC, datetime
+
+    from api.scans import service as scans
+
+    free_at = datetime(2026, 11, 21, 21, 39, tzinfo=UTC)
+
+    async def used_up(session, user_id):
+        return {
+            "enabled": True,
+            "per_hour": 3,
+            "left_this_hour": 0,
+            "per_day": 10,
+            "left_today": 4,
+            "next_at": free_at,
+        }
+
+    monkeypatch.setattr(scans, "scan_allowance", used_up)
+    calls = _model(
+        monkeypatch,
+        _tool("start_scan", category="student"),
+        LLMResponse(text="I can start it once a slot frees up."),
+    )
+    with TestClient(app) as client:
+        path = _chat(client)
+        events = _events(client.post(f"{path}/chat", json={"content": "Scan for me."}))
+        assert not any(e["event"] == "confirm_required" for e in events)
+        assert "don't repeat the time" in _last_tool_results(calls[1])[-1]["error"]
+        [card] = [
+            s for s in events[-2]["message"]["sources"] if s["kind"] == "scan_limit"
+        ]
+        assert card["title"] == "No scans left this hour"
+        assert card["available_at"].startswith("2026-11-21T21:39")
 
 
 QUESTIONS = {

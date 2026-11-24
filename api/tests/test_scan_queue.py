@@ -18,7 +18,7 @@ from tests.conftest import TEST_USER_ID
 def _scan(tasks: int = 0, **task_fields) -> tuple[str, list[str]]:
     async def go():
         async with SessionLocal() as session:
-            scan = Scan(user_id=TEST_USER_ID, region="Ghana", categories=["startup"], status="running")
+            scan = Scan(user_id=TEST_USER_ID, region="Ghana", categories=["startup"], status="running", kind="member")
             session.add(scan)
             await session.flush()
             ids = []

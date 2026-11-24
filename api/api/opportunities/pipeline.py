@@ -1,8 +1,10 @@
+import logging
+import re
 import time
 from datetime import timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import cast, func, or_, select, update
+from sqlalchemy import case, cast, func, or_, select, true, update
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.agent.orchestrator import TaskHalted, _halt_reason
@@ -13,9 +15,14 @@ from api.core.time import utcnow_naive
 from api.editorial.service import get_settings
 from api.opportunities import service
 from api.opportunities.crawl_models import CrawlCandidate, Source
-from api.opportunities.crawler import crawl_due, record_candidate
+from api.opportunities.crawler import (
+    HUB_LINKS,
+    crawl_due,
+    credit_source,
+    record_candidate,
+)
 from api.opportunities.dedupe import key_for
-from api.opportunities.extraction import extract_page
+from api.opportunities.extraction import cached_extraction, extract_page
 from api.opportunities.official import (
     aggregator_hosts,
     host_of,
@@ -23,8 +30,17 @@ from api.opportunities.official import (
     resolve_official,
 )
 from api.opportunities.page_cache import get_page
+from api.opportunities.page_content import normalized_url, shows_open_cycle
+from api.opportunities.screening import screen_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
-from api.opportunities.triage import is_listing, triage_page, triage_url
+from api.opportunities.triage import (
+    duplicate_url,
+    is_listing,
+    local_domains,
+    names_other_country,
+    triage_page,
+    triage_url,
+)
 
 
 def add_reason(metrics: dict, reason: str) -> None:
@@ -40,22 +56,55 @@ async def lock_claim(session, candidate, token) -> bool:
     return False
 
 
-def claim_order():
-    """Newest items first, then sources that have yielded saves, then newest found.
+def claim_order(local: list[str] | None = None):
+    """The region's own sites first when `local` names their country domains, then
+    newest items, then sources that have yielded saves, then newest found.
 
     Yield is smoothed ((saved + 1) / (found + 2)) so a new source starts at one half.
     """
     source_yield = (func.coalesce(Source.opportunities_saved, 0) + 1.0) / (
         func.coalesce(Source.candidates_found, 0) + 2.0
     )
+    on_local = (
+        [
+            case(
+                (
+                    or_(
+                        *[
+                            CrawlCandidate.url.op("~*")(
+                                rf"^https?://[^/]*\.{d}(:\d+)?(/|$)"
+                            )
+                            for d in local
+                        ]
+                    ),
+                    0,
+                ),
+                else_=1,
+            )
+        ]
+        if local
+        else []
+    )
     return (
+        *on_local,
         CrawlCandidate.published_date.desc().nulls_last(),
         source_yield.desc(),
         CrawlCandidate.created_at.desc(),
     )
 
 
-async def claim_candidate(session, category: str, region: str):
+log = logging.getLogger(__name__)
+
+
+async def claim_candidate(
+    session,
+    category: str,
+    region: str,
+    *,
+    prefer_local: bool = True,
+    skip_sources: frozenset[str] = frozenset(),
+    urls: list[str] | None = None,
+):
     now = utcnow_naive()
     query = (
         select(CrawlCandidate)
@@ -77,9 +126,16 @@ async def claim_candidate(session, category: str, region: str):
                 cast(CrawlCandidate.category_hints, JSONB) == [],
                 cast(CrawlCandidate.category_hints, JSONB).contains([category]),
             ),
+            or_(
+                CrawlCandidate.source_id.is_(None),
+                CrawlCandidate.source_id.not_in(skip_sources),
+            )
+            if skip_sources
+            else true(),
+            CrawlCandidate.url.in_(urls) if urls is not None else true(),
         )
         .outerjoin(Source, Source.id == CrawlCandidate.source_id)
-        .order_by(*claim_order())
+        .order_by(*claim_order(local_domains(region) if prefer_local else None))
         .with_for_update(skip_locked=True, of=CrawlCandidate)
         .limit(1)
     )
@@ -130,10 +186,182 @@ async def follow_aggregator(ctx, page, data, hosts, metrics: dict):
     return data.model_copy(update=changes), {"found_via": page.url}
 
 
-async def run_pipeline(session, task, scan, category: str, on_event=None) -> dict:
+#: Fixed searches that refill a thin region without a model, by category.
+SEED_QUERIES = {
+    "student": (
+        "scholarships for {region} students {year} apply",
+        "fully funded masters scholarships {year} {region} eligible",
+        "site:.{cc} scholarship {year}",
+    ),
+    "research": (
+        "call for proposals {year} researchers {region}",
+        "research grants {year} {region} eligible apply",
+        "site:.{cc} call for proposals {year}",
+    ),
+    "startup": (
+        "startup accelerator {year} applications open {region}",
+        "grants for entrepreneurs {region} {year}",
+        "site:.{cc} entrepreneurs programme {year}",
+    ),
+}
+
+
+async def claimable(session, category: str, region: str) -> int:
+    now = utcnow_naive()
+    return (
+        await session.execute(
+            select(func.count())
+            .select_from(CrawlCandidate)
+            .where(
+                CrawlCandidate.status == "new",
+                CrawlCandidate.reason != "region_excluded:" + region.strip().casefold(),
+                or_(
+                    CrawlCandidate.claimed_until.is_(None),
+                    CrawlCandidate.claimed_until < now,
+                ),
+                or_(
+                    cast(CrawlCandidate.category_hints, JSONB) == [],
+                    cast(CrawlCandidate.category_hints, JSONB).contains([category]),
+                ),
+            )
+        )
+    ).scalar_one()
+
+
+# Titles of roundups and guides, which list many opportunities rather than being one.
+_ROUNDUP = re.compile(
+    r"^\s*(?:top|best|list of|how to)\b|\b(?:\d+\+?|top|best)\s+(?:fully[- ]funded\s+)?"
+    r"(?:scholarships|grants|fellowships|internships|opportunities|programmes|programs)\b",
+    re.IGNORECASE,
+)
+
+
+async def leads(session, results: list[dict], region: str) -> list[dict]:
+    """Search results that look like an opportunity page this catalogue lacks, judged
+    without a model from the title and URL."""
+    from api.agent.tools.dispatch import unreadable_host
+    from api.opportunities.crawler import _LEAD_WORDS
+    from api.opportunities.triage import is_social_host
+
+    found, seen = [], set()
+    for result in results:
+        url = str(result.get("url") or "")
+        words = f"{result.get('title', '')} {url}".lower()
+        if (
+            not url.startswith(("http://", "https://"))
+            or normalized_url(url) in seen
+            or unreadable_host(url)
+            or is_social_host(url)
+            or not any(w in words for w in _LEAD_WORDS)
+            or _ROUNDUP.search(str(result.get("title") or ""))
+            or names_other_country(words, region)
+            or await duplicate_url(session, url)
+        ):
+            continue
+        seen.add(normalized_url(url))
+        found.append({"url": url, "title": str(result.get("title") or "")})
+    return found
+
+
+async def seed_region(session, category: str, region: str) -> list[str]:
+    """Run the category's fixed searches for a region and record the results that
+    look like opportunities as candidates."""
+    from api import web
+
+    domains = local_domains(region)
+    year = service.today().year
+    urls: list[str] = []
+    for template in SEED_QUERIES.get(category, ()):
+        if "{cc}" in template and not domains:
+            continue
+        query = template.format(
+            region=region, year=year, cc=domains[0] if domains else ""
+        )
+        try:
+            results = await web.search_web(query)
+        except web.SearchUnavailable:
+            break
+        for lead in await leads(session, results, region):
+            await record_candidate(
+                session,
+                lead["url"],
+                category_hints=[category],
+                title=lead["title"],
+                reason="seed",
+            )
+            urls.append(normalized_url(lead["url"]))
+    await session.commit()
+    return list(dict.fromkeys(urls))
+
+
+async def hand_off(
+    session,
+    pages: list[str],
+    category: str,
+    *,
+    picked: list[dict] | None = None,
+    seeded: list[str] | None = None,
+    seen: list[dict] | None = None,
+    region: str = "",
+) -> list[str]:
+    """Candidates for this task to extract: pages the agent queued, seeds, pages it read
+    that look like one open call (a stated deadline ahead or rolling, and not a hub;
+    hubs are crawled as sources on trial), then leads from the results it searched."""
+    from api.opportunities.crawl_models import PageCache
+
+    urls: list[str] = []
+    for page in picked or []:
+        await record_candidate(
+            session,
+            page["url"],
+            category_hints=[category],
+            title=page.get("title", ""),
+            reason="agent_pick",
+        )
+        urls.append(normalized_url(page["url"]))
+    urls += seeded or []
+    for url in pages:
+        row = await session.get(PageCache, normalized_url(url))
+        if row is None or row.error:
+            continue
+        metadata = row.metadata_json or {}
+        if len(metadata.get("links") or []) >= HUB_LINKS or not shows_open_cycle(
+            row.text, metadata, service.today()
+        ):
+            continue
+        await record_candidate(
+            session, url, category_hints=[category], reason="agent_read"
+        )
+        urls.append(normalized_url(url))
+    queued = set(urls)
+    room = settings.planner_max_picks - len(queued)
+    for lead in (await leads(session, seen or [], region))[: max(0, room)]:
+        if normalized_url(lead["url"]) in queued:
+            continue
+        await record_candidate(
+            session,
+            lead["url"],
+            category_hints=[category],
+            title=lead["title"],
+            reason="search_lead",
+        )
+        urls.append(normalized_url(lead["url"]))
+    await session.commit()
+    return list(dict.fromkeys(urls))
+
+
+async def run_pipeline(
+    session, task, scan, category: str, on_event=None, *, urls: list[str] | None = None
+) -> dict:
+    """Extract crawler candidates for this scan; with `urls`, only those pages (the
+    ones the agent read and left unsaved) and without crawling sources first."""
     started = time.monotonic()
     metrics = dict(task.metrics or {})
-    crawl = await crawl_due(session, categories=[category])
+    crawl = (
+        {"candidates_found": 0, "sources": {}}
+        if urls is not None
+        else await crawl_due(session, categories=[category])
+    )
     metrics["candidates_found"] = (
         metrics.get("candidates_found", 0) + crawl["candidates_found"]
     )
@@ -144,8 +372,15 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     ctx.save_via = "crawler"
     ctx.opportunities_saved = metrics.get("crawler_saved", 0)
     limit = (await get_settings(session))["crawler"]["max_candidates_per_task"]
+    if urls is not None:
+        urls = [normalized_url(u) for u in urls]
+        limit = min(limit, len(urls))
     hosts = await aggregator_hosts(session)
-    attempts = 0
+    attempts = local_attempts = 0
+    # No one feed takes every slot, and local sites get up to half of them.
+    per_source: dict[str, int] = {}
+    source_cap = max(2, -(-limit // 3))
+    local = local_domains(scan.region)
     for _ in range(limit * 10):
         if (
             attempts >= limit
@@ -159,12 +394,23 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
             break
         if halted := await _halt_reason(ctx):
             raise TaskHalted(halted)
-        candidate = await claim_candidate(session, category, scan.region)
+        candidate = await claim_candidate(
+            session,
+            category,
+            scan.region,
+            prefer_local=local_attempts < limit // 2,
+            skip_sources=frozenset(s for s, n in per_source.items() if n >= source_cap),
+            urls=urls,
+        )
         if candidate is None:
             break
         token = candidate.claim_token
         metrics["candidates_considered"] = metrics.get("candidates_considered", 0) + 1
         reason = await triage_url(session, candidate)
+        if reason is None and names_other_country(
+            f"{candidate.url} {candidate.title}", scan.region
+        ):
+            reason = "region_excluded:" + scan.region.strip().casefold()
         page = None
         if reason is None:
             await session.commit()
@@ -200,7 +446,7 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                 continue
             candidate.status = (
                 "new"
-                if reason.startswith("fetch_failed:")
+                if reason.startswith(("fetch_failed:", "region_excluded:"))
                 else "closed"
                 if reason == "deadline_passed"
                 else "duplicate"
@@ -208,9 +454,41 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                 else "rejected"
             )
             candidate.reason = reason
-            add_reason(metrics, reason)
+            add_reason(
+                metrics,
+                reason.partition(":")[0]
+                if reason.startswith("region_excluded:")
+                else reason,
+            )
+        elif not await cached_extraction(page, scan.region) and (
+            screened := (
+                screen := await screen_page(
+                    page,
+                    category=category,
+                    region=scan.region,
+                    today=service.today().isoformat(),
+                )
+            ).skip
+        ):
+            if not await lock_claim(session, candidate, token):
+                continue
+            if screened == "deadline_passed":
+                candidate.status, candidate.reason = "closed", screened
+            elif screened == "region_excluded":
+                candidate.status = "new"
+                candidate.reason = "region_excluded:" + scan.region.strip().casefold()
+            else:
+                candidate.status, candidate.reason = "new", screened
+                candidate.category_hints = [screen.category]
+            add_reason(metrics, f"screen_{screened}")
         else:
             attempts += 1
+            if candidate.source_id:
+                per_source[candidate.source_id] = (
+                    per_source.get(candidate.source_id, 0) + 1
+                )
+            if local and any(host_of(candidate.url).endswith("." + d) for d in local):
+                local_attempts += 1
             metrics["extraction_attempts"] = metrics.get("extraction_attempts", 0) + 1
             task.metrics = dict(metrics)
             await session.commit()
@@ -288,14 +566,7 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
                                 "crawler_saved", 0
                             ) + int(saved["created"])
                             if candidate.source_id and saved["created"]:
-                                await session.execute(
-                                    update(Source)
-                                    .where(Source.id == candidate.source_id)
-                                    .values(
-                                        opportunities_saved=Source.opportunities_saved
-                                        + 1
-                                    )
-                                )
+                                await credit_source(session, candidate.source_id)
             except (ValueError, ValidationError) as exc:
                 if not await lock_claim(session, candidate, token):
                     continue
@@ -326,4 +597,15 @@ async def run_pipeline(session, task, scan, category: str, on_event=None) -> dic
     metrics["pipeline_seconds"] = round(time.monotonic() - started, 2)
     task.metrics = metrics
     await session.commit()
+    log.info(
+        "crawler: scan %s %s in %s: %s checked, %s read, %s saved, skipped %s (%ss)",
+        scan.id[:8],
+        category,
+        scan.region,
+        metrics.get("candidates_considered", 0),
+        metrics.get("extracted", 0),
+        metrics.get("crawler_saved", 0),
+        metrics.get("triaged_out", {}),
+        metrics["pipeline_seconds"],
+    )
     return metrics

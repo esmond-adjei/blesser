@@ -49,3 +49,7 @@ class AssistantMessage(Base):
     @property
     def chips(self) -> list[dict]:
         return (self.context or {}).get("chips", [])
+
+    @property
+    def can_continue(self) -> bool:
+        return bool((self.context or {}).get("can_continue"))

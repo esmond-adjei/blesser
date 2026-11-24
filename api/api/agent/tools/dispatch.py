@@ -5,6 +5,7 @@ A new tool needs a HANDLERS row and a definition in definitions.py (parity is te
 
 import asyncio
 import json
+from urllib.parse import urlsplit
 
 from api import web
 from api.agent.tools.context import ToolContext
@@ -16,22 +17,79 @@ __all__ = ["HANDLERS", "READ_ONLY_TOOLS", "ToolContext", "dispatch_batch", "run_
 
 async def _search_web(tool_input: dict, ctx: ToolContext) -> dict:
     reused = web.reusable_search(tool_input["query"])
-    if reused is not None:
-        return {"results": web.brief_results(reused)}
-    results = await web.search_web(tool_input["query"])
-    return {"results": web.brief_results(results)}
+    results = (
+        reused if reused is not None else await web.search_web(tool_input["query"])
+    )
+    brief = web.brief_results(results)
+    if hasattr(ctx, "seen_results"):
+        ctx.seen_results += [
+            {"url": r.get("url", ""), "title": r.get("title", "")} for r in brief
+        ]
+    return {"results": brief}
+
+
+#: Search engines, caches and archives are never a source; search_web covers search and
+#: fetch_page already falls back to the Internet Archive. Proxies are blocked in egress.
+UNREADABLE_HOSTS = frozenset(
+    {
+        "google.com",
+        "cache.google.com",
+        "webcache.googleusercontent.com",
+        "bing.com",
+        "duckduckgo.com",
+        "yandex.com",
+        "yandex.ru",
+        "search.brave.com",
+        "startpage.com",
+        "mojeek.com",
+        "search.yahoo.com",
+        "baidu.com",
+        "archive.org",
+    }
+)
+
+
+def unreadable_host(url: str) -> bool:
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    return any(host == h or host.endswith("." + h) for h in UNREADABLE_HOSTS)
+
+
+async def _note_links(ctx: ToolContext, url: str) -> None:
+    """Remember the page's links, and suggest it as a source when it lists opportunities."""
+    from api.core.db import SessionLocal
+    from api.opportunities.crawl_models import PageCache
+    from api.opportunities.crawler import HUB_LINKS, propose_source
+    from api.opportunities.page_content import normalized_url
+
+    async with SessionLocal() as session:
+        row = await session.get(PageCache, normalized_url(url))
+        if row is None or row.error:
+            return
+        metadata = row.metadata_json or {}
+        listed = metadata.get("links") or []
+        ctx.page_links[opportunity_tools.url_key(url)] = {
+            opportunity_tools.url_key(link["url"])
+            for link in listed + (metadata.get("outbound") or [])
+        }
+        if len(listed) >= HUB_LINKS:
+            await propose_source(
+                session, url, ctx.category, feeds=metadata.get("feeds") or []
+            )
+            await session.commit()
 
 
 async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
     from api.opportunities.page_content import Page, expired, page_note
 
+    if unreadable_host(tool_input["url"]):
+        message = (
+            "[Not fetched: search engines, caches and archives are not sources. Use"
+            " search_web to find pages, or stop if there is no other source.]"
+        )
+        return {"text": message, "error": message}
     key = opportunity_tools.url_key(tool_input["url"])
     if key in ctx.known_pages and not ctx.reverify_id:
         note = ctx.known_pages[key]
-        if ctx.offered_tools and "add_catalogue_match" in ctx.offered_tools:
-            note += (
-                " If it fits the member's request, record it with add_catalogue_match."
-            )
         return {
             "text": "Skip known URL. " + note,
             "page_note": note,
@@ -70,6 +128,10 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
             Page(url=key, text=text, title=text.splitlines()[0][:120] if text else ""),
             verdict,
         )
+        if verdict != "fetch failed" and getattr(ctx, "scan_task", None) is not None:
+            await _note_links(ctx, tool_input["url"])
+        if verdict == "read" and tool_input["url"] not in ctx.read_pages:
+            ctx.read_pages.append(tool_input["url"])
         if closed:
             from api.core.db import SessionLocal
             from api.opportunities.crawler import record_candidate
@@ -83,6 +145,16 @@ async def _fetch_page(tool_input: dict, ctx: ToolContext) -> dict:
                     reason="deadline_passed",
                 )
                 await session.commit()
+            # The model pays for every character it reads; a closed call is worth one line.
+            rest = (
+                f" A newer cycle further down would be at offset={offset + settings.fetch_max_chars}."
+                if "more characters. Call fetch_page" in text
+                else ""
+            )
+            text = (
+                "[Closed: every deadline in this part of the page has passed and it does"
+                f" not say rolling. Move on unless you expect a newer cycle.{rest}]"
+            )
         result = {"text": text, "page_note": ctx.page_notes[key]}
         if verdict == "fetch failed":
             result["error"] = text
@@ -94,8 +166,7 @@ HANDLERS = {
     "fetch_page": _fetch_page,
     "save_opportunity": opportunity_tools.handle_save_opportunity,
     "reject_candidate": opportunity_tools.handle_reject_candidate,
-    "search_catalogue": opportunity_tools.handle_search_catalogue,
-    "add_catalogue_match": opportunity_tools.handle_add_catalogue_match,
+    "queue_pages": opportunity_tools.handle_queue_pages,
 }
 
 #: Safe to run concurrently: they never touch the (not concurrency-safe) DB session.

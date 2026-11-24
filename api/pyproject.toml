@@ -33,6 +33,7 @@ dependencies = [
     "pillow>=11",
     "pypdfium2>=4.30",
     "pypdf>=6",
+    "typesafe-sdk>=0.7.0",
 ]
 
 [project.scripts]

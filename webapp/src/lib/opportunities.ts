@@ -85,8 +85,9 @@ export function googleCalendarUrl(opp: Opportunity): string | null {
 
 const PAGE = 24
 
-export function useOpportunities(query: Omit<OpportunityQuery, "limit" | "offset">) {
+export function useOpportunities(query: Omit<OpportunityQuery, "limit" | "offset">, { enabled = true } = {}) {
   return useInfiniteQuery({
+    enabled,
     queryKey: ["opportunities", query],
     queryFn: ({ pageParam }) => api.listOpportunities({ ...query, limit: PAGE, offset: pageParam }),
     initialPageParam: 0,

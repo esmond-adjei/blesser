@@ -8,7 +8,7 @@ from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import aliased
 
 from api.core.config import settings
-from api.core.exceptions import NotFoundError
+from api.core.exceptions import ConflictError, NotFoundError
 from api.core.time import utcnow_naive
 from api.opportunities.models import Opportunity, OpportunityCategory
 from api.scans import models as m
@@ -60,6 +60,47 @@ async def check_sites(raw: list[str]) -> list[str]:
     return sites
 
 
+KIND_PLURALS = {
+    "grant": "grants",
+    "fellowship": "fellowships",
+    "scholarship": "scholarships",
+    "accelerator": "accelerators",
+    "incubator": "incubators",
+    "competition": "competitions",
+    "internship": "internships",
+    "call_for_proposals": "calls for proposals",
+    "training": "training",
+    "conference": "conferences",
+    "job": "jobs",
+}
+_KIND_WORDS = {
+    "scholarship": ("scholarship", "bursar", "tuition"),
+    "fellowship": ("fellowship",),
+    "grant": ("grant", "funding", "seed fund"),
+    "job": (" job", "jobs", "hiring", "career", "vacanc", "engineer role"),
+    "internship": ("internship", "intern "),
+    "accelerator": ("accelerator",),
+    "incubator": ("incubat",),
+    "competition": ("competition", "challenge", "prize", "hackathon"),
+    "conference": ("conference", "summit"),
+    "training": ("training", "bootcamp", "course"),
+    "call_for_proposals": ("call for proposals", "proposals"),
+}
+
+
+def scan_kinds(kinds, focus: str = "") -> list[str]:
+    """The listing types a scan is for: the ones picked, else any its focus names."""
+    if kinds:
+        return list(kinds)
+    text = f" {(focus or '').casefold()} "
+    return [k for k, words in _KIND_WORDS.items() if any(w in text for w in words)][:3]
+
+
+def kinds_phrase(kinds) -> str:
+    words = [KIND_PLURALS.get(k, k.replace("_", " ")) for k in kinds]
+    return words[0] if len(words) < 2 else f"{', '.join(words[:-1])} and {words[-1]}"
+
+
 async def start_scan(
     session,
     user_id: str,
@@ -68,7 +109,8 @@ async def start_scan(
     region: str = "",
     focus: str = "",
     sites: list[str] | None = None,
-    kind: str = "member",
+    kinds: list[str] | None = None,
+    kind: str,
     schedule_id: str | None = None,
     commit: bool = True,
 ) -> m.Scan:
@@ -85,6 +127,7 @@ async def start_scan(
         region=region.strip() or settings.opportunity_default_region,
         categories=ordered,
         focus=focus.strip(),
+        kinds=list(dict.fromkeys(kinds or [])),
         kind=kind,
         sites=list(sites or []),
         schedule_id=schedule_id,
@@ -107,6 +150,55 @@ async def start_scan(
     return scan
 
 
+def _tried(tasks, limit: int = 15) -> dict[str, list[str]]:
+    """What earlier runs searched for and read, newest last, so a follow-up can avoid it."""
+    searches, pages = {}, {}
+    for task in sorted(tasks, key=lambda t: t.created_at):
+        for event in _parse_log(task.log):
+            args = event.get("input") or {}
+            if event.get("tool") == "search_web" and args.get("query"):
+                searches[args["query"]] = None
+            elif event.get("tool") == "fetch_page" and args.get("url"):
+                pages[args["url"]] = None
+    return {"searches": list(searches)[-limit:], "pages": list(pages)[-limit:]}
+
+
+async def steer_scan(session, user_id: str, scan_id: str, prompt: str) -> m.Scan:
+    """Queue a follow-up run on a finished scan, steered by what the member said."""
+    scan = await get_or_404(session, user_id, scan_id)
+    if scan.kind not in ("member", "scheduled"):
+        raise ConflictError("This scan can't be steered.")
+    if scan.status == "running":
+        raise ConflictError(
+            "Wait for this scan to finish, or stop it, before steering it."
+        )
+    earlier = (
+        (await session.execute(select(m.ScanTask).where(m.ScanTask.scan_id == scan.id)))
+        .scalars()
+        .all()
+    )
+    tried = _tried(earlier)
+    for category in scan.categories:
+        session.add(
+            m.ScanTask(
+                scan_id=scan.id,
+                user_id=user_id,
+                task_type=TASK_TYPE,
+                target=f"category:{category}",
+                metrics={
+                    "steer": prompt.strip(),
+                    "pipeline_complete": True,
+                    **({"tried": tried} if tried["searches"] or tried["pages"] else {}),
+                },
+            )
+        )
+    scan.status = "running"
+    await session.flush()
+    await notify_work(session, scan.id)
+    await session.commit()
+    return scan
+
+
 async def note_tasks_drained(session, scan_id: str) -> None:
     """Flip a running scan to done once no task is open; the only way into done."""
     scan = await session.get(m.Scan, scan_id)
@@ -121,9 +213,7 @@ async def note_tasks_drained(session, scan_id: str) -> None:
     ).scalar() or 0
     if open_tasks == 0:
         scan.status = "done"
-        from api.opportunities.freshness import CHECK_FOCUS
-
-        if scan.focus == CHECK_FOCUS:
+        if scan.kind == m.CHECK_KIND:
             # Scheduled checks report through the listings themselves, not a notification.
             return
         from api.notifications import events
@@ -172,10 +262,10 @@ def task_out(task: m.ScanTask) -> dict:
 
 
 def _visible_find():
-    """Finds a member may see: published listings, and ones this scan created that
-    wait for review."""
-    return (Opportunity.status == "published") | (
-        m.ScanFind.created.is_(True) & (Opportunity.status == "in_review")
+    """Finds a member may see: listings this scan newly added, whether or not they've
+    been reviewed. Listings already in the catalogue are on their feed, so a scan doesn't list them."""
+    return m.ScanFind.created.is_(True) & Opportunity.status.in_(
+        ("published", "in_review", "draft")
     )
 
 
@@ -209,6 +299,7 @@ def _scan_out(
         "region": scan.region,
         "categories": scan.categories or [],
         "focus": scan.focus,
+        "kinds": scan.kinds or [],
         "sites": scan.sites or [],
         "kind": scan.kind,
         "status": scan.status,
@@ -224,9 +315,21 @@ def _scan_out(
     return out
 
 
+RUN_WINDOW = timedelta(seconds=5)
+
+
+def latest_run(tasks: list[m.ScanTask]) -> list[m.ScanTask]:
+    """The tasks queued together last: a retry or a steer starts a new run on the same scan."""
+    if not tasks:
+        return []
+    newest = max(t.created_at for t in tasks)
+    return [t for t in tasks if t.created_at >= newest - RUN_WINDOW]
+
+
 def _timing(scan: m.Scan, tasks: list[m.ScanTask]) -> dict:
-    starts = [t.started_at for t in tasks if t.started_at]
-    ends = [t.finished_at for t in tasks if t.finished_at]
+    run = latest_run(tasks)
+    starts = [t.started_at or t.created_at for t in run]
+    ends = [t.finished_at for t in run if t.finished_at]
     finished = max(ends) if ends and m.status_str(scan.status) != "running" else None
     return {"started_at": min(starts) if starts else None, "finished_at": finished}
 
@@ -259,7 +362,7 @@ async def list_scans(session, user_id: str, limit: int = 50) -> list[dict]:
         (
             await session.execute(
                 select(m.Scan)
-                .where(m.Scan.user_id == user_id)
+                .where(m.Scan.user_id == user_id, m.Scan.kind.in_(m.MEMBER_KINDS))
                 .order_by(m.Scan.created_at.desc(), m.Scan.id)
                 .limit(limit)
             )
@@ -343,7 +446,7 @@ async def _scan_finds(session, scan: m.Scan) -> list[dict]:
                 "source_domain": domain if created else None,
                 "official_url": official_url or source_url,
                 "is_new": not already_seen,
-                "in_review": opportunity.status == "in_review",
+                "in_review": opportunity.status in ("in_review", "draft"),
             }
         )
     return finds
@@ -423,19 +526,30 @@ async def scan_allowance(session, user_id: str) -> dict:
 
     limits = (await get_settings(session))["member_scan_limits"]
     now = utcnow_naive()
-    left = {}
+    left, frees = {}, []
     for key, seconds in (("per_hour", 3600), ("per_day", 86400)):
-        used = await session.scalar(
-            select(func.count())
-            .select_from(m.Scan)
-            .where(
-                m.Scan.user_id == user_id,
-                m.Scan.kind == "member",
-                m.Scan.created_at > now - timedelta(seconds=seconds),
+        window = timedelta(seconds=seconds)
+        started = (
+            (
+                await session.execute(
+                    select(m.Scan.created_at)
+                    .where(
+                        m.Scan.user_id == user_id,
+                        m.Scan.kind == "member",
+                        m.Scan.created_at > now - window,
+                    )
+                    .order_by(m.Scan.created_at)
+                )
             )
+            .scalars()
+            .all()
         )
-        left[key] = max(0, limits[key] - (used or 0))
+        left[key] = max(0, limits[key] - len(started))
+        if not left[key] and started and limits[key] > 0:
+            # A slot frees when the scan that fills the limit leaves the window.
+            frees.append(started[len(started) - limits[key]] + window)
     return {
+        "next_at": max(frees) if frees else None,
         "enabled": settings.rate_limits_enabled,
         "per_hour": limits["per_hour"],
         "left_this_hour": left["per_hour"],

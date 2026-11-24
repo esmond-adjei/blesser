@@ -119,3 +119,20 @@ describe("repeating scans", () => {
     expect(runSummary({ new: 0, updated: 0 })).toBe("Nothing new")
   })
 })
+
+describe("scanElapsedMs for a scan run again", () => {
+  const task = (created: string, started: string, finished: string | null) =>
+    ({ created_at: created, started_at: started, finished_at: finished }) as never
+  it("counts only the latest run, not the first start", () => {
+    const scan = {
+      status: "running",
+      created_at: "2026-11-20T10:00:00",
+      finished_at: null,
+      tasks: [
+        task("2026-11-20T10:00:00", "2026-11-20T10:00:05", "2026-11-20T10:10:00"),
+        task("2026-11-21T09:00:00", "2026-11-21T09:00:10", null),
+      ],
+    } as never
+    expect(scanElapsedMs(scan, Date.parse("2026-11-21T09:02:10Z"))).toBe(120_000)
+  })
+})

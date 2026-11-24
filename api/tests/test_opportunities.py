@@ -139,6 +139,7 @@ def _run_id() -> str:
                 region="Ghana",
                 categories=["startup"],
                 status="running",
+                kind="member",
             )
             session.add(run)
             await session.commit()
@@ -230,7 +231,7 @@ def test_save_creates_then_refreshes_without_duplicating():
     assert asyncio.run(count()) == 1
 
 
-def test_scan_finds_keep_web_and_catalog_provenance_without_logs():
+def test_scan_finds_keep_web_provenance_and_leave_out_catalogue_listings():
     first_scan, next_scan = _run_id(), _run_id()
     data = {
         **BASE,
@@ -264,19 +265,10 @@ def test_scan_finds_keep_web_and_catalog_provenance_without_logs():
     ]
     assert later["opportunities_added"] == 0
     assert later["tasks"] == []
-    assert later["finds"] == [
-        {
-            **first["finds"][0],
-            "source": "catalog",
-            "source_domain": None,
-            "is_new": False,
-        }
-    ]
+    # Already in the catalogue, so it's on the member's feed, not a new find.
+    assert later["finds"] == []
     client.delete(f"/api/app/scans/{first_scan}").raise_for_status()
-    assert (
-        client.get(f"/api/app/scans/{next_scan}").json()["finds"][0]["source"]
-        == "catalog"
-    )
+    assert client.get(f"/api/app/scans/{next_scan}").json()["finds"] == []
 
 
 def test_save_respects_task_budget(monkeypatch):
@@ -462,18 +454,14 @@ def test_calendar_feed_lists_deadlines_and_todos_and_rotates():
 # --- scans --------------------------------------------------------------------------
 
 
-def test_task_brief_lists_known_titles_and_today():
+def test_task_brief_names_today_and_focus_but_not_the_catalogue():
     _add(title="Known Grant")
     message = opp_tasks.user_message(
-        region="Ghana",
-        category="startup",
-        focus="climate",
-        today="2026-11-07",
-        known=["Known Grant (Accra Ventures)"],
+        region="Ghana", category="startup", focus="climate", today="2026-11-07"
     )
-    assert "Today's date: 2026-11-07" in message
-    assert "- Known Grant (Accra Ventures)" in message
-    assert "climate" in message
+    assert "Today's date: 2026-11-07" in message and "climate" in message
+    # Tools skip known pages and refuse duplicate saves; listing them costs every turn.
+    assert "Known Grant" not in message
 
 
 # --- the agent loop, end to end with a scripted model --------------------------------

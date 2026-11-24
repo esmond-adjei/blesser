@@ -1,23 +1,28 @@
 import { Checkbox } from "../components/ui/checkbox"
 import * as React from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   ArrowUpRight,
+  Bookmark,
   BookmarkPlus,
   Check,
   CalendarPlus,
   Download,
-  LayoutGrid,
-  List,
+  Link2,
   ListPlus,
+  Loader2,
   Lock,
   PanelRightOpen,
   MapPin,
   Plus,
   Search,
+  Settings2,
   Share2,
+  SlidersHorizontal,
   Sparkles,
   Target,
+  X,
 } from "lucide-react"
 import * as api from "../lib/api"
 import {
@@ -31,11 +36,12 @@ import {
   isKind,
   useOpportunities,
   useOpportunity,
-  useOpportunityFacets,
   useTodoMutations,
   useTrackOpportunity,
   useTrackedOpportunities,
 } from "../lib/opportunities"
+import { useApplicationMutations } from "../lib/applications"
+import { deadlineParts, sectionize, useLastVisit } from "../lib/feed"
 import { formatAgo } from "../lib/format"
 import {
   ALERTS,
@@ -49,18 +55,17 @@ import {
 } from "../lib/matching"
 import { useDrawerParam, useUrlParam } from "../lib/urlParams"
 import { toastError, toastSuccess } from "../lib/toast"
-import type { AlertFrequency, Opportunity, OpportunityCategory, OpportunityKind, OpportunitySort, SearchFilters } from "../lib/types"
+import type { AlertFrequency, Opportunity, OpportunityCategory, OpportunityKind, OpportunitySort, SavedSearch, SearchFilters } from "../lib/types"
 import {
   Button,
-  Chip,
   Countdown,
   Field,
   Input,
   OpportunityArt,
-  OpportunityCard,
   Select,
   Textarea,
   buttonVariants,
+  chipVariants,
   cn,
 } from "@blesser/ui"
 import {
@@ -74,9 +79,19 @@ import {
 } from "../components/ui/dialog"
 import { EmptyState, ErrorState } from "../components/feedback/EmptyState"
 import { Skeleton, SkeletonStack } from "../components/ui/feedback"
-import { FilterToggle, PageHeader, Segmented } from "../components/layout/PageHeader"
+import { Segmented } from "../components/layout/PageHeader"
+import { useShellHeader } from "../components/layout/shellHeader"
 import { ShareDialog } from "../components/share/ShareDialog"
 import { ActionContextMenu, ActionMenuButton, type MenuAction } from "../components/ui/menu"
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu"
+import { ConfirmDialog } from "../components/kit/parts"
 import { ScanDialog } from "./Scans"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "../components/ui/shadcn/sheet"
 import discoverArt from "../assets/illustrations/discover.webp"
@@ -91,29 +106,7 @@ const SORTS: { value: OpportunitySort; label: string }[] = [
 
 const isSort = (value: string): value is OpportunitySort => SORTS.some((s) => s.value === value)
 
-type View = "cards" | "list"
-const VIEW_KEY = "blesser.opportunities.view"
-
-function useView(): [View, (view: View) => void] {
-  const [view, setView] = React.useState<View>(() => {
-    try {
-      return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "cards"
-    } catch {
-      return "cards"
-    }
-  })
-  const choose = React.useCallback((next: View) => {
-    setView(next)
-    try {
-      localStorage.setItem(VIEW_KEY, next)
-    } catch {
-      // Storage can be blocked; the choice still holds for this visit.
-    }
-  }, [])
-  return [view, choose]
-}
-
-const GRID = "grid grid-cols-1 gap-5 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @xl:gap-6"
+const COLUMN = "mx-auto w-full max-w-[47.5rem]"
 const FLOATING_MENU_BUTTON = "size-8 rounded-full bg-surface-sunk text-ink-secondary hover:bg-separator hover:text-ink"
 
 export function Opportunities() {
@@ -126,12 +119,15 @@ export function Opportunities() {
   const [soonParam, setSoon] = useUrlParam("soon")
   const [closedParam, setClosed] = useUrlParam("closed")
   const [newParam, setNew] = useUrlParam("new")
+  const [hideParam, setHide] = useUrlParam("hide")
+  const [mineParam, setMine] = useUrlParam("mine")
   const drawer = useDrawerParam()
   const category = isCategory(categoryParam) ? categoryParam : undefined
   const kind = isKind(kindParam) ? kindParam : undefined
+  const hideTracked = hideParam === "tracked"
   // Searching ranks by best match until a sort is picked; best match needs words.
   const sort: OpportunitySort = isSort(sortParam) && (sortParam !== "relevance" || query) ? sortParam : query ? "relevance" : "deadline"
-  const [view, setView] = useView()
+  const lastVisit = useLastVisit()
 
   // Typing waits a beat before it touches the URL and the query; a URL change
   // (back/forward, a link) resets the box during render.
@@ -146,20 +142,30 @@ export function Opportunities() {
     return () => window.clearTimeout(t)
   }, [draft, query, setQuery])
 
-  const list = useOpportunities({
-    q: query || undefined,
-    category,
-    kind,
+  const profile = useMatchProfile()
+  const chosen = profile.data?.saved ? CATEGORIES.filter((c) => profile.data.categories.includes(c)) : []
+  // The feed shows only the audiences picked in Your feed settings; none picked means all.
+  const audiences = chosen.length ? chosen : CATEGORIES
+  const tabs = category && !audiences.includes(category) ? [...audiences, category] : audiences
+  const list = useOpportunities(
+    {
+      q: query || undefined,
+      category,
+      categories: !category && audiences.length < CATEGORIES.length ? audiences : undefined,
+      mine: mineParam ? true : undefined,
+      kind,
     country: country || undefined,
     sort,
     closing_within: soonParam ? 14 : undefined,
-    new: newParam ? true : undefined,
-    include_closed: closedParam ? true : undefined,
-  })
-  const facets = useOpportunityFacets()
+      new: newParam ? true : undefined,
+      include_closed: closedParam ? true : undefined,
+    },
+    { enabled: !profile.isPending },
+  )
   const tracked = useTrackedOpportunities()
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
-  const counts = new Map(facets.data?.categories.map((c) => [c.key, c.count]))
+  const shown = hideTracked ? items.filter((o) => !tracked.data?.[o.id]) : items
+  const sections = sectionize(shown, sort, lastVisit)
 
   const [todoFor, setTodoFor] = React.useState<Opportunity | null>(null)
   const [scanOpen, setScanOpen] = React.useState(false)
@@ -170,7 +176,7 @@ export function Opportunities() {
     onTodo: setTodoFor,
     onShare: setShareFor,
   }
-  const filtered = !!(query || category || kind || soonParam || newParam || closedParam)
+  const filtered = !!(query || category || kind || country || soonParam || newParam || closedParam || hideTracked || mineParam)
   const filters: SearchFilters = {
     q: query || undefined,
     category: category ?? null,
@@ -180,168 +186,185 @@ export function Opportunities() {
   }
   const searchable = !!(query || category || kind || country || soonParam)
   const [saveOpen, setSaveOpen] = React.useState(false)
-  const profile = useMatchProfile()
   const saved = useSavedSearches()
   const current = saved.data?.find((s) => sameFilters(s.filters, filters))
   useSavedSearchLink(saved.data)
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Opportunities"
-        description="Grants, accelerators, fellowships and scholarships open to people in Ghana, checked against each opportunity's own page."
-        actions={
-          <>
-            <Button size="sm" variant="brand" onClick={() => setSubmitOpen(true)} icon={<Plus />}>
-              Share one
-            </Button>
-            <Button size="sm" variant="primary" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
-              Find more
-            </Button>
-          </>
-        }
-      />
+  const header = React.useMemo(
+    () => ({
+      title: "Opportunities",
+      actions: (
+        <>
+          <Button size="sm" variant="quiet" icon={<Plus />} data-tooltip="Share an opportunity you know about" onClick={() => setSubmitOpen(true)}>
+            <span className="max-sm:sr-only">Share one</span>
+          </Button>
+          <Button size="sm" variant="primary" icon={<Sparkles />} onClick={() => setScanOpen(true)}>
+            Find more
+          </Button>
+        </>
+      ),
+    }),
+    [setSubmitOpen, setScanOpen],
+  )
+  useShellHeader(header)
 
-      <div className="space-y-2.5">
+  const [, setParams] = useSearchParams()
+  const active: { key: string; label: string }[] = [
+    ...(mineParam ? [{ key: "mine", label: "Found by my scans" }] : []),
+    ...(kind ? [{ key: "kind", label: KIND_LABELS[kind] }] : []),
+    ...(country ? [{ key: "country", label: country }] : []),
+    ...(newParam ? [{ key: "new", label: "New this week" }] : []),
+    ...(soonParam ? [{ key: "soon", label: "Closing in 2 weeks" }] : []),
+    ...(closedParam ? [{ key: "closed", label: "Including closed" }] : []),
+    ...(hideTracked ? [{ key: "hide", label: "Tracked hidden" }] : []),
+  ]
+  const clearFilters = (keys: string[]) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        keys.forEach((k) => next.delete(k))
+        return next
+      },
+      { replace: true },
+    )
+
+  // Section headings stick just under the control bar, whose height changes as it wraps.
+  const barRef = React.useRef<HTMLDivElement>(null)
+  const [barHeight, setBarHeight] = React.useState(0)
+  React.useLayoutEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setBarHeight(el.offsetHeight))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const sortOptions = SORTS.filter((s) => s.value !== "relevance" || query).map((s) => (
+    <option key={s.value} value={s.value}>
+      {s.label}
+    </option>
+  ))
+  const offsets = sections.map((_, i) => sections.slice(0, i).reduce((n, s) => n + s.items.length, 0))
+  return (
+    <div className={cn(COLUMN, "pb-16")}>
+      <div ref={barRef} className="sticky top-0 z-20 -mx-3 -mt-2 space-y-2 bg-canvas px-3 pt-2 pb-3 sm:-mx-6 sm:px-6 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:bg-linear-to-b after:from-canvas after:to-transparent after:content-[''] after:h-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Segmented
-            label="Audience"
-            value={category ?? ""}
-            onChange={(v) => setCategory(v)}
-            options={[
-              { value: "", label: "All", count: facets.data?.total },
-              ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 })),
-            ]}
-          />
-          <div className="relative min-w-[200px] flex-1">
+          <div className="relative min-w-0 flex-1 basis-32">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-tertiary" />
             <Input
               type="search"
               aria-label="Search opportunities"
-              placeholder="Search by name, funder, sector…"
+              placeholder="Search name, funder, sector"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="h-control-sm w-full pl-9 text-callout"
+              className="h-control-sm w-full pr-10 pl-9 text-callout"
+            />
+            <SavedSearchesMenu
+              searches={saved.data ?? []}
+              current={current}
+              canSave={searchable && !current}
+              onSave={() => setSaveOpen(true)}
             />
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label="Kind"
-            className="h-control-sm w-auto min-w-[140px] text-footnote"
-            value={kind ?? ""}
-            onChange={(e) => setKind(e.target.value)}
-          >
-            <option value="">All kinds</option>
-            {KINDS.map((k) => (
-              <option key={k} value={k}>
-                {KIND_LABELS[k]}
-              </option>
-            ))}
-          </Select>
+          {tabs.length > 1 ? (
+            <div className="min-w-0 max-sm:order-last max-sm:basis-full">
+              <Segmented
+                label="Audience"
+                className="[scrollbar-width:none]"
+                value={category ?? ""}
+                onChange={(v) => setCategory(v)}
+                options={[{ value: "", label: "All" }, ...tabs.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c] }))]}
+              />
+            </div>
+          ) : null}
+          <FiltersPopover
+            count={active.length}
+            sort={
+              <Select aria-label="Sort" className="h-control-sm text-footnote" value={sort} onChange={(e) => setSort(e.target.value)}>
+                {sortOptions}
+              </Select>
+            }
+            kind={kind}
+            onKind={setKind}
+            toggles={[
+              { label: "Found by my scans", on: !!mineParam, set: (on) => setMine(on ? "1" : "") },
+              { label: "New this week", on: !!newParam, set: (on) => setNew(on ? "1" : "") },
+              { label: "Closing in 2 weeks", on: !!soonParam, set: (on) => setSoon(on ? "1" : "") },
+              { label: "Include closed", on: !!closedParam, set: (on) => setClosed(on ? "1" : "") },
+              { label: "Hide tracked", on: hideTracked, set: (on) => setHide(on ? "tracked" : "") },
+            ]}
+          />
           <Select
             aria-label="Sort"
-            className="h-control-sm w-auto min-w-[150px] text-footnote"
+            className="h-control-sm w-40 min-w-0 shrink-0 text-footnote max-sm:hidden"
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
-            {SORTS.filter((s) => s.value !== "relevance" || query).map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
+            {sortOptions}
           </Select>
-          <FilterToggle pressed={!!newParam} onChange={(on) => setNew(on ? "1" : "")}>
-            New this week
-          </FilterToggle>
-          <FilterToggle pressed={!!soonParam} onChange={(on) => setSoon(on ? "1" : "")}>
-            Closing in 2 weeks
-          </FilterToggle>
-          <FilterToggle pressed={!!closedParam} onChange={(on) => setClosed(on ? "1" : "")}>
-            Include closed
-          </FilterToggle>
-          {searchable && !current ? (
-            <Button size="sm" variant="quiet" icon={<BookmarkPlus />} onClick={() => setSaveOpen(true)}>
-              Save search
-            </Button>
-          ) : null}
-          <Segmented
-            label="View"
-            value={view}
-            onChange={setView}
-            className="ml-auto"
-            options={[
-              { value: "cards", label: "Cards", icon: <LayoutGrid aria-hidden="true" /> },
-              { value: "list", label: "List", icon: <List aria-hidden="true" /> },
-            ]}
-          />
         </div>
+        {active.length ? (
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Active filters">
+            {active.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => clearFilters([f.key])}
+                aria-label={`Remove filter: ${f.label}`}
+                className={cn(
+                  chipVariants({ tone: "forest" }),
+                  "h-7 cursor-pointer pr-1.5 transition-colors hover:bg-highlight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
+                )}
+              >
+                {f.label}
+                <X aria-hidden="true" />
+              </button>
+            ))}
+            {active.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => clearFilters(active.map((f) => f.key))}
+                className="cursor-pointer px-1.5 text-footnote text-link hover:underline"
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      {saved.data?.length ? (
-        <div className="flex flex-wrap items-center gap-2" aria-label="Saved searches" role="group">
-          <span className="text-footnote text-ink-secondary">Saved:</span>
-          {saved.data.slice(0, 8).map((s) => (
-            <Link
-              key={s.id}
-              to={`/opportunities?${filtersToParams(s.filters).toString()}`}
-              aria-current={s.id === current?.id ? "true" : undefined}
-              className="rounded-full focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              <Chip tone={s.id === current?.id ? "forest" : "neutral"} className="h-7 hover:bg-separator">
-                {s.name}
-              </Chip>
-            </Link>
-          ))}
-          <Link to="/settings/matching" className="text-footnote text-link hover:underline">
-            Manage
-          </Link>
-        </div>
-      ) : null}
-
       {sort === "for_you" && profile.data && !profile.data.saved ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-forest/40 bg-forest-soft px-4 py-3.5 sm:flex-row sm:items-center">
+        <div className="mb-4 flex flex-col gap-3 rounded-lg bg-forest-soft px-4 py-3 sm:flex-row sm:items-center">
           <Target aria-hidden="true" className="hidden size-5 shrink-0 text-link sm:block" />
           <p className="min-w-0 flex-1 text-footnote text-ink">
-            Tell us what you're looking for and this list puts the best fits first. You can also get alerts when new ones are added.
+            Set up your feed and this list puts the best fits first. You can also get alerts when new ones are added.
           </p>
-          <Link to="/settings/matching" className={cn(buttonVariants({ size: "sm", variant: "primary" }))}>
+          <Link to="/settings/matching" className={cn(buttonVariants({ size: "sm", variant: "brand" }))}>
             Set it up
           </Link>
         </div>
       ) : null}
 
-      {list.isLoading && view === "cards" ? (
-        <div className="@container">
-          <div className={GRID}>
-            {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="overflow-hidden rounded-lg border border-separator bg-surface shadow-elevation-1 [&_div:empty]:animate-pulse [&_div:empty]:bg-surface-sunk motion-reduce:[&_div:empty]:animate-none">
-                <div className="space-y-3 p-5 [&>div]:rounded-sm">
-                  <div className="h-7 w-1/2 rounded-full!" />
-                  <div className="h-5 w-3/4" />
-                  <div className="h-4 w-1/2" />
-                  <div className="h-6 w-28 rounded-full!" />
-                  <div className="mt-5 h-8 w-full" />
-                </div>
+      {list.isLoading ? (
+        <ul className="space-y-3 pt-2" aria-busy="true">
+          {Array.from({ length: 5 }, (_, i) => (
+            <li key={i} className="flex gap-4 rounded-lg bg-surface p-4 shadow-elevation-1 sm:p-5">
+              <Skeleton className="size-12 shrink-0 rounded-md max-sm:hidden" />
+              <div className="min-w-0 flex-1 space-y-2.5">
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-3.5 w-1/3" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3.5 w-1/2" />
               </div>
-            ))}
-          </div>
-        </div>
-      ) : list.isLoading ? (
-        <div className="divide-y divide-separator rounded-lg border border-separator bg-surface">
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="h-[72px] px-4 py-3">
-              <div className="h-4 w-1/2 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
-              <div className="mt-2 h-3 w-1/3 animate-pulse rounded-sm bg-surface-sunk motion-reduce:animate-none" />
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : list.isError ? (
         <ErrorState title="Opportunities didn't load" description="Check your connection and try again." onRetry={() => void list.refetch()} />
-      ) : items.length === 0 ? (
+      ) : shown.length === 0 && !list.hasNextPage ? (
         <EmptyState
-          title={filtered ? "Nothing matches these filters" : "No opportunities yet"}
-          description="Send agents to look for new ones, or share one you know about."
+          title={mineParam && active.length === 1 && !query && !category ? "Your scans haven't found anything here yet" : filtered ? "Nothing matches these filters" : "No opportunities yet"}
+          description={mineParam ? "Send agents to look for new ones and what they find shows here." : "Send agents to look for new ones, or share one you know about."}
           action={
             <Button size="sm" onClick={() => setScanOpen(true)} icon={<Sparkles />}>
               Find more
@@ -350,27 +373,33 @@ export function Opportunities() {
         />
       ) : (
         <>
-          {view === "cards" ? (
-            <div className="@container" key="cards">
-              <ul className={GRID}>
-                {items.map((opp, i) => (
-                  <OpportunityTile key={opp.id} index={i} opp={opp} applicationId={tracked.data?.[opp.id]} {...handlers} />
+          {sections.map((section, si) => (
+            <section key={section.key} aria-label={section.title || "Opportunities"}>
+              {section.title ? (
+                <h2 style={{ top: barHeight }} className="sticky z-10 -mx-3 mb-5 bg-canvas px-3 pt-3 pb-2 sm:-mx-6 sm:px-6 text-footnote font-semibold text-ink-secondary after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:bg-linear-to-b after:from-canvas after:to-transparent after:content-[''] after:h-5">
+                  {section.title}
+                </h2>
+              ) : null}
+              <ul className={cn("space-y-3 pb-4", !section.title && "pt-5")}>
+                {section.items.map((opp, i) => (
+                  <FeedCard
+                    key={opp.id}
+                    index={offsets[si] + i}
+                    opp={opp}
+                    applicationId={tracked.data?.[opp.id]}
+                    showAudience={!category && audiences.length > 1}
+                    {...handlers}
+                  />
                 ))}
               </ul>
-            </div>
-          ) : (
-            <ul className="divide-y divide-separator rounded-lg border border-separator bg-surface">
-              {items.map((opp, i) => (
-                <OpportunityRow key={opp.id} index={i} opp={opp} applicationId={tracked.data?.[opp.id]} {...handlers} />
-              ))}
-            </ul>
-          )}
+            </section>
+          ))}
           {list.hasNextPage ? (
-            <div className="flex justify-center">
-              <Button size="sm" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
-                {list.isFetchingNextPage ? "Loading…" : "Load more"}
-              </Button>
-            </div>
+            <LoadMore
+              onLoad={() => void list.fetchNextPage()}
+              loading={list.isFetchingNextPage}
+              failed={list.isFetchNextPageError}
+            />
           ) : null}
         </>
       )}
@@ -388,6 +417,107 @@ export function Opportunities() {
       <ShareDialog opp={shareFor} onClose={() => setShareFor(null)} />
       <SaveSearchDialog open={saveOpen} filters={filters} onOpenChange={setSaveOpen} />
     </div>
+  )
+}
+
+function SavedSearchesMenu({
+  searches,
+  current,
+  canSave,
+  onSave,
+}: {
+  searches: SavedSearch[]
+  current: SavedSearch | undefined
+  canSave: boolean
+  onSave: () => void
+}) {
+  const navigate = useNavigate()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="quiet"
+          iconOnly
+          aria-label="Saved searches"
+          data-tooltip="Saved searches"
+          icon={<Bookmark className={cn(current && "fill-current")} />}
+          className={cn("absolute top-1/2 right-1 h-7 -translate-y-1/2 active:-translate-y-1/2", current ? "text-link" : "text-ink-secondary")}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" collisionPadding={8}>
+        {searches.slice(0, 12).map((s) => (
+          <DropdownMenuItem key={s.id} onSelect={() => navigate(`/opportunities?${filtersToParams(s.filters).toString()}`)}>
+            <Check className={cn(s.id !== current?.id && "invisible")} />
+            <span className="truncate">{s.name}</span>
+          </DropdownMenuItem>
+        ))}
+        {searches.length ? <DropdownMenuSeparator /> : null}
+        <DropdownMenuItem disabled={!canSave} onSelect={onSave}>
+          <BookmarkPlus />
+          {current ? "This search is saved" : "Save this search"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate("/settings/matching")}>
+          <Settings2 />
+          Manage saved searches
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function FiltersPopover({
+  count,
+  sort,
+  kind,
+  onKind,
+  toggles,
+}: {
+  count: number
+  /** Phones have no room for Sort in the bar, so it moves in here. */
+  sort: React.ReactElement<React.InputHTMLAttributes<HTMLElement>>
+  kind: OpportunityKind | undefined
+  onKind: (kind: string) => void
+  toggles: { label: string; on: boolean; set: (on: boolean) => void }[]
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<SlidersHorizontal />}
+          aria-label={count ? `Filters, ${count} on` : "Filters"}
+          data-tooltip="Filters"
+          className={cn("px-2.5", count && "border-forest/50 bg-forest-soft text-link hover:bg-forest-soft")}
+        >
+          {count ? <span className="tabular-nums">{count}</span> : null}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" collisionPadding={8} className="w-64 space-y-3 p-3">
+        <Field label="Sort" className="sm:hidden">
+          {sort}
+        </Field>
+        <Field label="Kind">
+          <Select className="h-control-sm text-footnote" value={kind ?? ""} onChange={(e) => onKind(e.target.value)}>
+            <option value="">All kinds</option>
+            {KINDS.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="space-y-0.5">
+          {toggles.map((t) => (
+            <label key={t.label} className="flex h-9 cursor-pointer items-center gap-2.5 rounded-sm px-1 text-callout text-ink hover:bg-highlight">
+              <Checkbox checked={t.on} onCheckedChange={(value) => t.set(value === true)} />
+              {t.label}
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -469,25 +599,25 @@ function SaveSearchDialog({ open, filters, onOpenChange }: { open: boolean; filt
 function MatchLine({ opp }: { opp: Opportunity }) {
   if (!opp.match_terms?.length) return null
   return (
-    <span className="inline-flex items-center gap-1 text-caption text-link">
-      <Target aria-hidden="true" className="size-3" />
-      Fits {opp.match_terms.slice(0, 2).join(", ")}
+    <span className="inline-flex min-w-0 items-center gap-1 text-caption text-link">
+      <Target aria-hidden="true" className="size-3 shrink-0" />
+      <span className="truncate">Fits {opp.match_terms.slice(0, 2).join(", ")}</span>
     </span>
   )
 }
 
-function Markers({ opp, members = true }: { opp: Opportunity; members?: boolean }) {
+function Markers({ opp, members = true, isNew = true }: { opp: Opportunity; members?: boolean; isNew?: boolean }) {
   return (
     <>
-      {opp.is_new ? (
-        <span className="inline-flex items-center gap-1 text-caption text-sun-ink">
+      {isNew && opp.is_new ? (
+        <span className="inline-flex shrink-0 items-center gap-1 text-caption text-sun-ink">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-sun" />
           New
         </span>
       ) : null}
       <MatchLine opp={opp} />
       {members && opp.audience === "members" ? (
-        <span className="inline-flex items-center gap-1 text-caption text-ink-tertiary">
+        <span className="inline-flex shrink-0 items-center gap-1 text-caption text-ink-tertiary">
           <Lock aria-hidden="true" className="size-3" />
           Members only
         </span>
@@ -504,7 +634,7 @@ function OpportunityMeta({ opp }: { opp: Opportunity }) {
       <span>{CATEGORY_LABELS[opp.category] ?? opp.category}</span>
       {opp.location ? (
         <span className="inline-flex items-center gap-1">
-          <MapPin aria-hidden="true" className="size-3.5 text-ink-tertiary" />
+          <MapPin aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
           {opp.location}
         </span>
       ) : null}
@@ -555,6 +685,14 @@ export interface OpportunityHandlers {
   onShare: (opp: Opportunity) => void
 }
 
+function copyLink(opp: Opportunity) {
+  const url = `${window.location.origin}/opportunities/${encodeURIComponent(opp.slug || opp.id)}`
+  navigator.clipboard.writeText(url).then(
+    () => toastSuccess("Link copied"),
+    () => toastError("That link didn't copy. Try again."),
+  )
+}
+
 /** Everything but Track, which each surface shows as its own button. */
 export function secondaryActions(opp: Opportunity, { onOpen, onTodo, onShare }: OpportunityHandlers, withOfficial = true): MenuAction[] {
   const google = googleCalendarUrl(opp)
@@ -572,80 +710,188 @@ export function secondaryActions(opp: Opportunity, { onOpen, onTodo, onShare }: 
       },
     )
   }
-  actions.push({ label: "Share", icon: <Share2 />, onSelect: () => onShare(opp) })
+  // Others can't open it until it's reviewed, so there's nothing to share yet.
+  if (!opp.in_review)
+    actions.push(
+      { label: "Share", icon: <Share2 />, onSelect: () => onShare(opp) },
+      { label: "Copy link", icon: <Link2 />, onSelect: () => copyLink(opp) },
+    )
   if (official) actions.push({ kind: "separator" }, { label: "Official page", icon: <ArrowUpRight />, href: official })
   return actions
-}
-
-interface ItemProps extends OpportunityHandlers {
-  opp: Opportunity
-  applicationId: string | undefined
-  index: number
 }
 
 export function Art({ opp, shape, className }: { opp: Opportunity; shape: "banner" | "square"; className?: string }) {
   return <OpportunityArt seed={opp.slug || opp.id} category={opp.category} kind={opp.kind} shape={shape} className={className} />
 }
 
-function OpportunityTile({ opp, applicationId, index, ...handlers }: ItemProps) {
-  const { pending, onTrack } = useTrack(opp, applicationId)
-  const actions = secondaryActions(opp, handlers)
+interface FeedCardProps extends OpportunityHandlers {
+  opp: Opportunity
+  applicationId: string | undefined
+  index: number
+  /** False when an audience tab already says who it's for. */
+  showAudience: boolean
+}
+
+function FeedCard({ opp, applicationId, index, showAudience, onOpen, onTodo, onShare }: FeedCardProps) {
+  const actions = secondaryActions(opp, { onTodo, onShare })
+  const due = deadlineParts(opp)
+  const meta = [
+    KIND_LABELS[opp.kind] ?? opp.kind,
+    showAudience ? CATEGORY_LABELS[opp.category] : null,
+    opp.audience === "members" ? "members only" : null,
+    due.date,
+  ].filter(Boolean).join(", ")
+  const blurb = opp.summary || opp.eligibility
+  const facts = !!(opp.benefits || opp.location)
   return (
     <ActionContextMenu actions={actions}>
-      <li style={{ "--i": index } as React.CSSProperties} className="bl-enter flex min-w-0">
-        <OpportunityCard
-          className="w-full"
-          organization={opp.organization || undefined}
-          title={
-            // The stretched hit area makes the whole card open the details; footer buttons sit above it.
-            <button type="button" onClick={() => handlers.onOpen?.(opp)} className="line-clamp-3 cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-focus">
-              {opp.title}
-            </button>
-          }
-          kind={KIND_LABELS[opp.kind] ?? opp.kind}
-          audiences={CATEGORY_LABELS[opp.category] ? [CATEGORY_LABELS[opp.category]] : []}
-          amount={opp.benefits || undefined}
-          countdown={countdownFor(opp)}
-          tracked={!!applicationId}
-          trackDisabled={pending}
-          onTrack={onTrack}
-          cornerAction={<ActionMenuButton actions={actions} label={`More for ${opp.title}`} className={FLOATING_MENU_BUTTON} />}
-        >
-          <MatchLine opp={opp} />
-        </OpportunityCard>
+      <li style={{ "--i": index } as React.CSSProperties} className="bl-enter">
+        <article className="relative flex min-h-36 gap-4 rounded-lg bg-surface p-4 shadow-elevation-1 transition-[box-shadow,translate] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0 sm:p-5">
+          <Art opp={opp} shape="square" className="size-12 shrink-0 rounded-md max-sm:hidden" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h3 className="line-clamp-2 pr-16 sm:pr-32 text-title-3 text-balance text-ink">
+              {/* The stretched hit area opens the details; the corner buttons sit above it. */}
+              <button
+                type="button"
+                onClick={() => onOpen?.(opp)}
+                className="cursor-pointer text-left after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-focus"
+              >
+                {opp.title}
+              </button>
+            </h3>
+            {opp.organization ? <p className="truncate pr-16 sm:pr-32 text-footnote text-ink-tertiary">{opp.organization}</p> : null}
+            {blurb ? <p className="mt-2 truncate text-callout font-normal text-ink-secondary">{blurb}</p> : null}
+            {facts ? (
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 overflow-hidden text-footnote sm:flex-nowrap">
+                {opp.benefits ? <span className="min-w-0 truncate font-semibold text-ink max-sm:basis-full">{opp.benefits}</span> : null}
+                {opp.location ? (
+                  <span className="inline-flex max-w-[45%] shrink-0 items-center gap-1 text-ink-secondary">
+                    <MapPin aria-hidden="true" className="size-3.5 shrink-0 text-ink-tertiary" />
+                    <span className="truncate">{opp.location}</span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2 text-footnote text-ink-secondary">
+              <span className="first-letter:uppercase">{meta}</span>
+              {due.daysLeft === null ? null : due.urgent ? (
+                <Countdown {...countdownFor(opp)} />
+              ) : (
+                <span className="font-medium text-sun-ink tabular-nums">{due.daysLeft} days left</span>
+              )}
+            </div>
+          </div>
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1 sm:top-4 sm:right-4">
+            <TrackToggle opp={opp} applicationId={applicationId} />
+            <ActionMenuButton actions={actions} label={`More for ${opp.title}`} className={FLOATING_MENU_BUTTON} />
+          </div>
+        </article>
       </li>
     </ActionContextMenu>
   )
 }
 
-function OpportunityRow({ opp, applicationId, index, ...handlers }: ItemProps) {
-  const meta = [opp.organization, KIND_LABELS[opp.kind] ?? opp.kind, CATEGORY_LABELS[opp.category]].filter(Boolean)
-  const actions = secondaryActions(opp, handlers)
-  const open = () => handlers.onOpen?.(opp)
+/** Loads the next page as it nears the viewport; a failed load waits for Try again. */
+function LoadMore({ onLoad, loading, failed }: { onLoad: () => void; loading: boolean; failed: boolean }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const load = React.useRef(onLoad)
+  React.useEffect(() => { load.current = onLoad })
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el || loading || failed || typeof IntersectionObserver === "undefined") return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) load.current()
+    }, { rootMargin: "800px 0px" })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loading, failed])
   return (
-    <ActionContextMenu actions={actions}>
-      <li
-        style={{ "--i": index } as React.CSSProperties}
-        className="bl-enter flex items-center gap-3 px-3 py-3 transition-colors hover:bg-highlight/50 data-[state=open]:bg-highlight/50 sm:gap-4 sm:px-4"
+    <div ref={ref} className="flex min-h-10 items-center justify-center text-footnote text-ink-secondary">
+      {failed ? (
+        <span role="alert">
+          More didn't load.{" "}
+          <button type="button" onClick={onLoad} className="cursor-pointer font-semibold text-link hover:underline">Try again</button>
+        </span>
+      ) : loading ? (
+        <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />Loading more</span>
+      ) : null}
+    </div>
+  )
+}
+
+/** Bookmark toggle; untracking asks first when the application has progress to lose. */
+function TrackToggle({ opp, applicationId }: { opp: Opportunity; applicationId: string | undefined }) {
+  const track = useTrackOpportunity()
+  const { remove } = useApplicationMutations()
+  const client = useQueryClient()
+  const [confirm, setConfirm] = React.useState(false)
+  const [checking, setChecking] = React.useState(false)
+  const busy = track.isPending || remove.isPending || checking
+
+  const untrack = async (id: string) => {
+    try {
+      await remove.mutateAsync(id)
+      toastSuccess("No longer tracking")
+    } catch (err) {
+      toastError(err, "That didn't update. Try again.")
+    }
+  }
+
+  const toggle = async () => {
+    if (!applicationId) {
+      track.mutate(opp.id, {
+        onSuccess: () => toastSuccess("Tracked. Deadline reminders are on."),
+        onError: (err) => toastError(err, "That didn't track. Try again."),
+      })
+      return
+    }
+    setChecking(true)
+    try {
+      const app = await client.fetchQuery({
+        queryKey: ["application", applicationId],
+        queryFn: () => api.getApplication(applicationId),
+        staleTime: 30_000,
+      })
+      const untouched = app.status === "saved" && !app.notes.trim() && !app.requirements.some((r) => r.done)
+      if (untouched) await untrack(applicationId)
+      else setConfirm(true)
+    } catch (err) {
+      toastError(err, "That didn't update. Try again.")
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const on = !!applicationId
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="quiet"
+        aria-label={`Track ${opp.title}`}
+        aria-pressed={on}
+        data-tooltip={on ? "Tracking. Select to stop" : undefined}
+        disabled={busy}
+        onClick={() => void toggle()}
+        icon={<Bookmark className={cn(on && "fill-current")} />}
+        className={cn(
+          "h-8 rounded-full bg-surface-sunk text-ink-secondary hover:bg-separator hover:text-ink max-sm:w-8 max-sm:px-0",
+          on && "bg-forest-soft text-link hover:bg-forest-soft hover:text-link",
+        )}
       >
-        <div aria-hidden="true" onClick={open} className="shrink-0 cursor-pointer">
-          <Art opp={opp} shape="square" className="size-10 rounded-md sm:size-11" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <button type="button" onClick={open} className="min-w-0 cursor-pointer text-left text-callout font-semibold text-ink hover:underline">
-              {opp.title}
-            </button>
-            <Markers opp={opp} members={false} />
-          </div>
-          <p className="mt-0.5 truncate text-footnote text-ink-tertiary">{meta.join(", ")}</p>
-          <Countdown variant="text" {...countdownFor(opp)} className="mt-1 sm:hidden" />
-        </div>
-        <Countdown variant="text" {...countdownFor(opp)} className="hidden w-24 justify-end sm:flex" />
-        <TrackButton opp={opp} applicationId={applicationId} className="shrink-0 sm:w-[104px]" />
-        <ActionMenuButton actions={actions} label={`More for ${opp.title}`} className="shrink-0" />
-      </li>
-    </ActionContextMenu>
+        <span className="max-sm:sr-only">Track</span>
+      </Button>
+      {applicationId ? (
+        <ConfirmDialog
+          open={confirm}
+          onOpenChange={setConfirm}
+          title="Stop tracking this?"
+          description="Its application, with your status, notes and checklist, will be removed."
+          confirm="Stop tracking"
+          onConfirm={() => untrack(applicationId)}
+        />
+      ) : null}
+    </>
   )
 }
 

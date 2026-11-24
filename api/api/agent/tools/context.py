@@ -26,6 +26,14 @@ class ToolContext:
         self.page_notes: dict[str, str] = {}
         self.known_pages: dict[str, str] = {}
         self.fetch_windows: set[tuple[str, int]] = set()
+        # {url_key: link keys} of pages read, to credit a save to the page it was found on.
+        self.page_links: dict[str, set[str]] = {}
+        # Pages read in full; the ones left unsaved are extracted after the agent stops.
+        self.read_pages: list[str] = []
+        # Pages queued from search results, extracted by the pipeline after the agent.
+        self.picked: list[dict] = []
+        # Search results this task saw: leads the handoff takes when too few are queued.
+        self.seen_results: list[dict] = []
         self.fetch_locks: dict = {}
         self.saved_titles: list[str] = []
         self.category: str = "startup"

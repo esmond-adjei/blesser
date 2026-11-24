@@ -35,9 +35,7 @@ export function Flag({ code, className }: { code: string; className?: string }) 
 }
 
 /** Picks one country by name, or Anywhere (an empty value). */
-export function CountrySelect({ value, onChange, label = "Where", className, side = "bottom", placeholder, compact = false }: {
-  /** On phones, show only the flag. */
-  compact?: boolean
+export function CountrySelect({ value, onChange, label = "Where", className, side = "bottom", placeholder }: {
   value: string
   onChange: (name: string) => void
   label?: string
@@ -86,7 +84,7 @@ export function CountrySelect({ value, onChange, label = "Where", className, sid
           )}
         >
           {selected ? <Flag code={selected.code} /> : <Globe className="size-3.5 shrink-0 text-ink-tertiary" aria-hidden="true" />}
-          <span className={cn("max-w-32 truncate", compact && "max-sm:sr-only")}>{selected?.name ?? (value || placeholder || "Anywhere")}</span>
+          <span className="max-w-32 truncate">{selected?.name ?? (value || placeholder || "Anywhere")}</span>
           <ChevronDown className="size-3.5 shrink-0 text-ink-tertiary" aria-hidden="true" />
         </button>
       </PopoverTrigger>

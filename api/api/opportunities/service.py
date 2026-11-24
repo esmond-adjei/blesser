@@ -42,6 +42,7 @@ def to_out(opp: m.Opportunity, on: date | None = None) -> dict:
         "audience": opp.audience,
         "found_by": opp.source,
         "closed": opp.status == "archived",
+        "in_review": opp.status in ("in_review", "draft"),
         "is_new": opp.created_at >= utcnow_naive() - timedelta(days=7),
         "published_at": opp.published_at,
         "published_by": opp.published_by,
@@ -104,6 +105,8 @@ def catalogue_filters(
     public_only: bool = False,
     new: bool = False,
     audience: str | None = None,
+    categories: list[str] | None = None,
+    found_by: str | None = None,
 ) -> list:
     """WHERE clauses for published listings; shared by the list and saved-search alerts."""
     from api.matching import service as matching
@@ -119,6 +122,18 @@ def catalogue_filters(
         filters.append(_open_clause(on))
     if category:
         filters.append(m.Opportunity.category == category)
+    elif categories:
+        filters.append(m.Opportunity.category.in_(categories))
+    if found_by:
+        from api.scans.models import Scan, ScanFind
+
+        filters.append(
+            m.Opportunity.id.in_(
+                select(ScanFind.opportunity_id)
+                .join(Scan, Scan.id == ScanFind.scan_id)
+                .where(Scan.user_id == found_by)
+            )
+        )
     if kind:
         filters.append(m.Opportunity.kind == kind)
     if country:
@@ -154,6 +169,8 @@ async def list_public(
     public_only: bool = False,
     new: bool = False,
     audience: str | None = None,
+    categories: list[str] | None = None,
+    found_by: str | None = None,
     match=None,
 ) -> dict:
     """One page of published listings.
@@ -175,6 +192,8 @@ async def list_public(
         public_only=public_only,
         new=new,
         audience=audience,
+        categories=categories,
+        found_by=found_by,
     )
     tsquery = matching.search_query(q)
     for_you = sort == "for_you" and match is not None
@@ -213,7 +232,11 @@ async def list_public(
     result = await session.execute(stmt.offset(max(offset, 0)).limit(limit))
     if for_you:
         items = [
-            {**to_out(r, on), "match_score": round(float(sc), 2), "match_terms": list(t or [])}
+            {
+                **to_out(r, on),
+                "match_score": round(float(sc), 2),
+                "match_terms": list(t or []),
+            }
             for r, sc, t in result.all()
         ]
     else:
@@ -284,6 +307,21 @@ async def get_or_404(
     if opp is None or (public and opp.status != "published"):
         raise NotFoundError("Opportunity not found")
     return opp
+
+
+async def get_for_member(session, user_id: str, opportunity_id: str) -> m.Opportunity:
+    """A published listing, or one the member's own scan found that isn't published
+    yet: review only gates what other members see."""
+    opp = await get_or_404(session, opportunity_id, public=False)
+    if opp.status == "published":
+        return opp
+    if opp.status in ("in_review", "draft") and opp.scan_id:
+        from api.scans.models import Scan
+
+        owner = await session.scalar(select(Scan.user_id).where(Scan.id == opp.scan_id))
+        if owner == user_id:
+            return opp
+    raise NotFoundError("Opportunity not found")
 
 
 def _clean_list(values: list[str], limit: int = 20) -> list[str]:
@@ -508,9 +546,7 @@ async def upsert_from_agent(
     if (
         opp.status == m.OpportunityStatus.archived.value
         and reopenable
-        and _new_cycle(
-            opp, deadline_date, data.rolling
-        )
+        and _new_cycle(opp, deadline_date, data.rolling)
     ):
         # A closed listing whose source now shows an open cycle: reopen it under the
         # cycle's own name. Held for review when the extraction was unsure.
@@ -565,19 +601,11 @@ def kind_label(kind: str) -> str:
     return _KIND_LABELS.get(kind, kind.replace("_", " ").capitalize())
 
 
-async def track(session, user_id: str, opportunity_id: str, *, commit: bool = True) -> tuple[dict, bool]:
+async def track(
+    session, user_id: str, opportunity_id: str, *, commit: bool = True
+) -> tuple[dict, bool]:
     """Copy an opportunity into the person's application tracker; idempotent."""
-    opp = await get_or_404(session, opportunity_id, public=False)
-    if opp.status != "published":
-        from api.scans.models import Scan
-
-        owner = (
-            await session.scalar(select(Scan.user_id).where(Scan.id == opp.scan_id))
-            if opp.status == "in_review" and opp.scan_id
-            else None
-        )
-        if owner != user_id:
-            raise NotFoundError("Opportunity not found")
+    opp = await get_for_member(session, user_id, opportunity_id)
     await session.execute(
         select(func.pg_advisory_xact_lock(func.hashtext(f"track:{user_id}:{opp.id}")))
     )

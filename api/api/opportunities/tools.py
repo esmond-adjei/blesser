@@ -9,7 +9,6 @@ from sqlalchemy.dialects.postgresql import insert
 from api.agent.tools.context import ToolContext
 from api.applications.dates import parse_deadline
 from api.core.config import settings
-from api.opportunities import models as m
 from api.opportunities import schemas
 from api.opportunities import service as opp_service
 from api.opportunities.page_content import dates_in, expired, normalized_url
@@ -251,9 +250,27 @@ async def handle_save_opportunity(
             if updated
             else find.on_conflict_do_nothing()
         )
-    from api.opportunities.crawler import propose_source, record_candidate
+    from api.opportunities.crawler import (
+        credit_source,
+        propose_source,
+        record_candidate,
+        source_for_host,
+    )
 
-    source_id = await propose_source(ctx.session, data.source_url, data.category.value)
+    saved_keys = {url_key(u) for u in (data.source_url, data.link) if u}
+    found_on = next(
+        (
+            page
+            for page, links in getattr(ctx, "page_links", {}).items()
+            if page not in saved_keys and links & saved_keys
+        ),
+        None,
+    )
+    source_id = (
+        await propose_source(ctx.session, found_on, data.category.value)
+        if found_on
+        else None
+    ) or await source_for_host(ctx.session, data.source_url)
     added = await record_candidate(
         ctx.session,
         data.source_url,
@@ -263,16 +280,14 @@ async def handle_save_opportunity(
         status="extracted",
         reason="agent_save",
     )
-    if getattr(ctx, "scan_task", None) is not None and created:
+    if getattr(ctx, "scan_task", None) is not None and created and source_id:
         from api.opportunities.crawl_models import Source
 
+        await credit_source(ctx.session, source_id)
         await ctx.session.execute(
             update(Source)
             .where(Source.id == source_id)
-            .values(
-                opportunities_saved=Source.opportunities_saved + 1,
-                candidates_found=Source.candidates_found + int(added),
-            )
+            .values(candidates_found=Source.candidates_found + int(added))
         )
     if created and getattr(ctx, "scan_task", None) is not None:
         ctx.scan_task.metrics = {
@@ -295,6 +310,33 @@ async def handle_save_opportunity(
         "deadline_date": opp.deadline_date.isoformat() if opp.deadline_date else None,
         "status": opp.status,
     }
+
+
+async def handle_queue_pages(tool_input: dict, ctx: ToolContext) -> dict:
+    from api.agent.tools.dispatch import unreadable_host
+    from api.opportunities.triage import is_social_host
+
+    queued, skipped = 0, []
+    room = settings.planner_max_picks - len(ctx.picked)
+    for page in (tool_input.get("pages") or [])[:10]:
+        url = str(page.get("url") or "").strip()
+        key = url_key(url) if url.startswith(("http://", "https://")) else ""
+        if not key or unreadable_host(url) or is_social_host(url):
+            skipped.append(f"{url}: not a page to read")
+        elif key in ctx.known_pages or any(p["url"] == key for p in ctx.picked):
+            skipped.append(f"{url}: known")
+        elif queued >= room:
+            skipped.append(f"{url}: queue full")
+        else:
+            ctx.picked.append({"url": key, "title": str(page.get("title") or "")[:300]})
+            ctx.known_pages[key] = f"{url} | queued"
+            queued += 1
+    result = {"queued": queued, "total_queued": len(ctx.picked)}
+    if skipped:
+        result["skipped"] = skipped
+    if len(ctx.picked) >= settings.planner_max_picks:
+        result["note"] = "The queue is full. Finish now."
+    return result
 
 
 async def handle_reject_candidate(tool_input: dict, ctx: ToolContext) -> dict:
@@ -334,84 +376,3 @@ async def handle_reject_candidate(tool_input: dict, ctx: ToolContext) -> dict:
             row.category_hints = []
     await ctx.session.commit()
     return {"url": url, "verdict": status, "reason": reason}
-
-
-#: Catalogue listings one task may match to the member's request.
-MAX_CATALOGUE_MATCHES = 15
-
-
-async def handle_search_catalogue(tool_input: dict, ctx: ToolContext) -> dict:
-    """Open, published listings in this task's category matching the words."""
-    from api.opportunities.service import list_public
-
-    query = str(tool_input.get("query", ""))[:200]
-    page = await list_public(
-        ctx.session,
-        q=query,
-        category=ctx.category,
-        sort="deadline",
-        limit=10,
-    )
-    if not page["items"] and len(query.split()) > 1:
-        # Every word must match; retry on each word alone, best first.
-        seen: dict[str, dict] = {}
-        for word in query.split()[:4]:
-            more = await list_public(
-                ctx.session, q=word, category=ctx.category, limit=5
-            )
-            for item in more["items"]:
-                seen.setdefault(item["id"], item)
-        page = {"items": list(seen.values())[:10]}
-    return {
-        "results": [
-            {
-                "opportunity_id": item["id"],
-                "title": item["title"],
-                "organization": item["organization"],
-                "kind": item["kind"],
-                "deadline": item["deadline_date"]
-                or ("rolling" if item["rolling"] else ""),
-                "location": item["location"],
-                "summary": (item["summary"] or "")[:240],
-                "eligibility": (item["eligibility"] or "")[:240],
-            }
-            for item in page["items"]
-        ]
-    }
-
-
-async def handle_add_catalogue_match(tool_input: dict, ctx: ToolContext) -> dict:
-    """Record an existing listing as a result of this member's scan."""
-    scan_id = getattr(getattr(ctx, "run", None), "id", None)
-    if not scan_id:
-        return {"error": "Matches belong to a scan."}
-    matched = getattr(ctx, "catalogue_matches", set())
-    if len(matched) >= MAX_CATALOGUE_MATCHES:
-        return {
-            "error": f"Match limit reached ({MAX_CATALOGUE_MATCHES}). Keep only the best fits."
-        }
-    opp_id = str(tool_input.get("opportunity_id", ""))
-    opp = await ctx.session.get(m.Opportunity, opp_id)
-    if (
-        opp is None
-        or opp.status != m.OpportunityStatus.published.value
-        or not opp_service.is_open(opp)
-    ):
-        return {"error": "Only open, published listings can be matched."}
-    result = await ctx.session.execute(
-        insert(ScanFind)
-        .values(
-            scan_id=scan_id,
-            opportunity_id=opp.id,
-            source_url=None,
-            via="catalog",
-            created=False,
-        )
-        .on_conflict_do_nothing()
-        .returning(ScanFind.opportunity_id)
-    )
-    added = result.scalar_one_or_none() is not None
-    await ctx.session.commit()
-    matched.add(opp.id)
-    ctx.catalogue_matches = matched
-    return {"opportunity_id": opp.id, "title": opp.title, "added": added}

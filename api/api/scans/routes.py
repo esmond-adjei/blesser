@@ -4,15 +4,16 @@ from datetime import date, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import schemas as auth_schemas
 from api.auth.routes import get_current_user
 from api.core.config import settings
 from api.core.db import get_session
+from api.core.exceptions import ConflictError
 from api.core.ratelimit import enforce_scan_limit
-from api.opportunities.models import OpportunityCategory
+from api.opportunities.models import OpportunityCategory, OpportunityKind
 from api.scans import schedules, service, sources
 
 router = APIRouter(tags=["scans"])
@@ -22,6 +23,11 @@ class ScanCreate(BaseModel):
     # One audience per scan keeps each agent's search precise.
     categories: list[OpportunityCategory] = Field(min_length=1, max_length=1)
     region: str = Field(default="", max_length=120)
+    kinds: list[OpportunityKind] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Optional: listing types to look for, such as scholarship or job.",
+    )
     focus: str = Field(
         default="",
         max_length=2000,
@@ -35,6 +41,30 @@ class ScanCreate(BaseModel):
     repeat: bool = Field(
         default=False, description="Repeat this scan every week from now on."
     )
+
+
+class ScanRerun(BaseModel):
+    """What to change when running a scan again; anything left out stays as it was."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    categories: list[OpportunityCategory] | None = Field(
+        default=None, min_length=1, max_length=1
+    )
+    region: str | None = Field(default=None, max_length=120)
+    kinds: list[OpportunityKind] | None = Field(default=None, max_length=3)
+    focus: str | None = Field(default=None, max_length=2000)
+    sites: list[Annotated[str, Field(max_length=2000)]] | None = Field(
+        default=None, max_length=service.MAX_SCAN_SITES
+    )
+
+
+class ScanSteer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
+    ]
 
 
 class TaskOut(BaseModel):
@@ -74,6 +104,7 @@ class ScanOut(BaseModel):
     region: str
     categories: list[str]
     focus: str
+    kinds: list[str] = Field(default_factory=list)
     sites: list[str] = Field(default_factory=list)
     kind: str = "member"
     status: str
@@ -108,6 +139,7 @@ async def start_scan(
             region=req.region,
             focus=req.focus,
             sites=sites,
+            kinds=[k.value for k in req.kinds],
         )
     scan = await service.start_scan(
         session,
@@ -115,11 +147,69 @@ async def start_scan(
         categories=categories,
         region=req.region,
         focus=req.focus,
+        kinds=[k.value for k in req.kinds],
+        kind="member",
         sites=sites,
     )
     if req.repeat:
         await schedules.repeat_scan(session, current.id, scan.id)
     return await service.scan_detail(session, current.id, scan.id)
+
+
+@router.post(
+    "/scans/{scan_id}/rerun",
+    response_model=ScanOut,
+    status_code=201,
+    dependencies=[Depends(enforce_scan_limit)],
+)
+async def rerun_scan(
+    scan_id: str,
+    req: ScanRerun,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Start a new scan from this one, optionally with a changed brief."""
+    original = await service.get_or_404(session, current.id, scan_id)
+    if original.kind not in ("member", "scheduled"):
+        raise ConflictError("This scan can't be run again.")
+    fields = req.model_dump(exclude_unset=True)
+    categories = (
+        [c.value for c in req.categories] if req.categories else original.categories
+    )
+    sites = (
+        await service.check_sites(req.sites)
+        if req.sites is not None
+        else list(original.sites or [])
+    )
+    scan = await service.start_scan(
+        session,
+        current.id,
+        categories=categories,
+        region=fields.get("region") if "region" in fields else original.region,
+        focus=fields.get("focus") if "focus" in fields else original.focus,
+        kinds=[k.value for k in req.kinds]
+        if req.kinds is not None
+        else list(original.kinds or []),
+        sites=sites,
+        kind="member",
+    )
+    return await service.scan_detail(session, current.id, scan.id)
+
+
+@router.post(
+    "/scans/{scan_id}/steer",
+    response_model=ScanOut,
+    dependencies=[Depends(enforce_scan_limit)],
+)
+async def steer_scan(
+    scan_id: str,
+    req: ScanSteer,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
+):
+    """Run the scan again with a note on what to look for or avoid."""
+    await service.steer_scan(session, current.id, scan_id, req.prompt)
+    return await service.scan_detail(session, current.id, scan_id)
 
 
 class ScanAllowanceOut(BaseModel):
@@ -157,6 +247,7 @@ class ScheduleOut(BaseModel):
     categories: list[str]
     region: str
     focus: str
+    kinds: list[str] = Field(default_factory=list)
     sites: list[str]
     interval_hours: int
     paused: bool

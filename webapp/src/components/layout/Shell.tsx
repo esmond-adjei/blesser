@@ -8,7 +8,7 @@ import { Logo, Wordmark, cn } from "@blesser/ui"
 import { ErrorBoundary } from "../feedback/ErrorBoundary"
 import { LoadingScreen } from "../feedback/LoadingScreen"
 import { ChatSkeleton } from "../assistant/ChatSkeleton"
-import { AssistantDock, AssistantDockProvider, AssistantHeaderMascot, AssistantMascot, AssistantPanel } from "../assistant/AssistantHost"
+import { AssistantDock, AssistantDockProvider, AssistantMascot, AssistantPanel } from "../assistant/AssistantHost"
 import { PageContextProvider } from "../assistant/PageContextProvider"
 import { SelectionPrompt } from "../assistant/SelectionPrompt"
 import { AccountMenu } from "./AccountMenu"
@@ -58,7 +58,6 @@ export function Shell() {
           ) : <ShellTitle />}
           <div className="ml-auto flex shrink-0 items-center gap-1">
             {pageHeader?.actions}
-            <AssistantHeaderMascot className="sm:hidden" />
           </div>
         </header>
         <ShellHeaderContext.Provider value={setPageHeader}>
@@ -115,6 +114,16 @@ function useInbox() {
   return inbox.data?.unread ?? 0
 }
 
+function useScanning() {
+  const scans = useQuery({
+    queryKey: ["scans"],
+    queryFn: api.listScans,
+    staleTime: 10_000,
+    refetchInterval: (q) => (q.state.data?.some((s) => s.status === "running") ? 10_000 : 60_000),
+  })
+  return !!scans.data?.some((s) => s.status === "running")
+}
+
 const ACTIVE = "data-[active=true]:bg-forest-soft/33 data-[active=true]:font-semibold data-[active=true]:text-link data-[active=true]:[&>svg]:text-link"
 
 function AppSidebar() {
@@ -122,6 +131,7 @@ function AppSidebar() {
   const { pathname } = useLocation()
   const compact = state === "collapsed" && !isMobile
   const unread = useInbox()
+  const scanning = useScanning()
   const [searching, setSearching] = React.useState(false)
   const openSearch = React.useCallback(() => { setOpenMobile(false); setSearching(true) }, [setOpenMobile])
   useSearchShortcut(openSearch)
@@ -164,13 +174,15 @@ function AppSidebar() {
                 <SidebarMenu>
                   {group.items.map((item) => {
                     const count = item.to === "/notifications" ? unread : 0
+                    const busy = item.to === "/scans" && scanning
                     return (
                       <SidebarMenuItem key={item.to}>
                         <SidebarMenuButton asChild tooltip={item.label} className={ACTIVE} isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}>
-                          <NavLink to={item.to} onClick={() => setOpenMobile(false)} aria-label={count ? `${item.label}, ${count} unread` : item.label}>
+                          <NavLink to={item.to} onClick={() => setOpenMobile(false)} aria-label={count ? `${item.label}, ${count} unread` : busy ? `${item.label}, a scan is running` : item.label}>
                             <item.icon strokeWidth={1.75} /><span>{item.label}</span>
                           </NavLink>
                         </SidebarMenuButton>
+                        {busy ? <span aria-hidden="true" className="pointer-events-none absolute top-1/2 right-2.5 size-2 -translate-y-1/2 rounded-full bg-sun motion-safe:animate-pulse group-data-[collapsible=icon]:top-1.5 group-data-[collapsible=icon]:right-1.5 group-data-[collapsible=icon]:translate-y-0" /> : null}
                         {count ? (
                           <SidebarMenuBadge className="rounded-full bg-sun px-1.5 text-caption text-on-sun tabular-nums peer-hover/menu-button:text-on-sun peer-data-[active=true]/menu-button:text-on-sun">{count > 99 ? "99+" : count}</SidebarMenuBadge>
                         ) : null}

@@ -24,6 +24,8 @@ router = APIRouter(tags=["opportunities"], dependencies=[Depends(get_current_use
 async def list_opportunities(
     q: str = Query(default="", max_length=200),
     category: OpportunityCategory | None = None,
+    categories: list[OpportunityCategory] = Query(default=[]),
+    mine: bool = False,
     kind: OpportunityKind | None = None,
     country: str | None = Query(default=None, max_length=80),
     include_closed: bool = False,
@@ -37,7 +39,8 @@ async def list_opportunities(
     current: auth_schemas.UserOut = Depends(get_current_user),
 ):
     """Member catalogue. sort: deadline, new, relevance (best match for q) or
-    for_you (your match profile; listings closed to your countries are left out)."""
+    for_you (your match profile; listings closed to your countries are left out).
+    categories limits an unfiltered list to those audiences; mine keeps only what your scans found."""
     from api.matching import service as matching
 
     match = await matching.get_prefs(session, current.id) if sort == "for_you" else None
@@ -47,6 +50,8 @@ async def list_opportunities(
         new=new,
         audience=audience,
         category=category.value if category else None,
+        categories=[c.value for c in categories],
+        found_by=current.id if mine else None,
         kind=kind.value if kind else None,
         country=country,
         open_only=not include_closed,
@@ -89,17 +94,23 @@ async def submit_opportunity(
 
 @router.get("/opportunities/{opportunity_id}", response_model=MemberOpportunity)
 async def get_opportunity(
-    opportunity_id: str, session: AsyncSession = Depends(get_session)
+    opportunity_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
 ):
-    return opp_service.to_out(await opp_service.get_or_404(session, opportunity_id))
+    return opp_service.to_out(
+        await opp_service.get_for_member(session, current.id, opportunity_id)
+    )
 
 
 @router.get("/opportunities/{opportunity_id}/calendar.ics", include_in_schema=False)
 async def opportunity_ics(
-    opportunity_id: str, session: AsyncSession = Depends(get_session)
+    opportunity_id: str,
+    session: AsyncSession = Depends(get_session),
+    current: auth_schemas.UserOut = Depends(get_current_user),
 ):
     """One all-day event on the deadline, to download or open in a calendar app."""
-    opp = await opp_service.get_or_404(session, opportunity_id)
+    opp = await opp_service.get_for_member(session, current.id, opportunity_id)
     events = []
     if opp.deadline_date is not None:
         events.append(

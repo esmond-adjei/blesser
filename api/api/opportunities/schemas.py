@@ -1,6 +1,7 @@
 from datetime import date
+from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from api.opportunities.models import (
     OpportunityCategory,
@@ -42,17 +43,28 @@ class OpportunitySubmit(BaseModel):
     link: str = Field(min_length=8, max_length=2000)
 
 
+def clipped(limit: int) -> BeforeValidator:
+    """Shorten model-written prose to `limit` at a word break instead of rejecting it."""
+
+    def clip(value):
+        if isinstance(value, str) and len(value) > limit:
+            return value[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:.") + "…"
+        return value
+
+    return BeforeValidator(clip)
+
+
 class AgentOpportunityIn(BaseModel):
     """save_opportunity payload. Empty fields stay empty; nothing is guessed."""
 
-    title: str = Field(min_length=3, max_length=300)
-    organization: str = Field(default="", max_length=200)
+    title: Annotated[str, clipped(300)] = Field(min_length=3, max_length=300)
+    organization: Annotated[str, clipped(200)] = Field(default="", max_length=200)
     category: OpportunityCategory
     kind: OpportunityKind = OpportunityKind.other
-    summary: str = Field(default="", max_length=2000)
-    eligibility: str = Field(default="", max_length=2000)
-    benefits: str = Field(default="", max_length=300)
-    location: str = Field(default="", max_length=200)
+    summary: Annotated[str, clipped(2000)] = Field(default="", max_length=2000)
+    eligibility: Annotated[str, clipped(2000)] = Field(default="", max_length=2000)
+    benefits: Annotated[str, clipped(300)] = Field(default="", max_length=300)
+    location: Annotated[str, clipped(200)] = Field(default="", max_length=200)
     countries: list[str] = []
     requirements: list[str] = []
     tags: list[str] = []

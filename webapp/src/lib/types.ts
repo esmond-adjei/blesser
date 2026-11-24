@@ -13,6 +13,8 @@ export interface AuthUser {
   email_verified: boolean
   /** False for accounts created through a sign-in provider only. */
   has_password: boolean
+  /** True once the member finished or skipped the feed setup. */
+  feed_set_up: boolean
 }
 
 export interface AuthTokens {
@@ -91,6 +93,8 @@ export interface ScanTask {
   created_at: string
   started_at: string | null
   finished_at: string | null
+  /** `steer` is the member's note on a follow-up run. */
+  metrics?: { steer?: string }
 }
 
 export type ScanFind = {
@@ -110,6 +114,8 @@ export interface Scan {
   region: string
   categories: OpportunityCategory[]
   focus: string
+  /** Listing types to look for; empty means any. */
+  kinds?: OpportunityKind[]
   /** Sites the member asked the agent to read first. */
   sites?: string[]
   kind?: "member" | "sweep" | "sources" | "scheduled"
@@ -166,6 +172,7 @@ export interface ScanRequest {
   categories?: OpportunityCategory[]
   region?: string
   focus?: string
+  kinds?: OpportunityKind[]
   sites?: string[]
   /** Repeat this scan every week from now on. */
   repeat?: boolean
@@ -250,6 +257,8 @@ export interface MemberOpportunity {
   found_by: "agent" | "community" | "staff"
   created_at: string
   is_new: boolean
+  /** Found by the member's own scan; others can't see it until it's reviewed. */
+  in_review?: boolean
   /** Only with sort=for_you. */
   match_score?: number | null
   match_terms?: string[]
@@ -297,6 +306,10 @@ export type OpportunitySort = "deadline" | "new" | "relevance" | "for_you"
 export interface OpportunityQuery {
   q?: string
   category?: OpportunityCategory
+  /** Limits an unfiltered list to these audiences. */
+  categories?: OpportunityCategory[]
+  /** Only listings the member's own scans found. */
+  mine?: boolean
   kind?: OpportunityKind
   country?: string
   include_closed?: boolean

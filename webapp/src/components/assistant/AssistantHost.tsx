@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react"
+import { useCallback, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { Maximize2, PanelRight, PictureInPicture2, X } from "lucide-react"
 import { Button, cn } from "@blesser/ui"
@@ -12,6 +12,18 @@ import { DockContext, useDock, useOpenAssistant, type Layout, type Mode } from "
 import { SunMascot } from "./SunMascot"
 
 const LAYOUT_KEY = "blesser.assistant.layout"
+const MODE_KEY = "blesser.assistant.mode"
+function readMode(): Mode {
+  try {
+    const saved = localStorage.getItem(MODE_KEY)
+    return saved === "dock" || saved === "panel" ? saved : "closed"
+  } catch {
+    return "closed"
+  }
+}
+function saveMode(mode: Mode) {
+  try { localStorage.setItem(MODE_KEY, mode) } catch { /* the window reopens closed */ }
+}
 function readLayout(): Layout {
   try {
     return localStorage.getItem(LAYOUT_KEY) === "panel" ? "panel" : "dock"
@@ -25,17 +37,22 @@ export function AssistantDockProvider({ children }: { children: React.ReactNode 
   const { user } = useAuth()
   const chatKey = `blesser.assistant.chat.${user?.id ?? ""}`
   const [layout, setLayoutState] = useState<Layout>(readLayout)
-  const [mode, setModeState] = useState<Mode>("closed")
+  const [mode, setModeState] = useState<Mode>(readMode)
   const [chatId, setChatIdState] = useState<string | undefined>(() => {
     try { return localStorage.getItem(chatKey) ?? undefined } catch { return undefined }
   })
   const setLayout = useCallback((next: Layout) => {
     setLayoutState(next)
-    setModeState((current) => (current === "closed" ? current : next))
+    setModeState((current) => {
+      if (current === "closed") return current
+      saveMode(next)
+      return next
+    })
     try { localStorage.setItem(LAYOUT_KEY, next) } catch { /* the choice resets on reload */ }
   }, [])
   const setMode = useCallback((next: Mode) => {
     setModeState(next)
+    saveMode(next)
     if (next !== "closed") setLayoutState(next)
   }, [])
   const setChatId = useCallback((id?: string) => {
@@ -92,13 +109,15 @@ export function AssistantMascot() {
   const { mode, setMode } = useDock()
   const open = useOpenAssistant()
   const onPage = useOnAssistantPage()
+  const { pathname } = useLocation()
   const t = useOpenTransition(mode === "closed" && !onPage, 150)
   if (!t.render) return null
   const pick = "grid size-8 cursor-pointer place-items-center rounded-full border border-separator bg-surface text-ink-secondary shadow-elevation-2 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
   return (
     <div
       className={cn(
-        "group fixed right-5 bottom-5 z-50 transition-all duration-150 max-sm:hidden motion-reduce:transition-none",
+        "group fixed right-4 z-50 transition-all duration-150 motion-reduce:transition-none sm:right-5",
+        pathname.startsWith("/scans") ? "bottom-28 sm:bottom-5" : "bottom-4 sm:bottom-5",
         t.shown ? "scale-100 opacity-100" : "scale-75 opacity-0",
       )}
     >
@@ -115,25 +134,6 @@ export function AssistantMascot() {
         <SunMascot size={64} className="drop-shadow-md" />
       </button>
     </div>
-  )
-}
-
-/** On phones the sun sits in the app header instead of floating over the page. */
-export function AssistantHeaderMascot({ className }: { className?: string }) {
-  const { mode } = useDock()
-  const open = useOpenAssistant()
-  const onPage = useOnAssistantPage()
-  if (mode !== "closed" || onPage) return null
-  return (
-    <button
-      type="button"
-      aria-label="Ask the Assistant"
-      title="Ask the Assistant"
-      onClick={open}
-      className={cn("grid h-9 w-11 shrink-0 cursor-pointer place-items-center rounded-md focus-visible:outline-2 focus-visible:outline-focus", className)}
-    >
-      <SunMascot size={36} />
-    </button>
   )
 }
 
@@ -187,16 +187,13 @@ const PANEL = [340, 720, 420] as const
 
 /** The Assistant as a column beside the page, resized from its left edge. */
 export function AssistantPanel() {
-  const { mode, setMode } = useDock()
+  const { mode } = useDock()
   const onPage = useOnAssistantPage()
   const phone = useIsMobile()
   const t = useOpenTransition(mode === "panel" && !onPage, 200)
   const [width, setWidth] = usePaneSize("blesser.assistant.panel.width", PANEL[2], PANEL[0], PANEL[1])
   const [active, setActive] = useState(false)
   const aside = useRef<HTMLElement>(null)
-  useEffect(() => {
-    if (onPage && mode !== "closed") setMode("closed")
-  }, [onPage, mode, setMode])
   if (!t.render) return null
   const move = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!active) return
@@ -216,7 +213,7 @@ export function AssistantPanel() {
       aria-label="Assistant"
       style={phone ? undefined : { width: t.shown ? width : 0 }}
       className={cn(
-        "relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-surface motion-reduce:transition-none",
+        "relative flex min-h-0 shrink-0 overflow-hidden border-separator bg-canvas motion-reduce:transition-none",
         active ? "transition-none" : "transition-[width,opacity] duration-200",
         phone ? "fixed inset-0 z-50" : "border-l",
         t.shown ? "opacity-100" : "opacity-0",

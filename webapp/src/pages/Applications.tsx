@@ -149,33 +149,31 @@ export function Applications() {
         title="Applications"
         description="Everything you're applying for. Saved and preparing applications get reminders 14, 7 and 1 days before the deadline."
         actions={
-          <Button data-tooltip="You can also use the assistant to add applications" size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
-            Add manually
-          </Button>
+          <>
+            <Segmented
+              label="View"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "list", label: "List", icon: <List aria-hidden="true" /> },
+                { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
+              ]}
+            />
+            <Button data-tooltip="You can also use the assistant to add applications" size="sm" onClick={() => setAdding(true)} icon={<Plus />}>
+              Add manually
+            </Button>
+          </>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {view === "list" ? (
-          <Segmented
-            label="Filter by status"
-            value={filter}
-            onChange={setFilter}
-            className="min-w-0 flex-1 sm:flex-none"
-            options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
-          />
-        ) : null}
+      {view === "list" ? (
         <Segmented
-          label="View"
-          value={view}
-          onChange={setView}
-          className="ml-auto"
-          options={[
-            { value: "list", label: "List", icon: <List aria-hidden="true" /> },
-            { value: "board", label: "Board", icon: <Columns3 aria-hidden="true" /> },
-          ]}
+          label="Filter by status"
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((f) => ({ value: f.value, label: f.label, count: countFor(f.value) || undefined }))}
         />
-      </div>
+      ) : null}
 
       {isLoading ? (
         <div className="h-48 animate-pulse rounded-lg bg-surface-sunk motion-reduce:animate-none" />
@@ -269,8 +267,25 @@ function Board({
     },
   })
 
+  const pan = React.useRef<{ x: number; left: number } | null>(null)
+  const startPan = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse" || e.button !== 0 || (e.target as HTMLElement).closest("[draggable=true], button, a, input, textarea, [role=menuitem]")) return
+    pan.current = { x: e.clientX, left: e.currentTarget.scrollLeft }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const movePan = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pan.current) e.currentTarget.scrollLeft = pan.current.left - (e.clientX - pan.current.x)
+  }
+  const endPan = () => { pan.current = null }
+
   return (
-    <div className="nice-scroll -mx-4 min-h-0 flex-1 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8">
+    <div
+      onPointerDown={startPan}
+      onPointerMove={movePan}
+      onPointerUp={endPan}
+      onPointerCancel={endPan}
+      className="nice-scroll -mx-4 min-h-0 flex-1 cursor-grab overflow-x-auto px-4 pb-2 active:cursor-grabbing sm:-mx-8 sm:px-8"
+    >
       <div className="grid h-full snap-x snap-mandatory auto-cols-[minmax(248px,85vw)] grid-flow-col grid-rows-[minmax(0,1fr)] gap-3 sm:auto-cols-[minmax(232px,1fr)]">
         {COLUMNS.map((col) => {
           const items = apps.filter((a) => col.statuses.includes(a.status))
@@ -290,7 +305,7 @@ function Board({
                 {col.label}
                 <span className="ml-auto text-ink-tertiary tabular-nums">{items.length}</span>
               </h2>
-              <div className="nice-scroll scroll-on-hover flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
+              <div className="nice-scroll scroll-on-hover flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain">
               {decision && dragging ? (
                 <div className="grid grid-cols-2 gap-2">
                   {(["accepted", "rejected"] as const).map((status) => (
