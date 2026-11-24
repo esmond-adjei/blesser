@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     # "planner": the scan agent only searches and queues pages; the pipeline reads them.
     scan_agent_mode: str = "planner"
     planner_max_picks: int = 12
+    # Each turn resends every earlier search result, so planner cost grows with turns.
+    planner_max_turns: int = 6
     # Below this many claimable candidates, a scan seeds its region with fixed searches.
     seed_when_pool_below: int = 10
     # Jev screens crawler pages before extraction; it skips a page only when this sure.

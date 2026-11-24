@@ -329,7 +329,9 @@ async def _run_agent(
         resume_messages=resume_messages,
         on_checkpoint=on_checkpoint,
         tools=tools,
-        max_turns=settings.discovery_max_turns,
+        max_turns=settings.planner_max_turns
+        if planner
+        else settings.discovery_max_turns,
         no_yield_turns=settings.discovery_no_yield_turns,
     )
     await session.commit()
