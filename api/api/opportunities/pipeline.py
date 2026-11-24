@@ -29,7 +29,7 @@ from api.opportunities.official import (
     resolve_official,
 )
 from api.opportunities.page_cache import get_page
-from api.opportunities.page_content import normalized_url
+from api.opportunities.page_content import normalized_url, shows_open_cycle
 from api.opportunities.screening import screen_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
 from api.opportunities.triage import (
@@ -185,19 +185,24 @@ async def follow_aggregator(ctx, page, data, hosts, metrics: dict):
 
 
 async def hand_off(session, pages: list[str], category: str) -> list[str]:
-    """Candidates for the pages the agent read: a page listing many opportunities
-    hands over its links instead of itself."""
+    """Candidates for the pages the agent read that look like one open call: a stated
+    deadline ahead or rolling, and not a hub (hubs are crawled as sources on trial)."""
     from api.opportunities.crawl_models import PageCache
 
     urls: list[str] = []
     for url in pages:
         row = await session.get(PageCache, normalized_url(url))
-        links = ((row.metadata_json or {}).get("links") or []) if row else []
-        for target in [i["url"] for i in links] if len(links) >= HUB_LINKS else [url]:
-            await record_candidate(
-                session, target, category_hints=[category], reason="agent_read"
-            )
-            urls.append(normalized_url(target))
+        if row is None or row.error:
+            continue
+        metadata = row.metadata_json or {}
+        if len(metadata.get("links") or []) >= HUB_LINKS or not shows_open_cycle(
+            row.text, metadata, service.today()
+        ):
+            continue
+        await record_candidate(
+            session, url, category_hints=[category], reason="agent_read"
+        )
+        urls.append(normalized_url(url))
     await session.commit()
     return list(dict.fromkeys(urls))
 

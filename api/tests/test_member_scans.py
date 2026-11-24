@@ -389,7 +389,7 @@ def test_a_member_can_open_their_own_scan_finds_before_review():
     assert find["opportunity_id"] == own and find["in_review"] is True
 
 
-def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
+def test_open_calls_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
     import uuid
     from datetime import timedelta
 
@@ -401,6 +401,7 @@ def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
 
     tag = uuid.uuid4().hex[:8]
     single = f"https://{tag}.example/call"
+    closed = f"https://{tag}.example/old-call"
     hub = f"https://{tag}.example/calls"
     hub_links = [{"url": f"{hub}/c{n}", "label": "Call"} for n in range(6)]
     handed = []
@@ -410,7 +411,11 @@ def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
         return {}
 
     async def fake_agent(session, task, scan, category, **kwargs):
-        return {"final_text": "done", "turns": 1, "read_pages": [single, hub]}
+        return {
+            "final_text": "done",
+            "turns": 1,
+            "read_pages": [single, closed, hub],
+        }
 
     async def crawler_off(session):
         return False
@@ -421,12 +426,26 @@ def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
 
     async def check():
         async with SessionLocal() as session:
-            session.add(
-                PageCache(
-                    url=normalized_url(hub),
-                    metadata_json={"links": hub_links},
-                    expires_at=utcnow_naive() + timedelta(days=1),
-                )
+            later = utcnow_naive() + timedelta(days=1)
+            session.add_all(
+                [
+                    PageCache(
+                        url=normalized_url(hub),
+                        text="Calls. Deadline: 30 June 2099",
+                        metadata_json={"links": hub_links},
+                        expires_at=later,
+                    ),
+                    PageCache(
+                        url=normalized_url(single),
+                        text="Research grant. Deadline: 30 June 2099",
+                        expires_at=later,
+                    ),
+                    PageCache(
+                        url=normalized_url(closed),
+                        text="Research grant. Deadline: 30 June 2020",
+                        expires_at=later,
+                    ),
+                ]
             )
             await session.commit()
             scan = await scans.start_scan(
@@ -434,9 +453,7 @@ def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
             )
             task = await queue.claim_next_task(session, scan_id=scan.id)
             await opp_tasks.run_discover_opportunities(session, task, scan)
-            expected = [normalized_url(single)] + [
-                normalized_url(i["url"]) for i in hub_links
-            ]
+            expected = [normalized_url(single)]
             assert handed == [expected]
             assert "agent_read" not in task.metrics
             rows = (
@@ -448,6 +465,9 @@ def test_pages_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
                 .scalars()
                 .all()
             )
-            assert {r.reason for r in rows} == {"agent_read"} and len(rows) == 7
+            assert [r.reason for r in rows] == ["agent_read"]
+            for row in rows:
+                await session.delete(row)
+            await session.commit()
 
     run(check())
