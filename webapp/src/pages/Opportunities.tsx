@@ -238,7 +238,7 @@ export function Opportunities() {
   const offsets = sections.map((_, i) => sections.slice(0, i).reduce((n, s) => n + s.items.length, 0))
   return (
     <div className={cn(COLUMN, "pb-16")}>
-      <div ref={barRef} className="sticky top-0 z-20 -mt-2 space-y-2 bg-canvas pt-2 pb-3">
+      <div ref={barRef} className="sticky top-0 z-20 -mx-3 -mt-2 space-y-2 bg-canvas px-3 pt-2 pb-3 sm:-mx-6 sm:px-6 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:bg-linear-to-b after:from-canvas after:to-transparent after:content-[''] after:h-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-1 basis-32">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-tertiary" />
@@ -367,7 +367,7 @@ export function Opportunities() {
           {sections.map((section, si) => (
             <section key={section.key} aria-label={section.title || "Opportunities"}>
               {section.title ? (
-                <h2 style={{ top: barHeight }} className="sticky z-10 bg-canvas py-2 text-footnote font-semibold text-ink-secondary">
+                <h2 style={{ top: barHeight }} className="sticky z-10 -mx-3 bg-canvas px-3 pt-3 pb-2 sm:-mx-6 sm:px-6 text-footnote font-semibold text-ink-secondary after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:bg-linear-to-b after:from-canvas after:to-transparent after:content-[''] after:h-6">
                   {section.title}
                 </h2>
               ) : null}
