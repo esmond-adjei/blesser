@@ -32,6 +32,8 @@ class ToolContext:
         self.read_pages: list[str] = []
         # Pages queued from search results, extracted by the pipeline after the agent.
         self.picked: list[dict] = []
+        # Search results this task saw: leads the handoff takes when too few are queued.
+        self.seen_results: list[dict] = []
         self.fetch_locks: dict = {}
         self.saved_titles: list[str] = []
         self.category: str = "startup"

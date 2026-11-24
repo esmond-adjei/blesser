@@ -17,10 +17,15 @@ __all__ = ["HANDLERS", "READ_ONLY_TOOLS", "ToolContext", "dispatch_batch", "run_
 
 async def _search_web(tool_input: dict, ctx: ToolContext) -> dict:
     reused = web.reusable_search(tool_input["query"])
-    if reused is not None:
-        return {"results": web.brief_results(reused)}
-    results = await web.search_web(tool_input["query"])
-    return {"results": web.brief_results(results)}
+    results = (
+        reused if reused is not None else await web.search_web(tool_input["query"])
+    )
+    brief = web.brief_results(results)
+    if hasattr(ctx, "seen_results"):
+        ctx.seen_results += [
+            {"url": r.get("url", ""), "title": r.get("title", "")} for r in brief
+        ]
+    return {"results": brief}
 
 
 #: Search engines, caches and archives are never a source; search_web covers search and

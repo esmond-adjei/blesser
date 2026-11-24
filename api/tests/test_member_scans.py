@@ -589,3 +589,32 @@ def test_a_thin_region_is_seeded_from_fixed_searches(monkeypatch):
             await session.commit()
 
     run(check())
+
+
+def test_a_planner_that_queues_too_little_hands_over_its_search_leads():
+    from api.opportunities import pipeline
+
+    tag = _token()
+    seen = [
+        {"url": f"https://{tag}.example/gef-small-grants-2026", "title": "2026 Call for Proposals: GEF Small Grants"},
+        {"url": f"https://{tag}.example/top-20", "title": "Top 20 Scholarships for Ghanaians"},
+        {"url": f"https://{tag}.example/about", "title": "About the foundation"},
+        {"url": f"https://{tag}.example/kenya", "title": "Grant for Kenyan farmers"},
+    ]
+
+    async def check():
+        async with SessionLocal() as session:
+            urls = await pipeline.hand_off(
+                session, [], "research", seen=seen, region="Ghana"
+            )
+            assert urls == [opp_tools.url_key(seen[0]["url"])]
+            row = (
+                await session.execute(
+                    select(CrawlCandidate).where(CrawlCandidate.url == urls[0])
+                )
+            ).scalar_one()
+            assert row.reason == "search_lead"
+            await session.delete(row)
+            await session.commit()
+
+    run(check())

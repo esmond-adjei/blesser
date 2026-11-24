@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import timedelta
 
@@ -227,13 +228,45 @@ async def claimable(session, category: str, region: str) -> int:
     ).scalar_one()
 
 
+# Titles of roundups and guides, which list many opportunities rather than being one.
+_ROUNDUP = re.compile(
+    r"^\s*(?:top|best|list of|how to)\b|\b(?:\d+\+?|top|best)\s+(?:fully[- ]funded\s+)?"
+    r"(?:scholarships|grants|fellowships|internships|opportunities|programmes|programs)\b",
+    re.IGNORECASE,
+)
+
+
+async def leads(session, results: list[dict], region: str) -> list[dict]:
+    """Search results that look like an opportunity page this catalogue lacks, judged
+    without a model from the title and URL."""
+    from api.agent.tools.dispatch import unreadable_host
+    from api.opportunities.crawler import _LEAD_WORDS
+    from api.opportunities.triage import is_social_host
+
+    found, seen = [], set()
+    for result in results:
+        url = str(result.get("url") or "")
+        words = f"{result.get('title', '')} {url}".lower()
+        if (
+            not url.startswith(("http://", "https://"))
+            or normalized_url(url) in seen
+            or unreadable_host(url)
+            or is_social_host(url)
+            or not any(w in words for w in _LEAD_WORDS)
+            or _ROUNDUP.search(str(result.get("title") or ""))
+            or names_other_country(words, region)
+            or await duplicate_url(session, url)
+        ):
+            continue
+        seen.add(normalized_url(url))
+        found.append({"url": url, "title": str(result.get("title") or "")})
+    return found
+
+
 async def seed_region(session, category: str, region: str) -> list[str]:
     """Run the category's fixed searches for a region and record the results that
     look like opportunities as candidates."""
     from api import web
-    from api.agent.tools.dispatch import unreadable_host
-    from api.opportunities.crawler import _LEAD_WORDS
-    from api.opportunities.triage import is_social_host
 
     domains = local_domains(region)
     year = service.today().year
@@ -248,26 +281,15 @@ async def seed_region(session, category: str, region: str) -> list[str]:
             results = await web.search_web(query)
         except web.SearchUnavailable:
             break
-        for result in results:
-            url = str(result.get("url") or "")
-            words = f"{result.get('title', '')} {url}".lower()
-            if (
-                not url.startswith(("http://", "https://"))
-                or unreadable_host(url)
-                or is_social_host(url)
-                or not any(w in words for w in _LEAD_WORDS)
-                or names_other_country(words, region)
-                or await duplicate_url(session, url)
-            ):
-                continue
+        for lead in await leads(session, results, region):
             await record_candidate(
                 session,
-                url,
+                lead["url"],
                 category_hints=[category],
-                title=str(result.get("title") or ""),
+                title=lead["title"],
                 reason="seed",
             )
-            urls.append(normalized_url(url))
+            urls.append(normalized_url(lead["url"]))
     await session.commit()
     return list(dict.fromkeys(urls))
 
@@ -279,10 +301,12 @@ async def hand_off(
     *,
     picked: list[dict] | None = None,
     seeded: list[str] | None = None,
+    seen: list[dict] | None = None,
+    region: str = "",
 ) -> list[str]:
-    """Candidates for this task to extract: pages the agent queued, seeds, then pages it
-    read that look like one open call (a stated deadline ahead or rolling, and not a
-    hub; hubs are crawled as sources on trial)."""
+    """Candidates for this task to extract: pages the agent queued, seeds, pages it read
+    that look like one open call (a stated deadline ahead or rolling, and not a hub;
+    hubs are crawled as sources on trial), then leads from the results it searched."""
     from api.opportunities.crawl_models import PageCache
 
     urls: list[str] = []
@@ -309,6 +333,19 @@ async def hand_off(
             session, url, category_hints=[category], reason="agent_read"
         )
         urls.append(normalized_url(url))
+    queued = set(urls)
+    room = settings.planner_max_picks - len(queued)
+    for lead in (await leads(session, seen or [], region))[: max(0, room)]:
+        if normalized_url(lead["url"]) in queued:
+            continue
+        await record_candidate(
+            session,
+            lead["url"],
+            category_hints=[category],
+            title=lead["title"],
+            reason="search_lead",
+        )
+        urls.append(normalized_url(lead["url"]))
     await session.commit()
     return list(dict.fromkeys(urls))
 

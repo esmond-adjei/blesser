@@ -83,9 +83,11 @@ How to work:
    government agencies, universities, embassies and development partners, \
    international funders and foundations, accelerator networks, and \
    opportunity sites. Use the region's name and this year.
-2. From the results, queue (queue_pages) the pages that look like ONE \
-   specific opportunity that is open or opening: a named call, grant, \
-   fellowship, scholarship or programme page. Queue several per turn.
+2. In the same turn as your next searches, queue (queue_pages) the pages \
+   from the results you have that look like ONE specific opportunity that is \
+   open or opening: a named call, grant, fellowship, scholarship or \
+   programme page. Queue as you go, never save it for later: a scan that \
+   searches without queuing stops early.
 3. Skip from the titles and snippets alone: lists and roundups of many \
    opportunities, news about past winners, funder home pages and general \
    "funding" sections, pages for other countries only, and anything whose \

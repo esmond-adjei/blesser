@@ -154,10 +154,11 @@ async def run_discover_opportunities(
             "agent_result": result,
             "agent_read": result.pop("read_pages", []),
             "agent_picked": result.pop("picked", []),
+            "agent_seen": result.pop("seen", []),
         }
         task.messages_json = None
         await session.commit()
-    handover = ("agent_read", "agent_picked", "seeded")
+    handover = ("agent_read", "agent_picked", "seeded", "agent_seen")
     if any((task.metrics or {}).get(k) for k in handover):
         from api.opportunities.pipeline import hand_off
 
@@ -174,6 +175,9 @@ async def run_discover_opportunities(
                 category,
                 picked=metrics.get("agent_picked") or [],
                 seeded=metrics.get("seeded") or [],
+                seen=metrics.get("agent_seen") or [],
+                region=(scan.region or "").strip()
+                or settings.opportunity_default_region,
             ),
         )
         task.metrics = {
@@ -334,6 +338,7 @@ async def _run_agent(
         "turns": result.get("turns"),
         "read_pages": ctx.read_pages,
         "picked": ctx.picked,
+        "seen": ctx.seen_results,
     }
 
 
