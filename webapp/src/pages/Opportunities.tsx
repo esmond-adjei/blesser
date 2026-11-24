@@ -379,7 +379,6 @@ export function Opportunities() {
                     opp={opp}
                     applicationId={tracked.data?.[opp.id]}
                     showAudience={!category}
-                    showNew={sort !== "new"}
                     {...handlers}
                   />
                 ))}
@@ -722,23 +721,26 @@ interface FeedCardProps extends OpportunityHandlers {
   index: number
   /** False when an audience tab already says who it's for. */
   showAudience: boolean
-  /** False on the Newest list, whose sections already say it. */
-  showNew: boolean
 }
 
-function FeedCard({ opp, applicationId, index, showAudience, showNew, onOpen, onTodo, onShare }: FeedCardProps) {
+function FeedCard({ opp, applicationId, index, showAudience, onOpen, onTodo, onShare }: FeedCardProps) {
   const actions = secondaryActions(opp, { onTodo, onShare })
   const due = deadlineParts(opp)
-  const meta = [KIND_LABELS[opp.kind] ?? opp.kind, showAudience ? CATEGORY_LABELS[opp.category] : null, due.date].filter(Boolean).join(", ")
+  const meta = [
+    KIND_LABELS[opp.kind] ?? opp.kind,
+    showAudience ? CATEGORY_LABELS[opp.category] : null,
+    opp.audience === "members" ? "members only" : null,
+    due.date,
+  ].filter(Boolean).join(", ")
   const blurb = opp.summary || opp.eligibility
-  const facts = !!(opp.benefits || opp.location || opp.match_terms?.length || opp.audience === "members" || (showNew && opp.is_new))
+  const facts = !!(opp.benefits || opp.location)
   return (
     <ActionContextMenu actions={actions}>
       <li style={{ "--i": index } as React.CSSProperties} className="bl-enter">
         <article className="relative flex min-h-36 gap-4 rounded-lg bg-surface p-4 shadow-elevation-1 transition-[box-shadow,translate] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevation-2 motion-reduce:hover:translate-y-0 sm:p-5">
           <Art opp={opp} shape="square" className="size-12 shrink-0 rounded-md max-sm:hidden" />
           <div className="flex min-w-0 flex-1 flex-col">
-            <h3 className="line-clamp-2 pr-16 text-title-3 text-balance text-ink">
+            <h3 className="line-clamp-2 pr-16 sm:pr-32 text-title-3 text-balance text-ink">
               {/* The stretched hit area opens the details; the corner buttons sit above it. */}
               <button
                 type="button"
@@ -748,7 +750,7 @@ function FeedCard({ opp, applicationId, index, showAudience, showNew, onOpen, on
                 {opp.title}
               </button>
             </h3>
-            {opp.organization ? <p className="truncate pr-16 text-footnote text-ink-tertiary">{opp.organization}</p> : null}
+            {opp.organization ? <p className="truncate pr-16 sm:pr-32 text-footnote text-ink-tertiary">{opp.organization}</p> : null}
             {blurb ? <p className="mt-2 truncate text-callout font-normal text-ink-secondary">{blurb}</p> : null}
             {facts ? (
               <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 overflow-hidden text-footnote sm:flex-nowrap">
@@ -759,7 +761,6 @@ function FeedCard({ opp, applicationId, index, showAudience, showNew, onOpen, on
                     <span className="truncate">{opp.location}</span>
                   </span>
                 ) : null}
-                <Markers opp={opp} isNew={showNew} />
               </div>
             ) : null}
             <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2 text-footnote text-ink-secondary">
@@ -830,15 +831,19 @@ function TrackToggle({ opp, applicationId }: { opp: Opportunity; applicationId: 
       <Button
         size="sm"
         variant="quiet"
-        iconOnly
         aria-label={`Track ${opp.title}`}
         aria-pressed={on}
-        data-tooltip={on ? "Tracking. Select to stop" : "Track"}
+        data-tooltip={on ? "Tracking. Select to stop" : undefined}
         disabled={busy}
         onClick={() => void toggle()}
         icon={<Bookmark className={cn(on && "fill-current")} />}
-        className={cn(FLOATING_MENU_BUTTON, on && "bg-forest-soft text-link hover:bg-forest-soft hover:text-link")}
-      />
+        className={cn(
+          "h-8 rounded-full bg-surface-sunk text-ink-secondary hover:bg-separator hover:text-ink max-sm:w-8 max-sm:px-0",
+          on && "bg-forest-soft text-link hover:bg-forest-soft hover:text-link",
+        )}
+      >
+        <span className="max-sm:sr-only">Track</span>
+      </Button>
       {applicationId ? (
         <ConfirmDialog
           open={confirm}
