@@ -11,6 +11,7 @@ import {
   Download,
   Link2,
   ListPlus,
+  Loader2,
   Lock,
   PanelRightOpen,
   MapPin,
@@ -35,7 +36,6 @@ import {
   isKind,
   useOpportunities,
   useOpportunity,
-  useOpportunityFacets,
   useTodoMutations,
   useTrackOpportunity,
   useTrackedOpportunities,
@@ -151,12 +151,10 @@ export function Opportunities() {
     new: newParam ? true : undefined,
     include_closed: closedParam ? true : undefined,
   })
-  const facets = useOpportunityFacets()
   const tracked = useTrackedOpportunities()
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
   const shown = hideTracked ? items.filter((o) => !tracked.data?.[o.id]) : items
   const sections = sectionize(shown, sort, lastVisit)
-  const counts = new Map(facets.data?.categories.map((c) => [c.key, c.count]))
 
   const [todoFor, setTodoFor] = React.useState<Opportunity | null>(null)
   const [scanOpen, setScanOpen] = React.useState(false)
@@ -264,8 +262,8 @@ export function Opportunities() {
               value={category ?? ""}
               onChange={(v) => setCategory(v)}
               options={[
-                { value: "", label: "All", count: facets.data?.total },
-                ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c], count: counts.get(c) ?? 0 })),
+                { value: "", label: "All" },
+                ...CATEGORIES.map((c) => ({ value: c as string, label: CATEGORY_LABELS[c] })),
               ]}
             />
           </div>
@@ -386,11 +384,11 @@ export function Opportunities() {
             </section>
           ))}
           {list.hasNextPage ? (
-            <div className="flex justify-center">
-              <Button size="sm" onClick={() => void list.fetchNextPage()} disabled={list.isFetchingNextPage}>
-                {list.isFetchingNextPage ? "Loading…" : "Load more"}
-              </Button>
-            </div>
+            <LoadMore
+              onLoad={() => void list.fetchNextPage()}
+              loading={list.isFetchingNextPage}
+              failed={list.isFetchNextPageError}
+            />
           ) : null}
         </>
       )}
@@ -779,6 +777,34 @@ function FeedCard({ opp, applicationId, index, showAudience, onOpen, onTodo, onS
         </article>
       </li>
     </ActionContextMenu>
+  )
+}
+
+/** Loads the next page as it nears the viewport; a failed load waits for Try again. */
+function LoadMore({ onLoad, loading, failed }: { onLoad: () => void; loading: boolean; failed: boolean }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const load = React.useRef(onLoad)
+  React.useEffect(() => { load.current = onLoad })
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el || loading || failed || typeof IntersectionObserver === "undefined") return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) load.current()
+    }, { rootMargin: "800px 0px" })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loading, failed])
+  return (
+    <div ref={ref} className="flex min-h-10 items-center justify-center text-footnote text-ink-secondary">
+      {failed ? (
+        <span role="alert">
+          More didn't load.{" "}
+          <button type="button" onClick={onLoad} className="cursor-pointer font-semibold text-link hover:underline">Try again</button>
+        </span>
+      ) : loading ? (
+        <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />Loading more</span>
+      ) : null}
+    </div>
   )
 }
 
