@@ -161,6 +161,7 @@ HANDLERS = {
     "fetch_page": _fetch_page,
     "save_opportunity": opportunity_tools.handle_save_opportunity,
     "reject_candidate": opportunity_tools.handle_reject_candidate,
+    "queue_pages": opportunity_tools.handle_queue_pages,
 }
 
 #: Safe to run concurrently: they never touch the (not concurrency-safe) DB session.

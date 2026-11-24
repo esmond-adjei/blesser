@@ -130,3 +130,6 @@ def _no_live_crawls(monkeypatch):
 
     monkeypatch.setattr(settings, "crawl_hours", 0)
     monkeypatch.setattr(settings, "crawl_max_candidates_per_task", 0)
+    # No live seed searches; agent tests drive the reading agent unless they opt in.
+    monkeypatch.setattr(settings, "seed_when_pool_below", 0)
+    monkeypatch.setattr(settings, "scan_agent_mode", "reader")

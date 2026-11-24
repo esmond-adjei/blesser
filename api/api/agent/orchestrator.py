@@ -281,7 +281,9 @@ async def run_agent_task(
         )
         # Request order keeps the trace and replayed history deterministic.
         for tool_use, result in zip(response.tool_calls, results, strict=True):
-            if tool_use.name == "save_opportunity" and result.get("created"):
+            if (tool_use.name == "save_opportunity" and result.get("created")) or (
+                tool_use.name == "queue_pages" and result.get("queued")
+            ):
                 last_save_turn = turn + 1
             elif tool_use.name == "fetch_page" and last_save_turn is None:
                 last_save_turn = turn

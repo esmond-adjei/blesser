@@ -312,6 +312,33 @@ async def handle_save_opportunity(
     }
 
 
+async def handle_queue_pages(tool_input: dict, ctx: ToolContext) -> dict:
+    from api.agent.tools.dispatch import unreadable_host
+    from api.opportunities.triage import is_social_host
+
+    queued, skipped = 0, []
+    room = settings.planner_max_picks - len(ctx.picked)
+    for page in (tool_input.get("pages") or [])[:10]:
+        url = str(page.get("url") or "").strip()
+        key = url_key(url) if url.startswith(("http://", "https://")) else ""
+        if not key or unreadable_host(url) or is_social_host(url):
+            skipped.append(f"{url}: not a page to read")
+        elif key in ctx.known_pages or any(p["url"] == key for p in ctx.picked):
+            skipped.append(f"{url}: known")
+        elif queued >= room:
+            skipped.append(f"{url}: queue full")
+        else:
+            ctx.picked.append({"url": key, "title": str(page.get("title") or "")[:300]})
+            ctx.known_pages[key] = f"{url} | queued"
+            queued += 1
+    result = {"queued": queued, "total_queued": len(ctx.picked)}
+    if skipped:
+        result["skipped"] = skipped
+    if len(ctx.picked) >= settings.planner_max_picks:
+        result["note"] = "The queue is full. Finish now."
+    return result
+
+
 async def handle_reject_candidate(tool_input: dict, ctx: ToolContext) -> dict:
     url = tool_input.get("url", "")
     if url_key(url) not in ctx.fetched_pages:

@@ -2,6 +2,31 @@
 
 TOOL_DEFINITIONS = [
     {
+        "name": "queue_pages",
+        "description": (
+            "Queue pages from search results that look like one specific, open "
+            "opportunity. Each is read, checked and saved for you."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pages": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "title": {"type": "string"},
+                        },
+                        "required": ["url"],
+                    },
+                }
+            },
+            "required": ["pages"],
+        },
+    },
+    {
         "name": "search_web",
         "description": (
             "Search the web for opportunity pages: funders, programmes, calls, "

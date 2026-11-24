@@ -471,3 +471,121 @@ def test_open_calls_the_agent_read_but_left_unsaved_are_extracted(monkeypatch):
             await session.commit()
 
     run(check())
+
+
+def test_the_planner_queues_search_results_for_the_pipeline(monkeypatch):
+    from api import web
+    from api.core.config import settings
+
+    monkeypatch.setattr(settings, "scan_agent_mode", "planner")
+    tag = _token()
+    fresh = f"https://{tag}.example/fellowship-2027"
+    script = Script(
+        [
+            [("search_web", {"query": "fellowships Ghana 2027"})],
+            [
+                (
+                    "queue_pages",
+                    {
+                        "pages": [
+                            {"url": fresh, "title": "Fellowship 2027"},
+                            {"url": "KNOWN"},
+                            {"url": "https://twitter.com/x/status/1"},
+                        ]
+                    },
+                )
+            ],
+        ]
+    )
+    offered = []
+
+    async def chat(**kwargs):
+        offered.append({t["name"] for t in kwargs.get("tools") or []})
+        return await Script.chat(script, **kwargs)
+
+    script.chat = chat
+    monkeypatch.setattr(orchestrator, "get_provider", script)
+
+    async def search(query, max_results=8):
+        return [{"url": fresh, "title": "Fellowship 2027", "snippet": "Apply"}]
+
+    monkeypatch.setattr(web, "search_web", search)
+    handed = []
+
+    async def fake_pipeline(session, task, scan, category, on_event=None, urls=None):
+        handed.append(urls)
+        return {}
+
+    async def no_crawler(session):
+        return False
+
+    monkeypatch.setattr(opp_tasks, "run_pipeline", fake_pipeline)
+    monkeypatch.setattr(opp_tasks, "_crawler_runs_in_member_scans", no_crawler)
+
+    async def check():
+        async with SessionLocal() as session:
+            listing = await _listing(session, f"Volta {tag} Grant")
+            await session.commit()
+            script.turns[1][0][1]["pages"][1]["url"] = listing.source_url
+            scan = await scans.start_scan(
+                session, TEST_USER_ID, categories=["research"], kind="member"
+            )
+            task = await queue.claim_next_task(session, scan_id=scan.id)
+            await queue.process_claimed(session, task)
+            assert task.status.value == "done", task.error
+            assert offered[0] == {"search_web", "queue_pages"}
+            result = script.messages[2][-1]["content"]
+            assert '"queued": 1' in result and "known" in result
+            assert handed == [[opp_tools.url_key(fresh)]]
+            assert task.metrics["picked_count"] == 1
+            row = (
+                await session.execute(
+                    select(CrawlCandidate).where(
+                        CrawlCandidate.url == opp_tools.url_key(fresh)
+                    )
+                )
+            ).scalar_one()
+            assert row.reason == "agent_pick" and row.category_hints == ["research"]
+            await session.delete(row)
+            await session.commit()
+
+    run(check())
+
+
+def test_a_thin_region_is_seeded_from_fixed_searches(monkeypatch):
+    from api import web
+    from api.core.config import settings
+    from api.opportunities import pipeline
+
+    monkeypatch.setattr(settings, "seed_when_pool_below", 10_000)
+    tag = _token()
+    queries = []
+
+    async def search(query, max_results=8):
+        queries.append(query)
+        return [
+            {"url": f"https://{tag}.example/{len(queries)}/scholarship", "title": "Scholarship 2027"},
+            {"url": f"https://{tag}.example/{len(queries)}/about", "title": "About us"},
+            {"url": f"https://{tag}.example/{len(queries)}/kenya-award", "title": "Award for Kenyans"},
+        ]
+
+    monkeypatch.setattr(web, "search_web", search)
+
+    async def check():
+        async with SessionLocal() as session:
+            seeded = await pipeline.seed_region(session, "student", "Ghana")
+            assert len(queries) == 3 and any("site:.gh" in q for q in queries)
+            assert seeded == [
+                f"https://{tag}.example/{n}/scholarship" for n in (1, 2, 3)
+            ]
+            rows = (
+                await session.execute(
+                    select(CrawlCandidate).where(CrawlCandidate.url.in_(seeded))
+                )
+            ).scalars().all()
+            assert {r.reason for r in rows} == {"seed"}
+            for row in rows:
+                await session.delete(row)
+            await session.commit()
+
+    run(check())

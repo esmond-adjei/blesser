@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     extraction_min_confidence: float = 0.85
     discovery_no_yield_turns: int = 5
     reverify_max_turns: int = 8
+    # "planner": the scan agent only searches and queues pages; the pipeline reads them.
+    scan_agent_mode: str = "planner"
+    planner_max_picks: int = 12
+    # Below this many claimable candidates, a scan seeds its region with fixed searches.
+    seed_when_pool_below: int = 10
     # Jev screens crawler pages before extraction; it skips a page only when this sure.
     typesafe_api_key: str = ""
     typesafe_model: str = "jev-1.13.0"

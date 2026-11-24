@@ -33,6 +33,7 @@ from api.opportunities.page_content import normalized_url, shows_open_cycle
 from api.opportunities.screening import screen_page
 from api.opportunities.tools import _scan_created, handle_save_opportunity, record_fetch
 from api.opportunities.triage import (
+    duplicate_url,
     is_listing,
     local_domains,
     names_other_country,
@@ -184,12 +185,117 @@ async def follow_aggregator(ctx, page, data, hosts, metrics: dict):
     return data.model_copy(update=changes), {"found_via": page.url}
 
 
-async def hand_off(session, pages: list[str], category: str) -> list[str]:
-    """Candidates for the pages the agent read that look like one open call: a stated
-    deadline ahead or rolling, and not a hub (hubs are crawled as sources on trial)."""
+#: Fixed searches that refill a thin region without a model, by category.
+SEED_QUERIES = {
+    "student": (
+        "scholarships for {region} students {year} apply",
+        "fully funded masters scholarships {year} {region} eligible",
+        "site:.{cc} scholarship {year}",
+    ),
+    "research": (
+        "call for proposals {year} researchers {region}",
+        "research grants {year} {region} eligible apply",
+        "site:.{cc} call for proposals {year}",
+    ),
+    "startup": (
+        "startup accelerator {year} applications open {region}",
+        "grants for entrepreneurs {region} {year}",
+        "site:.{cc} entrepreneurs programme {year}",
+    ),
+}
+
+
+async def claimable(session, category: str, region: str) -> int:
+    now = utcnow_naive()
+    return (
+        await session.execute(
+            select(func.count())
+            .select_from(CrawlCandidate)
+            .where(
+                CrawlCandidate.status == "new",
+                CrawlCandidate.reason != "region_excluded:" + region.strip().casefold(),
+                or_(
+                    CrawlCandidate.claimed_until.is_(None),
+                    CrawlCandidate.claimed_until < now,
+                ),
+                or_(
+                    cast(CrawlCandidate.category_hints, JSONB) == [],
+                    cast(CrawlCandidate.category_hints, JSONB).contains([category]),
+                ),
+            )
+        )
+    ).scalar_one()
+
+
+async def seed_region(session, category: str, region: str) -> list[str]:
+    """Run the category's fixed searches for a region and record the results that
+    look like opportunities as candidates."""
+    from api import web
+    from api.agent.tools.dispatch import unreadable_host
+    from api.opportunities.crawler import _LEAD_WORDS
+    from api.opportunities.triage import is_social_host
+
+    domains = local_domains(region)
+    year = service.today().year
+    urls: list[str] = []
+    for template in SEED_QUERIES.get(category, ()):
+        if "{cc}" in template and not domains:
+            continue
+        query = template.format(
+            region=region, year=year, cc=domains[0] if domains else ""
+        )
+        try:
+            results = await web.search_web(query)
+        except web.SearchUnavailable:
+            break
+        for result in results:
+            url = str(result.get("url") or "")
+            words = f"{result.get('title', '')} {url}".lower()
+            if (
+                not url.startswith(("http://", "https://"))
+                or unreadable_host(url)
+                or is_social_host(url)
+                or not any(w in words for w in _LEAD_WORDS)
+                or names_other_country(words, region)
+                or await duplicate_url(session, url)
+            ):
+                continue
+            await record_candidate(
+                session,
+                url,
+                category_hints=[category],
+                title=str(result.get("title") or ""),
+                reason="seed",
+            )
+            urls.append(normalized_url(url))
+    await session.commit()
+    return list(dict.fromkeys(urls))
+
+
+async def hand_off(
+    session,
+    pages: list[str],
+    category: str,
+    *,
+    picked: list[dict] | None = None,
+    seeded: list[str] | None = None,
+) -> list[str]:
+    """Candidates for this task to extract: pages the agent queued, seeds, then pages it
+    read that look like one open call (a stated deadline ahead or rolling, and not a
+    hub; hubs are crawled as sources on trial)."""
     from api.opportunities.crawl_models import PageCache
 
     urls: list[str] = []
+    for page in picked or []:
+        await record_candidate(
+            session,
+            page["url"],
+            category_hints=[category],
+            title=page.get("title", ""),
+            reason="agent_pick",
+        )
+        urls.append(normalized_url(page["url"]))
+    urls += seeded or []
     for url in pages:
         row = await session.get(PageCache, normalized_url(url))
         if row is None or row.error:

@@ -30,6 +30,8 @@ class ToolContext:
         self.page_links: dict[str, set[str]] = {}
         # Pages read in full; the ones left unsaved are extracted after the agent stops.
         self.read_pages: list[str] = []
+        # Pages queued from search results, extracted by the pipeline after the agent.
+        self.picked: list[dict] = []
         self.fetch_locks: dict = {}
         self.saved_titles: list[str] = []
         self.category: str = "startup"

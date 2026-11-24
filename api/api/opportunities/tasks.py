@@ -12,6 +12,7 @@ from api.opportunities.pipeline import run_pipeline
 from api.opportunities.prompts import (
     CATEGORY_BRIEFS,
     DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
+    PLANNER_SYSTEM_PROMPT,
 )
 
 
@@ -32,6 +33,7 @@ def user_message(
     sources_only: bool = False,
     repeat: bool = False,
     kinds: list[str] | None = None,
+    planner: bool = False,
 ) -> str:
     focus = (focus or "").strip()
     sites = sites or []
@@ -85,9 +87,14 @@ def user_message(
             if repeat
             else ""
         )
-        + f"\nBudget: save at most {settings.max_opportunities_per_task} opportunities in "
-        f"this task. Save each one as soon as it is verified, then stop and summarize "
-        f"what you saved and what you skipped."
+        + (
+            f"\nBudget: queue at most {settings.planner_max_picks} pages, then stop "
+            "and summarize what you queued."
+            if planner
+            else f"\nBudget: save at most {settings.max_opportunities_per_task} "
+            "opportunities in this task. Save each one as soon as it is verified, then "
+            "stop and summarize what you saved and what you skipped."
+        )
     )
 
 
@@ -117,6 +124,19 @@ async def run_discover_opportunities(
         task.metrics = {**(task.metrics or {}), "pipeline_complete": True}
         await session.commit()
     result = (task.metrics or {}).get("agent_result")
+    if result is None and "seeded" not in (task.metrics or {}):
+        from api.opportunities.pipeline import claimable, seed_region
+
+        region = (scan.region or "").strip() or settings.opportunity_default_region
+        seeded = (
+            await seed_region(session, category, region)
+            if scan.kind != "sources"
+            and await claimable(session, category, region)
+            < settings.seed_when_pool_below
+            else []
+        )
+        task.metrics = {**(task.metrics or {}), "seeded": seeded}
+        await session.commit()
     if result is None:
         result = await _run_agent(
             session,
@@ -127,27 +147,39 @@ async def run_discover_opportunities(
             on_event=on_event,
             resume_messages=resume_messages,
             on_checkpoint=on_checkpoint,
+            seeded=(task.metrics or {}).get("seeded") or [],
         )
         task.metrics = {
             **(task.metrics or {}),
             "agent_result": result,
             "agent_read": result.pop("read_pages", []),
+            "agent_picked": result.pop("picked", []),
         }
         task.messages_json = None
         await session.commit()
-    if read := (task.metrics or {}).get("agent_read"):
+    handover = ("agent_read", "agent_picked", "seeded")
+    if any((task.metrics or {}).get(k) for k in handover):
         from api.opportunities.pipeline import hand_off
 
+        metrics = task.metrics or {}
         await run_pipeline(
             session,
             task,
             scan,
             category,
             on_event,
-            urls=await hand_off(session, read, category),
+            urls=await hand_off(
+                session,
+                metrics.get("agent_read") or [],
+                category,
+                picked=metrics.get("agent_picked") or [],
+                seeded=metrics.get("seeded") or [],
+            ),
         )
         task.metrics = {
-            k: v for k, v in (task.metrics or {}).items() if k != "agent_read"
+            **{k: v for k, v in (task.metrics or {}).items() if k not in handover},
+            "seeded_count": len(metrics.get("seeded") or []),
+            "picked_count": len(metrics.get("agent_picked") or []),
         }
         await session.commit()
     if (
@@ -200,12 +232,14 @@ async def _run_agent(
     on_event=None,
     resume_messages=None,
     on_checkpoint=None,
+    seeded: list[str] = (),
 ) -> dict:
     from api.opportunities.tools import _scan_created, url_key
 
     region = (scan.region or "").strip() or settings.opportunity_default_region
     sites = list(scan.sites or []) if member else []
     sources_only = scan.kind == "sources"
+    planner = settings.scan_agent_mode == "planner"
     message = user_message(
         region=region,
         category=category,
@@ -216,6 +250,7 @@ async def _run_agent(
         sources_only=sources_only,
         repeat=bool(scan.schedule_id) and scan.kind != "member",
         kinds=list(scan.kinds or []),
+        planner=planner,
     )
     ctx = ToolContext(session=session, run=scan)
     ctx.category = category
@@ -274,11 +309,16 @@ async def _run_agent(
             "final_text": "Saved: None\nSkipped: Save budget reached.",
             "turns": 0,
         }
-    tools = ["fetch_page", "save_opportunity", "reject_candidate"]
+    for url in seeded:
+        ctx.known_pages.setdefault(url, f"{url} | queued")
+    if planner:
+        tools = (["fetch_page"] if sites else []) + ["queue_pages"]
+    else:
+        tools = ["fetch_page", "save_opportunity", "reject_candidate"]
     if not sources_only:
         tools.insert(0, "search_web")
     result = await run_agent_task(
-        DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
+        PLANNER_SYSTEM_PROMPT if planner else DISCOVER_OPPORTUNITIES_SYSTEM_PROMPT,
         message,
         ctx,
         on_event=on_event,
@@ -293,6 +333,7 @@ async def _run_agent(
         "final_text": result["final_text"],
         "turns": result.get("turns"),
         "read_pages": ctx.read_pages,
+        "picked": ctx.picked,
     }
 
 
