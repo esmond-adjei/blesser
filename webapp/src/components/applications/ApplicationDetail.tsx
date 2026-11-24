@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Link } from "react-router-dom"
 import { ApplicationStatus, Button, Field, Input, Textarea, cn, type ApplicationStage } from "@blesser/ui"
 import { useApplicationMutations } from "../../lib/applications"
 import { useTodos } from "../../lib/opportunities"
@@ -21,6 +22,14 @@ export function ApplicationDetail({ app }: { app: Application }) {
 
   return (
     <div className="space-y-4">
+      {app.opportunity_id ? (
+        <Link
+          to={`/opportunities/${encodeURIComponent(app.opportunity_id)}`}
+          className="inline-flex w-fit items-center text-callout font-medium text-link hover:underline"
+        >
+          Open opportunity
+        </Link>
+      ) : null}
       <ApplicationStatus status={stage(app.status)} />
       {app.benefits ? <p className="text-callout font-semibold text-ink">{app.benefits}</p> : null}
       <Field label="Deadline">
