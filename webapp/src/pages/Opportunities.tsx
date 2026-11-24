@@ -365,7 +365,7 @@ export function Opportunities() {
           {sections.map((section, si) => (
             <section key={section.key} aria-label={section.title || "Opportunities"}>
               {section.title ? (
-                <h2 style={{ top: barHeight }} className="sticky z-10 -mx-3 mb-5 bg-canvas px-3 pt-3 pb-2 sm:-mx-6 sm:px-6 text-footnote font-semibold text-ink-secondary after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:bg-linear-to-b after:from-canvas after:to-transparent after:content-[''] after:h-5">
+                <h2 style={{ top: barHeight }} className="sticky z-10 -mx-3 mb-8 bg-canvas px-3 pt-3 pb-2 sm:-mx-6 sm:px-6 text-footnote font-semibold text-ink-secondary after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:bg-linear-to-b after:from-canvas after:to-transparent after:content-[''] after:h-5">
                   {section.title}
                 </h2>
               ) : null}
